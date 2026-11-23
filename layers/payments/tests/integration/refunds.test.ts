@@ -115,6 +115,10 @@ describe('own-refund-not-approved', () => {
     const asked = await commit(unit => requestRefund(unit.view(), { partId: paid.ticketsPart, amountMinor: 300, requestedBy: 'acc_alice' }))
     expect(asked.state).toBe('requested')
     await expect(commit(unit => approveRefund(unit.view(), asked.refundId, 'acc_alice'))).rejects.toMatchObject({ code: 'payments.refund.own' })
+    // Needs attention lists a refund that waits, but only to someone who may approve it.
+    const waitingFor = async (abilities: string[]) => ((await (await call(handle, 'GET', '/api/payments/attention', { actor: person(abilities) })).json()) as { waitingRefunds: { id: string, amountMinor: number }[] }).waitingRefunds
+    expect(await waitingFor(['payments.attempt.reconcile', 'payments.refund.approve'])).toContainEqual(expect.objectContaining({ id: asked.refundId, amountMinor: 300 }))
+    expect(await waitingFor(['payments.attempt.reconcile'])).toEqual([])
     // The CHECK is the backstop.
     await expect(env.DB.prepare("UPDATE payments_refunds SET state = 'approved', approved_by = requested_by WHERE id = ?").bind(asked.refundId).run()).rejects.toThrow(/two_people|CHECK/)
     await setLimit(500)

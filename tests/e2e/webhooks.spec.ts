@@ -17,14 +17,16 @@ const noViolations = async (page: Page) => {
 test.describe('someone who looks after webhooks', () => {
   test.use(as(['core.webhook.manage']))
 
-  test('finds Webhooks in Admin, with its settings', async ({ page }) => {
+  test('finds Webhooks in Admin as the list alone, with its delivery limits on Advanced', async ({ page }) => {
     await visit(page, '/admin')
     const nav = page.getByRole('navigation', { name: 'Admin', exact: true })
     await nav.getByRole('link', { name: 'Webhooks' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Webhooks' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Webhook settings' })).toBeVisible()
-    await expect(page.getByText('Failures before a webhook is paused')).toBeVisible()
+    await expect(page.getByText('Failures before a webhook is paused')).toHaveCount(0)
     await noViolations(page)
+    await page.getByRole('link', { name: 'Delivery limits' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Advanced' })).toBeVisible()
+    await expect(page.getByText('Failures before a webhook is paused')).toBeVisible()
   })
 
   test('adds one, sees the secret once, and pauses it', async ({ page }) => {

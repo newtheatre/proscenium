@@ -15,11 +15,11 @@ The wireframes show layout and wording, not visual design; workstream 6 owns the
 | Screen | Route | What it does | Release |
 | --- | --- | --- | --- |
 | Booking action | part of the core's show and performance pages | The contribution to `core.booking-action`, one per performance, in the core's five states (part 4) | First |
-| Choose tickets | `/book/<production>/<performance>` | Ticket types with steppers, what is left, promo code, access needs. Pressing Hold tickets runs the claim batch and starts the hold | First |
+| Choose tickets | `/book/<production>/<performance>` | Ticket rows with steppers first, then any pass on offer, then one line, "Have a pass or a promo code?", that opens the pass and promo code boxes. The button, "Continue with N tickets, total", can always be pressed and says what is missing; pressing it runs the claim batch and starts the hold. Check and pay then follows on the same address, under a marker of the two steps, exactly as in the booking drawer (Matt, 21 November 2026) | First |
 | Choose seats | `/book/<production>/<performance>/seats` | "Best available" first, then the seat map, for allocated performances | Allocated-seating phase |
-| Check and pay | `/book/basket` | One address shown as short steps on a phone: basket, details, pay or reserve. Countdown, lines, fee, total, contact details | First |
+| Check and pay | second step of `/book/<production>/<performance>` and of the drawer; `/book/basket` | Countdown, lines, total, contact details, pay or reserve. `/book/basket` is no longer a step of its own: it is where a card payment on the provider's page comes back to, and where "Tickets held" in the public header leads while a basket is held | First |
 | Paying | provider's page or embedded form | Card entry belongs to the provider; the platform never sees a card number | First |
-| Check your email | `/book/confirm/<token>` | For a reservation by a buyer who is not signed in, when `box-office.reservations.confirm-email` is on | First |
+| Check your email | `/book/confirm/<token>` | For a reservation by a buyer who is not signed in, when `box-office.reservations.confirm-email` is on (it ships off). The page says the show, the tickets, the amount, the address and until when they are held, above the button | First |
 | Booked, or Reserved | `/book/done/<token>` | Reference, tickets or the desk code and amount due, calendar link, manage link | First |
 | Payment did not complete | `/book/problem/<token>` | Says plainly what happened: declined (try again, seats still held), or still checking (we will tell you) | First |
 | Manage booking | `/book/order/<token>` | View tickets, reissue, cancel a reservation; cancel or exchange paid tickets where the theatre allows | First |
@@ -54,8 +54,9 @@ What the three screens must get right:
 | Orders | `/console/box-office/orders` | `box-office.order.view`; export needs `box-office.order.export` | Search by name, email or reference; filter by show, performance, state and how it was sold | First |
 | Order | `/console/box-office/orders/<id>` | `box-office.order.view` | Lines, tickets, payments, refunds, history; actions to resend, reissue, cancel, exchange, refund, each under its own ability | First |
 | Door list | `/console/box-office/door-list/<performance>` | `box-office.ticket.admit` | Everyone expected, with admitted state and that an access note exists; printable. The fallback when the door has no connection | First |
-| Performances | `/console/box-office/performances` | `box-office.performance.manage` | Every performance with its sale state, sold and free | First |
-| Performance set-up | `/console/box-office/performances/<id>` | `box-office.performance.manage` | Bands and capacity, prices, on-sale window, limits, holds; a checklist of what blocks going on sale | First |
+| Ticket set-up | `/console/box-office/performances` | `box-office.performance.manage` | Productions with performances to come, each opening its run's tickets, with its nights beneath: sale state, sold and free | First |
+| The run's tickets | `/console/box-office/performances/run/<production>`, and the Tickets tab on the production's page | `box-office.performance.manage` | The one place a run's tickets are set up (Matt, 21 November 2026): seats, sections, prices now or from a later date, wheelchair spaces, the run put on sale, and each night with where it stands | First |
+| Performance set-up | `/console/box-office/performances/<id>` | `box-office.performance.manage` | This night only: on sale or paused, a checklist of what blocks going on sale, the on-sale window, the limits (each showing the theatre's value until given its own), and one folded card for where the night differs from the run: its seats, prices and wheelchair spaces. One Save for the page, with one Undo. No copying from another performance and no run-wide prices here | First |
 | Staff holds | within Performance set-up | `box-office.hold.manage` | Hold, label, release, sell from a hold | First |
 | Waiting list | within Performance set-up | `box-office.waitlist.manage` | The queue, offers out, make an offer by hand | First |
 | Ticket types and prices | `/console/box-office/pricing` | `box-office.pricing.manage` | Ticket types site-wide; a price grid per production | First |
@@ -64,7 +65,7 @@ What the three screens must get right:
 | Passes | `/console/box-office/passes` | `box-office.pass.manage` | Pass types and passes issued | Later |
 | Seating plans | `/console/box-office/plans` | `box-office.plan.manage` | Draw and publish a plan | Allocated-seating phase |
 | Sales report | `/console/box-office/reports/sales` | `box-office.report.view`; export needs `box-office.report.export` | By performance, ticket type and channel | First |
-| Bulk cancellation | `/console/box-office/performances/<id>/change`, reached from the link in the change guard's refusal | `box-office.performance.manage` | Shows the tickets and money affected and records the decision the core's cancel, reschedule or move then runs: refund all, offer exchange, or keep | First |
+| What happens to the bookings | No page of its own: asked inside Programme's cancel, reschedule and move windows, which post the answer to `POST /api/box-office/performances/<id>/change` (Matt, 21 November 2026) | `box-office.performance.manage` | The window shows the tickets and money affected and asks: refund all, offer exchange, or keep (never for a cancellation). The answer is recorded and the change made in one step | First |
 
 ![desk sale wireframe · 1 tablet screen](images/06-w2-desk-sale-wireframe.png)
 
@@ -105,15 +106,15 @@ What the door must get right:
 | --- | --- | --- | --- | --- |
 | My session | `/console/payments/session` | `payments.session.open` | Open with a float; cash up with a count; variance reason | First |
 | Sessions | `/console/payments/sessions` | `payments.session.view` | Every session, expected against counted | First |
-| Needs attention | `/console/payments/attention` | `payments.attempt.reconcile` | Attempts with no answer, unfulfilled payments, failed refunds | First |
+| Needs attention | `/console/payments/attention` | `payments.attempt.reconcile` | Attempts with no answer, unfulfilled payments, failed refunds, and (for someone who may approve them) refunds waiting for approval | First |
 | Refunds | `/console/payments/refunds` | `payments.refund.approve` | Requests waiting, with who asked and why | First |
 | Providers and readers | `/console/payments/providers` | `payments.provider.manage` | Add a provider, pair a reader, test mode, health | First |
 | Ledger | `/console/finance/ledger` | `finance.ledger.view` | Postings with their entries; filter by account, production, performance, period; every row links to its source | First |
 | Accounts | `/console/finance/accounts` | `finance.account.manage` | Chart of accounts; rename and recode | First |
 | Periods | `/console/finance/periods` | `finance.period.close` | The close checklist, close, reopen with a reason | First |
 | Production statement | `/console/finance/productions/<id>` | `finance.ledger.view` on that production | Income, fees and refunds for one production, for a visiting company's settlement | First |
-| Reconciliation | `/console/finance/reconcile` | `finance.ledger.view` | Clearing account balance against provider payouts | First: totals. Later: line matching |
-| Export | `/console/finance/export` | `finance.ledger.export` | CSV of postings for an accounting package | First |
+| Reconciliation | `/console/finance/reconcile` | `finance.ledger.view` | Clearing account balance against provider payouts, the latest payouts entered, and Record a payout for someone with `payments.provider.manage` | First: totals. Later: line matching |
+| Export | on the Ledger (`/console/finance/ledger?export=1`; the old address redirects) | `finance.ledger.export` | CSV of postings for an accounting package, from an Export button on the Ledger | First |
 
 ## States every screen has
 

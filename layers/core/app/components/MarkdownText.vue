@@ -40,7 +40,7 @@ function renderInline(nodes: Inline[], tel = true): (VNode | string)[] {
 }
 function block(b: Block): VNode {
   if (b.type === 'heading') return h(`h${b.level}`, { class: b.level === 3 ? 'text-base font-semibold text-highlighted' : 'font-medium text-highlighted' }, renderInline(b.children))
-  if (b.type === 'list') return h(b.ordered ? 'ol' : 'ul', { class: ['space-y-1 ps-5', b.ordered ? 'list-decimal' : 'list-disc'] }, b.items.map(item => h('li', renderInline(item))))
+  if (b.type === 'list') return h(b.ordered ? 'ol' : 'ul', { class: ['space-y-1', b.ordered ? 'list-decimal ps-[1.75em]' : 'list-disc ps-[1.25em]'] }, b.items.map(item => h('li', renderInline(item))))
   return h('p', renderInline(b.children))
 }
 const InlineText = () => blocks.value.flatMap((b, i) => [...(i ? [' '] : []), ...(b.type === 'list' ? b.items.flatMap((item, j) => [...(j ? [' · '] : []), ...renderInline(item)]) : renderInline(b.children))])

@@ -4,6 +4,7 @@
 <script setup lang="ts">
 interface Period { id: string, label: string, startsOn: string, endsOn: string, closed: boolean, debitsMinor: number, creditsMinor: number }
 interface Blocker { sentence: string, to?: string, module: string }
+interface Held { accountId: string, code: string, name: string, currency: string, amountMinor: number }
 interface Movement { accountId: string, code: string, name: string, kind: 'income' | 'expense', currency: string, amountMinor: number }
 
 const { t } = useT()
@@ -14,12 +15,16 @@ const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const id = computed(() => String(route.params.id))
-const { data, status, error, refresh } = await useAPI<{ period: Period, blockers: Blocker[], movement: Movement[], canClose: boolean, canReopen: boolean }>(() => `/api/finance/periods/${id.value}`, { key: `finance:period:${id.value}` })
+const { data, status, error, refresh } = await useAPI<{ period: Period, blockers: Blocker[], movement: Movement[], held?: Held[], ended?: boolean, closableFrom?: string, canClose: boolean, canReopen: boolean }>(() => `/api/finance/periods/${id.value}`, { key: `finance:period:${id.value}` })
 const { dayLong: dateOf } = useDates()
 
 // The chart is in the theatre's own currency; anything in another stays in the list beneath it.
 const moved = computed(() => (data.value?.movement ?? []).filter(m => m.currency === currency.value))
 const bars = computed(() => moved.value.map(m => ({ account: m.name, income: m.kind === 'income' ? m.amountMinor : 0, expense: m.kind === 'expense' ? m.amountMinor : 0 })))
+// Money taken in the period that is not income yet, in the theatre's own currency.
+const held = computed(() => (data.value?.held ?? []).filter(h => h.currency === currency.value))
+// A period still running is early, not blocked.
+const running = computed(() => !!data.value && !data.value.period.closed && data.value.ended === false)
 const total = (kind: Movement['kind']) => moved.value.filter(m => m.kind === kind).reduce((sum, m) => sum + m.amountMinor, 0)
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
@@ -93,7 +98,7 @@ async function reopen() {
       #primary
     >
       <UButton
-        v-if="!data.period.closed && data.canClose"
+        v-if="!data.period.closed && data.canClose && !running"
         :label="t('finance.screens.period.close-button')"
         icon="i-lucide-lock"
         :disabled="data.blockers.length > 0"
@@ -124,49 +129,32 @@ async function reopen() {
           <FactStrip
             :facts="[
               { label: t('finance.screens.period.dates'), value: t('finance.screens.periods.range', { from: dateOf(loaded.period.startsOn), to: dateOf(loaded.period.endsOn) }), strong: false },
-              { label: t('finance.screens.period.debits'), value: money(loaded.period.debitsMinor) },
-              { label: t('finance.screens.period.credits'), value: money(loaded.period.creditsMinor) },
+              { label: t('finance.screens.period.income'), value: money(total('income')) },
+              { label: t('finance.screens.period.expenses'), value: money(total('expense')) },
             ]"
           />
-          <ULink
-            :to="{ path: '/console/finance/ledger', query: { periodId: loaded.period.id } }"
-            class="inline-flex items-center gap-1.5"
-          >
-            <UIcon name="i-lucide-book-open" />
-            {{ t('finance.screens.period.postings') }}
-          </ULink>
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+            <span :title="t('finance.screens.period.posted-help')">{{ t('finance.screens.periods.moved', { amount: money(loaded.period.debitsMinor) }) }}</span>
+            <UButton
+              :to="{ path: '/console/finance/ledger', query: { period: loaded.period.id } }"
+              :label="t('finance.screens.period.postings')"
+              icon="i-lucide-book-open"
+              color="neutral"
+              variant="link"
+              class="px-0"
+            />
+          </div>
 
+          <UAlert
+            v-if="running && loaded.closableFrom"
+            color="neutral"
+            variant="subtle"
+            icon="i-lucide-calendar-clock"
+            :title="t('finance.screens.period.running', { day: dateOf(loaded.closableFrom) })"
+            :description="t('finance.screens.period.running-help')"
+          />
           <PageSection
-            v-if="loaded.movement.length"
-            :title="t('finance.screens.period.movement')"
-            :description="t('finance.screens.period.movement-help')"
-          >
-            <div class="space-y-4">
-              <ChartFigure
-                v-if="bars.length > 1"
-                :title="t('finance.screens.period.movement-chart')"
-                :summary="t('finance.screens.period.movement-summary', { income: money(total('income')), expense: money(total('expense')) })"
-                :data="bars"
-                index="account"
-                :categories="[{ key: 'income', label: t('finance.screens.accounts.kinds.income') }, { key: 'expense', label: t('finance.screens.accounts.kinds.expense') }]"
-                :format="(value: number) => money(value)"
-                stacked
-              />
-              <RecordList>
-                <RecordListItem
-                  v-for="m in loaded.movement"
-                  :key="`${m.accountId}:${m.currency}`"
-                  :name="m.name"
-                  :description="`${m.code} · ${t(`finance.screens.accounts.kinds.${m.kind}`)}`"
-                >
-                  <span class="font-medium tabular-nums">{{ money(m.amountMinor, m.currency) }}</span>
-                </RecordListItem>
-              </RecordList>
-            </div>
-          </PageSection>
-
-          <PageSection
-            v-if="!loaded.period.closed"
+            v-else-if="!loaded.period.closed"
             :title="t('finance.screens.period.checklist')"
             :description="t('finance.screens.period.checklist-help')"
           >
@@ -203,6 +191,52 @@ async function reopen() {
                 <span v-else>{{ b.sentence }}</span>
               </li>
             </ul>
+          </PageSection>
+
+          <PageSection
+            v-if="held.length"
+            :title="t('finance.screens.period.held')"
+            :description="t('finance.screens.period.held-help')"
+          >
+            <RecordList :label="t('finance.screens.period.held')">
+              <RecordListItem
+                v-for="h in held"
+                :key="h.accountId"
+                :name="h.name"
+                :description="h.code"
+              >
+                <span class="font-medium tabular-nums">{{ money(h.amountMinor, h.currency) }}</span>
+              </RecordListItem>
+            </RecordList>
+          </PageSection>
+
+          <PageSection
+            v-if="loaded.movement.length"
+            :title="t('finance.screens.period.movement')"
+            :description="t('finance.screens.period.movement-help')"
+          >
+            <div class="space-y-4">
+              <ChartFigure
+                v-if="bars.length > 1"
+                :title="t('finance.screens.period.movement-chart')"
+                :summary="t('finance.screens.period.movement-summary', { income: money(total('income')), expense: money(total('expense')) })"
+                :data="bars"
+                index="account"
+                :categories="[{ key: 'income', label: t('finance.screens.accounts.kinds.income') }, { key: 'expense', label: t('finance.screens.accounts.kinds.expense') }]"
+                :format="(value: number) => money(value)"
+                stacked
+              />
+              <RecordList>
+                <RecordListItem
+                  v-for="m in loaded.movement"
+                  :key="`${m.accountId}:${m.currency}`"
+                  :name="m.name"
+                  :description="`${m.code} · ${t(`finance.screens.accounts.kinds.${m.kind}`)}`"
+                >
+                  <span class="font-medium tabular-nums">{{ money(m.amountMinor, m.currency) }}</span>
+                </RecordListItem>
+              </RecordList>
+            </div>
           </PageSection>
         </div>
       </template>

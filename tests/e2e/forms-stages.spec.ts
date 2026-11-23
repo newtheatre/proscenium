@@ -73,8 +73,8 @@ test('a response moves through stages, goes back for changes and returns as a ne
   await expect(share.getByLabel('Address')).toHaveValue(/\/forms\//)
   const address = new URL(await share.getByLabel('Address').inputValue()).pathname
   const builder = new URL(page.url()).pathname
-  await share.getByRole('button', { name: 'Share the form' }).click()
-  await expect(page.getByText('The form is shared', { exact: true })).toBeVisible()
+  // Publishing for the first time shared it in the same step.
+  await expect(share.getByText('0 responses so far')).toBeVisible()
 
   // ---- a member answers ----
   const mine = await as(browser, member)
@@ -137,6 +137,7 @@ test('a response moves through stages, goes back for changes and returns as a ne
   await expect(panel).toBeHidden()
 
   // The table filters by stage, from the address.
+  await page.getByRole('button', { name: 'Filters' }).click()
   await page.getByRole('combobox').filter({ hasText: 'Any stage' }).click()
   await page.getByRole('option', { name: 'Declined' }).click()
   await expect(page.getByText('No responses match these filters')).toBeVisible()

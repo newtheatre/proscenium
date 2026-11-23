@@ -1,5 +1,5 @@
-<!-- Where an emailed link lands. The token is in the fragment, so it never reaches a server log.
-     It is used only on a press: mail scanners open links in a real browser (04-states-and-rules). -->
+<!-- Where an emailed link lands, its token in the fragment so no server log holds it. It signs in at once
+     in the browser that asked; elsewhere only on a press, as mail scanners open links (identity part 12). -->
 <script setup lang="ts">
 import type { Refusal } from '../../utils/identity'
 
@@ -11,6 +11,8 @@ useSeoMeta({ title: 'Sign in' })
 const refusal = ref<Refusal | null>(null)
 const arrived = ref<Arrived | null>(null)
 const token = ref('')
+// True while the page asks whether this is the browser that asked for the link.
+const asking = ref(false)
 
 const invitedLine = computed(() => {
   const invitation = arrived.value?.invitation
@@ -26,7 +28,16 @@ onMounted(() => {
   token.value = window.location.hash.slice(1)
   // Vue Router keeps its own data in the history state, so it is passed back rather than cleared.
   history.replaceState(history.state, '', window.location.pathname + window.location.search)
+  if (token.value) void signInHere()
 })
+
+// Spends nothing unless this browser asked for the link; a refusal here leaves the press to say why.
+async function signInHere() {
+  asking.value = true
+  const answer = await callIdentity<Arrived | { press: true }>('/api/core/sign-in/link', { token: token.value, here: true })
+  if (answer.ok && !('press' in answer.data)) return arriveSignedIn(answer.data)
+  asking.value = false
+}
 
 async function signIn() {
   refusal.value = null
@@ -71,6 +82,7 @@ async function signIn() {
       <UButton
         block
         label="Sign in"
+        :loading="asking"
         loading-auto
         @click="signIn()"
       />

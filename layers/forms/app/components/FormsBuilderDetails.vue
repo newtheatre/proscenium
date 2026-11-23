@@ -14,6 +14,16 @@ const question = computed(() => found.value && found.value.kind !== 'page' && fo
 const group = computed(() => found.value?.kind === 'item' && found.value.item.kind === 'group' ? found.value.item : null)
 const content = computed(() => found.value?.kind === 'item' && found.value.item.kind === 'content' ? found.value.item : null)
 const page = computed(() => found.value?.kind === 'page' ? found.value.page : null)
+const end = computed(() => builder.selected.value === FORMS_START ? 'start' : builder.selected.value === FORMS_END ? 'end' : null)
+const shown = computed(() => def.value.presentation ?? {})
+/** What is read before and after is part of the draft: saved like any other edit, published with the form. */
+function setShown(key: 'introduction' | 'confirmation' | 'submitLabel', value: string) {
+  const presentation = { ...shown.value, [key]: value }
+  if (!value.trim()) Reflect.deleteProperty(presentation, key)
+  const { presentation: _was, ...rest } = def.value
+  builder.apply(Object.keys(presentation).length ? { ...rest, presentation } : rest, `form:${key}`)
+}
+const advanced = ref(false)
 const before = computed(() => builder.selected.value ? earlier(def.value, builder.selected.value) : [])
 const published = computed(() => question.value ? builder.published.value.get(question.value.id) : undefined)
 
@@ -124,16 +134,31 @@ function setSource(key: string) {
 const ofPeople = computed(() => builder.sources.value.find(s => s.key === question.value?.source)?.people ?? false)
 const condition = (c: Condition | undefined) => c ? formsConditionSentence(c, def.value) : ''
 const text = (v: unknown) => String(v ?? '')
+const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-save', icon: 'i-lucide-cloud-check' }]
 </script>
 
 <template>
-  <div class="space-y-5">
-    <p
-      v-if="!found && !ending && !calculation"
-      class="text-sm text-muted"
+  <div
+    class="space-y-5"
+    data-forms-details
+  >
+    <div
+      v-if="!found && !ending && !calculation && !end"
+      class="space-y-3 text-sm text-muted"
     >
-      {{ t('forms.screens.details.nothing') }}
-    </p>
+      <p>{{ t('forms.screens.details.nothing') }}</p>
+      <p
+        v-for="tip in TIPS"
+        :key="tip.key"
+        class="flex items-start gap-2"
+      >
+        <UIcon
+          :name="tip.icon"
+          class="mt-0.5 shrink-0"
+        />
+        <span class="text-pretty">{{ t(`forms.screens.details.${tip.key}`) }}</span>
+      </p>
+    </div>
 
     <!-- A question -->
     <template v-if="question">
@@ -393,16 +418,6 @@ const text = (v: unknown) => String(v ?? '')
 
       <USeparator :label="t('forms.screens.details.data')" />
       <UFormField
-        :label="t('forms.screens.details.key')"
-        :help="t('forms.screens.details.key-help')"
-      >
-        <UInput
-          :model-value="question.key"
-          class="font-mono"
-          @update:model-value="setQ('key', text($event).toLowerCase().replace(/[^a-z\d_]/g, '_'), true)"
-        />
-      </UFormField>
-      <UFormField
         :label="t('forms.screens.details.class')"
         :help="t(`forms.classes.${question.dataClass}.help`)"
       >
@@ -412,6 +427,29 @@ const text = (v: unknown) => String(v ?? '')
           @update:model-value="setQ('dataClass', $event as Question['dataClass'])"
         />
       </UFormField>
+      <!-- What few authors need sits folded away, so the panel is the wording and the rules. -->
+      <UCollapsible v-model:open="advanced">
+        <UButton
+          color="neutral"
+          variant="link"
+          :icon="advanced ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+          :label="t('forms.screens.details.advanced')"
+          class="px-0"
+        />
+        <template #content>
+          <UFormField
+            class="pt-3"
+            :label="t('forms.screens.details.key')"
+            :help="t('forms.screens.details.key-help')"
+          >
+            <UInput
+              :model-value="question.key"
+              class="font-mono"
+              @update:model-value="setQ('key', text($event).toLowerCase().replace(/[^a-z\d_]/g, '_'), true)"
+            />
+          </UFormField>
+        </template>
+      </UCollapsible>
     </template>
 
     <!-- A repeating group -->
@@ -581,6 +619,49 @@ const text = (v: unknown) => String(v ?? '')
       :key="calculation.id"
       :calculation="calculation"
     />
+
+    <!-- Before the first page -->
+    <template v-else-if="end === 'start'">
+      <UFormField
+        :label="t('forms.screens.settings.introduction')"
+        :help="t('forms.screens.settings.introduction-help')"
+        :hint="t('forms.screens.details.optional')"
+      >
+        <UTextarea
+          :model-value="shown.introduction ?? ''"
+          :rows="4"
+          autoresize
+          @update:model-value="setShown('introduction', text($event))"
+        />
+      </UFormField>
+    </template>
+
+    <!-- After the last page -->
+    <template v-else-if="end === 'end'">
+      <UFormField
+        :label="t('forms.screens.settings.submit-label')"
+        :hint="t('forms.screens.details.optional')"
+      >
+        <UInput
+          :model-value="shown.submitLabel ?? ''"
+          maxlength="60"
+          :placeholder="t('forms.screens.fill.send')"
+          @update:model-value="setShown('submitLabel', text($event))"
+        />
+      </UFormField>
+      <UFormField
+        :label="t('forms.screens.settings.confirmation')"
+        :help="t('forms.screens.settings.confirmation-help')"
+        :hint="t('forms.screens.details.optional')"
+      >
+        <UTextarea
+          :model-value="shown.confirmation ?? ''"
+          :rows="3"
+          autoresize
+          @update:model-value="setShown('confirmation', text($event))"
+        />
+      </UFormField>
+    </template>
 
     <!-- An ending -->
     <template v-else-if="ending">

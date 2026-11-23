@@ -1,4 +1,4 @@
-// Setup, step 3: one recovery code typed back, then the Owner is written and signed in, strongly.
+// Setup, step 3: the page sends back one of the codes it showed, then the Owner is written and signed in, strongly.
 import { z } from 'zod'
 import { changeSetting, defineRoute, newId, nowMs, refuse, sealColumn, useSetting } from '#kit'
 import { normaliseOrigin, requestUrl } from '#kit/origin'

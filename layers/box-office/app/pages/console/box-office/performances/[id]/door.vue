@@ -75,6 +75,10 @@ async function releaseUnpaid() {
   }
 }
 
+const more = computed(() => [[
+  { label: t('box-office.live-door.print'), icon: 'i-lucide-printer', to: `/live/door/${encodeURIComponent(id.value)}/print` },
+  { label: t('box-office.door.release.button'), icon: 'i-lucide-clock-alert', onSelect: () => { void releaseUnpaid() } },
+]])
 const trail = computed(() => [
   { label: t('box-office.navigation.performances.label'), to: '/console/box-office/performances' },
   { label: t('box-office.door.set-up'), to: `/console/box-office/performances/${encodeURIComponent(id.value)}` },
@@ -102,15 +106,25 @@ const trail = computed(() => [
         icon="i-lucide-printer"
         color="neutral"
         variant="outline"
+        class="max-sm:hidden"
         :label="t('box-office.live-door.print')"
       />
       <UButton
         icon="i-lucide-clock-alert"
         color="neutral"
         variant="outline"
+        class="max-sm:hidden"
         :loading="releasing"
         :label="t('box-office.door.release.button')"
         @click="releaseUnpaid"
+      />
+      <!-- Three worded buttons do not fit a phone's bar: the two lesser ones fold into a menu there. -->
+      <RowActions
+        class="sm:hidden"
+        size="md"
+        variant="outline"
+        :items="more"
+        :label="t('box-office.door.more')"
       />
     </template>
     <template #cell-buyer="{ row }">

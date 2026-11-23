@@ -1,5 +1,5 @@
 <!-- The access scheme in My account (ID-38, ID-44; identity spec part 6). Before applying: what the
-     scheme is, who will read an application, and an "Apply" button to the form (access/apply).
+     scheme is, who will read an application, and the form itself (Matt, 21 November: no page between).
      Afterwards: the application's state in plain words, the reviewer's message, change or leave,
      switches for other uses, and every read by staff. With the scheme off it is a missing page. -->
 <script setup lang="ts">
@@ -10,7 +10,7 @@ interface Mine {
   enabled: boolean
   name?: string
   allowNote?: boolean
-  needs?: { id: string, key: string, label: string }[]
+  needs?: { id: string, key: string, label: string, description: string | null }[]
   application?: {
     status: 'submitted' | 'more-info' | 'accepted' | 'rejected'
     inForce: AccessApplicationValue | null
@@ -50,6 +50,13 @@ const showEvidence = computed(() => application.value?.status !== 'rejected' && 
 const refusal = ref<RefusalView | null>(null)
 const APPLY = '/account/access/apply'
 
+// A first application is made here. Sent, the overview's card says where it stands.
+const { schema, fields, toForm, toBody } = useAccessApplicationForm(() => data.value?.needs ?? [], () => !!data.value?.allowNote, () => false)
+async function apply(values: Record<string, unknown>) {
+  await $api('/api/core/me/access', { method: 'POST', body: toBody(values) })
+  await Promise.all([refreshNuxtData('core:my-access-summary'), refreshNuxtData('core:account-sections')])
+}
+
 async function leave() {
   const ok = await confirm({
     verb: t('core.access.leave.verb'),
@@ -61,7 +68,8 @@ async function leave() {
   try {
     await $api('/api/core/me/access', { method: 'DELETE', body: {} })
     toast.add({ title: t('core.access.left', { scheme: name.value }), color: 'success' })
-    await refresh()
+    await refreshNuxtData()
+    await navigateTo('/account')
   }
   catch (error) {
     refusal.value = toRefusal(error)
@@ -103,39 +111,28 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
 </script>
 
 <template>
-  <PageFrame
+  <PageForm
+    v-if="!application"
     :title="name"
+    :description="`${t('core.access.intro', { scheme: name })} ${t('core.access.form.who-reads-detail')}`"
+    :trail="[{ label: t('core.account.title'), to: '/account' }]"
+    :submit-label="t('core.access.form.send')"
+    :saved-title="t('core.access.sent')"
+    :schema="schema"
+    :fields="fields"
+    :initial="toForm(null)"
+    :submit="apply"
+    return-to="/account"
+  />
+  <PageFrame
+    v-else
+    :title="name"
+    :trail="[{ label: t('core.account.title'), to: '/account' }]"
     width="reading"
   >
     <RefusalNotice :refusal="refusal" />
 
-    <!-- Before applying. -->
-    <div
-      v-if="!application"
-      class="space-y-4"
-    >
-      <p>{{ t('core.access.intro', { scheme: name }) }}</p>
-      <p class="text-muted">
-        {{ t('core.access.intro-detail') }}
-      </p>
-      <UAlert
-        color="neutral"
-        icon="i-lucide-eye"
-        :title="t('core.access.form.who-reads')"
-        :description="t('core.access.form.who-reads-detail')"
-      />
-      <UButton
-        icon="i-lucide-file-pen-line"
-        :label="t('core.access.apply')"
-        :to="APPLY"
-      />
-    </div>
-
-    <!-- Afterwards. -->
-    <div
-      v-else
-      class="space-y-8"
-    >
+    <div class="space-y-8">
       <PageSection
         :title="t('core.access.state')"
       >

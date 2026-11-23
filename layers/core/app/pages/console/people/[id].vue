@@ -307,7 +307,7 @@ const summary = computed(() => {
     { label: t('core.person.since'), value: day(p.createdAt) },
     { label: t('core.person.last-signed-in'), value: p.lastSignedInAt ? day(p.lastSignedInAt) : t('core.person.never') },
     { label: t('core.person.origin'), value: t(`core.person.origins.${p.origin}`) },
-    { label: t('core.person.sessions.live'), value: String(p.liveSessions) },
+    { label: t('core.person.sessions.live'), value: t('core.person.sessions.devices', { count: p.liveSessions }) },
   ]
 })
 const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/console/people' }])
@@ -348,57 +348,70 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
             <dl class="space-y-2 text-sm">
               <div>
                 <dt class="text-muted">
+                  {{ t('core.person.details.name') }}
+                </dt>
+                <dd>{{ p.name ?? t('core.person.details.none') }}</dd>
+              </div>
+              <div>
+                <dt class="text-muted">
                   {{ t('core.person.details.pronouns') }}
                 </dt>
                 <dd>{{ p.pronouns ?? t('core.person.details.none') }}</dd>
               </div>
             </dl>
-          </PageSection>
-          <PageSection :title="t('core.person.addresses')">
-            <template
-              v-if="p.actions.update"
-              #actions
+            <!-- One card for who the person is: name, pronouns and their addresses. -->
+            <FieldGroup
+              :title="t('core.person.addresses')"
+              class="mt-4"
             >
-              <UButton
-                color="neutral"
-                variant="outline"
-                icon="i-lucide-plus"
-                :label="t('core.person.email.add')"
-                @click="openAddAddress"
-              />
-            </template>
-            <p
-              v-if="!p.addresses.length"
-              class="text-sm text-muted"
-            >
-              {{ t('core.person.no-addresses') }}
-            </p>
-            <ul
-              v-else
-              class="space-y-2"
-            >
-              <li
-                v-for="a in p.addresses"
-                :key="a.id"
-                class="flex flex-wrap items-center gap-2 text-sm"
+              <template
+                v-if="p.actions.update"
+                #actions
               >
-                <span class="min-w-0 flex-1 break-all">{{ a.address }}</span>
-                <StatusBadge
-                  :tone="a.verified ? 'success' : 'neutral'"
-                  :label="a.verified ? t('core.person.verified') : t('core.person.unverified')"
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  icon="i-lucide-plus"
+                  :label="t('core.person.email.add')"
+                  :aria-label="t('core.person.email.add-long')"
+                  @click="openAddAddress"
                 />
-                <StatusBadge
-                  v-if="a.audience"
-                  tone="info"
-                  :label="t('core.person.email.audience')"
-                />
-                <RowActions
-                  v-if="p.actions.update"
-                  :items="addressActions(a)"
-                  :label="t('core.person.email.actions', { address: a.address })"
-                />
-              </li>
-            </ul>
+              </template>
+              <p
+                v-if="!p.addresses.length"
+                class="text-sm text-muted"
+              >
+                {{ t('core.person.no-addresses') }}
+              </p>
+              <ul
+                v-else
+                class="space-y-2"
+              >
+                <li
+                  v-for="a in p.addresses"
+                  :key="a.id"
+                  class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+                >
+                  <span class="w-full break-all">{{ a.address }}</span>
+                  <StatusBadge
+                    :tone="a.verified ? 'success' : 'neutral'"
+                    :label="a.verified ? t('core.person.verified') : t('core.person.unverified')"
+                  />
+                  <StatusBadge
+                    v-if="a.audience"
+                    tone="info"
+                    :label="t('core.person.email.audience')"
+                  />
+                  <RowActions
+                    v-if="p.actions.update"
+                    class="ms-auto"
+                    :items="addressActions(a)"
+                    :label="t('core.person.email.actions', { address: a.address })"
+                  />
+                </li>
+              </ul>
+            </FieldGroup>
           </PageSection>
         </template>
 
@@ -548,9 +561,14 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
                     v-else
                     class="text-muted"
                   >{{ t('core.person.access.not-applied') }}</span>
-                  <ULink :to="`/console/people/access-scheme/${encodeURIComponent(p.id)}`">
-                    {{ t('core.person.access.open') }}
-                  </ULink>
+                  <UButton
+                    :to="`/console/people/access-scheme/${encodeURIComponent(p.id)}`"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    trailing-icon="i-lucide-arrow-right"
+                    :label="t('core.person.access.open')"
+                  />
                 </div>
                 <template v-if="p.actions.accessNeeds">
                   <UButton
@@ -588,12 +606,6 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
                   </p>
                 </template>
               </div>
-            </PageSection>
-
-            <PageSection :title="t('core.person.sessions.title')">
-              <p class="text-sm">
-                {{ t('core.person.sessions.count', { count: p.liveSessions }) }}
-              </p>
             </PageSection>
           </div>
         </template>

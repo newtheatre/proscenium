@@ -94,17 +94,29 @@ describe('the catalogue', () => {
     expect((await bar('POST', '/api/bar/prices', { variantId: lager.variantId, priceListId: null, amountMinor: 1 }, stocker)).status).toBe(403)
   })
 
-  it('reorders products by keyboard, and keeps a product on sale with at least one size', async () => {
+  it('reorders products by a step or to a place, and keeps a product on sale with at least one size', async () => {
     const { categoryId } = ok(await bar('POST', '/api/bar/categories', { name: 'Snacks' }))
     const a = ok(await bar('POST', '/api/bar/products', { categoryId, name: 'Apple' }))
     const b = ok(await bar('POST', '/api/bar/products', { categoryId, name: 'Banana' }))
     ok(await bar('POST', `/api/bar/products/${b.productId}/move`, { direction: 'up' }))
     expect((await rows<{ name: string }>('SELECT name FROM bar_products WHERE category_id = ? ORDER BY position', categoryId)).map(r => r.name)).toEqual(['Banana', 'Apple'])
+    // Dragged to a place, counted from nought; a place past the end is the end, and one below nought is refused.
+    const c = ok(await bar('POST', '/api/bar/products', { categoryId, name: 'Cherry' }))
+    const order = async () => (await rows<{ name: string }>('SELECT name FROM bar_products WHERE category_id = ? ORDER BY position', categoryId)).map(r => r.name)
+    ok(await bar('POST', `/api/bar/products/${c.productId}/move`, { to: 0 }))
+    expect(await order()).toEqual(['Cherry', 'Banana', 'Apple'])
+    ok(await bar('POST', `/api/bar/products/${c.productId}/move`, { to: 9 }))
+    expect(await order()).toEqual(['Banana', 'Apple', 'Cherry'])
+    ok(await bar('POST', `/api/bar/products/${a.productId}/move`, { to: 0 }))
+    expect(await order()).toEqual(['Apple', 'Banana', 'Cherry'])
+    expect((await bar('POST', `/api/bar/products/${a.productId}/move`, { to: -1 })).status).toBe(422)
+    expect((await bar('POST', `/api/bar/products/${a.productId}/move`, { to: 1, direction: 'up' })).status).toBe(422)
+    ok(await bar('POST', `/api/bar/products/${b.productId}/move`, { direction: 'up' }))
     expect((await bar('PATCH', `/api/bar/variants/${a.variantId}`, { active: false })).body.code).toBe('bar.variant.last')
     ok(await bar('PATCH', `/api/bar/products/${a.productId}`, { active: false }))
     ok(await bar('PATCH', `/api/bar/variants/${a.variantId}`, { active: false }))
     ok(await bar('PATCH', `/api/bar/categories/${categoryId}`, { active: false }))
-    expect((await bar('POST', '/api/bar/products', { categoryId, name: 'Cherry' })).body.code).toBe('bar.category.unknown')
+    expect((await bar('POST', '/api/bar/products', { categoryId, name: 'Damson' })).body.code).toBe('bar.category.unknown')
   })
 })
 

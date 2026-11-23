@@ -1,4 +1,4 @@
-// The Fees page (tab 5, scheme "Fee"): every scheme with its lengths, the price in force today for
+// A scheme's Fee section (tab 5, scheme "Fee"): every scheme with its lengths, the price in force today for
 // joining and for renewing each length, and each scheme's price history.
 import { all, defineRoute, today } from '#kit'
 import { priceInForce, pricesOf } from '../../../prices'

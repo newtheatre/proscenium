@@ -19,17 +19,18 @@ On 16 November 2026 Matt added a fourth shell, Admin at `/admin`, for screens ab
 | Delivery log | Console | unchanged |
 | Branding | Admin | `/admin/branding` |
 | Theatre (the generated settings page that holds the site, organisation and locale groups) | Admin | `/admin/theatre` |
-| Vocabularies | Admin | `/admin/vocabularies` |
+| Lists (the theatre's own vocabularies) | Admin | `/admin/vocabularies` |
+| A module's vocabularies | Admin, the Lists tab of the module's page | `/admin/modules/<module>/lists` |
 | Senders, with the sending-domain setup and the email outcomes step | Admin | `/admin/email` |
 | Delivery health, with the suppression list | Admin | `/admin/email/health` |
-| Webhooks, Webhook editor, Webhook delivery log | Admin | `/admin/webhooks` |
-| Site readiness | Admin | `/admin/site-readiness` |
+| Webhooks, Webhook editor, Webhook delivery log (the delivery limits are settings on Advanced) | Admin | `/admin/webhooks` |
+| Site readiness (letting search engines in is a button on its notice, not a settings card) | Admin | `/admin/site-readiness` |
 
 Each Admin entry declares `menu: 'admin'` and one of the interface specification's groups:
 
 | Group | Core's entries, in order |
 | --- | --- |
-| `theatre` (Theatre) | Theatre, Branding, Vocabularies, then the interface's Navigation, then Site readiness |
+| `theatre` (Theatre) | Theatre, Branding, Lists, then the interface's Navigation, then Site readiness |
 | `email` (Email) | Senders, Delivery health |
 | `connections` (Connections) | After the foundations' Credentials: Webhooks |
 
@@ -75,7 +76,7 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 
 | Screen | Who sees it | Shows |
 | --- | --- | --- |
-| Productions | `core.production.view` | A table: title, season, state, next performance, performances count. Filters for state, season, category. "New production". |
+| Productions | `core.production.view` | A table: title, season, state, next performance, performances count. Opens on the view "Coming up" (not over, not withdrawn or cancelled; soonest first, what has no dates yet last), with "Drafts", "Past" (newest first) and "All" beside it (Matt, 21 November 2026). Filters for state, season, category. "New production". |
 | Production | `core.production.view` on it | See the wireframe. The page follows the interface specification's Record convention. Tabs: Overview, Details, Dates, Credits, Media, Advisories and access, then any tab another module adds through `core.record-tab`, such as Box office's tickets or the form builder's custom fields. |
 | Add dates | `core.performance.schedule` | Two ways in one dialog: a single date, or a run (first date, last date, days of the week, times). A run shows every date it will create, with clashes and closures marked, before anything is saved. A long run is created by a job, and the dialog shows its progress (C-04). |
 | Calendar | `core.production.view` | Month, week and day views of performances and closures, by venue and space. Drag to reschedule a draft; a scheduled performance opens the reschedule dialog instead. |
@@ -97,7 +98,7 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 | Branding | `core.branding.edit` | See the wireframe. |
 | Theatre | `core.organisation.edit` | Name, time zone, language, currency and day start, which are foundations settings shown on this page, with core's contact details, social links, legal name and year end. Changing the time zone or day start shows how many performances will be recalculated. |
 | Site readiness | `public-site.readiness.view` | A checklist: pages still marked as placeholder, missing brand items, images without alt text, components whose module is off, settings a page quotes that are still unset, whether search engines are being turned away. Each line links to where it is fixed, or names the file to edit. |
-| Vocabularies | `core.vocabulary.manage` | Every vocabulary, grouped by module, with "New vocabulary" for a list of the theatre's own. Inside one: terms in order, drag to reorder, rename, retire, merge, with a count of records using each. |
+| Lists | `core.vocabulary.manage` | The theatre's own vocabularies under Admin > Lists, with "New list"; a module's on the Lists tab of its page. Inside one: terms in order (and headings, where it has them), dragged by a handle to reorder, with the arrow keys on the handle and Move up and Move down in the row's menu; rename, retire, merge, with a count of records using each. |
 | Files | `core.file.manage` | Every file: preview, owner, slot, size, state. Filter by owner type and state. Restore a deleted file before its purge date. Storage used. |
 
 ## Messages (console, except Senders and Delivery health)

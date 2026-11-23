@@ -88,7 +88,6 @@ export default defineModule({
       { id: 'finance.periods', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/periods', icon: 'i-lucide-calendar-check', ability: 'finance.period.close', order: 60 },
       { id: 'finance.productions', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/productions', icon: 'i-lucide-drama', ability: 'finance.ledger.view', order: 70 },
       { id: 'finance.reconcile', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/reconcile', icon: 'i-lucide-scale', ability: 'finance.ledger.view', order: 80 },
-      { id: 'finance.export', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/export', icon: 'i-lucide-file-down', ability: 'finance.ledger.export', order: 90 },
       { id: 'finance.accounts', menu: 'admin', group: 'modules', to: '/admin/modules/finance/accounts', icon: 'i-lucide-list-tree', ability: 'finance.account.manage', order: 20 },
     ],
   },

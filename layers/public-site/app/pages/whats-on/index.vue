@@ -73,10 +73,7 @@ const groups = computed(() => {
 <template>
   <UContainer>
     <UPage>
-      <UPageHeader
-        :title="t('public-site.whats-on.title')"
-        :description="t('public-site.whats-on.description')"
-      />
+      <UPageHeader :title="t('public-site.whats-on.title')" />
       <UPageBody>
         <PublicSiteSpotlight
           v-if="spotlight"
@@ -108,7 +105,6 @@ const groups = computed(() => {
                   :aria-current="!chosen[g.key] ? 'true' : undefined"
                   color="neutral"
                   :variant="!chosen[g.key] ? 'solid' : 'ghost'"
-                  size="sm"
                 />
               </li>
               <li
@@ -121,7 +117,6 @@ const groups = computed(() => {
                   :aria-current="chosen[g.key] === o.value ? 'true' : undefined"
                   color="neutral"
                   :variant="chosen[g.key] === o.value ? 'solid' : 'ghost'"
-                  size="sm"
                 />
               </li>
             </ul>

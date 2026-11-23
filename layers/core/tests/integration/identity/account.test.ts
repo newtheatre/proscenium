@@ -83,34 +83,44 @@ describe('my sessions (ID-13)', () => {
 })
 
 describe('the passkey offer (ID-03)', () => {
-  it('is offered after an email sign-in with no passkey, and not once there is one', async () => {
+  it('is a screen after an email sign-in only for somebody with no passkey whose roles reach the console', async () => {
     const browser = new Browser()
     const to = address()
     const first = await emailSignIn(browser, to)
-    expect((await browser.post('/api/core/sign-in/link', { token: tokenOf(first.message!) })).body.offerPasskey).toBe(true)
-    // A theatre-goer who can always sign in by email is not handed recovery codes.
-    expect(await addPasskey(browser, new Authenticator())).toBeUndefined()
-    const codes = (await browser.post('/api/core/me/recovery-codes')).body.recoveryCodes as string[]
-    expect(codes).toHaveLength(10)
-    expect((await browser.post('/api/core/me/recovery-codes/check', { code: codes![3]!.toUpperCase() })).body).toEqual({ matches: true })
-    expect((await browser.post('/api/core/me/recovery-codes/check', { code: 'aaaaa-bbbbb' })).body).toEqual({ matches: false })
-    const again = await emailSignIn(new Browser(), to)
-    expect((await new Browser().post('/api/core/sign-in/link', { token: tokenOf(again.message!) })).body.offerPasskey).toBe(false)
-  })
-
-  it('is not offered again while "Not now" lasts, except to somebody whose roles reach the console', async () => {
-    const browser = new Browser()
-    const to = address()
-    const accountId = await signInByEmail(browser, to)
-    const later = async () => {
+    // A buyer goes straight on: the offer is a notice on My account instead.
+    expect((await browser.post('/api/core/sign-in/link', { token: tokenOf(first.message!) })).body.offerPasskey).toBe(false)
+    const accountId = (await browser.get('/api/core/me')).body.account.id as string
+    await grantDirectly(accountId, ['core.role.manage'])
+    const again = async () => {
       const fresh = new Browser()
+      // "Not now" does not put the screen away for staff.
       fresh.cookies.set('proscenium-passkey-later', '1')
       const { message } = await emailSignIn(fresh, to)
       return (await fresh.post('/api/core/sign-in/link', { token: tokenOf(message!) })).body.offerPasskey
     }
-    expect(await later()).toBe(false)
-    await grantDirectly(accountId, ['core.role.manage'])
-    expect(await later()).toBe(true)
+    expect(await again()).toBe(true)
+    await addPasskey(browser, new Authenticator())
+    expect(await again()).toBe(false)
+  })
+
+  it('offers a passkey by a notice on My account until the person has one', async () => {
+    const browser = new Browser()
+    await signInByEmail(browser)
+    const offer = async () => ((await browser.get('/api/core/account-notices')).body.notices as { key: string, to?: string }[]).find(n => n.key === 'core.passkey-offer:offer')
+    expect(await offer()).toMatchObject({ tone: 'info', to: '/account/sign-in', title: 'core.account.notices.passkey.title' })
+    // A theatre-goer who can always sign in by email is not handed recovery codes.
+    expect(await addPasskey(browser, new Authenticator())).toBeUndefined()
+    expect(await offer()).toBeUndefined()
+  })
+
+  it('makes and checks recovery codes', async () => {
+    const browser = new Browser()
+    await signInByEmail(browser)
+    await addPasskey(browser, new Authenticator())
+    const codes = (await browser.post('/api/core/me/recovery-codes')).body.recoveryCodes as string[]
+    expect(codes).toHaveLength(10)
+    expect((await browser.post('/api/core/me/recovery-codes/check', { code: codes![3]!.toUpperCase() })).body).toEqual({ matches: true })
+    expect((await browser.post('/api/core/me/recovery-codes/check', { code: 'aaaaa-bbbbb' })).body).toEqual({ matches: false })
   })
 
   it('asks for a name on sign-in until the account has one', async () => {

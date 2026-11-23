@@ -22,6 +22,13 @@ const TONES = { reported: 'warning', in_review: 'info', closed: 'neutral' } as c
         :title="t('front-of-house.navigation.my-reports.label')"
         :description="t('front-of-house.my-reports.description')"
       >
+        <template #primary>
+          <UButton
+            to="/live/front-of-house/incident"
+            icon="i-lucide-shield-alert"
+            :label="t('front-of-house.live.report-incident')"
+          />
+        </template>
         <EmptyState
           v-if="!d.incidents.length"
           icon="i-lucide-shield-alert"

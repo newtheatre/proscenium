@@ -23,7 +23,11 @@ const top = computed<NavigationMenuItem[]>(() => sections.value.map(i => ({ labe
 <template>
   <div>
     <SkipLink />
-    <UHeader :title="name">
+    <!-- No menu button: the header has no drawer of its own, and the bar along the bottom moves between places. -->
+    <UHeader
+      :title="name"
+      :toggle="false"
+    >
       <!-- The area's name sits beside the theatre's link rather than inside it, so the link is named by
            what it shows; on a phone it gives way to the bell and the menu. -->
       <template #left>

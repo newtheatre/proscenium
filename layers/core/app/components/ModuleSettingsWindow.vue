@@ -69,15 +69,16 @@ watch([tabs, status], ([list, now]) => {
         :aria-label="t('core.modules.window.choose')"
         @update:model-value="choose"
       />
-      <UTabs
-        v-else-if="items.length > 1"
-        :model-value="active"
-        :items="items"
-        :content="false"
-        variant="link"
-        :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
-        @update:model-value="choose"
-      />
+      <TabStrip v-else-if="items.length > 1">
+        <UTabs
+          :model-value="active"
+          :items="items"
+          :content="false"
+          variant="link"
+          :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
+          @update:model-value="choose"
+        />
+      </TabStrip>
       <EmbeddedScreens
         v-if="resolved"
         window

@@ -2,7 +2,7 @@
 // or references, such as a students' union's export of student IDs, end dates and names. Each value
 // is kept only as a keyed hash; nobody can read the list back out. A name is kept in the clear for
 // staff, one entry at a time.
-import { all, credential, first, refuse } from '#kit'
+import { all, credential, first, refuse, setCredential, type UnitView } from '#kit'
 
 export const LIST_KEY = 'MEMBERSHIP_LIST_KEY'
 
@@ -74,12 +74,22 @@ async function hmacKey(): Promise<CryptoKey> {
 /** Refuses while the list key is not set, and says where to save one. Returns the key. */
 export async function requireListKey(): Promise<string> {
   const secret = await credential(LIST_KEY)
-  if (!secret) refuse('membership.list.no-key', 'Verification lists need a list key, which has not been set.', { status: 409, remedy: 'Save a list key under Keys on the Verification lists tab (Admin > Modules > Membership), or press Generate there.' })
+  if (!secret) refuse('membership.list.no-key', 'Verification lists need a list key, which has not been set.', { status: 409, remedy: 'Open List key on the Verification lists tab (Admin > Modules > Membership) and press Generate.' })
   return secret!
 }
 
 export async function hasListKey(): Promise<boolean> {
   return !!(await credential(LIST_KEY))
+}
+
+/**
+ * Makes the list key with the first list, so nobody has to press Generate before a list works.
+ * A key already saved is left alone: every loaded list was hashed with it.
+ */
+export async function ensureListKey(unit: UnitView, by: string | null): Promise<void> {
+  if (await hasListKey()) return
+  const bytes = crypto.getRandomValues(new Uint8Array(32)) // not-policy: a 256-bit key
+  await setCredential(unit, LIST_KEY, Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(''), { by }) // not-policy: hexadecimal
 }
 
 /** The keyed hash of a normalised value, as hex. The plain value is never stored (V10). */

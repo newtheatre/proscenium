@@ -2,7 +2,7 @@
      they are signed in (ID-13, its own section since 2026-11-17). Adding or
      removing a passkey, and making new codes, need a fresh re-assertion, which `$api` asks for in
      place. The server keeps the only way in: the last passkey stays unless a confirmed address or a
-     linked provider can still sign the person in. New codes are shown once and typed back. -->
+     linked provider can still sign the person in. New codes are shown once, to be saved. -->
 <script setup lang="ts">
 import { z } from 'zod'
 import type { RefusalView } from '../../utils/refusal'
@@ -18,7 +18,7 @@ const { data, status, error, refresh } = await useAPI<{ passkeys: Passkey[], rec
 
 const { dayLong: day } = useDates()
 const refusal = ref<RefusalView | null>(null)
-// New codes, shown once until the person types one back.
+// New codes, shown once until the person says they are saved.
 const codes = ref<string[] | null>(null)
 
 async function add() {
@@ -141,7 +141,6 @@ async function showCodes() {
     <UCard v-if="codes">
       <RecoveryCodes
         :codes="codes"
-        check-path="/api/core/me/recovery-codes/check"
         @kept="kept()"
       />
     </UCard>

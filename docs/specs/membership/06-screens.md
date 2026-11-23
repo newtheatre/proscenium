@@ -17,8 +17,7 @@ No address prefix is reserved for the module. Every address is under `/account` 
 
 | Id | Shell | To | Shown by | Group, section | Count |
 | --- | --- | --- | --- | --- | --- |
-| `membership.members` | console | `/console/membership` | `membership.membership.view` | Membership, everyday |  |
-| `membership.applications` | console | `/console/membership/applications` | `membership.membership.verify` or `membership.membership.view` | Membership, everyday | `membership.applications-waiting` |
+| `membership.members` | console | `/console/membership` | `membership.membership.view` | Membership, everyday | `membership.applications-waiting` |
 | `membership.schemes` | console | `/console/membership/schemes` | `membership.scheme.view` | Membership, setup |  |
 | `membership.lists` | console | `/console/membership/lists` | `membership.verification-list.manage` | Membership, setup |  |
 
@@ -99,7 +98,7 @@ The wireframe shows steps 1 and 2 on one sheet. The length question belongs to s
 | --- | --- | --- | --- |
 | Renewal | members, account | A holder inside the renewal window or in grace | "Your Student membership ends on 31 July. Renew" |
 | Finish joining | account | A person with an open application whose next step is theirs | "Pay £15.00 to finish joining Friends of the theatre" |
-| Applications waiting | console | Holders of `membership.membership.verify` | "4 applications are waiting to be checked" |
+| Applications waiting | console | Holders of `membership.membership.view` | "4 membership applications are waiting", leading to Members |
 
 ## Pages in the console
 
@@ -108,7 +107,6 @@ The wireframe shows steps 1 and 2 on one sheet. The length question belongs to s
 | Members | `/console/membership` | List | `membership.membership.view` | Add a member |
 | A membership | `/console/membership/<membership id>` | Record | `membership.membership.view` | The next staff step, if any |
 | Add a member | `/console/membership/add` | Form | `membership.membership.add` | Add |
-| Applications | `/console/membership/applications` | List | `membership.membership.view` | None; each row has Pass and Decline for holders of `membership.membership.verify` |
 | Schemes | `/console/membership/schemes` | List | `membership.scheme.view` | New scheme |
 | A scheme | `/console/membership/schemes/<scheme id>` | Record with tabs | `membership.scheme.view`; changes need `membership.scheme.manage` | Open, Close or Archive, by state |
 | Verification lists | `/console/membership/lists` | List | `membership.verification-list.manage` | New list |
@@ -159,9 +157,9 @@ Actions, each a confirmed dialog with the standard refusal handling: Pass verifi
 
 A Form page: the person (picker, or name and address), the scheme, the dates (prefilled from the scheme's rule, editable under rule D7), the note, and for a scheme that requires payment the three choices of rule P9. The summary line before the button reads, for example, "Casey Person will be a Student member from today until 31 July 2027 and will see the members' area." That last clause is there so nobody adds a supporter and expects them to get in, or the reverse.
 
-### Applications
+### Applications waiting
 
-A List page of pending memberships that need a person: waiting on a staff check (verifier `staff`, or `needs-staff` from another verifier), or stuck (failed verification for more than three days, unpaid for more than seven). Approval through a form's decision stage is not here: it is in the form builder's Reviews, and the row links to it.
+Not a page of its own (Matt, 21 November 2026): applications that need a person are a section above the rows of Members, drawn only while something waits, so the membership secretary has one screen for one list of people. The old address `/console/membership/applications` leads to Members. The section holds pending memberships waiting on a staff check (verifier `staff`, or `needs-staff` from another verifier) and those waiting for approval, and each row says which. A check is passed or declined on the row. Approval is decided through the form's decision stage, so that row has one button, "Read and decide", which opens the response in the form builder, where the form's own stages, reasons and conflict rules apply. The count beside Members in the sidebar, and the console home card, count both kinds. The oldest five show; a longer queue unfolds.
 
 Each row shows the applicant, the scheme, what it is waiting for and for how long. Pass and Decline open a dialog showing the application's answers, the verifier's reason and a note field. A person never sees their own application in this queue (rule V3).
 
@@ -175,11 +173,11 @@ The panel shows the length the applicant chose and lets the member of staff chan
 
 | Tab | Content |
 | --- | --- |
-| Details | Name, key, summary, side, order. The side control explains in a sentence what each side does and is locked once the scheme has memberships |
+| Details | Name, key, summary, side, order. The side is one switch, "Holders become members", which says that it opens the members' area, and is locked once the scheme has memberships. Screens say "Members' scheme" and "Supporters' scheme", never "side" |
 | Length and renewal | The length rule with a live example ("Somebody joining today would be a member until 31 July 2027"), rollover days, when renewal opens, grace |
 | Joining | Who may join, the verifier with its own configuration component (domains, or a list), whether renewal checks again, whether approval is needed, whether the scheme counts for voting |
 | Application form | The form attached in `membership.application`, with attach and detach, provided by the form builder's placement control. The custom fields form in `membership.member-fields` |
-| Fee | Fees module: the price in force, its tax code, a different renewal price, and price history. A new price takes a from-date |
+| Fee | Fees module: a section of the scheme's own page, with the price in force for each length, its tax code, a different renewal price, and price history. A new price takes a from-date. The fees module has no page of its own for prices (Matt, 21 November 2026) |
 | Members | A count by status, linking to the Members list filtered to this scheme |
 
 ![wireframe · A scheme, Length and renewal](images/06-scheme-length-and-renewal.png)
@@ -188,7 +186,9 @@ The panel shows the length the applicant chose and lets the member of staff chan
 
 The wireframe shows Length and renewal with its Lengths offered table (rule D8). Joining also holds "Accept a student ID or member number in place of signing in" (`accepts_reference`) and "Members may end their membership themselves" (`holder_may_end`). With the fees module on, Fee holds a price for each length.
 
-Opening a scheme runs the checks of rule S4 and lists what is missing. Closing or archiving shows the change-impact line: "214 current members keep their membership. 3 open applications will continue."
+New scheme asks for the name only: the key is made from the name (with a number added when it is taken) and the draft starts as a members' scheme of rolling length, all of which its page changes before it opens (Matt, 21 November 2026). Adding and importing members are on Members only, not on the scheme's page.
+
+Opening a scheme runs the checks of rule S4 and lists what is missing. Open scheme can always be pressed: with something missing it moves to that list instead of opening. Closing or archiving shows the change-impact line: "214 current members keep their membership. 3 open applications will continue."
 
 ### Verification lists
 

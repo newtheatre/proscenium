@@ -1,17 +1,22 @@
-<!-- My tickets (C3): every booking on the person's account. Visits still to come are first, soonest
-     first, each paid ticket with its code to scan at the door; past visits are folded away below. -->
+<!-- My tickets (C3): every booking on the person's account, one card for each performance. Nights still
+     to come are first, soonest first, each paid ticket with its code to scan at the door; past ones
+     are folded away below. -->
 <script setup lang="ts">
-import type { MyBookings } from '../../../utils/my-bookings'
+import { byPerformance, type MyBookings } from '../../../utils/my-bookings'
 
 const { t } = useT()
 const { data, status, error, refresh } = await useAPI<MyBookings>('/api/box-office/orders/mine', { key: 'box-office:mine' })
 const pastOpen = ref(false)
+// The night is the unit: several bookings for one performance share a card.
+const upcoming = computed(() => byPerformance(data.value?.upcoming ?? []))
+const past = computed(() => byPerformance(data.value?.past ?? []))
 </script>
 
 <template>
   <PageFrame
     :title="t('box-office.navigation.mine.label')"
     :description="t('box-office.mine.help')"
+    :trail="[{ label: t('core.account.title'), to: '/account' }]"
     width="reading"
   >
     <DataBoundary
@@ -29,16 +34,23 @@ const pastOpen = ref(false)
           :title="t('box-office.mine.empty')"
           :description="t('box-office.mine.empty-description')"
           icon="i-lucide-ticket"
-        />
+        >
+          <template #actions>
+            <UButton
+              to="/whats-on"
+              :label="t('box-office.mine.see-whats-on')"
+            />
+          </template>
+        </EmptyState>
         <section
           v-else
           :aria-label="t('box-office.mine.upcoming')"
           class="space-y-4"
         >
           <BoxOfficeVisit
-            v-for="v in data.upcoming"
-            :key="`${v.orderId}:${v.performance.id}`"
-            :visit="v"
+            v-for="n in upcoming"
+            :key="n.performance.id"
+            :night="n"
           />
         </section>
         <CollapsibleDivider
@@ -48,9 +60,9 @@ const pastOpen = ref(false)
         >
           <div class="space-y-4">
             <BoxOfficeVisit
-              v-for="v in data.past"
-              :key="`${v.orderId}:${v.performance.id}`"
-              :visit="v"
+              v-for="n in past"
+              :key="n.performance.id"
+              :night="n"
               past
             />
           </div>

@@ -20,8 +20,11 @@ const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const { data: accounts } = await useAPI<{ accounts: { id: string, code: string, name: string }[] }>('/api/finance/accounts', { key: 'finance:accounts' })
-const { data: periods } = await useAPI<{ periods: { id: string, label: string }[] }>('/api/finance/periods', { key: 'finance:periods' })
+const { data: periods } = await useAPI<{ periods: { id: string, label: string, startsOn: string, endsOn: string }[], canExport?: boolean }>('/api/finance/periods', { key: 'finance:periods' })
 const { data: productions } = await useAPI<{ productions: { productionId: string, title: string }[] }>('/api/finance/productions', { key: 'finance:productions' })
+
+// The accounting file for a range of days; an old link to the Export page opens it.
+const exporting = ref(route.query.export === '1')
 
 const kindLabel = (kind: string) => t(`finance.screens.ledger.kinds.${kind}`)
 const sourceLabel = (p: Row) => (te(`${p.source.module}.module.name`) ? t(`${p.source.module}.module.name`) : p.source.module)
@@ -52,6 +55,7 @@ function amountOf(p: Row): string {
   for (const e of p.entries) if (e.amountMinor > 0) totals.set(e.currency, (totals.get(e.currency) ?? 0) + e.amountMinor)
   return [...totals].map(([currency, minor]) => money(minor, currency)).join(', ')
 }
+const debitsFirst = (entries: Entry[]) => [...entries].sort((a, b) => Number(b.amountMinor > 0) - Number(a.amountMinor > 0))
 const rowLabel = (p: Row) => t('finance.screens.ledger.reverse-thing', { kind: kindLabel(p.kind).toLowerCase(), day: day(p.occurredAt) })
 
 async function reverse(p: Row) {
@@ -87,6 +91,18 @@ const rowActions = (p: Row): DropdownMenuItem[] => (p.canReverse
     :row-actions="rowActions"
     :empty="{ title: t('finance.screens.ledger.empty'), description: t('finance.screens.ledger.empty-help'), icon: 'i-lucide-book-open' }"
   >
+    <template
+      v-if="periods?.canExport"
+      #primary
+    >
+      <UButton
+        :label="t('finance.screens.export.open')"
+        icon="i-lucide-file-down"
+        color="neutral"
+        variant="outline"
+        @click="exporting = true"
+      />
+    </template>
     <template #cell-kind="{ row }">
       <span class="font-medium text-highlighted">{{ kindLabel(row.kind) }}</span>
       <StatusBadge
@@ -135,22 +151,31 @@ const rowActions = (p: Row): DropdownMenuItem[] => (p.canReverse
         <caption class="sr-only">
           {{ t('finance.screens.ledger.entries-of', { kind: kindLabel(row.kind), day: day(row.occurredAt) }) }}
         </caption>
-        <thead class="sr-only">
+        <thead class="text-xs text-muted">
           <tr>
-            <th scope="col">
+            <th
+              scope="col"
+              class="pb-1 text-left font-normal"
+            >
               {{ t('finance.screens.ledger.account') }}
             </th>
-            <th scope="col">
+            <th
+              scope="col"
+              class="pb-1 text-right font-normal"
+            >
               {{ t('finance.screens.ledger.debit') }}
             </th>
-            <th scope="col">
+            <th
+              scope="col"
+              class="pb-1 text-right font-normal"
+            >
               {{ t('finance.screens.ledger.credit') }}
             </th>
           </tr>
         </thead>
         <tbody>
           <tr
-            v-for="(entry, n) in row.entries"
+            v-for="(entry, n) in debitsFirst(row.entries)"
             :key="n"
           >
             <td class="py-1">
@@ -161,15 +186,27 @@ const rowActions = (p: Row): DropdownMenuItem[] => (p.canReverse
                 {{ entry.name }}
               </ULink>
             </td>
-            <td class="w-32 py-1 text-right tabular-nums">
+            <td class="w-24 py-1 text-right tabular-nums sm:w-32">
               {{ entry.amountMinor > 0 ? money(entry.amountMinor, entry.currency) : '' }}
             </td>
-            <td class="w-32 py-1 text-right tabular-nums">
+            <td class="w-24 py-1 text-right tabular-nums sm:w-32">
               {{ entry.amountMinor < 0 ? money(-entry.amountMinor, entry.currency) : '' }}
             </td>
           </tr>
         </tbody>
       </table>
     </template>
+
+    <UModal
+      v-model:open="exporting"
+      :title="t('finance.screens.export.title')"
+    >
+      <template #body>
+        <FinanceExport
+          :periods="periods?.periods ?? []"
+          :period-id="typeof route.query.period === 'string' ? route.query.period : undefined"
+        />
+      </template>
+    </UModal>
   </PageList>
 </template>

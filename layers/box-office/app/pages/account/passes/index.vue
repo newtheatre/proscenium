@@ -15,6 +15,7 @@ const { data, status, error, refresh } = await useAPI<{ passes: MyPass[] }>('/ap
   <PageFrame
     :title="t('box-office.navigation.my-passes.label')"
     :description="t('box-office.my-passes.help')"
+    :trail="[{ label: t('core.account.title'), to: '/account' }]"
     width="reading"
   >
     <DataBoundary
@@ -28,7 +29,16 @@ const { data, status, error, refresh } = await useAPI<{ passes: MyPass[] }>('/ap
         :title="t('box-office.my-passes.empty')"
         :description="t('box-office.my-passes.empty-description')"
         icon="i-lucide-id-card"
-      />
+      >
+        <template #actions>
+          <UButton
+            to="/whats-on"
+            color="neutral"
+            variant="outline"
+            :label="t('box-office.mine.see-whats-on')"
+          />
+        </template>
+      </EmptyState>
       <div
         v-else
         class="space-y-6"

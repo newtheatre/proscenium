@@ -175,7 +175,7 @@ export default defineModule({
       { id: 'front-of-house.rota', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/rota', icon: 'i-lucide-calendar-range', ability: 'front-of-house.shift.view', order: 10 },
       { id: 'front-of-house.incidents', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/incidents', icon: 'i-lucide-shield-alert', ability: 'front-of-house.incident.view', order: 20 },
       { id: 'front-of-house.night-reports', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/night-reports', icon: 'i-lucide-notebook-pen', ability: 'front-of-house.night-report.view', order: 30 },
-      { id: 'front-of-house.hours', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/hours', icon: 'i-lucide-clock', ability: 'front-of-house.hours.view', order: 40 },
+      { id: 'front-of-house.hours', menu: 'console', group: 'people', section: 'everyday', to: '/console/people/volunteer-hours', icon: 'i-lucide-clock', ability: 'front-of-house.hours.view', order: 30 },
       { id: 'front-of-house.duties', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/duties', icon: 'i-lucide-badge-check', ability: 'front-of-house.duty.manage', order: 60 },
       { id: 'front-of-house.rota-templates', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/rota-templates', icon: 'i-lucide-layout-list', ability: 'front-of-house.duty.manage', order: 70 },
       { id: 'front-of-house.checklists', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/checklists', icon: 'i-lucide-list-checks', ability: 'front-of-house.checklist.manage', order: 80 },
@@ -282,7 +282,7 @@ export default defineModule({
       category: 'transactional' as const,
       side: 'members' as const,
       channels: ['email' as const, 'inbox' as const],
-      link: '/members/front-of-house/open',
+      link: '/members/front-of-house?view=open',
       variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const },
       wording: {
         'en-GB': {
@@ -354,7 +354,7 @@ export default defineModule({
       side: 'members' as const,
       channels: ['email' as const, 'inbox' as const],
       topic: 'front-of-house.cover-needed',
-      link: '/members/front-of-house/open',
+      link: '/members/front-of-house?view=open',
       variables: { duty: 'text' as const, show: 'text' as const, when: 'text' as const, date: 'text' as const },
       wording: {
         'en-GB': {
@@ -371,12 +371,13 @@ export default defineModule({
       channels: ['email' as const, 'inbox' as const],
       lane: 'bulk' as const,
       topic: 'front-of-house.rota-published',
-      link: '/members/front-of-house/open',
+      link: '/members/front-of-house?view=open',
       variables: { count: 'text' as const, shifts: 'text' as const },
       wording: {
         'en-GB': {
           subject: 'New shifts on the rota: {{ count }}',
           body: 'These shifts have just gone on the rota and are open for sign-up:\n\n{{ shifts }}\n\nChoose the ones that suit you from Open shifts. Places go to whoever signs up first.',
+          action: 'See open shifts',
         },
       },
     }, {

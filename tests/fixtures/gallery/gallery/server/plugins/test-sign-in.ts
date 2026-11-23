@@ -20,5 +20,7 @@ export default defineNitroPlugin(() => {
     },
     grants: async actor => tested.has(actor) ? actor.grants ?? [] : installed.grants?.(actor) ?? [],
     factAbilities: async () => installed.factAbilities?.() ?? {},
+    // A test actor has two-step sign-in set up unless it says `twoStep: false`.
+    strongSetUp: async actor => tested.has(actor) ? (actor as Actor & { twoStep?: boolean }).twoStep !== false : await installed.strongSetUp?.(actor) ?? true,
   })
 })

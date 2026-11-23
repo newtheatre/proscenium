@@ -5,7 +5,7 @@ import type { Answers, Definition } from '../../../../../shared/engine'
 
 interface Change { kind: 'added' | 'retired' | 'changed', impact: 'safe' | 'caution' | 'breaking', questionId: string, label: string, what: string[] }
 interface Version { number: number, live: boolean, publishedAt: number, publishedBy: string | null, responses: number, summary: { impact: Change['impact'], changes: Change[] } }
-interface History { form: { id: string, title: string, status: string, archived: boolean }, editRevision: number, versions: Version[] }
+interface History { form: { id: string, title: string, mode?: string, status: string, archived: boolean, canRead?: boolean }, editRevision: number, versions: Version[] }
 
 definePageMeta({ layout: 'console' })
 const { t } = useT()
@@ -45,7 +45,6 @@ watch(openNumber, async (number) => {
     close()
   }
 }, { immediate: true })
-const open = (number: number) => router.replace({ query: { ...route.query, version: String(number) } })
 const close = () => router.replace({ query: { ...route.query, version: undefined } })
 const panel = computed({ get: () => !!openNumber.value, set: (v: boolean) => { if (!v) close() } })
 
@@ -75,10 +74,17 @@ async function restore() {
 
 <template>
   <PageFrame
-    :title="t('forms.screens.versions.title')"
+    :title="data?.form.title ?? t('forms.screens.versions.title')"
     :description="t('forms.screens.versions.help')"
-    :trail="[{ label: t('forms.navigation.forms.label'), to: '/console/forms' }, ...(data ? [{ label: data.form.title, to: `/console/forms/${formId}` }] : [])]"
+    :trail="[{ label: t('forms.navigation.forms.label'), to: '/console/forms' }]"
   >
+    <template #toolbar>
+      <FormsTabs
+        :form-id="formId"
+        current="history"
+        :responses="data?.form.mode !== 'record' && !!data?.form.canRead"
+      />
+    </template>
     <DataBoundary
       :data="data"
       :status="status"
@@ -99,6 +105,7 @@ async function restore() {
           v-for="v in data.versions"
           :key="v.number"
           icon="i-lucide-history"
+          :to="`/console/forms/${formId}/versions?version=${v.number}`"
           :name="t('forms.screens.versions.n', { n: v.number })"
           :description="about(v)"
         >
@@ -106,14 +113,6 @@ async function restore() {
             v-if="v.live"
             tone="success"
             :label="t('forms.screens.versions.live')"
-          />
-          <UButton
-            :label="t('forms.screens.versions.open')"
-            :aria-label="t('forms.screens.versions.open-n', { n: v.number })"
-            size="sm"
-            color="neutral"
-            variant="subtle"
-            @click="open(v.number)"
           />
         </RecordListItem>
       </RecordList>

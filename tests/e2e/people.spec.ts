@@ -21,12 +21,24 @@ async function noViolations(page: Page) {
 test.describe('Merges', () => {
   test.use(as(person('Morgan Merger', [grant('core.account.merge')])))
 
-  test('is in the console\'s People navigation and lists merges, or says there are none', async ({ page }) => {
+  test('is not in the console\'s menu, and lists merges or says there are none', async ({ page }) => {
     await visit(page, '/console/people/merges')
     await expect(page.getByRole('heading', { level: 1, name: 'Merges' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Merges' }).first()).toHaveAttribute('href', '/console/people/merges')
+    await expect(page.getByRole('navigation').getByRole('link', { name: 'Merges' })).toHaveCount(0)
     await expect(page.getByText('No merges yet').or(page.getByRole('list', { name: 'Merges' }))).toBeVisible()
     await noViolations(page)
+  })
+})
+
+test.describe('Merges, for someone who also reads accounts', () => {
+  test.use(as(person('Morgan Merger', [grant('core.account.merge'), grant('core.account.read')])))
+
+  test('is reached from Accounts', async ({ page }) => {
+    await visit(page, '/console/people')
+    await page.getByRole('button', { name: 'More about accounts' }).click()
+    await page.getByRole('menuitem', { name: 'Merges' }).click()
+    await expect(page).toHaveURL(/\/console\/people\/merges$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Merges' })).toBeVisible()
   })
 })
 

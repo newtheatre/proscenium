@@ -1,6 +1,7 @@
-<!-- Performances (Box office specification, part 6): those still to come, grouped by production, the
-     production with the soonest performance first and each production's soonest first, with their
-     sale state and how many seats are taken. Each opens its sales set-up. -->
+<!-- Ticket set-up (Box office specification, part 6): productions with performances still to come,
+     the one playing soonest first. A production opens its Tickets tab, where the run's tickets are
+     set up; its nights are listed beneath with their sale state and seats taken, each opening its
+     own page for its sale dates and anything that differs from the run (Matt, 21 Nov 2026). -->
 <script setup lang="ts">
 definePageMeta({ layout: 'console' })
 
@@ -75,12 +76,23 @@ const when = (row: Row) => row.label ? `${dateTime(row.startsAt)}, ${row.label}`
             :key="group.id"
             :aria-labelledby="`production-${group.id}`"
           >
-            <h2
-              :id="`production-${group.id}`"
-              class="mb-2 text-sm font-semibold text-highlighted"
-            >
-              {{ group.title }}
-            </h2>
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h2
+                :id="`production-${group.id}`"
+                class="font-semibold text-highlighted"
+              >
+                {{ group.title }}
+              </h2>
+              <UButton
+                :to="`/console/box-office/performances/run/${encodeURIComponent(group.id)}`"
+                icon="i-lucide-ticket"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                :label="t('box-office.performances.run')"
+                :aria-label="t('box-office.performances.run-label', { title: group.title })"
+              />
+            </div>
             <RecordList :label="group.title">
               <RecordListItem
                 v-for="row in group.rows"

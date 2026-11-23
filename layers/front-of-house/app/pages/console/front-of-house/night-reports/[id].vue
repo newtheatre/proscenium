@@ -116,6 +116,7 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
       <PageFrame
         :title="title"
         :trail="trail"
+        long-title
       >
         <template #status>
           <StatusBadge

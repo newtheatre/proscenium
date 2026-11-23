@@ -192,7 +192,9 @@ Any module may import core's services without listing core: `import { notifyAddr
   `listTerms(key, { includeRetired? })` gives a picker's options in order; `getTerm(id)` gives a
   label for any term, retired or merged ones too; `assertTerm(id, key)` is the predicate to put on
   your own insert or update, then `.expect(1)`, so a retired term or one from another vocabulary
-  is refused. Staff edit terms at `/admin/vocabularies`; a term in use can be retired but
+  is refused. Staff edit a module's terms on the Lists tab of its page in Admin
+  (`/admin/modules/<module>/lists`, generated for any module that ships a vocabulary) and the
+  theatre's own lists at `/admin/vocabularies`; a term in use can be retired but
   never deleted, and the restrict reference makes the database refuse it too. Merging terms
   (C-22) comes later; `core.term.merged` is declared for it.
 
@@ -573,13 +575,13 @@ settingGroups: {
 },
 ```
 
-A group not named is on the module's own page in its `place` (`admin` by default: the Settings tab
-of the module's page in Admin, `/admin/modules/<module>`, which console staff open from the cog on
-the module's console pages; `console`: `/console/<module>/settings`). A named `admin` page is another
+A group not named is on the module's own page: the Settings tab of the module's page in Admin,
+`/admin/modules/<module>`, which console staff open from the cog on the module's console pages.
+`place` is always `admin`: no page of settings is made in the console. A named `admin` page is another
 tab, at `/admin/modules/<module>/<page>`; `about` is reserved for the About tab. Core has no page of its own, so
 each of its groups names a home; the table is `layers/core/module/settings.ts`. A single setting may
 carry `screen` where only part of its group is bespoke. A setting or group names a screen only once that screen shows and saves it: no setting may be reachable only through the API. Page ids are `<module>.<page>`, plus
-`core.advanced` and each module's `<module>.settings` and `<module>.admin`. A page's name is
+`core.advanced` and each module's `<module>.admin`. A page's name is
 `<module>.settings-pages.<page>`. The conformance run fails for a screen that is not a page. In
 code, `useRegistry().settingPages` and `.settingHomes` say where everything is.
 

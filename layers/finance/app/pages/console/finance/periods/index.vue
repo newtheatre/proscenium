@@ -11,7 +11,10 @@ const { day: dateOf } = useDates()
 </script>
 
 <template>
-  <PageFrame :title="t('finance.navigation.periods.label')">
+  <PageFrame
+    :title="t('finance.navigation.periods.label')"
+    :description="t('finance.screens.periods.help')"
+  >
     <DataBoundary
       :data="data"
       :status="status"

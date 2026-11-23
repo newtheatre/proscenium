@@ -86,6 +86,21 @@ export function archiveTemplate(unit: UnitView, id: string): void {
   unit.audit({ action: 'update', detail: { template: id, archived: true } })
 }
 
+/** Brings an archived template back. It does not become the default again; that is a choice to make afresh. */
+export async function restoreTemplate(unit: UnitView, id: string): Promise<void> {
+  const row = await first<{ archived_at: number | null }>('SELECT archived_at FROM front_of_house_rota_templates WHERE id = ?', id)
+  if (!row) refuse('core.not-found', 'There is no such rota template.', { status: 404 })
+  const refusal = row.archived_at === null
+    ? { code: 'front-of-house.template-not-archived', reason: 'This rota template is not archived.' }
+    : { code: 'front-of-house.template-name-taken', reason: 'There is already a rota template with that name.', remedy: 'Rename the other template, then restore this one.' }
+  unit.add({
+    sql: `UPDATE front_of_house_rota_templates SET archived_at = NULL, updated_at = ? WHERE id = ? AND archived_at IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM front_of_house_rota_templates o WHERE o.name = front_of_house_rota_templates.name AND o.archived_at IS NULL)`,
+    params: [nowMs(), id],
+  }).expect(1, refusal)
+  unit.audit({ action: 'update', detail: { template: id, restored: true } })
+}
+
 export interface ApplyResult {
   /** Shifts made, by performance. */
   added: { performanceId: string, shiftIds: string[] }[]

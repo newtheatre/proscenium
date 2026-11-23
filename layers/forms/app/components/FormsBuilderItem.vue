@@ -86,7 +86,7 @@ const logic = (q: { visibleWhen?: Question['visibleWhen'] }) => q.visibleWhen ? 
     >
       <div
         ref="handle"
-        class="flex w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-l-lg text-dimmed hover:bg-elevated hover:text-default"
+        class="flex w-9 shrink-0 cursor-grab touch-none items-center justify-center rounded-l-lg text-dimmed hover:bg-elevated hover:text-default sm:w-7"
         :aria-label="t('forms.screens.builder.drag-named', { name })"
       >
         <UIcon name="i-lucide-grip-vertical" />

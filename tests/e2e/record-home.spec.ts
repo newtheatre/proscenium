@@ -22,7 +22,7 @@ test.describe('someone who may view the gallery', () => {
     expect(text.indexOf('Overdue')).toBeLessThan(text.indexOf('Good to know'))
     expect(text).toContain('3 sample drafts are waiting.')
     expect(text).not.toContain('never shows')
-    expect(text).not.toContain('Due today')
+    expect(text).not.toContain('Needs doing')
     // What needs the person comes before the quick actions and the figures.
     expect(text.indexOf('Good to know')).toBeLessThan(text.indexOf('New sample booking'))
     expect(text.indexOf('New sample booking')).toBeLessThan(text.indexOf('Drafts written'))

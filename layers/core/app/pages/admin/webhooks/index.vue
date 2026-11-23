@@ -4,7 +4,6 @@
 import type { Webhook } from '../../../../server/webhooks/service'
 
 const { t } = useT()
-const route = useRoute()
 const { brief } = useDates()
 const { data, status, error, refresh } = await useAPI<{ webhooks: Webhook[] }>('/api/core/webhooks', { key: 'core:webhooks' })
 
@@ -20,6 +19,7 @@ function describe(hook: Webhook): string {
   <PageFrame
     :title="t('core.webhooks.title')"
     :description="t('core.webhooks.description')"
+    width="reading"
   >
     <template #primary>
       <UButton
@@ -59,10 +59,13 @@ function describe(hook: Webhook): string {
         </RecordListItem>
       </RecordList>
     </DataBoundary>
-    <SettingsSections
-      screen="/admin/webhooks"
-      :heading="t('core.webhooks.settings')"
-      :highlight="typeof route.query.setting === 'string' ? route.query.setting : undefined"
+    <UButton
+      :label="t('core.webhooks.settings')"
+      trailing-icon="i-lucide-arrow-right"
+      color="neutral"
+      variant="link"
+      to="/admin/advanced?setting=core.webhooks.max-attempts"
+      class="px-0"
     />
   </PageFrame>
 </template>

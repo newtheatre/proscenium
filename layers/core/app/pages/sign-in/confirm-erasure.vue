@@ -44,7 +44,16 @@ async function finish() {
         Something needs to be settled first. Your account shows what it is.
       </p>
     </div>
-    <template v-else-if="!refusal">
+    <UButton
+      v-if="answer || refusal"
+      block
+      to="/account/data"
+      color="neutral"
+      variant="outline"
+    >
+      {{ answer ? 'Go to your account' : 'See the request in your account' }}
+    </UButton>
+    <template v-if="!answer && !refusal">
       <p class="text-sm text-muted">
         Press Confirm erasure to confirm that you want your account erased.
       </p>

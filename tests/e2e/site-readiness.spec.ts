@@ -63,13 +63,15 @@ test.describe('someone who looks after the public site', () => {
     const pages = page.getByRole('region', { name: 'Pages with starter text' })
     await expect(pages.getByRole('link', { name: /Welcome/ })).toHaveAttribute('href', '/')
     await expect(pages.getByText(/Edit site\/content\/pages\/index\.md/)).toBeVisible()
-    await expect(page.getByRole('region', { name: 'Parts of pages from a switched-off module' }).getByText('Every part a page uses is switched on.')).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Nothing left to do' }).getByText('Every part a page uses is switched on.')).toBeVisible()
     await noViolations(page)
 
-    await page.getByRole('switch', { name: 'Turn search engines away' }).click()
-    await page.getByRole('button', { name: 'Save search engines settings' }).click()
-    await page.getByRole('button', { name: 'Save the change' }).click()
-    await expect(page.getByText('Search engines may list the site')).toBeVisible()
+    // The switch is a button on the warning itself; there is no settings card at the foot.
+    await expect(page.getByRole('switch', { name: 'Turn search engines away' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Let search engines in' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Let search engines in' }).click()
+    await expect(page.getByText('Search engines may list the site', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Turn search engines away' })).toBeVisible()
 
     const robots = await (await request.get('/robots.txt')).text()
     expect(robots).not.toMatch(/^Disallow: \/$/m)

@@ -31,9 +31,9 @@ interface Choices {
 const { t } = useT()
 const write = useAct()
 const { toRefusal } = useRefusal()
-const { confirm } = useConfirm()
+const undo = useUndo()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ checklists: Checklist[] }>('/api/front-of-house/checklists', { key: 'front-of-house:checklists' })
+const { data, status, error, refresh } = await useAPI<{ checklists: Checklist[], archived?: Checklist[] }>('/api/front-of-house/checklists', { key: 'front-of-house:checklists' })
 const { data: choices } = await useAPI<Choices>('/api/front-of-house/choices', { key: 'front-of-house:choices' })
 
 const ANY = 'any'
@@ -48,14 +48,19 @@ const blank = () => ({ name: '', moment: 'pre-show' as Moment, venueId: ANY, dut
 const form = ref(blank())
 const editing = ref<Checklist | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const open = ref(false)
 
 function edit(list: Checklist) {
   editing.value = list
   form.value = { name: list.name, moment: list.moment, venueId: list.venueId ?? ANY, dutyId: list.dutyId ?? ANY, items: list.items.map(i => ({ ...i, unit: i.unit ?? '' })) }
+  refusal.value = null
+  open.value = true
 }
-function stop() {
+function add() {
   editing.value = null
   form.value = blank()
+  refusal.value = null
+  open.value = true
 }
 function move(i: number, by: -1 | 1) {
   const items = form.value.items
@@ -78,7 +83,7 @@ async function save() {
     if (editing.value) await write(`/api/front-of-house/checklists/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
     else await write('/api/front-of-house/checklists', { method: 'POST', body })
     toast.add({ title: t(editing.value ? 'front-of-house.checklists.saved' : 'front-of-house.checklists.added', { name: body.name }), color: 'success' })
-    stop()
+    open.value = false
     await refresh()
   }
   catch (e) {
@@ -86,22 +91,27 @@ async function save() {
   }
 }
 
-async function archive(list: Checklist) {
-  if (!await confirm({ verb: t('front-of-house.archive.verb'), thing: t('front-of-house.checklists.thing', { name: list.name }), consequence: t('front-of-house.checklists.archive-consequence'), button: t('front-of-house.archive.button') })) return
+// Archiving asks nothing first: it is undone from its own toast, or later from the archived list.
+async function setArchived(list: Checklist, archived: boolean) {
   refusal.value = null
+  const call = (to: boolean) => write(`/api/front-of-house/checklists/${encodeURIComponent(list.id)}/${to ? 'archive' : 'restore'}`, { method: 'POST', body: {} })
   try {
-    await write(`/api/front-of-house/checklists/${encodeURIComponent(list.id)}/archive`, { method: 'POST', body: {} })
-    toast.add({ title: t('front-of-house.checklists.archived', { name: list.name }), color: 'success' })
+    await call(archived)
+    undo.offer(t(archived ? 'front-of-house.checklists.archived' : 'front-of-house.checklists.restored', { name: list.name }), async () => {
+      await call(!archived)
+      await refresh()
+    })
     await refresh()
   }
   catch (e) {
     refusal.value = toRefusal(e)
   }
 }
+const showArchived = ref(false)
 
 const actions = (list: Checklist): DropdownMenuItem[][] => [
   [{ label: t('front-of-house.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(list) }],
-  [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void archive(list) } }],
+  [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void setArchived(list, true) } }],
 ]
 </script>
 
@@ -110,8 +120,18 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
     :title="t('front-of-house.navigation.checklists.label')"
     :description="t('front-of-house.checklists.description')"
   >
-    <div class="space-y-8">
-      <RefusalNotice :refusal="refusal" />
+    <template #primary>
+      <UButton
+        icon="i-lucide-plus"
+        :label="t('front-of-house.checklists.add-button')"
+        @click="add"
+      />
+    </template>
+    <div class="space-y-4">
+      <RefusalNotice
+        v-if="!open"
+        :refusal="refusal"
+      />
       <DataBoundary
         :data="data"
         :status="status"
@@ -119,39 +139,74 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
         @retry="refresh()"
       >
         <template #default="{ data: d }">
-          <EmptyState
-            v-if="!d.checklists.length"
-            :title="t('front-of-house.checklists.empty.title')"
-            :description="t('front-of-house.checklists.empty.description')"
-            icon="i-lucide-list-checks"
-          />
-          <RecordList
-            v-else
-            :label="t('front-of-house.navigation.checklists.label')"
-          >
-            <RecordListItem
-              v-for="list in d.checklists"
-              :key="list.id"
-              :name="list.name"
-              :description="[t(`front-of-house.checklists.moment.${list.moment}`), venueName(list.venueId), t('front-of-house.checklists.items', { count: list.items.length })].join(' · ')"
+          <div class="space-y-4">
+            <EmptyState
+              v-if="!d.checklists.length"
+              :title="t('front-of-house.checklists.empty.title')"
+              :description="t('front-of-house.checklists.empty.description')"
+              icon="i-lucide-list-checks"
+            />
+            <RecordList
+              v-else
+              :label="t('front-of-house.navigation.checklists.label')"
             >
-              <RowActions
-                :items="actions(list)"
-                :label="t('front-of-house.actions-for', { name: list.name })"
-              />
-            </RecordListItem>
-          </RecordList>
+              <RecordListItem
+                v-for="list in d.checklists"
+                :key="list.id"
+                :name="list.name"
+                :description="[t(`front-of-house.checklists.moment.${list.moment}`), venueName(list.venueId), t('front-of-house.checklists.items', { count: list.items.length })].join(' · ')"
+              >
+                <RowActions
+                  :items="actions(list)"
+                  :label="t('front-of-house.actions-for', { name: list.name })"
+                />
+              </RecordListItem>
+            </RecordList>
+            <CollapsibleDivider
+              v-model:open="showArchived"
+              :label="t('front-of-house.archived.label')"
+              :count="d.archived?.length ?? 0"
+            >
+              <RecordList :label="t('front-of-house.checklists.archived-list')">
+                <RecordListItem
+                  v-for="list in d.archived"
+                  :key="list.id"
+                  :name="list.name"
+                  :description="[t(`front-of-house.checklists.moment.${list.moment}`), venueName(list.venueId), t('front-of-house.checklists.items', { count: list.items.length })].join(' · ')"
+                  muted
+                >
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    icon="i-lucide-archive-restore"
+                    :label="t('front-of-house.restore.button')"
+                    :aria-label="t('front-of-house.restore.named', { name: list.name })"
+                    loading-auto
+                    @click="setArchived(list, false)"
+                  />
+                </RecordListItem>
+              </RecordList>
+            </CollapsibleDivider>
+          </div>
         </template>
       </DataBoundary>
+    </div>
 
-      <PageSection :title="editing ? t('front-of-house.checklists.edit-title', { name: editing.name }) : t('front-of-house.checklists.add-title')">
+    <UModal
+      v-model:open="open"
+      :title="editing ? t('front-of-house.checklists.edit-title', { name: editing.name }) : t('front-of-house.checklists.add-title')"
+    >
+      <template #body>
         <UForm
+          id="fh-checklist"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ name: form.name })"
           novalidate
           @submit="save"
         >
+          <RefusalNotice :refusal="refusal" />
           <UFormField
             name="name"
             :label="t('front-of-house.checklists.name')"
@@ -260,21 +315,15 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
               @click="form.items.push(blankItem())"
             />
           </fieldset>
-          <div class="flex gap-2">
-            <UButton
-              type="submit"
-              :label="editing ? t('front-of-house.save') : t('front-of-house.checklists.add-button')"
-            />
-            <UButton
-              v-if="editing"
-              color="neutral"
-              variant="ghost"
-              :label="t('front-of-house.cancel')"
-              @click="stop"
-            />
-          </div>
         </UForm>
-      </PageSection>
-    </div>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="fh-checklist"
+          :label="editing ? t('front-of-house.save') : t('front-of-house.checklists.add-button')"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>

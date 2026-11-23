@@ -45,7 +45,8 @@ const text = (f?: FigureText) => (f ? t(f.key, f.params) : '')
 type Row = NonNullable<ShownFigure['chart']>['rows'][number]
 const rowName = (r: Row) => r.date ? dayAxis(r.date) : r.month ? monthBrief(`${r.month}-01`) : r.at ? brief(r.at) : (r.label ?? '')
 const chart = computed(() => props.figure.chart)
-const drawn = computed(() => chart.value && chart.value.type !== 'meters' && chart.value.rows.length > 1
+// A chart of nothing but noughts is an empty box with an axis: the figure above already says nought.
+const drawn = computed(() => chart.value && chart.value.type !== 'meters' && chart.value.rows.length > 1 && chart.value.rows.some(r => Object.values(r.values).some(v => v !== 0))
   ? chart.value.rows.map(r => ({ name: rowName(r), ...r.values }))
   : [])
 const meters = computed(() => chart.value?.type === 'meters' ? chart.value.rows : [])
@@ -109,12 +110,12 @@ const span = { small: '', wide: 'sm:col-span-2', tall: 'sm:row-span-2' } as cons
           class="space-y-1"
         >
           <div class="flex items-baseline justify-between gap-3 text-sm">
-            <span class="min-w-0 truncate">
-              <span class="font-medium text-highlighted">{{ r.label }}</span>
+            <span class="min-w-0">
+              <span class="block truncate font-medium text-highlighted">{{ r.label }}</span>
               <span
                 v-if="r.at"
-                class="text-muted"
-              > · {{ dayBrief(r.at) }}, {{ time(r.at) }}</span>
+                class="block text-xs text-muted"
+              >{{ dayBrief(r.at) }}, {{ time(r.at) }}</span>
             </span>
             <span class="shrink-0 tabular-nums text-muted">{{ t('core.home-figures.meter', { value: Object.values(r.values)[0] ?? 0, max: r.max ?? 0 }) }}</span>
           </div>

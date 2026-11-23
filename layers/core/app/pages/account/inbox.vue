@@ -7,6 +7,7 @@ const { t } = useT()
 <template>
   <PageFrame
     :title="t('core.inbox.title')"
+    :trail="[{ label: t('core.account.title'), to: '/account' }]"
     width="reading"
   >
     <InboxList />

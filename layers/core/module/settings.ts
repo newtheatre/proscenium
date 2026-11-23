@@ -47,8 +47,8 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   'retention': advanced,
   'files': advanced,
   'delivery': advanced,
-  // The Webhooks screen draws these under its list (C-49).
-  'webhooks': { screen: '/admin/webhooks' },
+  // Delivery limits, not day-to-day choices: the Webhooks screen is the list alone (Matt, 21 November 2026).
+  'webhooks': advanced,
   'lists': advanced,
   'programme': on('programme'),
   'grants': on('people'),

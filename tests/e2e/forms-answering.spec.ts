@@ -64,9 +64,8 @@ async function share(page: Page, title: string) {
   await expect(page.getByRole('dialog', { name: 'Form settings' })).toBeHidden()
   await page.getByRole('button', { name: 'Publish', exact: true }).click()
   await page.getByRole('button', { name: 'Publish version 1' }).click()
-  // Publishing for the first time goes straight on to sharing.
+  // Publishing for the first time shares the form in the same step, and shows its address.
   const dialog = page.getByRole('dialog', { name: 'Share' })
-  await expect(dialog.getByText('Nobody can open this address until the form is shared.')).toBeVisible()
   await expect(dialog.getByLabel('Address')).toHaveValue(/\/forms\//)
   const address = new URL(await dialog.getByLabel('Address').inputValue()).pathname
   return { dialog, address, builder: new URL(page.url()).pathname }
@@ -75,8 +74,8 @@ async function share(page: Page, title: string) {
 test('a shared form is answered without an account, and the author reads the response', async ({ page, browser }) => {
   const { dialog, address, builder } = await share(page, `Nominations ${run}`)
   await axe(page)
-  await dialog.getByRole('button', { name: 'Share the form' }).click()
-  await expect(page.getByText('The form is shared', { exact: true })).toBeVisible()
+  // Publishing for the first time shared it in the same step.
+  await expect(dialog.getByText('0 responses so far')).toBeVisible()
 
   const visitor = await as(browser, null)
   await visit(visitor, address)
@@ -115,6 +114,7 @@ test('a shared form is answered without an account, and the author reads the res
   await page.keyboard.press('Escape')
 
   // A view is in the address, so it can be sent to somebody else.
+  await page.getByRole('button', { name: 'Filters' }).click()
   await page.getByRole('combobox').filter({ hasText: 'Any question' }).click()
   await page.getByRole('option', { name: 'Who are you nominating?' }).click()
   await page.getByLabel('Is', { exact: true }).fill('Somebody else')
@@ -127,9 +127,10 @@ test('a shared form is answered without an account, and the author reads the res
 
 test('somebody signed in has their answers kept, and finds them under My forms', async ({ page, browser }) => {
   const { dialog, address } = await share(page, `Feedback ${run}`)
+  await expect(dialog.getByText('0 responses so far')).toBeVisible()
   await dialog.getByRole('switch', { name: 'One response each' }).click()
-  await dialog.getByRole('button', { name: 'Share the form' }).click()
-  await expect(page.getByText('The form is shared', { exact: true })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Sharing saved', { exact: true })).toBeVisible()
 
   const mine = await as(browser, member)
   await visit(mine, address)
@@ -157,8 +158,8 @@ test('somebody signed in has their answers kept, and finds them under My forms',
 test.describe('on a phone', () => {
   test('a form is answered without the page scrolling sideways', async ({ page, browser }) => {
     const { dialog, address } = await share(page, `Phone answers ${run}`)
-    await dialog.getByRole('button', { name: 'Share the form' }).click()
-    await expect(page.getByText('The form is shared', { exact: true })).toBeVisible()
+    // Publishing for the first time shared it in the same step.
+    await expect(dialog.getByText('0 responses so far')).toBeVisible()
     const phone = await as(browser, null, { width: 390, height: 800 })
     await visit(phone, address)
     await phone.getByLabel('Who are you nominating?').fill('Ada Lovelace')

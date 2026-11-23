@@ -12,7 +12,5 @@
   "core.confirm-its-you.confirm": "Confirm",
   "core.confirm-its-you.resend": "Send another code",
   "core.confirm-its-you.no-way": "This sign-in cannot be confirmed here. Sign in again, then try once more.",
-  "core.confirm-its-you.sign-in": "Sign in again",
-  "core.confirm-its-you.add-passkey": "Your account has no passkey yet. Add one, then try again.",
-  "core.confirm-its-you.add-passkey-button": "Add a passkey"
+  "core.confirm-its-you.sign-in": "Sign in again"
 }
