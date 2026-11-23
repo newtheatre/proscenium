@@ -17,7 +17,7 @@ No address prefix is reserved for the module. Every address is under `/account` 
 
 | Id | Shell | To | Shown by | Group, section | Count |
 | --- | --- | --- | --- | --- | --- |
-| `membership.members` | console | `/console/membership` | `membership.membership.view` | Membership, everyday | `membership.applications-waiting` |
+| `membership.members` | console | `/console/membership` | `membership.membership.view` | People, everyday | `membership.applications-waiting` |
 | `membership.schemes` | console | `/console/membership/schemes` | `membership.scheme.view` | Membership, setup |  |
 | `membership.lists` | console | `/console/membership/lists` | `membership.verification-list.manage` | Membership, setup |  |
 
