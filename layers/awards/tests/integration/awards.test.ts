@@ -2,7 +2,7 @@
 // decided, for an account, a new address or a name alone, and may correct or revoke it; the holder
 // sees theirs and chooses where each is listed; erasing a person takes theirs off the roll.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { env, inContext, person, rows } from '../../../../tests/integration/helpers'
+import { env, inContext, owner, person, rows } from '../../../../tests/integration/helpers'
 import { eraseAccount } from '../../../core/server/identity/erasure'
 import unlisted from '../../server/contributions/core.account-notice/unlisted'
 import { awardType, holder, holds, issue, NOV_17, ready, req } from './stage'
@@ -103,6 +103,13 @@ describe('issuing an award', () => {
     const self = person(['awards.award.issue'], { accountId: me.accountId, reassertedAt: NOV_17 })
     expect((await req('POST', `/api/awards/types/${type}/awards`, { awardedOn: '2026-11-17', accountId: me.accountId }, self)).body.code).toBe('awards.award.own')
     expect((await req('POST', `/api/awards/types/${type}/awards`, { awardedOn: '2026-11-17' })).status).toBe(422)
+  })
+
+  it('lets an Owner issue an award to their own account, having nobody above them to ask', async () => {
+    const type = await awardType()
+    const me = await holder('The Owner')
+    const self = owner(['awards.award.issue'], { accountId: me.accountId, reassertedAt: NOV_17 })
+    expect((await req('POST', `/api/awards/types/${type}/awards`, { awardedOn: '2026-11-17', accountId: me.accountId }, self)).status).toBe(200)
   })
 })
 
