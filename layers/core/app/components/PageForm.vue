@@ -65,9 +65,11 @@ const props = withDefaults(defineProps<{
   undo?: (result: unknown) => Promise<unknown>
   /** Panel mode: whether the panel is open. */
   open?: boolean
+  /** Panel mode even when long: for a form opened from a screen it must not leave, such as the till. */
+  alwaysPanel?: boolean
   /** What the toast says once saved, such as "Production created". Default: "Saved". */
   savedTitle?: string
-}>(), { description: undefined, open: undefined, savedTitle: undefined, version: undefined, current: undefined, returnTo: undefined, trail: undefined, draftKey: undefined, done: undefined, undo: undefined })
+}>(), { description: undefined, open: undefined, alwaysPanel: false, savedTitle: undefined, version: undefined, current: undefined, returnTo: undefined, trail: undefined, draftKey: undefined, done: undefined, undo: undefined })
 const emit = defineEmits<{
   (e: 'saved', result: unknown): void
   (e: 'cancel'): void
@@ -87,7 +89,7 @@ const PageFrame = resolveComponent('PageFrame')
 const bodySlot = computed(() => panel.value ? 'body' : 'default')
 // The buttons sit in the panel's or the page's footer, outside the form they submit.
 const formId = useId()
-const panel = computed(() => props.open !== undefined && props.fields.length <= PANEL_FIELD_LIMIT)
+const panel = computed(() => props.open !== undefined && (props.alwaysPanel || props.fields.length <= PANEL_FIELD_LIMIT))
 // A tick list holds { value, note? } for each ticked option, in the order of the options.
 function tickOf(name: string, value: string | number) {
   return (state[name] as { value: string | number, note?: string }[] | undefined)?.find(x => x.value === value)
