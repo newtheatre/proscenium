@@ -61,6 +61,15 @@ export const testAccess: AccessProvider = {
     const header = getHeader(event, 'x-test-actor')
     return header ? JSON.parse(header) as Actor : { kind: 'anonymous' }
   },
+  ownRecordExempt: async actor => !!actor.grants?.some(g => g.via === OWNER_VIA),
+}
+
+/** What a test actor's grants come through to stand for the theatre's Owner role. */
+export const OWNER_VIA = 'grant:owner'
+
+/** A test actor who is one of the theatre's Owners, holding these abilities. */
+export function owner(abilities: string[], extra: Partial<Actor> = {}): Actor {
+  return person([], { grants: abilities.map(ability => ({ ability, via: OWNER_VIA })), ...extra })
 }
 
 export function person(abilities: string[], extra: Partial<Actor> = {}): Actor {

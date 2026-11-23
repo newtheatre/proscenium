@@ -17,7 +17,7 @@ function paragraphs(text: string): string {
 // The page's look, around the theatre's colours, radius and display font set on :root.
 const STYLE = [
   '* { box-sizing: border-box; }', // not-policy: the page's look
-  'body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 2rem 1rem; background: var(--bg); color: var(--ink); font: 1.0625rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }', // not-policy: the page's look
+  'body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 2rem 1rem; background: var(--bg); color: var(--ink); font: 1.0625rem/1.6 var(--body); }', // not-policy: the page's look
   'main { width: 100%; max-width: 34rem; }', // not-policy: the page's look
   '.logo { display: block; max-height: 4rem; width: auto; margin: 0 0 1.5rem; }', // not-policy: the page's look
   '.kicker { margin: 0 0 .75rem; font-size: .8125rem; letter-spacing: .12em; text-transform: uppercase; color: var(--soft); }', // not-policy: the page's look
@@ -79,7 +79,8 @@ export async function noticePage(options: { setup?: boolean } = {}): Promise<str
 <meta name="robots" content="noindex">
 <title>${escape(words('maintenance.notice.title'))} · ${escape(name)}</title>
 <style>
-  :root { color-scheme: light dark; ${mode(light)}; --radius: ${brand.tokens.radius}; --display: ${brand.tokens.displayFont}; }
+  ${brand.tokens.fontFaces}
+  :root { color-scheme: light dark; ${mode(light)}; --radius: ${brand.tokens.radius}; --display: ${brand.tokens.displayFont}; --body: ${brand.tokens.bodyFont ?? 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'}; }
   @media (prefers-color-scheme: dark) { :root { ${mode(dark)}; } }
   ${STYLE}
 </style>

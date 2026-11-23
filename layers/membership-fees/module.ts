@@ -17,7 +17,7 @@ export default defineModule({
   stability: 'experimental',
   requires: ['membership', 'payments', 'finance'],
   // Fees has no console pages of its own: its tabs are in the Membership pages' settings window.
-  settingsIn: ['membership'],
+  settingsIn: ['membership.members'],
 
   settings: defineSettings('membership-fees', {
     // How long an online payment may take before its intent expires. The application itself stays open.

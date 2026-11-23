@@ -11,7 +11,7 @@ export type { EventRow, CallOutcome, CallAttempt } from './handlers'
 
 export { defineRoute, routeDeclaration } from './route'
 export type { RouteDeclaration, RouteContext } from './route'
-export { can, fact, factHolders, requireAbility, setAccessProvider, STRONGER_SIGN_IN } from './access'
+export { can, fact, factHolders, ownRecordExempt, requireAbility, setAccessProvider, STRONGER_SIGN_IN } from './access'
 export type { AccessProvider, Decision } from './access'
 export { createUnit } from './unit'
 export type { UnitView, UnitOfWork, AuditEntry, RecordRef, CommitResult } from './unit'

@@ -18,12 +18,17 @@ here is stable before 1.0.
 Every shell and live mode wear the brand (C-35): `app.vue` puts the brand's stylesheet (primary,
 greys, radius, already shaded to reach 4.5 to 1 in light and dark) in the head of every page, so a layout
 never loads it itself, and each header draws the theatre's logo, or its name when there is none, with
-`BrandMark`. The heading font (`core.brand.display-font`) is the public shell's alone: `layouts/default.vue`
-sets `public-shell` on `body` and `main.css` gives its `h1` to `h3` and the header's name
-`--brand-display-font`; the other shells keep the system font. The choices are font stacks the device
-already has, so nothing is downloaded. Fonts the site serves itself and remote fonts (such as Google
-Fonts) are not supported yet; adding one means a choice with a source as well as a stack, and a
-`@font-face` or stylesheet link from `themeCss`.
+`BrandMark`. The heading font (`core.brand.display-font`) and the body font (`core.brand.body-font`) are
+the public shell's alone: `layouts/default.vue` sets `public-shell` on `body`, `main.css` gives its `h1`
+to `h3` and the header's name `--brand-display-font`, and the brand's stylesheet sets the body font on
+`body.public-shell` unless it is the device's own; the other shells keep the system font.
+
+Both choose from `shared/brand-fonts.ts`: three stacks the device already has, and fonts the site serves
+itself from `layers/core/public/fonts`, each a variable font's latin and latin-ext files from Fontsource
+with its SIL Open Font License beside it. `themeCss` writes the `@font-face` rules for the chosen fonts
+only, so a font nobody chose is never downloaded, and no page asks another site for a font. To offer
+another font, add its two files and `OFL.txt` under `public/fonts/<id>/`, an entry in `BRAND_FONTS` and
+its two option labels; only fonts whose licence allows self-hosting (OFL or similar) belong there.
 
 `/account /members /console /admin /live /book /sign-in /setup /api /files` are reserved. A page under a
 shell prefix is checked before it renders by `middleware/access.global.ts`, which asks

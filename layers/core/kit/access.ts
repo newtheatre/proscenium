@@ -1,6 +1,7 @@
 // The one permission check (R1). Grants, roles, facts and ownership only ever allow; the single
-// declarative refusal is owner: 'refuses'. Where grants come from is identity's business: it
-// installs an access provider. Until then the provider reads grants from the actor itself.
+// declarative refusal is owner: 'refuses', which the theatre's Owners stand above. Where grants
+// come from is identity's business: it installs an access provider. Until then the provider reads
+// grants from the actor itself.
 import { useRegistry } from './registry'
 import { impliedAbility } from './abilities'
 import { isEnabled } from './modules-store'
@@ -23,6 +24,8 @@ export interface AccessProvider {
   factAbilities?: () => Promise<Record<string, string[]>>
   /** Whether the actor's account has any way to sign in strongly (a passkey, or an authenticator app where accepted). */
   strongSetUp?: (actor: Actor) => Promise<boolean>
+  /** Whether the actor stands above the own-record refusal: the theatre's Owners, who have nobody above them to ask. */
+  ownRecordExempt?: (actor: Actor) => Promise<boolean>
 }
 
 /** Refusals that mean "you hold this, but your sign-in is not strong enough": the second when nothing is set up to make it so. */
@@ -34,6 +37,7 @@ const defaultProvider: AccessProvider = {
   actor: async () => ({ kind: 'anonymous' }),
   grants: async actor => actor.grants ?? [],
   factAbilities: async () => ({}),
+  ownRecordExempt: async () => false,
 }
 let provider: AccessProvider = defaultProvider
 
@@ -124,7 +128,7 @@ export async function can(actor: Actor, ability: AbilityName | 'signed-in', reco
 
   const owner = record && decl.owner && decl.owner !== 'ignored' ? await ownerOf(record) : null
   const isOwner = !!owner && owner === actor.accountId
-  if (decl.owner === 'refuses' && isOwner) return refuse('core.access.own-record', 'You cannot do this to your own record.', 403, 'Ask someone else who has this permission.')
+  if (decl.owner === 'refuses' && isOwner && !(await ownRecordExempt(actor))) return refuse('core.access.own-record', 'You cannot do this to your own record.', 403, 'Ask someone else who has this permission.')
 
   let by: string | undefined
   if (decl.owner === 'grants' && isOwner) by = 'owner'
@@ -189,6 +193,14 @@ export async function can(actor: Actor, ability: AbilityName | 'signed-in', reco
       return refuse('core.access.not-fresh', 'For your safety, confirm it is you before doing this.', 403, 'Confirm your sign-in, then try again.')
   }
   return { allowed: true, by }
+}
+
+/**
+ * Whether the actor may act on their own record where a rule refuses it: owner: 'refuses' here, and
+ * the services that apply the same rule to a record not yet made (Matt, 23 November 2026).
+ */
+export async function ownRecordExempt(actor: Actor): Promise<boolean> {
+  return actor.kind === 'person' && !!actor.accountId && !!(await provider.ownRecordExempt?.(actor))
 }
 
 /** Reads a fact another module declared. A fact of a switched-off module holds for nobody. */

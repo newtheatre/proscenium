@@ -150,7 +150,7 @@ export default defineModule({
     ],
     'core.navigation': [
       { id: 'membership.schemes', menu: 'admin', group: 'modules', to: '/admin/modules/membership/schemes', match: '/admin/modules/membership/schemes', icon: 'i-lucide-id-card', ability: 'membership.scheme.view', order: 10 },
-      { id: 'membership.members', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership', match: '/console/membership/memberships', icon: 'i-lucide-users', ability: 'membership.membership.view', order: 1, count: 'membership.applications-waiting' },
+      { id: 'membership.members', menu: 'console', group: 'people', section: 'everyday', to: '/console/membership', match: '/console/membership/memberships', icon: 'i-lucide-id-card', ability: 'membership.membership.view', order: 15, count: 'membership.applications-waiting' },
       { id: 'membership.lists', menu: 'admin', group: 'modules', to: '/admin/modules/membership/lists', match: '/admin/modules/membership/lists', icon: 'i-lucide-list-checks', ability: 'membership.verification-list.manage', order: 20 },
       { id: 'membership.mine', menu: 'account', group: 'theatre', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35, forNonMembers: true },
     ],
