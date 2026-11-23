@@ -130,11 +130,10 @@ const setCriterion = (id: string, change: Partial<Criterion>, merge?: string) =>
             :label="t('forms.screens.review.quorum')"
             :help="t('forms.screens.review.quorum-help')"
           >
-            <UInputNumber
+            <FieldNumber
               :model-value="review.quorum ?? 1"
               :min="1"
               :max="40"
-              class="w-32"
               @update:model-value="set((r) => { r.quorum = Number($event) || 1 }, `quorum:${stage.key}`)"
             />
           </UFormField>

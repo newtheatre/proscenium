@@ -82,6 +82,8 @@ export default defineRoute({
       canChange: decision.allowed && !entry.managed,
       min: entry.kind === 'rate' ? RATE_COUNT.min : entry.min,
       max: entry.kind === 'rate' ? RATE_COUNT.max : entry.max,
+      /** Words that may not be empty, such as the theatre's name: there is then no Reset to "not set". */
+      minLength: entry.minLength,
       maxLength: entry.maxLength,
       /** A duration's units, when it offers only some. */
       units: entry.kind === 'duration' ? entry.units : undefined,

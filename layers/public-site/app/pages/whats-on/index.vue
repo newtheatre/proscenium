@@ -1,8 +1,9 @@
 <!-- What's on (C-38): published, listed productions with a scheduled performance still to come,
-     soonest first, filtered by category, season, venue and month. Unfiltered, the soonest show is billed
+     soonest first, filtered by category, season, venue and month from one toolbar over the list
+     (a sheet on a phone). Unfiltered, the soonest show is billed
      at the top with its next dates (PublicSiteSpotlight); the rest follow under the month they next
-     play. Each card links to the production's page. The filters are ordinary links, so the page works
-     with scripts off. -->
+     play. Each card links to the production's page. The filters are a GET form, so the page works with
+     scripts off. -->
 <script setup lang="ts">
 interface Listing {
   id: string
@@ -55,7 +56,7 @@ const months = computed(() => {
   return [...groups.entries()].map(([month, shows]) => ({ month, label: monthYear(`${month}-01`), shows }))
 })
 
-// A group shows only when it offers a real choice. Each option keeps the other filters as they are.
+// A group shows only when it offers a real choice. Each choice keeps the other filters as they are.
 const link = (key: Key, value: string | undefined) => ({ path: '/whats-on', query: { ...chosen.value, [key]: value } })
 const groups = computed(() => {
   const f = filters.value
@@ -68,6 +69,18 @@ const groups = computed(() => {
   ]
   return all.filter(g => g.options.length > 1 || chosen.value[g.key])
 })
+const chips = computed(() => groups.value.flatMap((g) => {
+  const value = chosen.value[g.key]
+  const option = value ? g.options.find(o => o.value === value) : undefined
+  return value ? [{ key: g.key, label: option?.label ?? value }] : []
+}))
+const listed = computed(() => months.value.reduce((n, m) => n + m.shows.length, 0))
+
+// Native selects in a GET form, so the filters still work with scripts off (C-38); with scripts on a
+// choice applies at once and the Show button is hidden by the noscript style below.
+const pick = (key: Key, value: string) => navigateTo(link(key, value || undefined), { replace: true })
+const sheet = ref(false)
+useHead({ noscript: [{ key: 'whats-on-filters', innerHTML: '<style>.whats-on-filters{display:flex!important}.whats-on-apply{display:inline-flex!important}.whats-on-filter-open{display:none!important}</style>' }] })
 </script>
 
 <template>
@@ -80,48 +93,129 @@ const groups = computed(() => {
           :show="spotlight"
           class="mb-8"
         />
-        <nav
-          v-if="groups.length"
-          :aria-label="t('public-site.whats-on.filters')"
-          class="mb-8 grid gap-3"
+        <div
+          v-if="groups.length || productions.length"
+          class="mb-8 flex flex-col gap-3 border-b border-default pb-4"
         >
-          <div
-            v-for="g in groups"
-            :key="g.key"
-            class="flex flex-wrap items-center gap-1"
-          >
-            <span
-              :id="`filter-${g.key}`"
-              class="me-2 w-20 text-sm font-medium"
-            >{{ g.label }}</span>
-            <ul
-              :aria-labelledby="`filter-${g.key}`"
-              class="flex flex-wrap gap-1"
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2
+              id="coming-up"
+              class="text-2xl font-bold text-highlighted sm:text-3xl"
             >
-              <li>
-                <UButton
-                  :to="link(g.key, undefined)"
-                  :label="t('public-site.whats-on.filter-any')"
-                  :aria-current="!chosen[g.key] ? 'true' : undefined"
-                  color="neutral"
-                  :variant="!chosen[g.key] ? 'solid' : 'ghost'"
-                />
-              </li>
-              <li
-                v-for="o in g.options"
-                :key="o.value"
+              {{ t('public-site.whats-on.coming-up') }}
+              <span class="ms-2 text-sm font-normal text-muted">{{ t('public-site.whats-on.month-count', { count: listed }) }}</span>
+            </h2>
+            <PublicSiteFilterForm
+              v-if="groups.length"
+              action="/whats-on"
+              :label="t('public-site.whats-on.filters')"
+              class="whats-on-filters hidden flex-wrap items-center gap-2 sm:flex"
+            >
+              <PublicSiteWhatsOnFilter
+                v-for="g in groups"
+                :key="g.key"
+                :name="g.key"
+                :label="g.label"
+                :any="t('public-site.whats-on.filter-any')"
+                :options="g.options"
+                :value="chosen[g.key]"
+                @pick="pick(g.key, $event)"
+              />
+              <UButton
+                type="submit"
+                :label="t('public-site.whats-on.apply')"
+                color="neutral"
+                variant="outline"
+                class="whats-on-apply hidden"
+              />
+            </PublicSiteFilterForm>
+            <UButton
+              v-if="groups.length"
+              :label="t('public-site.whats-on.filter')"
+              icon="i-lucide-sliders-horizontal"
+              color="neutral"
+              variant="outline"
+              class="whats-on-filter-open sm:hidden"
+              @click="sheet = true"
+            >
+              <template
+                v-if="chips.length"
+                #trailing
               >
-                <UButton
-                  :to="link(g.key, o.value)"
-                  :label="o.label"
-                  :aria-current="chosen[g.key] === o.value ? 'true' : undefined"
+                <UBadge
+                  :label="String(chips.length)"
                   color="neutral"
-                  :variant="chosen[g.key] === o.value ? 'solid' : 'ghost'"
+                  size="sm"
                 />
-              </li>
-            </ul>
+              </template>
+            </UButton>
           </div>
-        </nav>
+          <ul
+            v-if="chips.length"
+            class="flex flex-wrap items-center gap-2"
+          >
+            <li
+              v-for="c in chips"
+              :key="c.key"
+            >
+              <UButton
+                :to="link(c.key, undefined)"
+                :label="c.label"
+                :aria-label="t('public-site.whats-on.remove-filter', { label: c.label })"
+                trailing-icon="i-lucide-x"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                class="rounded-full"
+              />
+            </li>
+            <li>
+              <UButton
+                to="/whats-on"
+                :label="t('public-site.whats-on.clear-all')"
+                variant="link"
+                size="sm"
+              />
+            </li>
+          </ul>
+        </div>
+        <USlideover
+          v-model:open="sheet"
+          side="bottom"
+          :title="t('public-site.whats-on.filters')"
+        >
+          <template #body>
+            <div class="flex flex-col gap-4">
+              <PublicSiteWhatsOnFilter
+                v-for="g in groups"
+                :key="g.key"
+                :name="g.key"
+                :label="g.label"
+                :any="t('public-site.whats-on.filter-any')"
+                :options="g.options"
+                :value="chosen[g.key]"
+                stacked
+                @pick="pick(g.key, $event)"
+              />
+            </div>
+          </template>
+          <template #footer>
+            <div class="flex w-full items-center justify-between gap-3">
+              <UButton
+                v-if="chips.length"
+                to="/whats-on"
+                :label="t('public-site.whats-on.clear-all')"
+                variant="link"
+                @click="sheet = false"
+              />
+              <UButton
+                :label="t('public-site.whats-on.show-results', { count: listed })"
+                class="ms-auto"
+                @click="sheet = false"
+              />
+            </div>
+          </template>
+        </USlideover>
         <template v-if="productions.length">
           <section
             v-for="m in months"
@@ -130,12 +224,12 @@ const groups = computed(() => {
             class="mb-10"
           >
             <div class="mb-4 flex items-baseline gap-3">
-              <h2
+              <h3
                 :id="`month-${m.month}`"
                 class="text-2xl font-bold text-highlighted"
               >
                 {{ m.label }}
-              </h2>
+              </h3>
               <span class="text-sm text-muted">{{ t('public-site.whats-on.month-count', { count: m.shows.length }) }}</span>
             </div>
             <ul class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

@@ -4,7 +4,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { changeSetting, createUnit } from '#kit'
 import * as standings from '../../../core/server/identity/standings'
-import { inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
+import { inContext, owner, person, rows, setModule } from '../../../../tests/integration/helpers'
 import { awardType, holder, issue, NOV_17, ready, req } from './stage'
 
 beforeAll(ready)
@@ -110,5 +110,7 @@ describe('linking an account', () => {
     const me = await holder('Me')
     const self = person(['awards.award.update'], { accountId: me.accountId, reassertedAt: NOV_17 })
     expect((await req('POST', `/api/awards/awards/${past}/link`, { accountId: me.accountId }, self)).body.code).toBe('awards.award.own')
+    const theOwner = owner(['awards.award.update'], { accountId: me.accountId, reassertedAt: NOV_17 })
+    expect((await req('POST', `/api/awards/awards/${past}/link`, { accountId: me.accountId }, theOwner)).status).toBe(200)
   })
 })

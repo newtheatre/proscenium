@@ -1,5 +1,6 @@
 <!-- A failed first load shows only the reason and one way on, never a half-filled page: Try again
-     where trying again can help, the way back where it cannot (not found, not allowed, gone). -->
+     where trying again can help, the way back where it cannot (not found, not allowed, gone). It
+     takes the empty state's shape, so a refusal reads as the page's answer rather than a fault. -->
 <script setup lang="ts">
 const props = defineProps<{ reason: string, retrying?: boolean, /** The answer's HTTP status, when there was one. */ status?: number, remedy?: string, /** The refusal's code: one that somewhere else puts right (two-step sign-in) offers the way there. */ code?: string }>()
 const emit = defineEmits<{ retry: [] }>()
@@ -12,6 +13,8 @@ const back = computed(() => parent?.value
   ? { label: t('core.trail.back-to', { where: parent.value.label }), to: parent.value.to }
   : { label: t('core.failed.back'), to: route.path.replace(/\/[^/]+\/?$/, '') || '/' })
 const go = computed(() => refusalAction({ code: props.code }))
+const ICONS: Record<number, string> = { 0: 'i-lucide-wifi-off', 401: 'i-lucide-lock', 403: 'i-lucide-lock', 404: 'i-lucide-search-x', 410: 'i-lucide-archive' }
+const icon = computed(() => ICONS[props.status ?? 0] ?? 'i-lucide-cloud-alert')
 const actions = computed(() => go.value
   ? [{ label: go.value.label, trailingIcon: 'i-lucide-arrow-right', color: 'neutral' as const, variant: 'outline' as const, to: go.value.to }]
   : final.value
@@ -20,12 +23,13 @@ const actions = computed(() => go.value
 </script>
 
 <template>
-  <UAlert
-    role="alert"
-    color="error"
-    icon="i-lucide-circle-alert"
-    :title="reason"
-    :description="remedy"
-    :actions="actions"
-  />
+  <div role="alert">
+    <UEmpty
+      variant="naked"
+      :icon="icon"
+      :title="reason"
+      :description="remedy"
+      :actions="actions"
+    />
+  </div>
 </template>

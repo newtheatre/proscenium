@@ -33,6 +33,12 @@ test.describe('someone who reads roles and sets up sign-in', () => {
     await visit(page, '/admin/roles/new')
     await expect(page.getByRole('heading', { level: 1, name: 'New role' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'What it lets holders do' })).toBeVisible()
+    // Each module folds to its count; Core starts open, the rest are opened here.
+    await expect(page.getByRole('button', { name: /^Core · \d+ of \d+ ticked$/ })).toHaveAttribute('aria-expanded', 'true')
+    // Opening one takes it out of the folded set, so the first folded row is pressed until none is left.
+    const folded = page.getByRole('button', { name: /of \d+ ticked$/, expanded: false })
+    while (await folded.count()) await folded.first().click()
+    await expect(folded).toHaveCount(0)
     await expect(page.getByText('You do not hold this, so you cannot give it').first()).toBeVisible()
     await noViolations(page)
   })

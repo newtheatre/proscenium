@@ -23,16 +23,17 @@ const cards = computed(() => (home.value?.cards ?? []).flatMap((c) => {
       v-if="cards.length"
       class="grid grid-cols-1 gap-3 md:grid-cols-2"
     >
-      <li
+      <UCard
         v-for="c in cards"
         :key="c.id"
-        class="rounded-lg border border-default p-4"
+        as="li"
+        :ui="{ body: 'p-4 sm:p-4' }"
       >
         <component
           :is="c.component"
           :count="c.count"
         />
-      </li>
+      </UCard>
     </ul>
     <EmptyState
       v-else-if="navigation?.items.length"

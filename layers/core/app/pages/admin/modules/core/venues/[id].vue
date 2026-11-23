@@ -450,13 +450,12 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             hint="Optional"
             help="Box office and room bookings start from this."
           >
-            <UInputNumber
+            <FieldNumber
               v-model="space.defaultCapacity"
               :min="1"
               :increment="false"
               :decrement="false"
               placeholder="Not set"
-              class="w-32"
             />
           </UFormField>
           <UCheckbox

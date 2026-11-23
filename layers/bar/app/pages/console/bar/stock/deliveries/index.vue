@@ -7,8 +7,6 @@ const { t } = useT()
 const { dateTime } = useDates()
 const { data, status, error, refresh } = await useAPI<{ deliveries: Delivery[], locations: { id: string, name: string }[] }>('/api/bar/stock/deliveries', { key: 'bar:deliveries' })
 
-// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
-const phone = useScreenQuery('(max-width: 639px)')
 const locationName = (id: string) => data.value?.locations.find(l => l.id === id)?.name ?? ''
 const columns = computed(() => [
   { id: 'when', header: t('bar.screens.deliveries.when') },
@@ -50,31 +48,25 @@ const columns = computed(() => [
             />
           </template>
         </EmptyState>
-        <RecordList
-          v-if="d.deliveries.length && phone"
-          :label="t('bar.screens.deliveries.title')"
-        >
-          <RecordListItem
-            v-for="r in d.deliveries"
-            :key="r.id"
-            :to="`/console/bar/stock/deliveries/${r.id}`"
-            :name="[r.supplier ?? t('bar.screens.deliveries.no-supplier'), locationName(r.locationId)].join(' · ')"
-            :description="[dateTime(r.receivedAt ?? r.createdAt), r.supplierRef ? t('bar.screens.deliveries.note-ref', { ref: r.supplierRef }) : null, t('bar.screens.deliveries.items-count', { count: r.lines.length })].filter(Boolean).join(' · ')"
-          >
-            <StatusBadge
-              :tone="r.state === 'received' ? 'success' : 'warning'"
-              :label="t(`bar.screens.deliveries.states.${r.state}`)"
-            />
-          </RecordListItem>
-        </RecordList>
-        <UTable
-          v-else-if="d.deliveries.length"
-          :data="d.deliveries"
+        <TableOrList
+          v-if="d.deliveries.length"
+          :rows="d.deliveries"
           :columns="columns"
-          :caption="t('bar.screens.deliveries.title')"
-          :meta="{ class: { tr: 'cursor-pointer' } }"
-          @select="(_event: Event, row: { original: Delivery }) => navigateTo(`/console/bar/stock/deliveries/${row.original.id}`)"
+          :label="t('bar.screens.deliveries.title')"
+          :to="(r: Delivery) => `/console/bar/stock/deliveries/${r.id}`"
         >
+          <template #item="{ row: r }">
+            <RecordListItem
+              :to="`/console/bar/stock/deliveries/${r.id}`"
+              :name="[r.supplier ?? t('bar.screens.deliveries.no-supplier'), locationName(r.locationId)].join(' · ')"
+              :description="[dateTime(r.receivedAt ?? r.createdAt), r.supplierRef ? t('bar.screens.deliveries.note-ref', { ref: r.supplierRef }) : null, t('bar.screens.deliveries.items-count', { count: r.lines.length })].filter(Boolean).join(' · ')"
+            >
+              <StatusBadge
+                :tone="r.state === 'received' ? 'success' : 'warning'"
+                :label="t(`bar.screens.deliveries.states.${r.state}`)"
+              />
+            </RecordListItem>
+          </template>
           <template #when-cell="{ row }">
             <ULink
               :to="`/console/bar/stock/deliveries/${row.original.id}`"
@@ -102,7 +94,7 @@ const columns = computed(() => [
               :label="t(`bar.screens.deliveries.states.${row.original.state}`)"
             />
           </template>
-        </UTable>
+        </TableOrList>
       </template>
     </DataBoundary>
   </PageFrame>

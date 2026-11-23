@@ -19,8 +19,6 @@ const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 
-// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
-const phone = useScreenQuery('(max-width: 639px)')
 const ALL = 'all'
 const param = (key: string) => computed({
   get: () => (route.query[key] as string | undefined) ?? ALL,
@@ -186,34 +184,28 @@ const columns = computed(() => [
           :description="t('bar.screens.sales.empty.description')"
           icon="i-lucide-receipt"
         />
-        <RecordList
-          v-if="d.rows.length && phone"
-          :label="t('bar.navigation.sales.label')"
-        >
-          <RecordListItem
-            v-for="r in d.rows"
-            :key="r.reference"
-            :to="`/console/bar/sales/${r.reference}`"
-            :name="r.reference"
-            :description="[dateTime(r.at), r.outlet, r.state === 'paid' ? null : stateLabel(r.state)].filter(Boolean).join(' · ')"
-          >
-            <span class="text-right text-sm">
-              <span class="block font-medium tabular-nums">{{ money(r.totalMinor) }}</span>
-              <span
-                v-if="r.refundedMinor"
-                class="block text-muted"
-              >{{ t('bar.screens.sales.refunded', { amount: money(r.refundedMinor) }) }}</span>
-            </span>
-          </RecordListItem>
-        </RecordList>
-        <UTable
-          v-else-if="d.rows.length"
-          :data="d.rows"
+        <TableOrList
+          v-if="d.rows.length"
+          :rows="d.rows"
           :columns="columns"
-          :caption="t('bar.navigation.sales.label')"
-          :meta="{ class: { tr: 'cursor-pointer' } }"
-          @select="(_event: Event, row: { original: Row }) => navigateTo(`/console/bar/sales/${row.original.reference}`)"
+          :label="t('bar.navigation.sales.label')"
+          :to="(r: Row) => `/console/bar/sales/${r.reference}`"
         >
+          <template #item="{ row: r }">
+            <RecordListItem
+              :to="`/console/bar/sales/${r.reference}`"
+              :name="r.reference"
+              :description="[dateTime(r.at), r.outlet, r.state === 'paid' ? null : stateLabel(r.state)].filter(Boolean).join(' · ')"
+            >
+              <span class="text-right text-sm">
+                <span class="block font-medium tabular-nums">{{ money(r.totalMinor) }}</span>
+                <span
+                  v-if="r.refundedMinor"
+                  class="block text-muted"
+                >{{ t('bar.screens.sales.refunded', { amount: money(r.refundedMinor) }) }}</span>
+              </span>
+            </RecordListItem>
+          </template>
           <template #reference-cell="{ row }">
             <ULink
               :to="`/console/bar/sales/${row.original.reference}`"
@@ -237,7 +229,7 @@ const columns = computed(() => [
               :label="stateLabel(row.original.state)"
             />
           </template>
-        </UTable>
+        </TableOrList>
       </template>
     </DataBoundary>
   </PageFrame>

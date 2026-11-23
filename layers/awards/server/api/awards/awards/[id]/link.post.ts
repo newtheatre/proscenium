@@ -7,7 +7,7 @@
 // which is then revoked as merged.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
-import { can, defineRoute, first, nowMs, refuse } from '#kit'
+import { can, defineRoute, first, nowMs, ownRecordExempt, refuse } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { findOrCreateAccount } from '#modules/core'
 import { requireAward } from '../../../../awards'
@@ -31,7 +31,7 @@ export default defineRoute({
   let accountId = input.accountId ?? null
   if (accountId && !(await first('SELECT 1 FROM core_accounts WHERE id = ? AND anonymised_at IS NULL', accountId))) refuse('core.not-found', 'There is no such person.', { status: 404 })
   if (!accountId) accountId = (await findOrCreateAccount(unit, { address: input.address!, name: award.recipientName, origin: 'staff' })).accountId
-  if (actor.accountId && await first(`SELECT 1 WHERE ?1 IN (${accountScopeSql('?2')})`, accountId, actor.accountId))
+  if (actor.accountId && await first(`SELECT 1 WHERE ?1 IN (${accountScopeSql('?2')})`, accountId, actor.accountId) && !(await ownRecordExempt(actor)))
     refuse('awards.award.own', 'You cannot link an award to your own account.', { status: 403, remedy: 'Ask somebody else who may correct awards.' })
   if (type.onePerPerson && award.state === 'current' && !award.accountId) {
     const mine = await first<{ id: string, awardedOn: string, awardedPrecision: string, awardedFor: string | null, citation: string | null }>(

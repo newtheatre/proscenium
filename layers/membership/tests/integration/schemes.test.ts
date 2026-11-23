@@ -3,7 +3,7 @@
 // add a member by address; the standing follows the dates with nothing run, on the right side only.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { setClock } from '#kit'
-import { person, rows } from '../../../../tests/integration/helpers'
+import { owner, person, rows } from '../../../../tests/integration/helpers'
 import { holds, NOV_17, officer, ready, req, scheme } from './stage'
 
 beforeAll(ready)
@@ -157,12 +157,17 @@ describe('holding a scheme', () => {
     expect((await req('GET', '/api/membership/schemes/all')).body.schemes.find((s: any) => s.id === id).holders).toBe(1)
   })
 
-  it('refuses staff adding their own account', async () => {
+  it('refuses staff adding their own account, unless they are an Owner', async () => {
     const id = await scheme()
     await req('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })
     const address = `self${Date.now()}@example.org`
     const first = await req('POST', `/api/membership/schemes/${id}/members`, { address })
     const self = { ...officer, accountId: first.body.accountId }
     expect((await req('POST', `/api/membership/schemes/${id}/members`, { address }, self)).body.code).toBe('membership.membership.own')
+    // An Owner has nobody above them to ask.
+    const other = await scheme()
+    await req('POST', `/api/membership/schemes/${other}/state`, { to: 'open' })
+    const theOwner = owner((officer.grants ?? []).map(g => g.ability!), { accountId: first.body.accountId, reassertedAt: NOV_17 })
+    expect((await req('POST', `/api/membership/schemes/${other}/members`, { address }, theOwner)).status).toBe(200)
   })
 })

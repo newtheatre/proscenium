@@ -172,7 +172,7 @@ const isToday = (c: Comparison) => !!one(c) && 'today' in one(c)!
           />
         </template>
         <template v-else-if="rightKind(part as Comparison) === 'number'">
-          <UInputNumber
+          <FieldNumber
             class="w-28"
             :model-value="one(part as Comparison)?.value"
             size="sm"
@@ -181,7 +181,7 @@ const isToday = (c: Comparison) => !!one(c) && 'today' in one(c)!
           />
         </template>
         <template v-else-if="rightKind(part as Comparison) === 'between'">
-          <UInputNumber
+          <FieldNumber
             v-for="n in [0, 1]"
             :key="n"
             class="w-28"
@@ -192,7 +192,7 @@ const isToday = (c: Comparison) => !!one(c) && 'today' in one(c)!
           />
         </template>
         <template v-else-if="rightKind(part as Comparison) === 'date'">
-          <UInputNumber
+          <FieldNumber
             v-if="(part as Comparison).op === 'within-days'"
             class="w-24"
             :model-value="(part as Comparison).days"

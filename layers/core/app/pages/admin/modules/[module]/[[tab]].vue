@@ -38,6 +38,7 @@ const view = computed(() => modules.value?.modules.find(m => m.id === module.val
     :key="route.path"
     :page="page"
     :highlight="highlight"
+    one-save
   />
   <EmptyState
     v-else

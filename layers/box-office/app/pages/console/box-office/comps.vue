@@ -301,7 +301,7 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
             :label="t('box-office.comps.ask.quantity')"
             required
           >
-            <UInputNumber
+            <FieldNumber
               v-model="form.quantity"
               :min="1"
             />

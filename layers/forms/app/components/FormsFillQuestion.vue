@@ -94,7 +94,7 @@ const setDateTime = (date: string, time: string) => { text.value = date ? `${dat
       inputmode="url"
       placeholder="https://"
     />
-    <UInputNumber
+    <FieldNumber
       v-else-if="q.type === 'number'"
       class="w-40"
       :model-value="typeof model === 'number' ? model : null"

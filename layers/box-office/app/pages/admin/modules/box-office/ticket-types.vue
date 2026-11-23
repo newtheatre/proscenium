@@ -419,7 +419,7 @@ function describe(type: TicketType): string {
               :label="t('box-office.ticket-types.add.max-per-holder')"
               :help="t('box-office.ticket-types.add.max-per-holder-help')"
             >
-              <UInputNumber
+              <FieldNumber
                 v-model="editForm.maxPerHolder"
                 :min="1"
                 :max="50"
