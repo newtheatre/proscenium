@@ -39,6 +39,9 @@ test.describe('a site owner with no console', () => {
     await visit(page, '/admin/advanced')
     await expect(page.getByRole('heading', { level: 1, name: 'Advanced' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible()
+    // The search is a link until asked for; pressing it opens the box with the cursor in it.
+    await page.getByRole('button', { name: 'Find a setting' }).click()
+    await expect(page.getByRole('searchbox', { name: 'Find a setting' })).toBeFocused()
     await page.getByRole('searchbox').first().fill('rate')
     await expect(page.getByRole('link').filter({ hasText: /limit/i }).first()).toBeVisible()
     await noViolations(page)
@@ -69,14 +72,13 @@ test.describe('a site owner with no console', () => {
     await count.blur()
     await period.fill('2')
     await period.blur()
-    const section = page.locator('form').filter({ has: count })
-    await section.getByRole('button', { name: /^Save/ }).click()
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click() // the page's one Save bar
     // Rate limits are confirmed: the dialog says what will change, and Go back saves nothing.
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Rate limit: exports goes from 10 in 1 hour to 12 in 2 hours.')
     await dialog.getByRole('button', { name: 'Go back' }).click()
     await expect(page.getByText('Saved 1 change')).toHaveCount(0)
-    await section.getByRole('button', { name: /^Save/ }).click()
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click() // the page's one Save bar
     await page.getByRole('dialog').getByRole('button', { name: 'Save the change' }).click()
     await expect(page.getByText('Saved 1 change', { exact: true })).toBeVisible() // not the toaster's own live-region copy
     await visit(page, '/admin/advanced')
@@ -104,7 +106,7 @@ test.describe('a site owner with no console', () => {
     await size.click()
     await page.getByRole('option', { name: '50' }).click()
     const section = page.locator('form').filter({ has: size })
-    await section.getByRole('button', { name: /^Save/ }).click()
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click() // the page's one Save bar
     await expect(page.getByText('Saved 1 change', { exact: true })).toBeVisible()
     await expect(section.getByRole('button', { name: /^Changed by the system, / })).toBeVisible()
     await section.getByRole('button', { name: /^Changed by the system, .*Show the history of Rows on a page of a list/ }).click()
@@ -163,7 +165,7 @@ test.describe('the organisation\'s year end', () => {
     await yearEnd.getByRole('combobox', { name: 'Month' }).click()
     await page.getByRole('option', { name: 'July' }).click()
     await expect(yearEnd.getByRole('spinbutton', { name: 'Day' })).toHaveValue('31')
-    await page.getByRole('button', { name: 'Save organisation settings' }).click()
+    await page.getByRole('button', { name: 'Save changes' }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Save this change?')
     await expect(dialog).toContainText(/Year end (is set to|goes from .+ to) 31 July\./)

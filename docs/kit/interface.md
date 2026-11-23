@@ -366,6 +366,27 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
   refuses an icon-only `UButton`.
 - `RowActions`: the ellipsis menu a row or a record ends with. It takes `items` and a `label`
   ("Actions for Hamlet") and draws nothing when there are no items.
+- `PageActions`: a page's actions for PageFrame's `primary` slot when there are more than one. It
+  takes `actions` (`label`, `icon`, `to` or `onSelect`, `loading`, `disabled`, `lesser`); every one is
+  a worded button from 640 pixels, and on a phone the first stays a button while the rest fold into
+  one "More actions" menu (`more-label` names it), so the bar never overflows. Use it in place of
+  hiding buttons by hand with `max-sm:hidden` and a second menu.
+- `TableOrList`: rows as a `UTable` from 640 pixels and a `RecordList` on a phone, chosen after
+  hydration so only one is drawn. It takes `rows`, `columns`, a `label` (the caption and the list's
+  name) and `to` (where a row leads, in both forms); the table's cells are UTable's slots
+  (`#when-cell`) and the phone's row is the `item` slot, a `RecordListItem`. A page does not call
+  `useScreenQuery` and draw both itself.
+- `FieldNumber`: a count or whole number. It is `UInputNumber` at a width for a few digits (`w-32`),
+  where the theme's own default fills the row; `class="w-24"` or `class="w-full"` gives another.
+- `DefaultedNumber` and `DefaultedMinutes`: a count, or a length in minutes, that takes the
+  theatre's value until it is given its own. Left alone it shows that value with a "Theatre default"
+  badge and Change; changed, it is an ordinary box with "Use theatre default".
+- `sticky-panel` and `sticky-bar` (utilities in `main.css`): a panel that stays beside the content
+  as the page scrolls, and a bar of actions that stays at the foot. Inside a dashboard page `top` is
+  measured within the body's padding, so the panel uses `top: 0`; writing `sticky top-4` by hand sits
+  16 pixels low. With a breakpoint: `lg:sticky-panel`.
+- `AbilityPicker` folds each module to its count ("3 of 14 ticked") with Tick all on the module's
+  row; Core and any module with a tick start open.
 - A status is named by the catalogue (`core.states.draft`), never by capitalising its key, and a
   count comes from the catalogue's plural (`core.counts.records` with `count`).
 - A select whose list grows with the theatre's data (accounts, periods, spaces, seasons) is a
@@ -421,6 +442,16 @@ Four rules:
   width for the month and week, and the day view shows one column at a time there, chosen from a
   menu. It shows the window the calendar is showing, not a paged list: a module that needs filters,
   sort or export over a longer period adds a `PageList` of its own.
+
+### One Save bar on a page of settings
+
+`SettingsSections` takes `one-save`: the sections then carry no Save of their own (only "Reset
+section" where there is something to reset) and one bar at the foot of the page, kept in view as it
+scrolls, says how many changes there are and saves them all ("Save changes"). `PageSettings` and a
+module's generated tab use it. A bespoke screen that draws one section among its own content (Email
+sending, Branding) keeps that section's own Save. Reset is not offered on words that may not be
+empty and default to nothing, such as the theatre's name, and "Find a setting" is a link that opens
+the search box, so a page of settings starts with its settings.
 
 ### Controls for the setting kinds
 

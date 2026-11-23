@@ -209,7 +209,7 @@ const actions = (l: Layout) => [[
             name="seats"
             :help="t('box-office.layouts.seats-help')"
           >
-            <UInputNumber
+            <FieldNumber
               :model-value="form.seats ?? undefined"
               :min="0"
               @update:model-value="form.seats = $event ?? null"
@@ -220,7 +220,7 @@ const actions = (l: Layout) => [[
             name="wheelchairSpaces"
             required
           >
-            <UInputNumber
+            <FieldNumber
               v-model="form.wheelchairSpaces"
               :min="0"
               :max="500"
@@ -233,7 +233,7 @@ const actions = (l: Layout) => [[
             :help="t('box-office.layouts.each-help')"
             required
           >
-            <UInputNumber
+            <FieldNumber
               v-model="form.seatsPerSpace"
               :min="0"
               :max="20"
