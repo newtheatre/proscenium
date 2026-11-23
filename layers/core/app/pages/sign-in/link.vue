@@ -7,7 +7,7 @@ interface Arrived { next: string, offerPasskey: boolean, welcome: boolean, invit
 
 const { t } = useT()
 const { language } = useDates()
-useSeoMeta({ title: 'Sign in' })
+useSeoMeta({ title: () => t('core.link-landing.title') })
 const refusal = ref<Refusal | null>(null)
 const arrived = ref<Arrived | null>(null)
 const token = ref('')
@@ -55,16 +55,15 @@ async function signIn() {
 </script>
 
 <template>
-  <IdentityCard :title="arrived?.invitation ? t('core.invitation.landing.title') : 'Sign in'">
+  <IdentityCard :title="arrived?.invitation ? t('core.invitation.landing.title') : t('core.link-landing.title')">
     <RefusalNotice :refusal="refusal" />
     <UButton
       v-if="refusal"
       to="/sign-in"
       color="neutral"
       variant="outline"
-    >
-      Back to sign in
-    </UButton>
+      :label="t('core.link-landing.back')"
+    />
     <template v-else-if="arrived?.invitation">
       <p class="text-sm">
         {{ invitedLine }}
@@ -77,11 +76,11 @@ async function signIn() {
     </template>
     <template v-else>
       <p class="text-sm text-muted">
-        Press Sign in to finish signing in from your email.
+        {{ t('core.link-landing.press') }}
       </p>
       <UButton
         block
-        label="Sign in"
+        :label="t('core.link-landing.sign-in')"
         :loading="asking"
         loading-auto
         @click="signIn()"

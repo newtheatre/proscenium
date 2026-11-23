@@ -38,7 +38,6 @@
   "core.access.sharing-help": "The box office always sees your arrangements while you are on the scheme. Switch on anyone else you would like to see them.",
   "core.access.reads.title": "Who has read it",
   "core.access.reads.none": "Nobody at the theatre has read your application yet.",
-  "core.access.reads.line": "{date}: {by}",
   "core.access.reads.reviewer": "A reviewer of the scheme",
   "core.access.form.needs": "What would help you?",
   "core.access.form.needs-help": "Tick everything that would make your visit easier. Tell us what helps, not why: we never ask for a diagnosis.",

@@ -24,11 +24,9 @@ watch(() => data.value?.account, (a) => {
   if (a) Object.assign(form, { name: a.name ?? '', pronouns: a.pronouns ?? '' })
 }, { immediate: true })
 
-const saving = ref(false)
 const refusal = ref<RefusalView | null>(null)
 
 async function save() {
-  saving.value = true
   refusal.value = null
   try {
     await $api('/api/core/me', { method: 'PATCH', body: { name: form.name.trim(), pronouns: form.pronouns.trim() || null } })
@@ -37,9 +35,6 @@ async function save() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    saving.value = false
   }
 }
 </script>
@@ -91,7 +86,7 @@ async function save() {
             </UFormField>
             <UButton
               type="submit"
-              :loading="saving"
+              loading-auto
               :label="t('core.me.details.save')"
             />
           </UForm>

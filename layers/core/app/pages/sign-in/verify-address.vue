@@ -4,7 +4,8 @@
 <script setup lang="ts">
 import type { Refusal } from '../../utils/identity'
 
-useSeoMeta({ title: 'Confirm your address' })
+const { t } = useT()
+useSeoMeta({ title: () => t('core.verify-address.title') })
 const refusal = ref<Refusal | null>(null)
 const done = ref(false)
 const token = ref('')
@@ -24,14 +25,14 @@ async function finish() {
 </script>
 
 <template>
-  <IdentityCard title="Confirm your address">
+  <IdentityCard :title="t('core.verify-address.title')">
     <RefusalNotice :refusal="refusal" />
     <p
       v-if="done"
       class="text-sm"
       aria-live="polite"
     >
-      Your address is confirmed. You can close this page.
+      {{ t('core.verify-address.done') }}
     </p>
     <UButton
       v-if="done || refusal"
@@ -39,16 +40,15 @@ async function finish() {
       to="/account/details#email"
       color="neutral"
       variant="outline"
-    >
-      {{ done ? 'Go to your email addresses' : 'Send a new link from your account' }}
-    </UButton>
+      :label="done ? t('core.verify-address.go') : t('core.verify-address.new-link')"
+    />
     <template v-else-if="!refusal">
       <p class="text-sm text-muted">
-        Press Confirm address to finish adding it to your account.
+        {{ t('core.verify-address.press') }}
       </p>
       <UButton
         block
-        label="Confirm address"
+        :label="t('core.verify-address.confirm')"
         loading-auto
         @click="finish()"
       />

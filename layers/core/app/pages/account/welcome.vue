@@ -4,7 +4,8 @@
 import { z } from 'zod'
 import type { Refusal } from '../../utils/identity'
 
-useSeoMeta({ title: 'Welcome' })
+const { t } = useT()
+useSeoMeta({ title: () => t('core.welcome.title') })
 const route = useRoute()
 const next = nextPath(route.query.next) ?? '/'
 const offerPasskey = route.query.passkey === '1'
@@ -36,8 +37,8 @@ async function save() {
 
 <template>
   <IdentityCard
-    title="Welcome"
-    :description="address ? `You're signed in as ${address}. What should we call you? It goes on your tickets and on anything the theatre sends you.` : 'What should we call you? It goes on your tickets and on anything the theatre sends you.'"
+    :title="t('core.welcome.title')"
+    :description="address ? t('core.welcome.signed-in-as', { address }) : t('core.welcome.ask')"
   >
     <RefusalNotice :refusal="refusal" />
     <UForm
@@ -49,7 +50,7 @@ async function save() {
       @submit="save"
     >
       <UFormField
-        label="Your name"
+        :label="t('core.welcome.name')"
         name="name"
       >
         <UInput
@@ -62,17 +63,15 @@ async function save() {
         type="submit"
         block
         loading-auto
-      >
-        Continue
-      </UButton>
+        :label="t('core.welcome.continue')"
+      />
     </UForm>
     <UButton
       block
       color="neutral"
       variant="link"
+      :label="t('core.welcome.skip')"
       @click="goOn()"
-    >
-      Skip for now
-    </UButton>
+    />
   </IdentityCard>
 </template>

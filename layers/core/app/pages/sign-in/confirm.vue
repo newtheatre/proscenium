@@ -1,8 +1,8 @@
 <!-- Confirm it is you, reached by address rather than from an action (ID-28). Screens confirm in
      place through the dialogue; this page opens the same dialogue and then goes on to `next`. -->
 <script setup lang="ts">
-useSeoMeta({ title: 'Confirm it is you' })
 const { t } = useT()
+useSeoMeta({ title: () => t('core.confirm-its-you.title') })
 const route = useRoute()
 const next = nextPath(route.query.next) ?? '/'
 const { confirmItsYou } = useConfirmItsYou()

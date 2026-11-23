@@ -49,10 +49,8 @@ async function submit(values: Record<string, unknown>) {
 // Answering alone: the application is sent back as it stands, with the answer.
 const answerSchema = z.object({ answer: z.string().trim().min(1, t('core.access.answer.needed')).max(1000) }) // not-policy: the server's bound on an answer
 const answer = reactive({ answer: '' })
-const busy = ref(false)
 const refusal = ref<RefusalView | null>(null)
 async function sendAnswer() {
-  busy.value = true
   refusal.value = null
   try {
     await submit({ ...initial, answer: answer.answer })
@@ -60,9 +58,6 @@ async function sendAnswer() {
   }
   catch (error) {
     refusal.value = toRefusal(error)
-  }
-  finally {
-    busy.value = false
   }
 }
 </script>
@@ -103,7 +98,7 @@ async function sendAnswer() {
         <div class="flex flex-wrap items-center gap-4">
           <UButton
             type="submit"
-            :loading="busy"
+            loading-auto
             :label="t('core.access.answer.send')"
           />
           <UButton

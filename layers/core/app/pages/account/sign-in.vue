@@ -174,6 +174,7 @@ async function showCodes() {
             <RecordList
               v-if="data.passkeys.length"
               :label="t('core.me.sign-in.passkeys')"
+              flush
             >
               <RecordListItem
                 v-for="p in data.passkeys"
@@ -309,6 +310,7 @@ async function showCodes() {
                 color="neutral"
                 variant="outline"
                 icon="i-lucide-eye"
+                loading-auto
                 :label="t('core.me.sign-in.show-codes')"
                 @click="showCodes()"
               />
