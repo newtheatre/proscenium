@@ -45,6 +45,7 @@ const onlyChanged = ref(false)
     <SettingsSections
       :page="page"
       :highlight="highlight"
+      one-save
       :only-changed="onlyChanged"
     />
     <div

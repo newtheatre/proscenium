@@ -2,7 +2,8 @@
      Flytower's role editor), and Core's by task: Programme, People, Settings and Messages. An ability
      that comes with one already ticked is ticked and locked; an ability that amounts to control over
      others or the theatre is marked; one the editor does not hold cannot be added, because nobody
-     gives what they do not have. Each group can be ticked whole. A module that is switched off is
+     gives what they do not have. Each module folds to its count ("3 of 14 ticked") and can be ticked
+     whole from its row; Core and a module with a tick start open. A module that is switched off is
      left out unless something of it is ticked, and can be shown on request. -->
 <script setup lang="ts">
 export interface CatalogueAbility { name: string, module: string, risk: 'normal' | 'privileged', implies: string[], label: string, held: boolean, moduleOn?: boolean, on?: string | null, within?: string[] }
@@ -90,6 +91,16 @@ function tickAll(section: Section) {
   chosen.value = allTicked(section) ? chosen.value.filter(a => !names.includes(a)) : [...new Set([...chosen.value, ...names])]
 }
 
+/** A module's abilities as one section, for its count and the Tick all on its row. */
+const whole = (group: Group): Section => ({ id: group.module, abilities: group.sections.flatMap(s => s.abilities) })
+const tickedIn = (group: Group) => whole(group).abilities.filter(a => isTicked(a.name)).length
+// A module is folded to its count until it is opened: Core and any module with a tick start open.
+const folded = ref<Record<string, boolean>>({})
+const isOpen = (group: Group) => folded.value[group.module] !== undefined ? !folded.value[group.module] : group.module === 'core' || tickedIn(group) > 0
+function fold(group: Group) {
+  folded.value = { ...folded.value, [group.module]: isOpen(group) }
+}
+
 function hint(ability: CatalogueAbility): string | undefined {
   if (implied.value.has(ability.name)) return t('core.roles.editor.comes-with')
   if (!ability.held && !chosen.value.includes(ability.name)) return t('core.roles.editor.not-held')
@@ -103,77 +114,108 @@ function hint(ability: CatalogueAbility): string | undefined {
     <fieldset
       v-for="group in groups"
       :key="group.module"
-      class="space-y-4"
+      class="space-y-3"
     >
-      <legend class="text-sm font-semibold text-highlighted mb-2">
+      <legend class="sr-only">
         {{ moduleName(group.module) }}
-        <span
-          v-if="!group.on"
-          class="font-normal text-muted"
-        > · {{ t('core.roles.editor.module-off') }}</span>
       </legend>
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-default pb-1">
+        <UButton
+          color="neutral"
+          variant="link"
+          class="-ms-2.5 text-start"
+          :aria-expanded="isOpen(group)"
+          :aria-controls="`abilities-${group.module}`"
+          :icon="isOpen(group) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+          @click="fold(group)"
+        >
+          <span class="text-sm font-semibold text-highlighted">{{ moduleName(group.module) }}</span>
+          <span
+            v-if="!group.on"
+            class="text-sm font-normal text-muted"
+          > · {{ t('core.roles.editor.module-off') }}</span>
+          <span class="text-sm font-normal text-muted"> · {{ t('core.roles.editor.ticked', { count: tickedIn(group), total: whole(group).abilities.length }) }}</span>
+        </UButton>
+        <UButton
+          v-if="!disabled && tickable(whole(group)).length"
+          size="xs"
+          color="neutral"
+          variant="link"
+          :label="allTicked(whole(group)) ? t('core.roles.editor.untick-all') : t('core.roles.editor.tick-all')"
+          :aria-label="allTicked(whole(group))
+            ? t('core.roles.editor.untick-all-in', { group: moduleName(group.module) })
+            : t('core.roles.editor.tick-all-in', { group: moduleName(group.module) })"
+          @click="tickAll(whole(group))"
+        />
+      </div>
       <div
-        v-for="section in group.sections"
-        :key="section.id"
-        :role="section.label ? 'group' : undefined"
-        :aria-labelledby="section.label ? `${section.id}-label` : undefined"
-        class="space-y-2"
+        v-if="isOpen(group)"
+        :id="`abilities-${group.module}`"
+        class="space-y-4"
       >
         <div
-          v-if="section.label || (!disabled && tickable(section).length)"
-          class="flex flex-wrap items-center justify-between gap-2"
+          v-for="section in group.sections"
+          :key="section.id"
+          :role="section.label ? 'group' : undefined"
+          :aria-labelledby="section.label ? `${section.id}-label` : undefined"
+          class="space-y-2"
         >
-          <p
+          <div
             v-if="section.label"
-            :id="`${section.id}-label`"
-            class="text-sm font-medium text-toned"
+            class="flex flex-wrap items-center justify-between gap-2"
           >
-            {{ section.label }}
-          </p>
-          <UButton
-            v-if="!disabled && tickable(section).length"
-            size="xs"
-            color="neutral"
-            variant="link"
-            class="ms-auto"
-            :label="allTicked(section) ? t('core.roles.editor.untick-all') : t('core.roles.editor.tick-all')"
-            :aria-label="allTicked(section)
-              ? t('core.roles.editor.untick-all-in', { group: section.label ?? moduleName(group.module) })
-              : t('core.roles.editor.tick-all-in', { group: section.label ?? moduleName(group.module) })"
-            @click="tickAll(section)"
-          />
-        </div>
-        <div
-          v-for="ability in section.abilities"
-          :key="ability.name"
-          class="flex items-start justify-between gap-3"
-        >
-          <div>
-            <UCheckbox
-              :id="`ability-${ability.name}`"
-              :model-value="isTicked(ability.name)"
-              :disabled="isLocked(ability)"
-              :label="labelOf(ability)"
-              :name="ability.name"
-              :aria-describedby="hint(ability) ? `ability-${ability.name}-hint` : undefined"
-              @update:model-value="toggle(ability.name, $event)"
-            />
-            <!-- Outside the checkbox, so a locked one's dimming does not take the hint below legible contrast. -->
             <p
-              v-if="hint(ability)"
-              :id="`ability-${ability.name}-hint`"
-              class="ms-6 text-sm text-muted"
+              v-if="section.label"
+              :id="`${section.id}-label`"
+              class="text-sm font-medium text-toned"
             >
-              {{ hint(ability) }}
+              {{ section.label }}
             </p>
+            <UButton
+              v-if="section.label && !disabled && tickable(section).length"
+              size="xs"
+              color="neutral"
+              variant="link"
+              class="ms-auto"
+              :label="allTicked(section) ? t('core.roles.editor.untick-all') : t('core.roles.editor.tick-all')"
+              :aria-label="allTicked(section)
+                ? t('core.roles.editor.untick-all-in', { group: section.label })
+                : t('core.roles.editor.tick-all-in', { group: section.label })"
+              @click="tickAll(section)"
+            />
           </div>
-          <UBadge
-            v-if="ability.risk === 'privileged'"
-            color="warning"
-            size="sm"
-            :label="t('core.roles.editor.full-control')"
-            class="shrink-0"
-          />
+          <div
+            v-for="ability in section.abilities"
+            :key="ability.name"
+            class="flex items-start justify-between gap-3"
+          >
+            <div>
+              <UCheckbox
+                :id="`ability-${ability.name}`"
+                :model-value="isTicked(ability.name)"
+                :disabled="isLocked(ability)"
+                :label="labelOf(ability)"
+                :name="ability.name"
+                :aria-describedby="hint(ability) ? `ability-${ability.name}-hint` : undefined"
+                @update:model-value="toggle(ability.name, $event)"
+              />
+              <!-- Outside the checkbox, so a locked one's dimming does not take the hint below legible contrast. -->
+              <p
+                v-if="hint(ability)"
+                :id="`ability-${ability.name}-hint`"
+                class="ms-6 text-sm text-muted"
+              >
+                {{ hint(ability) }}
+              </p>
+            </div>
+            <UBadge
+              v-if="ability.risk === 'privileged'"
+              color="warning"
+              size="sm"
+              :label="t('core.roles.editor.full-control')"
+              class="shrink-0"
+            />
+          </div>
         </div>
       </div>
     </fieldset>

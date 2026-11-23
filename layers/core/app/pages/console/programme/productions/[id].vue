@@ -515,7 +515,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                   label="Intervals"
                   name="intervalCount"
                 >
-                  <UInputNumber
+                  <FieldNumber
                     v-model="details.intervalCount"
                     :min="0"
                     :max="10"
