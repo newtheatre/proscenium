@@ -291,6 +291,7 @@
   "core.list.selected": "{count} selected",
   "core.list.bulk": "Actions for the selected rows",
   "core.list.actions": "Actions",
+  "core.list.open-new-tab": "Open in a new tab",
   "core.list.actions-for": "Actions for {row}",
   "core.list.page-of": "Page {page} of {pages}, {total} in all",
   "core.list.total": "{total} in all",

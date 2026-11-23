@@ -110,6 +110,25 @@ test.describe('a list with views and rows that open', () => {
     await noViolations(page)
   })
 
+  test('a right click on a row opens the same actions as its ellipsis menu, with Open in a new tab', async ({ page }) => {
+    await visit(page, '/console/gallery/list')
+    const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: /^Actions for / }) }).first()
+    await row.getByRole('button', { name: /^Actions for / }).click()
+    const offered = await page.getByRole('menu').getByRole('menuitem').allTextContents()
+    expect(offered.length).toBeGreaterThan(0)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await row.getByRole('cell').nth(2).click({ button: 'right' })
+    const menu = page.getByRole('menu')
+    await expect(menu.getByRole('menuitem')).toHaveText([...offered, 'Open in a new tab'])
+    await expect(menu.getByRole('menuitem', { name: 'Open in a new tab' })).toHaveAttribute('target', '_blank')
+    await noViolations(page)
+    await page.keyboard.press('Escape')
+    // The headings are not a row: nothing of ours opens there.
+    await page.getByRole('columnheader').nth(2).click({ button: 'right' })
+    await expect(page.getByRole('menu')).toHaveCount(0)
+  })
+
   test('the server names a key it does not know', async ({ page }) => {
     const response = await page.request.get('/api/gallery/shows?colour=red', { headers: { 'x-test-actor': JSON.stringify(staff) } })
     expect(response.status()).toBe(422)
