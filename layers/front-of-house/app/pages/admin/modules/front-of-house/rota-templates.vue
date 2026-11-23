@@ -236,7 +236,7 @@ const describe = (template: Template) => [
                 />
               </UFormField>
               <UFormField :label="t('front-of-house.templates.places')">
-                <UInputNumber
+                <FieldNumber
                   v-model="line.places"
                   :min="1"
                   :max="50"

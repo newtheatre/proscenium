@@ -55,7 +55,7 @@ const describe = (r: Report) => [
           >
             <StatusBadge
               :tone="r.state === 'signed_off' ? 'success' : 'warning'"
-              :label="t(`front-of-house.report-states.${r.state}`)"
+              :label="t(r.state === 'draft' ? 'core.states.draft' : 'front-of-house.report-states.signed_off')"
             />
           </RecordListItem>
         </RecordList>
