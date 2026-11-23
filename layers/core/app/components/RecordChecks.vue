@@ -10,8 +10,8 @@ const { t } = useT()
 </script>
 
 <template>
-  <section class="rounded-lg border border-default p-4">
-    <h2 class="mb-2 text-sm font-semibold text-highlighted">
+  <section class="space-y-3 rounded-lg border border-default p-4">
+    <h2 class="text-sm font-semibold text-highlighted">
       {{ title }}
     </h2>
     <ul class="space-y-2 text-sm">

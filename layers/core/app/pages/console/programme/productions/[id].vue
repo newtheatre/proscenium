@@ -278,17 +278,10 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
     >
       <template #aside>
         <ProductionPoster :production-id="production.id" />
-        <section
+        <SidePanel
           v-if="production.state === 'published'"
-          aria-labelledby="published-heading"
-          class="space-y-3 rounded-lg border border-default p-4"
+          :title="t('core.states.published')"
         >
-          <h2
-            id="published-heading"
-            class="text-sm font-semibold text-highlighted"
-          >
-            Published
-          </h2>
           <p
             v-if="production.publishedAt"
             class="text-sm"
@@ -314,7 +307,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
               @click="withdraw()"
             />
           </div>
-        </section>
+        </SidePanel>
       </template>
 
       <template #tab-overview>

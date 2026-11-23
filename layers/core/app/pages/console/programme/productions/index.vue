@@ -26,28 +26,28 @@ const { range, dateTime, toLocal } = useDates()
 const { data: seasons } = await useAPI<{ rows: Season[] }>('/api/core/seasons', { key: 'core:seasons:picker', query: { size: 100 } })
 const list = defineList('core.productions', {
   filters: {
-    state: { kind: 'choice', label: 'State', options: [{ value: 'draft', label: 'Draft' }, { value: 'published', label: 'Published' }, { value: 'withdrawn', label: 'Withdrawn' }, { value: 'cancelled', label: 'Cancelled' }] },
-    seasonId: { kind: 'choice', label: 'Season', options: [] },
+    state: { kind: 'choice', label: t('core.productions.columns.state'), options: [{ value: 'draft', label: t('core.states.draft') }, { value: 'published', label: t('core.states.published') }, { value: 'withdrawn', label: t('core.states.withdrawn') }, { value: 'cancelled', label: t('core.states.cancelled') }] },
+    seasonId: { kind: 'choice', label: t('core.productions.season'), options: [] },
   },
-  sorts: { title: { label: 'Production', type: 'text' }, dates: { label: 'Dates', type: 'date' } },
+  sorts: { title: { label: t('core.productions.columns.title'), type: 'text' }, dates: { label: t('core.productions.columns.dates'), type: 'date' } },
   columns: {
-    title: { label: 'Production', sort: 'title', card: true, always: true },
-    dates: { label: 'Dates', sort: 'dates', card: true },
-    next: { label: 'Next performance' },
-    space: { label: 'Space' },
-    state: { label: 'State', card: true },
+    title: { label: t('core.productions.columns.title'), sort: 'title', card: true, always: true },
+    dates: { label: t('core.productions.columns.dates'), sort: 'dates', card: true },
+    next: { label: t('core.productions.columns.next') },
+    space: { label: t('core.productions.columns.space') },
+    state: { label: t('core.productions.columns.state'), card: true },
   },
   // The route narrows and orders each view; Drafts also says so in the State filter.
   views: {
-    'coming-up': { label: 'Coming up', sort: 'dates', order: 'asc' },
-    'drafts': { label: 'Drafts', filters: { state: 'draft' } },
-    'past': { label: 'Past', sort: 'dates', order: 'desc' },
-    'all': { label: 'All' },
+    'coming-up': { label: t('core.productions.views.coming-up'), sort: 'dates', order: 'asc' },
+    'drafts': { label: t('core.productions.views.drafts'), filters: { state: 'draft' } },
+    'past': { label: t('core.productions.views.past'), sort: 'dates', order: 'desc' },
+    'all': { label: t('core.productions.views.all') },
   },
   defaultView: 'coming-up',
 })
 const seasonOptions = computed(() => ({ seasonId: (seasons.value?.rows ?? []).map(s => ({ value: s.id, label: s.name })) }))
-const KINDS = [{ value: 'own', label: 'Our own production' }, { value: 'visiting', label: 'A visiting company' }, { value: 'hire', label: 'A hire' }, { value: 'event', label: 'An event, such as a workshop' }]
+const KINDS = (['own', 'visiting', 'hire', 'event'] as const).map(value => ({ value, label: t(`core.productions.kinds.${value}`) }))
 const TONES = { draft: 'neutral', published: 'success', withdrawn: 'warning', cancelled: 'danger' } as const
 
 // The season a new production most likely belongs to: the one on today, else the next to start.
@@ -67,13 +67,13 @@ const likelySpace = computed(() => (likelySeason.value === NONE ? placing.value?
 // A short form, so it opens as a panel over the list, checked by the schema the server uses.
 const creating = ref(false)
 const fields = computed(() => [
-  { name: 'title', label: 'Title', kind: 'text' as const },
-  { name: 'kind', label: 'What it is', kind: 'radio' as const, options: KINDS },
+  { name: 'title', label: t('core.productions.new.title-label'), kind: 'text' as const },
+  { name: 'kind', label: t('core.productions.new.kind'), kind: 'radio' as const, options: KINDS },
   ...(openSeasons.value.length
-    ? [{ name: 'seasonId', label: 'Season', kind: 'select' as const, help: 'You can change it later on Details.', options: [...openSeasons.value.map(s => ({ value: s.id, label: s.name })), { value: NONE, label: 'No season' }] }]
+    ? [{ name: 'seasonId', label: t('core.productions.season'), kind: 'select' as const, help: t('core.productions.new.season-help'), options: [...openSeasons.value.map(s => ({ value: s.id, label: s.name })), { value: NONE, label: t('core.productions.new.no-season') }] }]
     : []),
   ...(placing.value?.spaces.length
-    ? [{ name: 'usualSpaceId', label: 'Usual space', kind: 'select' as const, help: 'Where it usually plays: adding dates starts there.', options: [...placing.value.spaces.map(s => ({ value: s.id, label: s.label })), { value: NONE, label: 'Not set' }] }]
+    ? [{ name: 'usualSpaceId', label: t('core.productions.new.space'), kind: 'select' as const, help: t('core.productions.new.space-help'), options: [...placing.value.spaces.map(s => ({ value: s.id, label: s.label })), { value: NONE, label: t('core.productions.new.space-none') }] }]
     : []),
 ])
 const create = (values: Record<string, unknown>) => $api<{ id: string }>('/api/core/productions', {
@@ -97,17 +97,17 @@ const rowTo = (row: Row) => choosingForRun.value ? `/console/programme/productio
 
 <template>
   <PageList
-    title="Productions"
+    :title="t('core.productions.title')"
     route="/api/core/productions"
     :list="list"
     :filter-options="seasonOptions"
     :row-label="(row: Row) => row.title"
     :row-to="rowTo"
-    :empty="{ title: 'No productions yet', description: 'A production is anything the theatre puts in front of people: its own show, a visiting company, a hire or an event.', icon: 'i-lucide-drama' }"
+    :empty="{ title: t('core.productions.empty.title'), description: t('core.productions.empty.description'), icon: 'i-lucide-drama' }"
   >
     <template #primary>
       <UButton
-        label="New production"
+        :label="t('core.productions.new.title')"
         icon="i-lucide-plus"
         @click="creating = true"
       />
@@ -118,8 +118,8 @@ const rowTo = (row: Row) => choosingForRun.value ? `/console/programme/productio
     >
       <UAlert
         icon="i-lucide-calendar-plus"
-        title="Which production is the run for?"
-        description="Choose one below and its dates open with Add a run."
+        :title="t('core.productions.run.title')"
+        :description="t('core.productions.run.description')"
         close
         @update:open="navigateTo({ query: { ...route.query, run: undefined } }, { replace: true })"
       />
@@ -139,14 +139,14 @@ const rowTo = (row: Row) => choosingForRun.value ? `/console/programme/productio
       <span
         v-else
         class="text-muted"
-      >No dates yet</span>
+      >{{ t('core.productions.no-dates') }}</span>
     </template>
     <template #cell-next="{ row }">
       <span v-if="row.next">{{ dateTime(row.next.startsAt) }}</span>
       <span
         v-else
         class="text-muted"
-      >None to come</span>
+      >{{ t('core.productions.none-to-come') }}</span>
     </template>
     <template #cell-space="{ row }">
       {{ row.space ?? '' }}
@@ -160,10 +160,10 @@ const rowTo = (row: Row) => choosingForRun.value ? `/console/programme/productio
 
     <PageForm
       v-model:open="creating"
-      title="New production"
-      description="It starts as a draft. Nothing is public until you publish it."
-      submit-label="Create production"
-      saved-title="Production created"
+      :title="t('core.productions.new.title')"
+      :description="t('core.productions.new.description')"
+      :submit-label="t('core.productions.new.submit')"
+      :saved-title="t('core.productions.new.saved')"
       :schema="productionInput"
       :fields="fields"
       :initial="{ title: '', kind: 'own', seasonId: likelySeason, usualSpaceId: likelySpace }"

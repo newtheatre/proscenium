@@ -339,7 +339,7 @@ async function save() {
     </PageSection>
 
     <!-- One Save for the whole tab, kept in view while the long list scrolls. -->
-    <div class="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-end gap-3 border-t border-default bg-default/95 px-1 py-3 backdrop-blur">
+    <div class="sticky-bar flex flex-wrap items-center justify-end gap-3">
       <p
         v-if="attempted && ungraded.length"
         role="alert"
