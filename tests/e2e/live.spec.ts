@@ -23,6 +23,9 @@ test.describe('someone who can work tonight', () => {
     await expect(page.getByRole('link', { name: 'Leave live mode' })).toBeVisible()
     // Worded, not an arrow alone.
     await expect(page.getByRole('link', { name: 'Leave live mode' })).toContainText('Leave')
+    // An exit, so at the end of the strip after the connection state, not before the title.
+    const leave = (await page.getByRole('link', { name: 'Leave live mode' }).boundingBox())!
+    expect(leave.x).toBeGreaterThan((await page.getByRole('status').filter({ hasText: 'Online' }).boundingBox())!.x)
     await noViolations(page)
   })
 
