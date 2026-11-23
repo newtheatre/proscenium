@@ -10,10 +10,7 @@ const { t } = useT()
 </script>
 
 <template>
-  <section class="rounded-lg border border-default p-4">
-    <h2 class="mb-2 text-sm font-semibold text-highlighted">
-      {{ title }}
-    </h2>
+  <SidePanel :title="title">
     <ul class="space-y-2 text-sm">
       <li
         v-for="c in checks"
@@ -40,5 +37,5 @@ const { t } = useT()
         >({{ t('core.record.check-wanted') }})</span>
       </li>
     </ul>
-  </section>
+  </SidePanel>
 </template>
