@@ -262,8 +262,9 @@ async function reopen() {
             :label="t('finance.screens.period.reason')"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="reason"
+              value-key="value"
               :items="reasons?.reasons.map(r => ({ value: r.id, label: r.label })) ?? []"
             />
           </UFormField>

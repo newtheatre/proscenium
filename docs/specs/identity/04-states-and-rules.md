@@ -346,7 +346,7 @@ A person's access needs are held because they applied to the theatre's access sc
 
 | Matter | Rule |
 | --- | --- |
-| What is stored | The application: ticks against the core vocabulary `core.access-need`, each with an optional note, and the number of essential companions. The vocabulary describes barriers, never diagnoses, and a theatre can edit it. Each entry has a short label naming the barrier and a one-line description in plain words, shown under it on the form. It is seeded with nine entries, in our own wording: standing or queueing, crowds and busy spaces, steps and stairs, walking distances, getting to a toilet quickly, hearing what is said (information shown or written), seeing or reading information (information read out or described), needs a companion to help, and something else. The categories follow those of the Nimbus Access Card (see Sources); no Nimbus wording or symbols are used. A record stores the entry's id, never its label. |
+| What is stored | The application: ticks against the core vocabulary `core.access-need`, each with an optional note, and the number of essential companions. The vocabulary says what would help, never a diagnosis, and a theatre can edit it. Each entry has a short label naming the help and a one-line description in plain words, shown under it on the form, and sits under one of four headings: Getting in and out, Your seat, Seeing and hearing the show, and More about your visit (the entries the form asks about in its own words). The form asks "What would help you?" because people look for the support they need, such as captions, rather than describing themselves, and staff act on the help, not the barrier (Matt, 23 November 2026). A record stores the entry's id, never its label. |
 | Class and storage | Special category, because a need can reveal health. One special column under `CORE_ENCRYPTION_KEY`. It cannot be searched, filtered or listed. |
 | Who writes it | The person, through the application form, or staff on their behalf as above. An unclaimed account has none until its owner signs in. |
 | Who it is shared with | The scheme's reviewers and the box office purpose `box-office.booking`, which applying agrees to and the form says so. Every other purpose is off until the person switches it on. Each purpose is declared by a module through `core.access-purpose`, with a plain sentence saying who will see the needs and why. An audience member sees audience purposes only, and a members' purpose appears only while they have a standing. In the first release the only members' purpose is the welfare lead's; production teams do not read access needs (Matt, 16 November 2026). |
@@ -358,15 +358,34 @@ A person's access needs are held because they applied to the theatre's access sc
 | Switching a purpose off | Stops further reads at once. It does not withdraw copies already on a booking; the person changes those on the booking. The box office purpose cannot be switched off while on the scheme; leaving the scheme withdraws the application. |
 | Download, merge, erasure | In the person's own download with the decisions made and their sharing choices. On merge the survivor's application stays; if only the merged-away account has one, it moves. Deleted in the erasure batch, with the choices. A rejected application is deleted `core.access-scheme.keep-rejected` after the decision (90 days), and a withdrawn one at once. |
 
-The nine seeded entries have the keys `standing`, `crowds`, `level-access`, `distance`, `urgent-toilet`, `essential-companion`, `visual-information`, `audible-information` and `other`. Two more are seeded for box office and front of house, outside the Access Card's categories: `wheelchair-stays` (uses a wheelchair and stays in it) and `wheelchair-transfers` (uses a wheelchair and transfers to a seat). They allocate nothing; they tell the house team whether a space is needed or a chair needs storing.
+Nine seeded entries follow the categories of the Nimbus Access Card (see Sources), in our own wording and with no Nimbus symbols, so a reviewer checking a card in person can match it:
 
-**How the form asks** (Matt, 17 November 2026). Seven entries are tick boxes. The other four are asked in the form's own words and stored as entries, so a purpose reads them like any other:
+| Key | Label | Heading |
+| --- | --- | --- |
+| `standing` | No queueing, and a seat while you wait | Getting in and out |
+| `crowds` | A calmer way in | Getting in and out |
+| `level-access` | A step-free route | Getting in and out |
+| `distance` | A short walk to your seat | Your seat |
+| `urgent-toilet` | An aisle seat near an exit | Your seat |
+| `visual-information` | Captions, and things written down | Seeing and hearing the show |
+| `audible-information` | Audio description, and things read out | Seeing and hearing the show |
+| `essential-companion` | Needs a companion to help | More about your visit |
+| `other` | Something else (see their note) | More about your visit |
+
+The keys keep the Access Card's names: visual information is what a Deaf person needs, audible information what a blind person needs. Seven more are seeded outside the card's categories: `wheelchair-stays` (uses a wheelchair and stays in it) and `wheelchair-transfers` (uses a wheelchair and transfers to a seat), which allocate nothing but tell the house team whether a space is needed or a chair needs storing; and, added on 23 November 2026, `meet-and-guide` (someone to meet you), `emergency-help` (help to leave in an emergency) and `assistance-dog` (comes with an assistance dog) under Getting in and out and More about your visit, `near-stage` (a seat near the stage) under Your seat, and `bsl` (BSL interpretation) under Seeing and hearing the show. A hearing loop and relaxed performances are left for a theatre to add: the first only means something where the venue has one, and the second is a kind of performance rather than help for one person.
+
+A site made before the headings existed gains them, and the entries it lacks, the first time the list is read; the seven first-release entries take the new labels and descriptions only where the theatre has not renamed them (migration `access-what-would-help`). Stored applications do not change, since they hold entry ids.
+
+**How the form asks** (Matt, 17 November 2026; 23 November 2026). The form asks "What would help you?" over the tick boxes, grouped under their headings, and says that we never ask for a diagnosis. Every entry under the first three headings is a tick box. The five under More about your visit are asked in the form's own words and stored as entries, so a purpose reads them like any other:
 
 - **Wheelchair.** A separate tick box, "I use a wheelchair", outside the list. Once ticked, it asks "At a performance, would you rather: stay in my wheelchair, or move to a seat", one answer, stored as `wheelchair-stays` or `wheelchair-transfers`. An application holds at most one of the two; both together are refused. It is a question of its own rather than a follow-up to standing or distance, because many people who find standing or walking hard do not use a wheelchair, and a wheelchair user may tick neither. If a theatre retires one of the two, the tick box alone means the other; if it retires both, the question is not asked.
+- **Assistance dog.** A tick box, "I come with an assistance dog", stored as `assistance-dog`. Not asked if the theatre retires the entry.
 - **Companion.** `essential-companion` is set by the server whenever the person asks for one or two companions, so the list does not ask the same thing twice.
-- **Something else.** `other` is set by the server whenever "Anything else" has text.
+- **Something else.** `other` is set by the server whenever "Anything else that would help" has text.
 
-The server only adds these two; it never removes an entry the person sent. Leaving the companions at none, or "Anything else" empty, on a later change leaves them out because the form no longer sends them. Labels and descriptions changed after release reach a theatre's existing list only where it has not renamed the entry (migration `access-need-wording`).
+The server only adds these two; it never removes an entry the person sent. Leaving the companions at none, or "Anything else" empty, on a later change leaves them out because the form no longer sends them. Labels and descriptions changed after release reach a theatre's existing list only where it has not renamed the entry.
+
+**New entries.** When the list gains an entry the form asks about after somebody sent their details, their Access scheme page names it once: "We have added some options", with Change my details and "None of these would help". Choosing it, sending a change, or saying none helps (`options_seen_at`) ends the notice until another entry arrives. Nothing is emailed and nothing lapses. A rejected application is not told.
 
 Four limits, agreed with box office:
 

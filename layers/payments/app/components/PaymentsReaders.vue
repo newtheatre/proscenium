@@ -72,28 +72,25 @@ async function retire(r: Reader) {
     >
       {{ t('payments.screens.readers.none') }}
     </p>
-    <ul
+    <RecordList
       v-else
-      class="space-y-1"
+      :label="t('payments.screens.readers.title')"
     >
-      <li
+      <RecordListItem
         v-for="r in data.readers.filter(r => r.active)"
         :key="r.id"
-        class="flex items-center gap-2 text-sm"
+        icon="i-lucide-smartphone-nfc"
+        :name="r.label"
+        :description="t('payments.screens.readers.since', { day: day(r.createdAt) })"
       >
-        <UIcon
-          name="i-lucide-smartphone-nfc"
-          class="text-muted"
-        />
-        <span class="flex-1">{{ r.label }} <span class="text-muted">· {{ t('payments.screens.readers.since', { day: day(r.createdAt) }) }}</span></span>
         <IconButton
           icon="i-lucide-unplug"
           :label="t('payments.screens.readers.retire-label', { reader: r.label })"
           size="xs"
           @click="retire(r)"
         />
-      </li>
-    </ul>
+      </RecordListItem>
+    </RecordList>
 
     <UModal
       v-model:open="pairing"

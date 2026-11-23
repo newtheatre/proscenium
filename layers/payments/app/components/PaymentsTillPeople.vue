@@ -40,11 +40,9 @@ const items = (p: Person) => p.items.map(i => (i.quantity > 1 ? t('payments.scre
       <p class="flex items-baseline justify-between gap-2">
         <span class="flex items-center gap-2 font-medium">
           {{ t('payments.screens.till.person', { n: p.position }) }}
-          <UBadge
+          <StatusBadge
             v-if="p.paid"
-            color="success"
-            variant="subtle"
-            icon="i-lucide-check"
+            tone="success"
             :label="t('payments.screens.till.person-paid')"
           />
         </span>

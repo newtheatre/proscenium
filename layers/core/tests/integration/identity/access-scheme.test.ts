@@ -7,6 +7,8 @@ import { inContext, rows, setModule } from '../../../../../tests/integration/hel
 import { setMailer, useMailer, type OutgoingEmail } from '../../../server/notifications/mailer'
 import { countOf } from '../../../server/interface/counts'
 import { accessNeedsFor, sweepAccessScheme } from '../../../server/identity/access-scheme'
+import { ensureVocabularies } from '../../../server/vocabularies/service'
+import whatWouldHelp from '../../../../../migrations/20261123112235_access-what-would-help/migration.sql?raw'
 
 const sent: OutgoingEmail[] = []
 
@@ -49,7 +51,7 @@ async function companionsAnswer(accountId: string) {
 }
 
 describe('applying (ID-38)', () => {
-  it('offers the eleven seeded needs, takes ticks with notes and companions, and tells the person', async () => {
+  it('offers the seeded needs, takes ticks with notes and companions, and tells the person', async () => {
     const { browser, accountId, mine, need } = await applicant()
     expect(Object.keys(need)).toEqual(expect.arrayContaining(['standing', 'level-access', 'essential-companion', 'wheelchair-transfers']))
     const sentForm = await browser.post('/api/core/me/access', { needs: [{ term: need['level-access'], note: 'Ramp at the side door, please' }, { term: need.crowds }], companions: 1 })
@@ -273,7 +275,7 @@ describe('reading for a purpose (ID-39)', () => {
     await desk.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept' })
     const answer = (await read()).body
     expect(answer.shared).toBe(true)
-    expect(answer.needs).toEqual(expect.arrayContaining([{ key: 'crowds', label: 'Crowds and busy spaces', note: 'Quiet corner' }, { key: 'standing', label: 'Standing or queueing' }]))
+    expect(answer.needs).toEqual(expect.arrayContaining([{ key: 'crowds', label: 'A calmer way in', note: 'Quiet corner' }, { key: 'standing', label: 'No queueing, and a seat while you wait' }]))
     // The person sees the read, with the purpose.
     const reads = (await browser.get('/api/core/me/access')).body.reads
     expect(reads.some((r: any) => r.purpose === 'core.welfare')).toBe(true)
@@ -303,11 +305,28 @@ describe('the wheelchair question and the entries the form sets (ID-38)', () => 
     expect(pending.other).toBe('A seat on the end of a row')
   })
 
-  it('offers each need with a plain description', async () => {
+  it('offers each need as the help itself, with a plain description, under its heading', async () => {
     const { browser } = await applicant()
-    const needs = (await browser.get('/api/core/me/access')).body.needs as { key: string, label: string, description: string | null }[]
-    expect(needs.find(n => n.key === 'level-access')).toMatchObject({ label: 'Steps and stairs', description: expect.stringMatching(/ramp, a lift or a level route/) })
-    expect(needs.every(n => n.description)).toBe(true)
+    const needs = (await browser.get('/api/core/me/access')).body.needs as { key: string, label: string, description: string | null, group: string | null }[]
+    expect(needs.find(n => n.key === 'level-access')).toMatchObject({ label: 'A step-free route', description: expect.stringMatching(/without steps or stairs/), group: 'Getting in and out' })
+    expect(needs.find(n => n.key === 'urgent-toilet')).toMatchObject({ label: 'An aisle seat near an exit', group: 'Your seat' })
+    expect(needs.find(n => n.key === 'visual-information')).toMatchObject({ label: 'Captions, and things written down', group: 'Seeing and hearing the show' })
+    expect(needs.every(n => n.description && n.group)).toBe(true)
+  })
+
+  it('offers the help added on 23 November 2026, and takes an assistance dog as an entry', async () => {
+    const { browser, need } = await applicant()
+    const needs = (await browser.get('/api/core/me/access')).body.needs as { key: string, group: string | null }[]
+    expect(Object.fromEntries(needs.filter(n => ['meet-and-guide', 'emergency-help', 'near-stage', 'bsl', 'assistance-dog'].includes(n.key)).map(n => [n.key, n.group]))).toEqual({
+      'meet-and-guide': 'Getting in and out',
+      'emergency-help': 'Getting in and out',
+      'near-stage': 'Your seat',
+      'bsl': 'Seeing and hearing the show',
+      'assistance-dog': 'More about your visit',
+    })
+    expect((await browser.post('/api/core/me/access', { needs: [{ term: need.bsl }, { term: need['assistance-dog'] }], companions: 0 })).status).toBe(200)
+    const pending = (await browser.get('/api/core/me/access')).body.application.pending
+    expect(pending.needs.map((n: any) => n.term)).toEqual([need.bsl, need['assistance-dog']])
   })
 
   it('makes a wheelchair user a holder of core.access-scheme:wheelchair, flagged as pending until the application is decided', async () => {
@@ -544,5 +563,57 @@ describe('switching on-the-night sharing on for people already on the scheme', (
     for (const person of [outsider, waiting, locked]) expect(await shared(person.accountId)).toBe(false)
     await deliver()
     for (const person of [outsider, waiting, locked]) expect(to(person.mine)).toEqual([])
+  })
+})
+
+describe('asking what would help (Matt, 23 November 2026)', () => {
+  const NEW = ['meet-and-guide', 'emergency-help', 'near-stage', 'bsl', 'assistance-dog']
+  const OLD: Record<string, string> = { 'standing': 'Standing or queueing', 'crowds': 'Crowds and busy spaces', 'level-access': 'Steps and stairs', 'distance': 'Walking distances', 'urgent-toilet': 'Getting to a toilet quickly', 'visual-information': 'Hearing what is said', 'audible-information': 'Seeing or reading information' }
+  const labels = async () => Object.fromEntries((await rows<{ slug: string, label: string }>("SELECT slug, label FROM core_terms WHERE vocabulary_key = 'core.access-need'")).map(r => [r.slug, r.label]))
+
+  it('reaches a site made before: unrenamed entries take the new words, and the list gains its headings and the new entries', async () => {
+    await inContext(() => ensureVocabularies())
+    // The list as the first release left it, with one entry the theatre renamed itself.
+    await rows("UPDATE core_terms SET group_id = NULL WHERE vocabulary_key = 'core.access-need'")
+    await rows("DELETE FROM core_term_groups WHERE vocabulary_key = 'core.access-need'")
+    await rows(`DELETE FROM core_terms WHERE vocabulary_key = 'core.access-need' AND slug IN (${NEW.map(() => '?').join(', ')})`, ...NEW)
+    for (const [slug, label] of Object.entries(OLD)) await rows("UPDATE core_terms SET label = ? WHERE vocabulary_key = 'core.access-need' AND slug = ?", slug === 'crowds' ? 'Busy foyers' : label, slug)
+    await rows("UPDATE core_vocabularies SET grouped = 0 WHERE key = 'core.access-need'")
+    const run = () => env.DB.batch(whatWouldHelp.split('--> statement-breakpoint').slice(1).map(s => env.DB.prepare(s)))
+    await run()
+    await run()
+    await inContext(() => ensureVocabularies())
+    const after = await labels()
+    expect(after).toMatchObject({ 'standing': 'No queueing, and a seat while you wait', 'level-access': 'A step-free route', 'urgent-toilet': 'An aisle seat near an exit', 'visual-information': 'Captions, and things written down', 'crowds': 'Busy foyers' })
+    for (const slug of NEW) expect(after[slug]).toBeTruthy()
+    const groups = await rows<{ label: string }>("SELECT label FROM core_term_groups WHERE vocabulary_key = 'core.access-need' ORDER BY sort")
+    expect(groups.map(g => g.label)).toEqual(['Getting in and out', 'Your seat', 'Seeing and hearing the show', 'More about your visit'])
+    expect(await rows("SELECT 1 FROM core_terms WHERE vocabulary_key = 'core.access-need' AND group_id IS NULL")).toEqual([])
+    await rows("UPDATE core_terms SET label = 'A calmer way in' WHERE vocabulary_key = 'core.access-need' AND slug = 'crowds'")
+  })
+
+  it('points out entries added since somebody applied, until they choose them or say none helps', async () => {
+    const { browser, accountId, need } = await applicant()
+    await browser.post('/api/core/me/access', { needs: [{ term: need.standing }], companions: 0 })
+    const desk = await reviewer()
+    await desk.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept' })
+    const fresh = async () => (await browser.get('/api/core/me/access')).body.application.newOptions.map((o: any) => o.label)
+    expect(await fresh()).toEqual([])
+    const [{ at }] = await rows<{ at: number }>('SELECT submitted_at AS at FROM core_access_profiles WHERE account_id = ?', accountId) as [{ at: number }]
+    const arrive = (slugs: string[], when: number) => rows(`UPDATE core_terms SET created_at = ? WHERE vocabulary_key = 'core.access-need' AND slug IN (${slugs.map(() => '?').join(', ')})`, when, ...slugs)
+    try {
+      // The entries the form sets itself are never pointed out.
+      await arrive(['near-stage', 'bsl', 'other'], at + 1)
+      expect(await fresh()).toEqual(['A seat near the stage', 'BSL interpretation'])
+      expect((await browser.post('/api/core/me/access/options-seen', {})).status).toBe(200)
+      expect(await fresh()).toEqual([])
+      await arrive(['meet-and-guide'], Date.now() + 60_000)
+      expect(await fresh()).toEqual(['Someone to meet you'])
+      await browser.post('/api/core/me/access', { needs: [{ term: need.standing }, { term: need['meet-and-guide'] }], companions: 0 })
+      expect(await fresh()).toEqual([])
+    }
+    finally {
+      await arrive(['near-stage', 'bsl', 'other', 'meet-and-guide'], 0)
+    }
   })
 })

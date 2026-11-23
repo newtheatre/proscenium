@@ -28,11 +28,9 @@ watch(() => props.deviceName, (now) => { name.value = now })
 
 // The code this device shows, until it runs out.
 const offer = ref<{ code: string, expiresAt: number } | null>(null)
-const offering = ref(false)
 const offerError = ref<string | null>(null)
 let ending: ReturnType<typeof setTimeout> | undefined
 async function showCode() {
-  offering.value = true
   offerError.value = null
   try {
     offer.value = await $api<{ code: string, expiresAt: number }>('/api/payments/till/link-code', { method: 'POST', body: {} })
@@ -41,9 +39,6 @@ async function showCode() {
   }
   catch (e) {
     offerError.value = toRefusal(e).reason
-  }
-  finally {
-    offering.value = false
   }
 }
 onBeforeUnmount(() => clearTimeout(ending))
@@ -58,7 +53,6 @@ const scanTo = computed(() => {
 const spaced = computed(() => offer.value ? `${offer.value.code.slice(0, 3)} ${offer.value.code.slice(3)}` : '')
 
 const typed = ref('')
-const joining = ref(false)
 const joinError = ref<string | null>(null)
 async function submit() {
   const code = typed.value.replace(/\D/g, '')
@@ -66,9 +60,7 @@ async function submit() {
     joinError.value = t('payments.screens.till.linked.code-six')
     return
   }
-  joining.value = true
   joinError.value = await props.join(code)
-  joining.value = false
   if (!joinError.value) typed.value = ''
 }
 </script>
@@ -113,9 +105,8 @@ async function submit() {
             class="flex items-center justify-between gap-2"
           >
             <span class="min-w-0 truncate">{{ d.name }}</span>
-            <UBadge
-              :color="solo ? 'neutral' : 'success'"
-              variant="subtle"
+            <StatusBadge
+              :tone="solo ? 'neutral' : 'success'"
               :label="solo ? t('payments.screens.till.linked.not-linked') : t('payments.screens.till.linked.in-sync')"
             />
           </li>
@@ -181,7 +172,7 @@ async function submit() {
               color="neutral"
               variant="outline"
               icon="i-lucide-qr-code"
-              :loading="offering"
+              loading-auto
               :label="t('payments.screens.till.linked.show-code')"
               data-testid="till-link-show"
               @click="showCode"
@@ -218,7 +209,7 @@ async function submit() {
               type="submit"
               color="neutral"
               variant="outline"
-              :loading="joining"
+              loading-auto
               :label="t('payments.screens.till.linked.join')"
             />
           </UForm>

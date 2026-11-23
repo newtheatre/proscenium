@@ -243,7 +243,7 @@ async function setActive(path: string, name: string, active: boolean) {
               v-if="!shownItems.length"
               class="text-sm text-muted"
             >
-              {{ t('bar.screens.stock.no-match') }}
+              {{ query.trim() ? t('bar.screens.stock.no-match') : t('bar.screens.stock.all-checked') }}
             </p>
             <RecordList
               v-if="currentItems.length"

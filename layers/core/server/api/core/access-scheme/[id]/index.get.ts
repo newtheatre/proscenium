@@ -6,8 +6,7 @@ import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { defineRoute, refuse, useSetting } from '#kit'
 import { accountById, accountLabel } from '../../../../identity/accounts'
-import { historyOf, NEEDS_VOCABULARY, openForReview } from '../../../../identity/access-scheme'
-import { listTerms } from '../../../../vocabularies/service'
+import { historyOf, needOptions, openForReview } from '../../../../identity/access-scheme'
 
 export default defineRoute({
   ability: 'core.access-scheme.read',
@@ -21,7 +20,7 @@ export default defineRoute({
     name: await accountLabel(record!.id),
     application: await openForReview(record!.id),
     history: await historyOf(record!.id),
-    needs: (await listTerms(NEEDS_VOCABULARY, { includeRetired: true })).map(t => ({ id: t.id, key: t.slug, label: t.label, description: t.description, retired: t.retired })),
+    needs: await needOptions({ includeRetired: true }),
     allowNote: await useSetting('core.access-scheme.allow-note'),
   }
 })

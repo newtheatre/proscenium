@@ -8,7 +8,7 @@ import type { H3Event } from 'h3'
 import { all, can, createUnit, first, isEnabled, log, newId, nowMs, openSpecial, refuse, sealSpecial, usePoint, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
 import { notify } from '../notifications/notify'
 import { notifyAddress } from '../notifications/send'
-import { getTerm, listTerms } from '../vocabularies/service'
+import { getTerm, listTermGroups, listTerms } from '../vocabularies/service'
 import { accountById, isUsable, normaliseAddress } from './accounts'
 import { digest, randomToken } from './crypto'
 import { findOrCreateAccount } from './guests'
@@ -59,6 +59,7 @@ export interface ProfileRow {
   review_due: number | null
   reminders: number
   flagged_at: number | null
+  options_seen_at: number | null
   updated_at: number
 }
 
@@ -74,6 +75,40 @@ export interface Purpose {
   agreedOnApplying?: boolean
   fixed?: boolean
   onForExisting?: string
+}
+
+/** The list the form offers, each entry with the heading it sits under (null in a list with none). */
+export async function needOptions(options: { includeRetired?: boolean } = {}) {
+  const groups = new Map((await listTermGroups(NEEDS_VOCABULARY)).map(g => [g.id, g.label]))
+  return (await listTerms(NEEDS_VOCABULARY, options)).map(t => ({
+    id: t.id,
+    key: t.slug,
+    label: t.label,
+    description: t.description,
+    group: t.groupId ? groups.get(t.groupId) ?? null : null,
+    ...(options.includeRetired ? { retired: t.retired } : {}),
+  }))
+}
+
+/**
+ * The entries the form asks about that arrived after the person last sent their details or said none
+ * of them helps, and that they have not chosen: what My account points out once (Matt, 23 November 2026).
+ */
+async function newOptionsFor(row: ProfileRow, app: Application | null): Promise<{ id: string, label: string }[]> {
+  if (row.status === 'rejected') return []
+  const since = Math.max(row.submitted_at, row.options_seen_at ?? 0)
+  const chosen = new Set((app?.needs ?? []).map(n => n.term))
+  const fresh = await all<{ id: string, slug: string, label: string }>(
+    'SELECT id, slug, label FROM core_terms WHERE vocabulary_key = ? AND retired_at IS NULL AND created_at > ? ORDER BY sort, lower(label)', NEEDS_VOCABULARY, since)
+  const derived: string[] = [DERIVED.companion, DERIVED.other]
+  return fresh.filter(t => !derived.includes(t.slug) && !chosen.has(t.id)).map(t => ({ id: t.id, label: t.label }))
+}
+
+/** The person has seen the new entries and none of them helps: the notice goes until more arrive. */
+export async function markOptionsSeen(unit: UnitView, accountId: string): Promise<void> {
+  const at = nowMs()
+  unit.add({ sql: 'UPDATE core_access_profiles SET options_seen_at = ?, updated_at = ? WHERE account_id = ?', params: [at, at, accountId] })
+    .expect(1, { code: 'core.not-found', reason: 'There is no application.' })
 }
 
 const NOT_FOUND = (): never => refuse('core.not-found', 'There is no such page.', { status: 404 })
@@ -269,10 +304,11 @@ export async function myApplication(accountId: string) {
   const row = await profileOf(accountId)
   if (!row) return null
   const inForce = await openApp(row.payload)
+  const pending = await openApp(row.pending)
   return {
     status: row.status,
     inForce,
-    pending: await openApp(row.pending),
+    pending,
     message: await openSpecial(row.message),
     verified: !!row.verified_at && (row.verified_companions ?? 0) >= (inForce?.companions ?? 0),
     companions: companionsInForce(row, inForce, !!(await useSetting('core.access-scheme.companions-need-verified'))),
@@ -280,6 +316,7 @@ export async function myApplication(accountId: string) {
     submittedAt: row.submitted_at,
     decidedAt: row.decided_at,
     reviewDue: row.review_due,
+    newOptions: await newOptionsFor(row, pending ?? inForce),
   }
 }
 
@@ -597,7 +634,7 @@ export async function inviteToApply(unit: UnitView, event: H3Event, actor: Actor
 export interface DeskAccessForm {
   /** Whether they have an application already: waiting, accepted, asking for more or turned down. */
   applied: boolean
-  needs: { id: string, key: string, label: string, description: string | null }[]
+  needs: { id: string, key: string, label: string, description: string | null, group: string | null }[]
   allowNote: boolean
 }
 
@@ -612,7 +649,7 @@ export async function deskAccessForm(accountId: string): Promise<DeskAccessForm 
   const row = await profileOf(accountId)
   return {
     applied: !!row,
-    needs: (await listTerms(NEEDS_VOCABULARY)).map(t => ({ id: t.id, key: t.slug, label: t.label, description: t.description ?? null })),
+    needs: await needOptions(),
     allowNote: await useSetting('core.access-scheme.allow-note') as boolean,
   }
 }
