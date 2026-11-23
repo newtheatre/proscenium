@@ -14,13 +14,11 @@ const toast = useToast()
 
 const countedMinor = ref<number | null>(props.session.handlesCash ? null : 0)
 const note = ref('')
-const busy = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const difference = computed(() => (countedMinor.value === null ? null : countedMinor.value - props.session.expectedCashMinor))
 
 async function close() {
   if (countedMinor.value === null) return
-  busy.value = true
   refusal.value = null
   try {
     await $api(`/api/payments/sessions/${props.session.id}/close` as string, { method: 'POST', body: { countedMinor: countedMinor.value, varianceNote: note.value.trim() || undefined } })
@@ -29,9 +27,6 @@ async function close() {
   }
   catch (error) {
     refusal.value = toRefusal(error)
-  }
-  finally {
-    busy.value = false
   }
 }
 </script>
@@ -88,7 +83,7 @@ async function close() {
     </UFormField>
     <UButton
       type="submit"
-      :loading="busy"
+      loading-auto
       :label="t('payments.screens.close.button')"
     />
   </UForm>

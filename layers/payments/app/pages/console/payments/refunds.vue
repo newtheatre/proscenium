@@ -165,8 +165,9 @@ const rowActions = (r: Row): DropdownMenuItem[] => {
             :label="t('payments.screens.refunds.decline-reason')"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="reason"
+              value-key="value"
               :items="reasons?.reasons.map(r => ({ value: r.id, label: r.label })) ?? []"
             />
           </UFormField>
