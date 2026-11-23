@@ -9,6 +9,7 @@ const SETTINGS = {
   accent: 'core.brand.accent',
   neutral: 'core.brand.neutral',
   displayFont: 'core.brand.display-font',
+  bodyFont: 'core.brand.body-font',
   radius: 'core.brand.radius',
   creditLine: 'core.brand.credit-line',
 } as const

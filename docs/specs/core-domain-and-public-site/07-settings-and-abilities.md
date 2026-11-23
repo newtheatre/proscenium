@@ -39,6 +39,7 @@ The time zone stays unset until setup, and its audience is public, because publi
 | `core.brand.accent` | colour | A neutral blue | A hex colour | `core.branding.edit` | public | No | The one colour everything derives from |
 | `core.brand.neutral` | choice | `slate` | slate, stone, zinc, neutral | `core.branding.edit` | public | No | The tone of greys: cool, warm or plain |
 | `core.brand.display-font` | choice | `system` | The bundled fonts, or `system` | `core.branding.edit` | public | No | Headings in the public shell |
+| `core.brand.body-font` | choice | `system` | The bundled fonts, or `system` | `core.branding.edit` | public | No | Body text in the public shell; `system` leaves the site's own font |
 | `core.brand.radius` | choice | `medium` | none, small, medium, large | `core.branding.edit` | public | No | How rounded corners are |
 | `core.brand.credit-line` | boolean | true |  | `core.branding.edit` | public | No | Shows "Powered by Proscenium" in the public footer |
 | `core.brand.revision` | integer | 0 | Managed | Nobody: raised on save | public | No | Cache-busting for the stylesheet and logos |

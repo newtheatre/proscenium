@@ -6,12 +6,13 @@ import { watchDebounced } from '@vueuse/core'
 import type { BrandLogo } from '../composables/useBrand'
 
 interface ModeTokens { background: string, surface: string, border: string, text: string, muted: string, link: string, solid: string, onSolid: string }
-interface Preview { tokens: { light: ModeTokens, dark: ModeTokens, radius: string, displayFont: string }, email: { subject: string, html: string } }
+interface Preview { tokens: { light: ModeTokens, dark: ModeTokens, radius: string, displayFont: string, bodyFont: string | null, fontFaces: string }, email: { subject: string, html: string } }
 
 const props = defineProps<{
   accent: string
   neutral: string
   displayFont: string
+  bodyFont: string
   radius: string
   name: string
   logo: BrandLogo | null
@@ -29,7 +30,7 @@ async function load() {
   try {
     preview.value = await $api<Preview>('/api/core/branding/preview', {
       method: 'POST',
-      body: { accent: props.accent, neutral: props.neutral, displayFont: props.displayFont, radius: props.radius },
+      body: { accent: props.accent, neutral: props.neutral, displayFont: props.displayFont, bodyFont: props.bodyFont, radius: props.radius },
     })
     failed.value = false
   }
@@ -38,7 +39,10 @@ async function load() {
   }
 }
 onMounted(load)
-watchDebounced(() => [props.accent, props.neutral, props.displayFont, props.radius], load, { debounce: 300 }) // not-policy: wait for typing to pause
+watchDebounced(() => [props.accent, props.neutral, props.displayFont, props.bodyFont, props.radius], load, { debounce: 300 }) // not-policy: wait for typing to pause
+
+// A font the site serves itself is drawn only once its @font-face is on the page.
+useHead(() => ({ style: preview.value?.tokens.fontFaces ? [{ key: 'brand-preview-fonts', innerHTML: preview.value.tokens.fontFaces }] : [] }))
 
 const modes = computed(() => {
   const p = preview.value
@@ -80,7 +84,7 @@ const modes = computed(() => {
         </figcaption>
         <div
           class="space-y-3 border p-4 text-sm"
-          :style="{ background: mode.tokens.background, color: mode.tokens.text, borderColor: mode.tokens.border, borderRadius: preview.tokens.radius }"
+          :style="{ background: mode.tokens.background, color: mode.tokens.text, borderColor: mode.tokens.border, borderRadius: preview.tokens.radius, fontFamily: preview.tokens.bodyFont ?? undefined }"
         >
           <div
             class="flex items-center gap-2 border-b pb-2"
