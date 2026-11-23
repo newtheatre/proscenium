@@ -128,7 +128,10 @@ async function cancel(request: Request) {
           v-if="data.requests.length"
           :title="t('core.me.data.requests')"
         >
-          <RecordList :label="t('core.me.data.requests')">
+          <RecordList
+            :label="t('core.me.data.requests')"
+            flush
+          >
             <RecordListItem
               v-for="r in data.requests"
               :key="r.id"

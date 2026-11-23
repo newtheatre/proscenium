@@ -26,8 +26,6 @@ watch(() => data.value?.contacts, (contacts) => {
 // The route's schema, with the confirmation held as a tick box until it is ticked.
 const schema = emergencyContactsInput.extend({ told: z.boolean() }).refine(v => v.told || !v.contacts.length, { path: ['told'], message: t('core.me.contacts.told-needed') })
 const formRef = useTemplateRef('formRef')
-const uid = useId()
-const saving = ref(false)
 const refusal = ref<RefusalView | null>(null)
 
 function add() {
@@ -38,7 +36,6 @@ function remove(index: number) {
 }
 
 async function save() {
-  saving.value = true
   refusal.value = null
   try {
     await $api('/api/core/me/emergency-contacts', {
@@ -51,9 +48,6 @@ async function save() {
   catch (e) {
     refusal.value = toRefusal(e)
     formRef.value?.setErrors(fieldErrors(refusal.value))
-  }
-  finally {
-    saving.value = false
   }
 }
 
@@ -82,20 +76,13 @@ const reasonLabel = (reason: string) => REASONS.includes(reason) ? t(`core.perso
       >
         {{ t('core.me.contacts.none') }}
       </p>
-      <div
+      <FieldGroup
         v-for="(contact, index) in form.contacts"
         :key="index"
-        role="group"
-        :aria-labelledby="`${uid}-contact-${index}`"
-        class="space-y-4"
+        :title="t('core.me.contacts.contact', { number: index + 1 })"
+        :first="index === 0"
       >
-        <div class="flex items-center justify-between gap-3">
-          <h3
-            :id="`${uid}-contact-${index}`"
-            class="font-medium text-highlighted"
-          >
-            {{ t('core.me.contacts.contact', { number: index + 1 }) }}
-          </h3>
+        <template #actions>
           <UButton
             color="neutral"
             variant="ghost"
@@ -103,7 +90,7 @@ const reasonLabel = (reason: string) => REASONS.includes(reason) ? t(`core.perso
             :label="t('core.me.contacts.remove')"
             @click="remove(index)"
           />
-        </div>
+        </template>
         <UFormField
           :name="`contacts.${index}.name`"
           :label="t('core.me.contacts.name')"
@@ -138,7 +125,7 @@ const reasonLabel = (reason: string) => REASONS.includes(reason) ? t(`core.perso
             maxlength="40"
           />
         </UFormField>
-      </div>
+      </FieldGroup>
       <UButton
         v-if="form.contacts.length < MAX_EMERGENCY_CONTACTS"
         color="neutral"
@@ -160,25 +147,19 @@ const reasonLabel = (reason: string) => REASONS.includes(reason) ? t(`core.perso
       <UButton
         v-if="form.contacts.length || data.contacts.length"
         type="submit"
-        :loading="saving"
+        loading-auto
         :label="t('core.me.contacts.save')"
       />
     </UForm>
-    <div
+    <FieldGroup
       v-if="data.reads.length"
-      class="space-y-2"
+      :title="t('core.me.contacts.reads')"
     >
-      <h3 class="text-sm font-medium text-highlighted">
-        {{ t('core.me.contacts.reads') }}
-      </h3>
-      <ul class="space-y-1 text-sm text-muted">
-        <li
-          v-for="read in data.reads"
-          :key="read.at"
-        >
-          {{ t('core.me.contacts.read', { when: dateTime(read.at), capacity: read.capacity, reason: reasonLabel(read.reason) }) }}
-        </li>
-      </ul>
-    </div>
+      <UTimeline
+        :items="data.reads.map(read => ({ date: dateTime(read.at), title: reasonLabel(read.reason), description: t('core.me.contacts.read-as', { capacity: read.capacity }) }))"
+        color="neutral"
+        size="xs"
+      />
+    </FieldGroup>
   </PageSection>
 </template>

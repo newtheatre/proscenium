@@ -204,6 +204,7 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
           variant="outline"
           icon="i-lucide-check"
           :label="t('core.access.still-right')"
+          loading-auto
           @click="confirmStillRight"
         />
         <UButton
@@ -250,17 +251,12 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
       >
         {{ t('core.access.reads.none') }}
       </p>
-      <ul
+      <UTimeline
         v-else
-        class="space-y-1 text-sm"
-      >
-        <li
-          v-for="(read, i) in data.reads"
-          :key="i"
-        >
-          {{ t('core.access.reads.line', { date: day(read.at), by: purposeLabel(read) }) }}
-        </li>
-      </ul>
+        :items="data.reads.map(read => ({ date: day(read.at), title: purposeLabel(read) }))"
+        color="neutral"
+        size="xs"
+      />
     </PageSection>
   </PageFrame>
 </template>
