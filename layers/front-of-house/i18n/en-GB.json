@@ -531,7 +531,6 @@
   "front-of-house.live.not-arrived": "{count} not here yet",
   "front-of-house.live.not-arrived.one": "1 not here yet",
   "front-of-house.live.checklists": "Checklists",
-  "front-of-house.live.checklist-done": "Completed",
   "front-of-house.live.done-of": "{done} of {total} done",
   "front-of-house.live.exceptions": "{count} problems",
   "front-of-house.live.exceptions.one": "1 problem",
