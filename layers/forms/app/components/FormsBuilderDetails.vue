@@ -330,7 +330,7 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
             v-else-if="rule.rule === 'maxFileSize'"
             size="sm"
           >
-            <UInputNumber
+            <FieldNumber
               class="w-24"
               :min="1"
               :model-value="Math.max(1, Math.round((rule.value as number) / MEGABYTE))"
@@ -343,7 +343,7 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
               :label="t('forms.screens.details.megabytes')"
             />
           </UFieldGroup>
-          <UInputNumber
+          <FieldNumber
             v-else-if="typeof rule.value === 'number'"
             class="w-28"
             size="sm"
@@ -372,7 +372,7 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
               :model-value="rule.value"
               @update:model-value="setRule(i, { value: $event ?? '' })"
             />
-            <UInputNumber
+            <FieldNumber
               v-else
               class="w-24"
               size="sm"

@@ -252,7 +252,7 @@ async function archive() {
             name="expiryDays"
             :label="t('core.roles.ends.days-label')"
           >
-            <UInputNumber
+            <FieldNumber
               v-model="form.expiryDays"
               :min="1"
               :max="3650"

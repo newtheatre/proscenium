@@ -20,6 +20,10 @@ const canAdd = computed(() => !!choices.value?.schemes.some(s => s.canAdd))
 const canImport = computed(() => !!choices.value?.schemes.some(s => s.canImport))
 const adding = ref(false)
 const importing = ref(false)
+const actions = computed(() => [
+  ...(canAdd.value ? [{ label: t('membership.screens.add-member.title'), icon: 'i-lucide-user-plus', onSelect: () => { adding.value = true } }] : []),
+  ...(canImport.value ? [{ label: t('membership.screens.import.action'), icon: 'i-lucide-file-up', lesser: true, onSelect: () => { importing.value = true } }] : []),
+])
 const reload = () => refreshNuxtData('core:list:/api/membership/members')
 const TONES = { 'current': 'success', 'in-grace': 'warning', 'upcoming': 'info', 'lapsed': 'neutral', 'ended': 'neutral' } as const
 
@@ -56,20 +60,7 @@ const list = computed(() => ({
       </span>
     </template>
     <template #primary>
-      <UButton
-        v-if="canAdd"
-        icon="i-lucide-user-plus"
-        :label="t('membership.screens.add-member.title')"
-        @click="adding = true"
-      />
-      <UButton
-        v-if="canImport"
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-file-up"
-        :label="t('membership.screens.import.action')"
-        @click="importing = true"
-      />
+      <PageActions :actions="actions" />
     </template>
     <template #before>
       <MembershipWaiting @decided="reload" />

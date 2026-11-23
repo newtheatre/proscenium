@@ -160,10 +160,9 @@ async function save() {
           :hint="t('forms.screens.details.optional')"
           :help="t('forms.screens.link.cap-help')"
         >
-          <UInputNumber
+          <FieldNumber
             v-model="state.responseCap"
             :min="1"
-            class="w-32"
           />
         </UFormField>
         <UFormField

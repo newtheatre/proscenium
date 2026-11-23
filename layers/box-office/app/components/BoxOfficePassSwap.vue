@@ -99,7 +99,7 @@ const referenceId = useId()
             {{ t('box-office.book.swap.terms', { amount: money(row.price.amountMinor, currency), count: row.entries, each: money(Math.round(row.price.amountMinor / row.entries), currency), more: money(row.price.amountMinor - row.ticket.amountMinor, currency) }) }}
           </span>
         </span>
-        <UInputNumber
+        <FieldNumber
           :model-value="countOf(row)"
           :min="0"
           :max="mostOf(row)"

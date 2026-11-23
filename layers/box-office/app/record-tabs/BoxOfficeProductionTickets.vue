@@ -245,7 +245,7 @@ async function openRun() {
               v-if="!data.sections.length"
               :label="t('box-office.setup.capacity.whole')"
             >
-              <UInputNumber
+              <FieldNumber
                 v-model="wholeSeats"
                 class="w-40"
                 :min="0"
@@ -256,7 +256,7 @@ async function openRun() {
               :key="s.id"
               :label="sectioned ? s.name : t('box-office.setup.capacity.whole')"
             >
-              <UInputNumber
+              <FieldNumber
                 v-model="seats[s.id]"
                 class="w-40"
                 :min="0"

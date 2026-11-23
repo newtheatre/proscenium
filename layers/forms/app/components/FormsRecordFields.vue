@@ -54,17 +54,15 @@ async function save(set: FieldSet, given: Answers): Promise<boolean> {
 </script>
 
 <template>
-  <div class="space-y-8">
+  <!-- A slot with no fields attached draws nothing, so the record's page has no empty block. -->
+  <div
+    v-if="error || data?.sets.length"
+    class="space-y-8"
+  >
     <RefusalNotice
       v-if="error"
       :refusal="toRefusal(error)"
     />
-    <p
-      v-else-if="data && !data.sets.length"
-      class="text-sm text-muted"
-    >
-      {{ t('forms.screens.fields.none') }}
-    </p>
     <section
       v-for="set in data?.sets ?? []"
       :key="set.formId"

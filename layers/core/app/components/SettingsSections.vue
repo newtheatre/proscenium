@@ -1,9 +1,9 @@
 <!-- The sections of settings the Settings page type draws (UI-14), for a generated page or for the
      settings a bespoke screen manages (`screen` on a setting or its group), so a screen like Email
      sending saves its settings exactly as a generated page does. Each setting shows its value, its
-     default with a Reset link once changed, who may change it (to someone who may not), its latest change and a "Quoted on
-     public pages" tag where a content page shows it live. Changes save per section with a stated
-     summary, asking again first for a setting declared onChange: 'confirm'. -->
+     default with a Reset link once changed, who may change it (to someone who may not), its latest
+     change and a "Quoted on public pages" tag where a content page shows it live. Changes save per
+     section, or from one bar for the page (`one-save`), with a stated summary, asking again first for a setting declared onChange: 'confirm'. -->
 <script setup lang="ts">
 import type { Component } from 'vue'
 import { parseTime } from '@internationalized/date'
@@ -37,6 +37,7 @@ interface SettingView {
   lastChange?: { at: number, by: string | null } | null
   /** A value the server suggests while none is set (the address this page was loaded on). */
   suggestion?: string | null
+  minLength?: number
   min?: number | string
   max?: number | string
   maxLength?: number
@@ -68,6 +69,8 @@ const props = defineProps<{
   omit?: string[]
   /** A screen with one section of settings may give it its own heading ("Email settings"). */
   heading?: string
+  /** One Save bar for the whole page, kept in view, instead of a Save in every section. */
+  oneSave?: boolean
 }>()
 defineSlots<{
   /** Beneath one setting's field: a screen's preview or warning, with the value as edited. */
@@ -215,6 +218,8 @@ const sectionTitle = (section: { module: string, group: string }) => {
  * site's address or the time zone, which setup records: resetting would only break what depends on them.
  */
 const mayReset = (s: SettingView) => s.canChange && !(s.unset && s.default == null && s.onChange === 'confirm')
+  // Nor on words that may not be empty and default to nothing (the theatre's name): Reset would blank them.
+  && !(s.kind === 'text' && !!s.minLength && (s.default == null || s.default === ''))
 const resettable = (settings: SettingView[]) => settings.filter(s => mayReset(s) && s.overridden && !resets[s.key])
 function resetSection(settings: SettingView[]) {
   for (const s of resettable(settings)) resetToDefault(s)
@@ -295,7 +300,7 @@ onMounted(() => {
         v-for="section in sections"
         :key="section.id"
         novalidate
-        @submit.prevent="save(section.id, section.settings)"
+        @submit.prevent="oneSave ? save('all', shown) : save(section.id, section.settings)"
       >
         <PageSection :title="heading ?? sectionTitle(section)">
           <div class="divide-y divide-default">
@@ -325,13 +330,12 @@ onMounted(() => {
                   :disabled="!s.canChange"
                   @update:model-value="onEdit(s, $event)"
                 />
-                <UInputNumber
+                <FieldNumber
                   v-else-if="s.kind === 'integer'"
                   :model-value="draft[s.key]"
                   :disabled="!s.canChange"
                   :min="limit(s, 'min')"
                   :max="limit(s, 'max')"
-                  class="w-32"
                   @update:model-value="onEdit(s, $event)"
                 />
                 <FieldMoney
@@ -435,13 +439,12 @@ onMounted(() => {
                   v-else-if="s.kind === 'rate'"
                   class="flex flex-wrap items-center gap-2"
                 >
-                  <UInputNumber
+                  <FieldNumber
                     :model-value="rate(s).count"
                     :disabled="!s.canChange"
                     :min="limit(s, 'min')"
                     :max="limit(s, 'max')"
                     :aria-label="t('core.settings-page.rate-count', { setting: t(s.labelKey) })"
-                    class="w-32"
                     @update:model-value="onRate(s, { count: $event ?? undefined })"
                   />
                   <span class="text-sm text-muted">{{ t('core.settings-page.rate-in') }}</span>
@@ -536,8 +539,12 @@ onMounted(() => {
               </div>
             </div>
           </div>
-          <template #footer>
+          <template
+            v-if="!oneSave || resettable(section.settings).length"
+            #footer
+          >
             <p
+              v-if="!oneSave"
               class="text-sm text-muted"
               aria-live="polite"
             >
@@ -552,6 +559,7 @@ onMounted(() => {
               @click="resetSection(section.settings)"
             />
             <UButton
+              v-if="!oneSave"
               type="submit"
               :label="t('core.settings-page.save', { section: inSentence(t(`${section.module}.settings-sections.${section.group}`), { article: false }) })"
               :loading="saving === section.id"
@@ -560,6 +568,23 @@ onMounted(() => {
           </template>
         </PageSection>
       </form>
+      <div
+        v-if="oneSave && sections.length && all.some(s => s.canChange)"
+        class="sticky-bar mt-4 flex flex-wrap items-center justify-end gap-3"
+      >
+        <p
+          class="me-auto text-sm text-muted"
+          aria-live="polite"
+        >
+          {{ changesIn(shown).length ? t('core.settings-page.changes', { count: changesIn(shown).length }) : t('core.settings-page.no-changes') }}
+        </p>
+        <UButton
+          :label="t('core.settings-page.save-all')"
+          :loading="saving === 'all'"
+          :disabled="!changesIn(shown).length || saving !== null"
+          @click="save('all', shown)"
+        />
+      </div>
     </DataBoundary>
     <USlideover
       :open="!!history"

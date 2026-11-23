@@ -16,8 +16,6 @@ const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 
-// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
-const phone = useScreenQuery('(max-width: 639px)')
 // Filters live in the address.
 const ALL = 'all'
 const range = computed({
@@ -187,49 +185,44 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
             icon="i-lucide-id-card"
           />
           <!-- On a phone: one row a check, what happened first and the rest under it. -->
-          <RecordList
-            v-if="d.rows.length && phone"
+          <TableOrList
+            v-if="d.rows.length"
+            :rows="d.rows"
+            :columns="columns"
             :label="t('bar.navigation.age-checks.label')"
           >
-            <RecordListItem
-              v-for="r in d.rows"
-              :key="r.id"
-              :name="[r.reason ?? (r.idType ? idTypeLabel(r.idType) : null), r.scope === 'all' ? t('bar.screens.age-checks.whole-sale') : r.product].filter(Boolean).join(' · ') || outcomeLabel(r.outcome)"
-              :description="[dateTime(r.at), r.outlet, r.by, r.sale].filter(Boolean).join(' · ')"
-            >
-              <StatusBadge
-                v-if="r.outcome === 'refused'"
-                tone="warning"
-                :label="outcomeLabel(r.outcome)"
-              />
-              <UBadge
-                v-else
-                :color="r.outcome === 'id_checked' ? 'success' : 'neutral'"
-                icon="i-lucide-circle-check"
-                :label="outcomeLabel(r.outcome)"
-              />
-              <template
-                v-if="r.description"
-                #below
+            <template #item="{ row: r }">
+              <RecordListItem
+                :name="[r.reason ?? (r.idType ? idTypeLabel(r.idType) : null), r.scope === 'all' ? t('bar.screens.age-checks.whole-sale') : r.product].filter(Boolean).join(' · ') || outcomeLabel(r.outcome)"
+                :description="[dateTime(r.at), r.outlet, r.by, r.sale].filter(Boolean).join(' · ')"
               >
-                <div class="flex items-center gap-2 text-sm">
-                  <span>{{ r.description }}</span>
-                  <IconButton
-                    v-if="d.canReview"
-                    icon="i-lucide-eraser"
-                    :label="t('bar.screens.age-checks.erase')"
-                    @click="erase(r)"
-                  />
-                </div>
-              </template>
-            </RecordListItem>
-          </RecordList>
-          <UTable
-            v-else-if="d.rows.length"
-            :data="d.rows"
-            :columns="columns"
-            :caption="t('bar.navigation.age-checks.label')"
-          >
+                <StatusBadge
+                  v-if="r.outcome === 'refused'"
+                  tone="warning"
+                  :label="outcomeLabel(r.outcome)"
+                />
+                <UBadge
+                  v-else
+                  :color="r.outcome === 'id_checked' ? 'success' : 'neutral'"
+                  icon="i-lucide-circle-check"
+                  :label="outcomeLabel(r.outcome)"
+                />
+                <template
+                  v-if="r.description"
+                  #below
+                >
+                  <div class="flex items-center gap-2 text-sm">
+                    <span>{{ r.description }}</span>
+                    <IconButton
+                      v-if="d.canReview"
+                      icon="i-lucide-eraser"
+                      :label="t('bar.screens.age-checks.erase')"
+                      @click="erase(r)"
+                    />
+                  </div>
+                </template>
+              </RecordListItem>
+            </template>
             <template #at-cell="{ row }">
               {{ dateTime(row.original.at) }}
             </template>
@@ -290,7 +283,7 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
                 />
               </div>
             </template>
-          </UTable>
+          </TableOrList>
         </div>
       </template>
     </DataBoundary>

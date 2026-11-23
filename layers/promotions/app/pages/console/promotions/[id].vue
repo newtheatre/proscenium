@@ -290,12 +290,11 @@ if (existing.value) form.value = asForm(existing.value)
                 name="value"
                 required
               >
-                <UInputNumber
+                <FieldNumber
                   v-model="form.percent"
                   :min="1"
                   :max="100"
                   :format-options="{ maximumFractionDigits: 2 }"
-                  class="w-32"
                 />
               </UFormField>
               <template v-else-if="form.effect === 'multi_buy'">
@@ -306,11 +305,10 @@ if (existing.value) form.value = asForm(existing.value)
                     name="buyQuantity"
                     required
                   >
-                    <UInputNumber
+                    <FieldNumber
                       :model-value="form.buyQuantity ?? undefined"
                       :min="2"
                       :max="50"
-                      class="w-32"
                       @update:model-value="form.buyQuantity = $event ?? null"
                     />
                   </UFormField>
@@ -332,11 +330,10 @@ if (existing.value) form.value = asForm(existing.value)
                   name="freeQuantity"
                   required
                 >
-                  <UInputNumber
+                  <FieldNumber
                     :model-value="form.freeQuantity ?? undefined"
                     :min="1"
                     :max="49"
-                    class="w-32"
                     @update:model-value="form.freeQuantity = $event ?? null"
                   />
                 </UFormField>
@@ -487,7 +484,7 @@ if (existing.value) form.value = asForm(existing.value)
                       class="w-48 uppercase"
                       :aria-label="t('promotions.field.code')"
                     />
-                    <UInputNumber
+                    <FieldNumber
                       :model-value="c.maxUses ?? undefined"
                       :min="1"
                       :placeholder="t('promotions.field.code-uses')"
@@ -603,10 +600,9 @@ if (existing.value) form.value = asForm(existing.value)
                   :help="t(`promotions.field.max-uses-help.${form.countBy}`)"
                   name="maxUses"
                 >
-                  <UInputNumber
+                  <FieldNumber
                     :model-value="form.maxUses ?? undefined"
                     :min="1"
-                    class="w-32"
                     @update:model-value="form.maxUses = $event ?? null"
                   />
                 </UFormField>
@@ -616,10 +612,9 @@ if (existing.value) form.value = asForm(existing.value)
                   :help="t('promotions.field.per-sale-help')"
                   name="maxPerSale"
                 >
-                  <UInputNumber
+                  <FieldNumber
                     :model-value="form.maxPerSale ?? undefined"
                     :min="1"
-                    class="w-32"
                     @update:model-value="form.maxPerSale = $event ?? null"
                   />
                 </UFormField>

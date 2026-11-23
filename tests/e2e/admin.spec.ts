@@ -163,7 +163,7 @@ test.describe('the organisation\'s year end', () => {
     await yearEnd.getByRole('combobox', { name: 'Month' }).click()
     await page.getByRole('option', { name: 'July' }).click()
     await expect(yearEnd.getByRole('spinbutton', { name: 'Day' })).toHaveValue('31')
-    await page.getByRole('button', { name: 'Save organisation settings' }).click()
+    await page.getByRole('button', { name: 'Save changes' }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Save this change?')
     await expect(dialog).toContainText(/Year end (is set to|goes from .+ to) 31 July\./)

@@ -161,12 +161,11 @@ async function conflict() {
               :help="t('forms.screens.review.mark-help', { max: c.max })"
               required
             >
-              <UInputNumber
+              <FieldNumber
                 v-model="state.marks[c.id]"
                 :min="0"
                 :max="c.max"
                 :disabled="!canChange"
-                class="w-32"
               />
             </UFormField>
           </template>
