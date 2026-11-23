@@ -19,11 +19,12 @@ const noViolations = async (page: Page) => expect((await new AxeBuilder({ page }
 test.describe('a site owner with no console', () => {
   test.use(as(siteOwner('Sol Site', ['core.audit.view'])))
 
-  test('has the Admin mark, a way back to the site, the overview and no link in a console that is not theirs', async ({ page }) => {
+  test('has the Admin mark, a way to the site, the overview and no link in a console that is not theirs', async ({ page }) => {
     await visit(page, '/admin')
     await expect(page).toHaveTitle(/^Overview · Admin · /)
     await expect(page.getByText('Admin', { exact: true }).first()).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'View site' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Back to console' })).toHaveCount(0)
     // Admin wears the brand like every shell (C-35).
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--brand-solid').trim())).toMatch(/^#[0-9a-f]{6}$/i)
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible()
@@ -221,7 +222,7 @@ test.describe('on a phone, in dark mode', () => {
     const toggle = page.getByRole('button', { name: 'Open sidebar' })
     await expect(toggle).toHaveCount(1)
     await toggle.click()
-    await expect(page.getByRole('link', { name: 'Back to the site' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'View site' })).toBeVisible()
     await page.getByRole('link', { name: 'Advanced' }).click()
     await expect(page).toHaveURL(/\/admin\/advanced/)
     await noViolations(page)

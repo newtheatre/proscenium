@@ -498,7 +498,7 @@ one admin entry (the viewer then has the side `admin` and the account menu shows
 anyone else finds `/admin` is not there. The layout is `layouts/admin.vue`: the console's frame with an
 "Admin" mark at the start of every page's navbar that says where you are at every width (PageFrame
 draws it when the layout provides `ADMIN_SHELL`; there is no second bar, and below 1024 pixels the
-navbar's own menu button opens the drawer), a "Back to console" (or "Back to the site") row where the theatre's mark is,
+navbar's own menu button opens the drawer), a "Back to console" row at the foot of the sidebar for someone with a console,
 the same primary colour as the console (the brand's, as in every shell, C-35), so a control looks the same in either shell and in the
 console's settings window (the `admin-shell` class on `body` is kept as a hook), and a browser title
 that starts "Admin". A page uses it with `definePageMeta({ layout: 'admin' })`.
@@ -535,9 +535,10 @@ a layout, not a shell, and it has no navigation of its own.
   pixels) square.
 - **PageLive** is the page type: `title` and `context` (both already translated, for example the
   screen and the performance), an optional `back` address, the task in the default slot and a sticky
-  `footer` slot. Its status strip shows the title, the context, whether the device is online and the
-  way out: an arrow back to the Tonight hub from a screen, and on the hub a worded "Leave" button
-  (named "Leave live mode") back to the console, members' area or My account.
+  `footer` slot. Its status strip is as tall as the console's navbar and lines up with the page below it. It
+  shows the title, the context, whether the device is online and the way out: an arrow back to the
+  Tonight hub at the start from a screen, and on the hub a worded ghost "Leave" button (named "Leave
+  live mode") at the end, after the connection state, back to the console, members' area or My account.
 - **The till** (`/live/till`, Payments) is the combined till for show nights: every
   `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment.
   `?only=box-office` (a comma list of modules) narrows it to those panels, which is how the
@@ -616,11 +617,11 @@ all exercised there; the tests use one worker because they share a local databas
 One menu: each navigation group of two or more entries is a collapsible section (open when it holds
 the current page), a group of one entry is a plain link, and there are no "Everyday" and "Set up"
 headings (everyday entries come first). The sidebar is resizable as well as collapsible (Nuxt UI's
-dashboard sidebar; the width is kept in a cookie). The foot holds a Documentation link (a placeholder
-pointing at the repository's docs until screens have help pages), a Admin link for anyone
-who holds an admin entry, and the account menu. In Admin the theatre's mark sits where it
-does in the console and "Back to console" (or "Back to the site") sits at the foot instead of the
-Admin link. The navbar keeps only search.
+dashboard sidebar; the width is kept in a cookie). The foot holds View site (the public site's home, in the same tab),
+a Documentation link (a placeholder pointing at the repository's docs until screens have help pages),
+an Admin link for anyone who holds an admin entry, and the account menu. In Admin the theatre's mark
+sits where it does in the console and "Back to console" sits at the foot instead of the Admin link,
+for someone with a console; anyone else has View site. The navbar keeps only search.
 ## Lists: defineList, filters, sort and columns
 
 A list is declared once and read by the page, the data route and the export. The declaration is
