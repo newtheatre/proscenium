@@ -23,17 +23,9 @@ const { offer } = useUndo()
 const { data, status, error, refresh } = await useAPI<{ groups: Group[], mixers: { key: string, label: string }[], canAllergens: boolean, allergens: Record<string, Answer>, allergensFromStock: string[], canStock: boolean, stockItems: { id: string, name: string }[], stockOf: Record<string, string> }>('/api/bar/choices', { key: 'bar:choices' })
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-// A modal's Save sits outside its form, where loading-auto cannot see the submit, so it spins on this.
-const submitting = ref(false)
-async function submit(run: () => Promise<unknown>) {
-  submitting.value = true
-  try { await run() }
-  finally { submitting.value = false }
-}
-type FormRef = { setErrors: (errors: FieldError[]) => void }
-const groupEl = useTemplateRef<FormRef>('groupEl')
-const optionEl = useTemplateRef<FormRef>('optionEl')
-const labelEl = useTemplateRef<FormRef>('labelEl')
+const groupEl = useFormRef('groupEl')
+const optionEl = useFormRef('optionEl')
+const labelEl = useFormRef('labelEl')
 const sourceItems = computed(() => (['options', 'mixers'] as const).map(s => ({ value: s, label: t(`bar.screens.choices.sources.${s}`), description: t(`bar.screens.choices.sources.${s}-help`) })))
 const pricingItems = computed(() => (['included', 'fixed', 'own_price'] as const).map(p => ({ value: p, label: t(`bar.screens.choices.pricing.${p}`) })))
 const named = (keys: string[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
@@ -380,7 +372,7 @@ async function saveAllergens() {
           :state="group"
           :validate="validateGroup"
           class="space-y-4"
-          @submit="submit(saveGroup)"
+          @submit="saveGroup"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -454,7 +446,7 @@ async function saveAllergens() {
         <UButton
           type="submit"
           form="bar-choice"
-          :loading="submitting"
+          :loading="groupEl?.loading"
           :label="t('bar.screens.save')"
         />
       </template>
@@ -474,7 +466,7 @@ async function saveAllergens() {
           :state="option"
           :validate="() => bodyErrors(optionInput, optionBody())"
           class="space-y-4"
-          @submit="submit(saveOption)"
+          @submit="saveOption"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -519,7 +511,7 @@ async function saveAllergens() {
         <UButton
           type="submit"
           form="bar-choice-option"
-          :loading="submitting"
+          :loading="optionEl?.loading"
           :label="t('bar.screens.save')"
         />
       </template>
@@ -538,7 +530,7 @@ async function saveAllergens() {
           novalidate
           :state="label"
           class="space-y-4"
-          @submit="submit(saveAllergens)"
+          @submit="saveAllergens"
         >
           <RefusalNotice :refusal="refusal" />
           <p class="text-sm text-muted">
@@ -578,7 +570,7 @@ async function saveAllergens() {
         <UButton
           type="submit"
           form="bar-option-allergens"
-          :loading="submitting"
+          :loading="labelEl?.loading"
           :label="t('bar.screens.product.allergens-record')"
         />
       </template>

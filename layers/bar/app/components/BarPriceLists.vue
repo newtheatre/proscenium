@@ -36,15 +36,7 @@ const retired = computed(() => shown.value.filter(l => !l.active))
 
 const form = ref<{ id: string | null, standard: boolean, name: string, restricted: boolean, fallsBack: boolean } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-// A modal's Save sits outside its form, where loading-auto cannot see the submit, so it spins on this.
-const submitting = ref(false)
-async function submit(run: () => Promise<unknown>) {
-  submitting.value = true
-  try { await run() }
-  finally { submitting.value = false }
-}
-type FormRef = { setErrors: (errors: FieldError[]) => void }
-const formEl = useTemplateRef<FormRef>('formEl')
+const formEl = useFormRef('formEl')
 function edit(l?: List) {
   refusal.value = null
   form.value = l
@@ -230,7 +222,7 @@ async function setActive(l: List, active: boolean) {
           :validate="validate"
           class="space-y-4"
           novalidate
-          @submit="submit(save)"
+          @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -258,7 +250,7 @@ async function setActive(l: List, active: boolean) {
         <UButton
           type="submit"
           form="bar-list"
-          :loading="submitting"
+          :loading="formEl?.loading"
           :label="t('bar.screens.save')"
         />
       </template>

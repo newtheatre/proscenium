@@ -80,14 +80,7 @@ const parentItems = computed(() => {
   return [{ value: 'none', label: t('bar.screens.products.parent-none') }, ...tops.map(c => ({ value: c.id, label: c.name }))]
 })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-// A modal's Save sits outside its form, where loading-auto cannot see the submit, so it spins on this.
-const submitting = ref(false)
-async function submit(run: () => Promise<unknown>) {
-  submitting.value = true
-  try { await run() }
-  finally { submitting.value = false }
-}
-const categoryEl = useTemplateRef<{ setErrors: (errors: FieldError[]) => void }>('categoryEl')
+const categoryEl = useFormRef('categoryEl')
 async function editCategory(c?: Category) {
   refusal.value = null
   presets.value = (await $api<{ presets: { id: string, builtIn: boolean, name: string | null }[] }>('/api/bar/presets')).presets
@@ -284,7 +277,7 @@ async function move(p: Product, to: number) {
           :validate="() => bodyErrors(categoryInput, categoryBody())"
           class="space-y-4"
           novalidate
-          @submit="submit(saveCategory)"
+          @submit="saveCategory"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -337,7 +330,7 @@ async function move(p: Product, to: number) {
         <UButton
           type="submit"
           form="bar-category"
-          :loading="submitting"
+          :loading="categoryEl?.loading"
           :label="t('bar.screens.save')"
         />
       </template>
