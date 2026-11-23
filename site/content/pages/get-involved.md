@@ -1,7 +1,8 @@
 ---
 title: Get involved
-description: How to join the Nottingham New Theatre, and what there is to do once you have.
+description: How to join the Nottingham New Theatre.
 banner: /images/banners/get-involved.webp
+departmentsTitle: New roles in every department available each season
 headline: Come along and get involved
 flash: No experience needed
 join:

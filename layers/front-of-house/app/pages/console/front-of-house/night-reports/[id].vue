@@ -76,6 +76,15 @@ const primary = computed(() => {
   if (d.state === 'signed_off' && d.can.write) return { label: t('front-of-house.report.add-addendum'), icon: 'i-lucide-file-plus' }
   return undefined
 })
+// The first is the page's main act; adding a note is lesser even when it is the only one.
+const pageActions = computed(() => {
+  const d = data.value
+  if (!d) return []
+  return [
+    ...(primary.value ? [{ ...primary.value, onSelect: () => open(d.state === 'draft' ? 'sign-off' : 'note') }] : []),
+    ...(d.state === 'draft' && d.can.write ? [{ label: t('front-of-house.report.add-note'), icon: 'i-lucide-message-square-plus', lesser: true, onSelect: () => open('note') }] : []),
+  ]
+})
 const summary = computed(() => {
   const d = data.value
   if (!d) return []
@@ -121,26 +130,14 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
         <template #status>
           <StatusBadge
             :tone="d.state === 'signed_off' ? 'success' : 'warning'"
-            :label="t(`front-of-house.report-states.${d.state}`)"
+            :label="t(d.state === 'draft' ? 'core.states.draft' : 'front-of-house.report-states.signed_off')"
           />
         </template>
-        <template #primary>
-          <div class="flex gap-2">
-            <UButton
-              v-if="d.state === 'draft' && d.can.write"
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-message-square-plus"
-              :label="t('front-of-house.report.add-note')"
-              @click="open('note')"
-            />
-            <UButton
-              v-if="primary"
-              :icon="primary.icon"
-              :label="primary.label"
-              @click="open(d.state === 'draft' ? 'sign-off' : 'note')"
-            />
-          </div>
+        <template
+          v-if="pageActions.length"
+          #primary
+        >
+          <PageActions :actions="pageActions" />
         </template>
         <div class="space-y-6">
           <RefusalNotice :refusal="refusal" />

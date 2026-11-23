@@ -39,15 +39,8 @@ const columns = computed(() => [
           :title="t('bar.screens.deliveries.empty.title')"
           :description="t('bar.screens.deliveries.empty.description')"
           icon="i-lucide-truck"
-        >
-          <template #actions>
-            <UButton
-              to="/console/bar/stock/deliveries/new"
-              icon="i-lucide-plus"
-              :label="t('bar.screens.deliveries.record')"
-            />
-          </template>
-        </EmptyState>
+          :action="{ label: t('bar.screens.deliveries.record'), icon: 'i-lucide-plus', to: '/console/bar/stock/deliveries/new' }"
+        />
         <TableOrList
           v-if="d.deliveries.length"
           :rows="d.deliveries"

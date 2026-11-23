@@ -15,8 +15,8 @@ const line = (row: Row) => [row.description, t('core.counts.terms', { count: row
 
 <template>
   <PageFrame
-    title="Lists"
-    description="The choices this module offers in its pickers, such as reasons. Open a list to add, rename, reorder or retire its terms."
+    :title="t('core.lists.lists')"
+    :description="t('core.lists.description-the-choices-this')"
     width="reading"
   >
     <DataBoundary
@@ -28,12 +28,12 @@ const line = (row: Row) => [row.description, t('core.counts.terms', { count: row
       <EmptyState
         v-if="!data?.rows.length"
         icon="i-lucide-list-tree"
-        title="No lists"
-        description="This module has no lists of its own."
+        :title="t('core.lists.no-lists')"
+        :description="t('core.lists.description-this-module-has')"
       />
       <RecordList
         v-else
-        label="Lists"
+        :label="t('core.lists.lists')"
       >
         <RecordListItem
           v-for="row in data.rows"

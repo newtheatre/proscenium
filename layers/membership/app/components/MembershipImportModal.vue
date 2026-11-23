@@ -68,8 +68,9 @@ async function run() {
           :label="t('membership.screens.import.scheme')"
           required
         >
-          <USelect
+          <USelectMenu
             v-model="chosen"
+            value-key="value"
             :items="choices.map(s => ({ value: s.id, label: s.name }))"
             :placeholder="t('membership.screens.add-member.scheme-placeholder')"
           />

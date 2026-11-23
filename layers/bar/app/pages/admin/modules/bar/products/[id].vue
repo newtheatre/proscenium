@@ -410,6 +410,7 @@ function planned(v: Variant, l: List): string | null {
           </template>
           <RecordList
             v-if="!v.mixerMeasure || data.canStock"
+            flush
             :label="t('bar.screens.product.prices-of', { name: v.name })"
           >
             <RecordListItem
@@ -475,9 +476,10 @@ function planned(v: Variant, l: List): string | null {
             :label="t('bar.screens.products.category')"
             name="categoryId"
           >
-            <USelect
+            <USelectMenu
               v-model="editing.categoryId"
               :items="categoryItems"
+              value-key="value"
             />
           </UFormField>
           <UFormField
@@ -656,11 +658,12 @@ function planned(v: Variant, l: List): string | null {
             :help="t('bar.screens.product.recipe-copy-help')"
             name="copyFrom"
           >
-            <USelect
+            <USelectMenu
               :model-value="undefined"
               :items="copyItems"
               :placeholder="t('bar.screens.product.recipe-copy-pick')"
               class="w-48"
+              value-key="value"
               @update:model-value="v => copyFrom(v as string)"
             />
           </UFormField>
@@ -686,7 +689,7 @@ function planned(v: Variant, l: List): string | null {
               :name="`lines.${i}.quantity`"
             >
               <UFieldGroup>
-                <UInputNumber
+                <FieldNumber
                   v-model="line.quantity"
                   :min="1"
                 />

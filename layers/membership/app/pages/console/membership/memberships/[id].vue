@@ -136,6 +136,16 @@ async function saveDates() {
     datesRefusal.value = toRefusal(e)
   }
 }
+function openEnd() {
+  note.value = ''
+  refusal.value = null
+  ending.value = true
+}
+// Neither is the page's primary action: both change the record, and reading it is the common case.
+const pageActions = computed(() => [
+  ...(data.value?.canChangeDates ? [{ label: t('membership.membership.change-dates'), icon: 'i-lucide-calendar-cog', lesser: true, onSelect: openDates }] : []),
+  { label: t('membership.membership.end'), icon: 'i-lucide-circle-stop', lesser: true, onSelect: openEnd },
+])
 </script>
 
 <template>
@@ -156,21 +166,7 @@ async function saveDates() {
       v-if="m && (m.state === 'active' || m.state === 'pending')"
       #primary
     >
-      <UButton
-        v-if="data?.canChangeDates"
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-calendar-cog"
-        :label="t('membership.membership.change-dates')"
-        @click="openDates()"
-      />
-      <UButton
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-circle-stop"
-        :label="t('membership.membership.end')"
-        @click="ending = true; note = ''; refusal = null"
-      />
+      <PageActions :actions="pageActions" />
     </template>
     <DataBoundary
       :data="data"

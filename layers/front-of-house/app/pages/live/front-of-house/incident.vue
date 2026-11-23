@@ -64,7 +64,6 @@ function addPerson() {
 }
 watch(() => [person.value.source, person.value.accountId, person.value.name], () => { unnamed.value = false })
 const sent = ref<{ reference: string } | null>(null)
-const sending = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 // One key for this report, kept across a retried send, so a report is never made twice.
 let reportKey: string | undefined
@@ -100,7 +99,6 @@ async function send() {
   // Someone filled in but not yet added is added on the way, rather than lost.
   if (person.value.accountId || person.value.name.trim()) addPerson()
   refusal.value = null
-  sending.value = true
   try {
     const f = form.value
     reportKey ??= crypto.randomUUID()
@@ -125,9 +123,6 @@ async function send() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    sending.value = false
   }
 }
 const back = computed(() => board.value ? `/live/front-of-house/${encodeURIComponent(board.value.performance.id)}` : '/live/front-of-house')
@@ -367,7 +362,7 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
           block
           icon="i-lucide-send"
           :disabled="!online"
-          :loading="sending"
+          loading-auto
           :label="t('front-of-house.live.incident.send')"
           @click="send"
         />

@@ -210,6 +210,8 @@ const offeredOptions = computed(() => (data.value?.options ?? []).filter(o => o.
 const withdrawnOptions = computed(() => (data.value?.options ?? []).filter(o => o.state === 'withdrawn'))
 const showWithdrawn = ref(false)
 const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthOptionId === optionId)?.endsOn
+// Draft and archived are the catalogue's shared words; open and closed are a scheme's own.
+const schemeStateLabel = (state: string) => state === 'draft' || state === 'archived' ? t(`core.states.${state}`) : t(`membership.screens.states.${state}`)
 </script>
 
 <template>
@@ -223,7 +225,7 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
     >
       <StatusBadge
         :tone="TONE[scheme.state]"
-        :label="t(`membership.screens.states.${scheme.state}`)"
+        :label="schemeStateLabel(scheme.state)"
       />
     </template>
     <template
@@ -552,8 +554,9 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
               :label="t('membership.screens.scheme.list')"
               :error="detailsRefusal?.fields?.listId ? detailsRefusal.reason : undefined"
             >
-              <USelect
+              <USelectMenu
                 v-model="details.listId"
+                value-key="value"
                 :items="data.lists.map(l => ({ value: l.id, label: l.name }))"
                 :placeholder="t('membership.screens.scheme.list-choose')"
                 class="sm:w-80"
@@ -636,7 +639,7 @@ const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthO
             :label="unit"
             required
           >
-            <UInputNumber
+            <FieldNumber
               v-model="option.count"
               :min="1"
               :max="120"

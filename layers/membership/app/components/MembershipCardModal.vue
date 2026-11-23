@@ -2,8 +2,6 @@
      it is valid until, with a code Box office signs each time it is opened. Without Box office it
      shows no code. Opened from My membership and from the members' area home. -->
 <script setup lang="ts">
-import { encode } from 'uqr'
-
 interface Shown { id: string, schemeName: string, endsOn: string | null }
 const props = defineProps<{ membership: Shown | null, number?: string | null }>()
 const emit = defineEmits<{ close: [] }>()
@@ -23,13 +21,6 @@ watch(() => props.membership?.id, async (id) => {
     // Box office is off, or the card is no longer offered: the card is shown without a code.
   }
 }, { immediate: true })
-// The code as an SVG path, one unit square per dark module, with a quiet border of four.
-const qr = computed(() => {
-  if (!doorCode.value) return null
-  const { size, data } = encode(doorCode.value, { border: 4, ecc: 'M' })
-  const path = data.flatMap((row, y) => row.map((dark, x) => dark ? `M${x} ${y}h1v1h-1z` : '')).join('')
-  return { size, path }
-})
 </script>
 
 <template>
@@ -57,21 +48,14 @@ const qr = computed(() => {
             { label: t('membership.screens.mine.valid-until'), value: membership.endsOn ? day(membership.endsOn) : t('membership.screens.mine.no-end') },
           ]"
         />
-        <svg
-          v-if="qr"
-          :viewBox="`0 0 ${qr.size} ${qr.size}`"
-          class="aspect-square w-72 max-w-full rounded-md bg-white"
-          shape-rendering="crispEdges"
-          role="img"
-          :aria-label="t('membership.screens.mine.card-code')"
-        >
-          <path
-            :d="qr.path"
-            fill="black"
-          />
-        </svg>
+        <QrCode
+          v-if="doorCode"
+          :value="doorCode"
+          :label="t('membership.screens.mine.card-code')"
+          class="w-72!"
+        />
         <p class="text-sm text-muted">
-          {{ t(qr ? 'core.card.show' : 'core.card.show-no-code') }}
+          {{ t(doorCode ? 'core.card.show' : 'core.card.show-no-code') }}
         </p>
       </div>
     </template>

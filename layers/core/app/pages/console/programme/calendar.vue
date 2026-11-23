@@ -12,14 +12,10 @@ interface Place { id: string, name: string, spaces: { id: string, name: string }
 const route = useRoute()
 const router = useRouter()
 const dates = useDates()
+const { t } = useT()
 const { data: settings } = usePublicSettings()
 
-const VIEWS: { value: CalendarView, label: string }[] = [
-  { value: 'month', label: 'Month' },
-  { value: 'week', label: 'Week' },
-  { value: 'day', label: 'Day' },
-  { value: 'list', label: 'List' },
-]
+const VIEWS: { value: CalendarView, label: string }[] = (['month', 'week', 'day', 'list'] as const).map(value => ({ value, label: t(`core.calendar.views.${value}`) }))
 const DATE = /^\d{4}-\d{2}-\d{2}$/ // not-policy: a date's shape
 const one = (v: unknown) => (Array.isArray(v) ? v[0] : v) as string | undefined
 const view = computed<CalendarView>(() => VIEWS.some(v => v.value === one(route.query.view)) ? one(route.query.view) as CalendarView : 'month')
@@ -59,7 +55,7 @@ const { data, status, error, refresh } = await useAPI<{ performances: Performanc
 const EVERYWHERE = 'all'
 const where = computed(() => spaceId.value ? `${venueId.value}/${spaceId.value}` : venueId.value ?? EVERYWHERE)
 const places = computed(() => [
-  { value: EVERYWHERE, label: 'Every venue' },
+  { value: EVERYWHERE, label: t('core.calendar.every-venue') },
   ...(data.value?.places ?? []).flatMap(v => [
     { value: v.id, label: v.name },
     ...(v.spaces.length > 1 ? v.spaces.map(s => ({ value: `${v.id}/${s.id}`, label: `${v.name}: ${s.name}` })) : []),
@@ -87,11 +83,11 @@ function colourOf(id: string): CalendarItem['colour'] {
   return (hash + 1) as CalendarItem['colour']
 }
 const STATES = {
-  draft: { label: 'Draft', edge: 'dashed' },
-  scheduled: { label: 'Scheduled', edge: 'solid', usual: true },
-  cancelled: { label: 'Cancelled', edge: 'dotted' },
-  completed: { label: 'Completed', edge: 'solid' },
-} as const
+  draft: { label: t('core.states.draft'), edge: 'dashed' as const },
+  scheduled: { label: t('core.states.scheduled'), edge: 'solid' as const, usual: true },
+  cancelled: { label: t('core.states.cancelled'), edge: 'dotted' as const },
+  completed: { label: t('core.states.completed'), edge: 'solid' as const },
+}
 const items = computed<CalendarItem[]>(() => [
   ...(data.value?.performances ?? []).map(p => ({
     id: p.id,
@@ -108,38 +104,38 @@ const items = computed<CalendarItem[]>(() => [
   ...(data.value?.closures ?? []).map(c => ({
     id: c.id,
     title: c.title,
-    detail: c.spaceId ? placeName(c.spaceId) : c.venueId ? data.value?.places.find(v => v.id === c.venueId)?.name : 'The whole theatre',
+    detail: c.spaceId ? placeName(c.spaceId) : c.venueId ? data.value?.places.find(v => v.id === c.venueId)?.name : t('core.calendar.whole-theatre'),
     day: c.firstDay,
     lastDay: c.lastDay,
     ...(c.allDay ? {} : { startsAt: c.startsAt, endsAt: c.endsAt }),
     column: c.spaceId ?? undefined,
     colour: 8 as const,
-    state: c.kind === 'public_holiday' ? { label: 'Holiday', edge: 'dashed' as const } : c.blocksPerformances ? { label: 'Closed', edge: 'double' as const } : { label: 'Closure', edge: 'dashed' as const },
+    state: c.kind === 'public_holiday' ? { label: t('core.calendar.holiday'), edge: 'dashed' as const } : c.blocksPerformances ? { label: t('core.calendar.closed'), edge: 'double' as const } : { label: t('core.calendar.closure'), edge: 'dashed' as const },
   })),
 ])
 </script>
 
 <template>
   <PageFrame
-    title="Calendar"
-    description="Performances and closures, in the theatre's time zone. A show after midnight sits with the evening before."
+    :title="t('core.calendar.title')"
+    :description="t('core.calendar.description')"
     width="full"
   >
     <div class="mb-4 flex flex-wrap items-center gap-2">
       <IconButton
         icon="i-lucide-chevron-left"
-        label="Earlier"
+        :label="t('core.calendar.earlier')"
         @click="step(-1)"
       />
       <UButton
-        label="Today"
+        :label="t('core.calendar.today')"
         color="neutral"
         variant="outline"
         @click="go({ day: undefined })"
       />
       <IconButton
         icon="i-lucide-chevron-right"
-        label="Later"
+        :label="t('core.calendar.later')"
         @click="step(1)"
       />
       <h2
@@ -151,7 +147,7 @@ const items = computed<CalendarItem[]>(() => [
       <USelect
         :model-value="where"
         :items="places"
-        aria-label="Where"
+        :aria-label="t('core.calendar.where')"
         class="w-56"
         @update:model-value="setWhere(String($event))"
       />
@@ -175,7 +171,7 @@ const items = computed<CalendarItem[]>(() => [
         :month="view === 'month' ? day.slice(0, 7) : undefined"
         :items="items"
         :columns="columns"
-        empty="No performances or closures in this period."
+        :empty="t('core.calendar.empty')"
         @day="go({ view: 'day', day: $event })"
       />
     </DataBoundary>

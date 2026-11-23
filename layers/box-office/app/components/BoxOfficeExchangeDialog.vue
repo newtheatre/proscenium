@@ -142,8 +142,9 @@ async function exchange() {
           :label="t('box-office.order.exchange.performance')"
           required
         >
-          <USelect
+          <USelectMenu
             v-model="form.performanceId"
+            value-key="value"
             :items="performanceItems"
           />
         </UFormField>

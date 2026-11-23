@@ -12,6 +12,7 @@ interface Place { id: string, name: string, addressLines: string | null, localit
 interface Upcoming { id: string, productionId: string, title: string, space: string, startsAt: number }
 interface Venue extends Place { description: string | null, accessInfo: string | null, gettingHere: string | null, archived: boolean, spaces: Space[], access: { spaceId: string | null, termId: string, note: string | null }[] }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
 const base = computed(() => `/api/core/venues/${String(route.params.id)}`)
@@ -59,7 +60,7 @@ watch(venue, (v) => {
   })
 }, { immediate: true })
 // The form hands over what the schema made of the values, which is what the route expects.
-const saveDetails = (event: FormSubmitEvent<z.output<typeof venuePatch>>) => run(() => api('', 'PATCH', event.data), 'Venue saved')
+const saveDetails = (event: FormSubmitEvent<z.output<typeof venuePatch>>) => run(() => api('', 'PATCH', event.data), t('core.venue.saved'))
 
 // A venue cannot be archived while performances still to come are in its spaces; they are listed, to be moved or cancelled first.
 const blockedOpen = ref(false)
@@ -68,15 +69,15 @@ async function setArchived(archived: boolean) {
     blockedOpen.value = true
     return
   }
-  if (archived && !await confirm({ verb: 'Archive', thing: venue.value!.name, consequence: 'It leaves every picker and the public site. Records that use it keep it, and you can restore it later.', button: 'Archive venue' })) return
-  await run(() => api(archived ? '/archive' : '/restore', 'POST'), archived ? 'Venue archived' : 'Venue restored', () => api(archived ? '/restore' : '/archive', 'POST'))
+  if (archived && !await confirm({ verb: t('core.venue.archive'), thing: venue.value!.name, consequence: t('core.venue.archive-consequence'), button: t('core.venue.archive-venue') })) return
+  await run(() => api(archived ? '/archive' : '/restore', 'POST'), archived ? t('core.venue.archived') : t('core.venue.restored'), () => api(archived ? '/restore' : '/archive', 'POST'))
 }
 
 // Spaces
 // A space with no usual run preset starts from the theatre's, shown first as what "none" means.
 const theatrePresetName = computed(() => data.value?.presets.find(p => p.id === data.value?.usualPreset)?.name)
 const USUAL = '__usual'
-const presetItems = computed(() => [{ value: USUAL, label: theatrePresetName.value ? `The theatre's usual (${theatrePresetName.value})` : 'None' }, ...(data.value?.presets ?? []).map(p => ({ value: p.id, label: p.name }))])
+const presetItems = computed(() => [{ value: USUAL, label: theatrePresetName.value ? t('core.venue.usual-preset', { name: theatrePresetName.value }) : t('core.venue.no-preset') }, ...(data.value?.presets ?? []).map(p => ({ value: p.id, label: p.name }))])
 const spaceOpen = ref(false)
 const spaceId = ref<string | null>(null)
 // A new space has no kind until one is chosen or the name gives it away ("Studio").
@@ -102,29 +103,29 @@ async function saveSpace(event: FormSubmitEvent<z.output<typeof spaceInput>>) {
   const before = venue.value?.spaces.find(s => s.id === spaceId.value)
   if (before && body.managed !== undefined && body.managed !== before.managed) {
     const { lines } = await $api<{ lines: string[] }>(`${base.value}/spaces/${before.id}/impact` as string, { query: { managed: String(body.managed) } })
-    if (lines.length && !await confirm({ verb: 'Change', thing: before.name, consequence: lines.join(' '), button: 'Save space' })) return
+    if (lines.length && !await confirm({ verb: t('core.venue.change'), thing: before.name, consequence: lines.join(' '), button: t('core.venue.save-space') })) return
   }
   const ok = spaceId.value
-    ? await run(() => api(`/spaces/${spaceId.value}`, 'PATCH', body), `${space.name} saved`)
-    : await run(() => $api<{ id: string }>(`${base.value}/spaces` as string, { method: 'POST', body }), 'Space added', ({ id }) => api(`/spaces/${id}`, 'DELETE'))
+    ? await run(() => api(`/spaces/${spaceId.value}`, 'PATCH', body), t('core.venue.space-saved', { name: space.name }))
+    : await run(() => $api<{ id: string }>(`${base.value}/spaces` as string, { method: 'POST', body }), t('core.venue.space-added'), ({ id }) => api(`/spaces/${id}`, 'DELETE'))
   if (ok) spaceOpen.value = false
 }
 async function removeSpace(s: Space) {
-  if (!await confirm({ verb: 'Delete', thing: s.name, consequence: 'The space and its access features are removed. This cannot be undone.', button: 'Delete space' })) return
-  await run(() => api(`/spaces/${s.id}`, 'DELETE'), `Deleted ${s.name}`)
+  if (!await confirm({ verb: t('core.venue.delete'), thing: s.name, consequence: t('core.venue.delete-consequence'), button: t('core.venue.delete-space') })) return
+  await run(() => api(`/spaces/${s.id}`, 'DELETE'), t('core.venue.space-deleted', { name: s.name }))
 }
 const spaceActions = (s: Space) => [[
-  { label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => openSpace(s) },
+  { label: t('core.venue.edit'), icon: 'i-lucide-pencil', onSelect: () => openSpace(s) },
   s.archived
-    ? { label: 'Restore', icon: 'i-lucide-archive-restore', onSelect: () => run(() => api(`/spaces/${s.id}/restore`, 'POST'), `Restored ${s.name}`) }
-    : { label: 'Archive', icon: 'i-lucide-archive', onSelect: () => run(() => api(`/spaces/${s.id}/archive`, 'POST'), `Archived ${s.name}`) },
-  ...((venue.value?.spaces.length ?? 0) > 1 ? [{ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => removeSpace(s) }] : []),
+    ? { label: t('core.venue.restore'), icon: 'i-lucide-archive-restore', onSelect: () => run(() => api(`/spaces/${s.id}/restore`, 'POST'), t('core.venue.space-restored', { name: s.name }), () => api(`/spaces/${s.id}/archive`, 'POST')) }
+    : { label: t('core.venue.archive'), icon: 'i-lucide-archive', onSelect: () => run(() => api(`/spaces/${s.id}/archive`, 'POST'), t('core.venue.space-archived', { name: s.name }), () => api(`/spaces/${s.id}/restore`, 'POST')) },
+  ...((venue.value?.spaces.length ?? 0) > 1 ? [{ label: t('core.venue.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => removeSpace(s) }] : []),
 ]]
 
 // Access features, for the whole venue or one space
 const WHOLE = 'venue'
 const scope = ref(WHOLE)
-const scopes = computed(() => [{ value: WHOLE, label: 'The whole venue' }, ...(venue.value?.spaces ?? []).map(s => ({ value: s.id, label: s.name }))])
+const scopes = computed(() => [{ value: WHOLE, label: t('core.venue.whole-venue') }, ...(venue.value?.spaces ?? []).map(s => ({ value: s.id, label: s.name }))])
 const chosen = reactive<Record<string, { on: boolean, note: string }>>({})
 function loadAccess() {
   const spaceId = scope.value === WHOLE ? null : scope.value
@@ -138,20 +139,20 @@ const shownFeatures = computed(() => (data.value?.features ?? []).filter(f => !f
 const saveAccess = () => run(() => api('/access', 'PUT', {
   spaceId: scope.value === WHOLE ? null : scope.value,
   features: shownFeatures.value.filter(f => chosen[f.id]?.on).map(f => ({ termId: f.id, note: chosen[f.id]!.note.trim() || null })),
-}), 'Access features saved')
+}), t('core.venue.access-saved'))
 </script>
 
 <template>
   <PageFrame
-    :title="venue?.name ?? 'Venue'"
-    :trail="[{ label: 'Venues', to: '/admin/modules/core/venues' }]"
+    :title="venue?.name ?? t('core.venue.venue')"
+    :trail="[{ label: t('core.venue.venues'), to: '/admin/modules/core/venues' }]"
     width="reading"
   >
     <template #status>
       <StatusBadge
         v-if="venue?.archived"
         tone="neutral"
-        label="Archived"
+        :label="t('core.states.archived')"
       />
     </template>
     <DataBoundary
@@ -166,7 +167,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
           :refusal="refusal"
         />
 
-        <PageSection title="Details">
+        <PageSection :title="t('core.venue.details')">
           <UForm
             id="venue-details"
             :schema="venuePatch"
@@ -177,7 +178,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
           >
             <UFormField
               name="name"
-              label="Name"
+              :label="t('core.venue.name')"
               required
             >
               <UInput
@@ -187,8 +188,8 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             </UFormField>
             <UFormField
               name="addressLines"
-              label="Address"
-              hint="Optional"
+              :label="t('core.venue.address')"
+              :hint="t('core.form.optional')"
             >
               <UTextarea
                 v-model="details.addressLines"
@@ -199,8 +200,8 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             <div class="grid gap-4 sm:grid-cols-3">
               <UFormField
                 name="locality"
-                label="Town or city"
-                hint="Optional"
+                :label="t('core.venue.town-or-city')"
+                :hint="t('core.form.optional')"
               >
                 <UInput
                   v-model="details.locality"
@@ -209,8 +210,8 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               </UFormField>
               <UFormField
                 name="postcode"
-                label="Postcode"
-                hint="Optional"
+                :label="t('core.venue.postcode')"
+                :hint="t('core.form.optional')"
               >
                 <UInput
                   v-model="details.postcode"
@@ -219,17 +220,17 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               </UFormField>
               <UFormField
                 name="country"
-                label="Country"
-                hint="Optional"
+                :label="t('core.venue.country')"
+                :hint="t('core.form.optional')"
               >
                 <FieldCountry v-model="details.country" />
               </UFormField>
             </div>
             <UFormField
               name="description"
-              label="About the venue"
-              hint="Optional"
-              help="Shown on the venue's public page."
+              :label="t('core.venue.about-the-venue')"
+              :hint="t('core.form.optional')"
+              :help="t('core.venue.help-shown-on-the')"
             >
               <UTextarea
                 v-model="details.description"
@@ -239,9 +240,9 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             </UFormField>
             <UFormField
               name="gettingHere"
-              label="Getting here"
-              hint="Optional"
-              help="Public transport, parking and where the entrance is."
+              :label="t('core.venue.getting-here')"
+              :hint="t('core.form.optional')"
+              :help="t('core.venue.help-public-transport-parking')"
             >
               <UTextarea
                 v-model="details.gettingHere"
@@ -251,9 +252,9 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             </UFormField>
             <UFormField
               name="accessInfo"
-              label="Access"
-              hint="Optional"
-              help="What to expect on arrival, in words. The features below are shown as well."
+              :label="t('core.venue.access')"
+              :hint="t('core.form.optional')"
+              :help="t('core.venue.help-what-to-expect')"
             >
               <UTextarea
                 v-model="details.accessInfo"
@@ -265,32 +266,34 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
           <template #footer>
             <UButton
               v-if="venue.archived"
-              label="Restore venue"
+              :label="t('core.venue.restore-venue')"
               color="neutral"
               variant="outline"
               icon="i-lucide-archive-restore"
+              loading-auto
               @click="setArchived(false)"
             />
             <UButton
               v-else
-              label="Archive venue"
+              :label="t('core.venue.archive-venue')"
               color="neutral"
               variant="outline"
               icon="i-lucide-archive"
+              loading-auto
               @click="setArchived(true)"
             />
             <UButton
               type="submit"
               form="venue-details"
-              label="Save venue"
+              :label="t('core.venue.save-venue')"
             />
           </template>
         </PageSection>
 
-        <PageSection title="Spaces">
+        <PageSection :title="t('core.venue.spaces')">
           <template #actions>
             <UButton
-              label="Add space"
+              :label="t('core.venue.add-space')"
               icon="i-lucide-plus"
               color="neutral"
               variant="outline"
@@ -298,35 +301,35 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               @click="openSpace()"
             />
           </template>
-          <RecordList label="Spaces">
+          <RecordList :label="t('core.venue.spaces')">
             <RecordListItem
               v-for="s in venue.spaces"
               :key="s.id"
               :name="s.name"
-              :description="`${kindLabel(s.kindTermId)} · ${s.defaultCapacity ? `${s.defaultCapacity} seats` : 'No capacity set'}`"
+              :description="`${kindLabel(s.kindTermId)} · ${s.defaultCapacity ? t('core.venue.seats', { count: s.defaultCapacity }) : t('core.venue.no-capacity')}`"
               :muted="s.archived"
             >
               <StatusBadge
                 v-if="!s.managed"
                 tone="neutral"
-                label="Not run by the theatre"
+                :label="t('core.venue.not-run-by-the')"
               />
               <StatusBadge
                 v-if="s.archived"
                 tone="neutral"
-                label="Archived"
+                :label="t('core.states.archived')"
               />
               <RowActions
                 :items="spaceActions(s)"
-                :label="`Actions for ${s.name}`"
+                :label="t('core.venue.actions-for', { name: s.name })"
               />
             </RecordListItem>
           </RecordList>
         </PageSection>
 
         <PageSection
-          title="Access features"
-          description="Tick what the venue or a space offers. Each is listed for visitors as a feature; a tick says it is there, and does not set a number of seats or wheelchair places."
+          :title="t('core.venue.access-features')"
+          :description="t('core.venue.description-tick-what-the')"
         >
           <UForm
             id="venue-access"
@@ -337,10 +340,11 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
           >
             <UFormField
               v-if="venue.spaces.length > 1"
-              label="Features of"
+              :label="t('core.venue.features-of')"
             >
-              <USelect
+              <USelectMenu
                 v-model="scope"
+                value-key="value"
                 :items="scopes"
               />
             </UFormField>
@@ -357,8 +361,8 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               <UInput
                 v-if="chosen[f.id]!.on"
                 v-model="chosen[f.id]!.note"
-                placeholder="Note, such as where it is"
-                :aria-label="`Note on ${f.label}`"
+                :placeholder="t('core.venue.placeholder-note-such-as')"
+                :aria-label="t('core.venue.note-on', { feature: f.label })"
                 maxlength="200"
                 size="sm"
                 class="flex-1 max-sm:ms-6"
@@ -369,7 +373,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             <UButton
               type="submit"
               form="venue-access"
-              label="Save access features"
+              :label="t('core.venue.save-access-features')"
             />
           </template>
         </PageSection>
@@ -378,29 +382,23 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
 
     <UModal
       v-model:open="blockedOpen"
-      :title="`${venue?.name ?? 'This venue'} cannot be archived yet`"
-      description="Performances still to come are scheduled in its spaces. Move them to another space or cancel them first, then archive the venue."
+      :title="t('core.venue.blocked', { name: venue?.name ?? t('core.venue.this-venue') })"
+      :description="t('core.venue.description-performances-still-to')"
     >
       <template #body>
-        <ul class="divide-y divide-default text-sm">
-          <li
+        <RecordList :label="t('core.venue.upcoming')">
+          <RecordListItem
             v-for="p in data?.upcoming"
             :key="p.id"
-            class="flex flex-wrap items-center justify-between gap-2 py-2"
-          >
-            <NuxtLink
-              :to="`/console/programme/productions/${p.productionId}`"
-              class="font-medium text-highlighted hover:underline"
-            >
-              {{ p.title }}
-            </NuxtLink>
-            <span class="text-muted">{{ dates.dateTime(p.startsAt) }} · {{ p.space }}</span>
-          </li>
-        </ul>
+            :to="`/console/programme/productions/${p.productionId}`"
+            :name="p.title"
+            :description="`${dates.dateTime(p.startsAt)} · ${p.space}`"
+          />
+        </RecordList>
       </template>
       <template #footer>
         <UButton
-          label="Close"
+          :label="t('core.venue.close')"
           color="neutral"
           variant="outline"
           @click="blockedOpen = false"
@@ -410,7 +408,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
 
     <UModal
       v-model:open="spaceOpen"
-      :title="spaceId ? 'Edit space' : 'Add space'"
+      :title="spaceId ? t('core.venue.edit-space') : t('core.venue.add-space')"
     >
       <template #body>
         <UForm
@@ -424,7 +422,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
           <RefusalNotice :refusal="refusal" />
           <UFormField
             name="name"
-            label="Name"
+            :label="t('core.venue.name')"
             required
           >
             <UInput
@@ -434,34 +432,35 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
           </UFormField>
           <UFormField
             name="kindTermId"
-            label="Kind"
+            :label="t('core.venue.kind')"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="space.kindTermId"
+              value-key="value"
               :items="liveKinds"
-              placeholder="Choose a kind"
+              :placeholder="t('core.venue.choose-a-kind')"
               @update:model-value="kindChosen = true"
             />
           </UFormField>
           <UFormField
             name="defaultCapacity"
-            label="Usual capacity"
-            hint="Optional"
-            help="Box office and room bookings start from this."
+            :label="t('core.venue.usual-capacity')"
+            :hint="t('core.form.optional')"
+            :help="t('core.venue.help-box-office-and')"
           >
             <FieldNumber
               v-model="space.defaultCapacity"
               :min="1"
               :increment="false"
               :decrement="false"
-              placeholder="Not set"
+              :placeholder="t('core.venue.not-set')"
             />
           </UFormField>
           <UCheckbox
             v-model="space.performable"
             name="performable"
-            label="Performances can happen here"
+            :label="t('core.venue.performances-can-happen-here')"
           />
           <div
             v-if="space.performable"
@@ -469,22 +468,23 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
           >
             <UFormField
               name="doorsBeforeMinutes"
-              label="Doors open before"
+              :label="t('core.venue.doors-open-before')"
             >
               <MinutesInput
                 v-model="space.doorsBeforeMinutes"
                 :placeholder="data?.doorsBeforeMinutes"
                 :max="180"
-                label="Doors open before"
+                :label="t('core.venue.doors-open-before')"
               />
             </UFormField>
             <UFormField
               name="runPresetId"
-              label="Usual run preset"
-              help="What Add a run starts from here."
+              :label="t('core.venue.usual-run-preset')"
+              :help="t('core.venue.help-what-add-a')"
             >
-              <USelect
+              <USelectMenu
                 :model-value="space.runPresetId ?? USUAL"
+                value-key="value"
                 :items="presetItems"
                 @update:model-value="space.runPresetId = $event === USUAL ? null : String($event)"
               />
@@ -493,20 +493,20 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
           <UCheckbox
             v-model="space.exclusive"
             name="exclusive"
-            label="One thing at a time"
-            description="Untick for a space several groups can share at once, such as a foyer."
+            :label="t('core.venue.one-thing-at-a')"
+            :description="t('core.venue.description-untick-for-a')"
           />
           <UCheckbox
             v-model="space.managed"
             name="managed"
-            label="The theatre runs this space"
-            description="Untick for a space in a building someone else runs, or one the theatre visits."
+            :label="t('core.venue.the-theatre-runs-this')"
+            :description="t('core.venue.description-untick-for-a-2')"
           />
           <UFormField
             name="findingIt"
-            label="Finding it"
-            hint="Optional"
-            help="A short note shown under the venue's directions, such as which entrance and floor."
+            :label="t('core.venue.finding-it')"
+            :hint="t('core.form.optional')"
+            :help="t('core.venue.help-a-short-note')"
           >
             <UInput
               v-model="space.findingIt"
@@ -515,8 +515,8 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
           </UFormField>
           <UFormField
             name="accessInfo"
-            label="Access"
-            hint="Optional"
+            :label="t('core.venue.access')"
+            :hint="t('core.form.optional')"
           >
             <UTextarea
               v-model="space.accessInfo"
@@ -530,7 +530,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
         <UButton
           type="submit"
           form="space-form"
-          :label="spaceId ? 'Save space' : 'Add space'"
+          :label="spaceId ? t('core.venue.save-space') : t('core.venue.add-space')"
         />
       </template>
     </UModal>

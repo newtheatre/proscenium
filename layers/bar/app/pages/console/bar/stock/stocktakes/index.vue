@@ -74,15 +74,8 @@ async function start() {
           :title="t('bar.screens.stocktakes.empty.title')"
           :description="t('bar.screens.stocktakes.empty.description')"
           icon="i-lucide-clipboard-list"
-        >
-          <template #actions>
-            <UButton
-              icon="i-lucide-plus"
-              :label="t('bar.screens.stocktakes.start')"
-              @click="openStart"
-            />
-          </template>
-        </EmptyState>
+          :action="{ label: t('bar.screens.stocktakes.start'), icon: 'i-lucide-plus', onClick: openStart }"
+        />
         <TableOrList
           v-if="d.stocktakes.length"
           :rows="d.stocktakes"
@@ -151,9 +144,10 @@ async function start() {
             name="locationId"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="starting.locationId"
               :items="locationItems"
+              value-key="value"
             />
           </UFormField>
           <UFormField
@@ -161,9 +155,10 @@ async function start() {
             :help="[t('bar.screens.stocktakes.what-help'), data?.uncategorised && starting.categoryId !== EVERYTHING ? t('bar.screens.stocktakes.uncategorised', { count: data.uncategorised }) : ''].filter(Boolean).join(' ')"
             name="categoryId"
           >
-            <USelect
+            <USelectMenu
               v-model="starting.categoryId"
               :items="scopeItems"
+              value-key="value"
             />
           </UFormField>
           <UCheckbox

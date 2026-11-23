@@ -379,6 +379,9 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
 - A group of buttons of which one is pressed (the appearance choice, a date filter's presets) is a
   `UToggleGroup`, not buttons with `aria-pressed` set by hand. A fixed choice in a form is still a
   dropdown.
+- `SidePanel`: a small titled card for a record page's `aside` (the poster, "Published"), with the
+  same frame and heading as the checklist beside it. A screen does not write its own bordered
+  `section` there.
 - `PageActions`: a page's actions for PageFrame's `primary` slot when there are more than one. It
   takes `actions` (`label`, `icon`, `to` or `onSelect`, `loading`, `disabled`, `lesser`); every one is
   a worded button from 640 pixels, and on a phone the first stays a button while the rest fold into

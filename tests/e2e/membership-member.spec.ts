@@ -67,10 +67,11 @@ test.describe('as a member', () => {
 test.describe('as an administrator', () => {
   test.use({ extraHTTPHeaders: as(admin) })
 
-  test('a verification list opens with what it holds, and adds an entry from a window', async ({ page }) => {
+  test('a verification list opens with what it holds, and adds an entry from its menu', async ({ page }) => {
     await visit(page, `/admin/modules/membership/lists/${listId}`)
     await expect(page.getByText('Email addresses')).toBeVisible()
-    await page.getByRole('button', { name: 'Add entry' }).click()
+    await page.getByRole('button', { name: `Actions for Students ${stamp}` }).click()
+    await page.getByRole('menuitem', { name: 'Add entry' }).click()
     await expect(page.getByRole('dialog').getByLabel('Email address')).toBeVisible()
     await page.keyboard.press('Escape')
     // The list key was made with the first list, so a file can be loaded with nothing saved by hand.

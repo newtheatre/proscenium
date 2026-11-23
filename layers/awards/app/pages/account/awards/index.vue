@@ -3,8 +3,6 @@
      price has a card, opened full screen with a code signed afresh each time, to show a seller. An
      award given before the person ever signed in waits off the roll, and asks them to choose. -->
 <script setup lang="ts">
-import { encode } from 'uqr'
-
 interface Mine { id: string, card: boolean, recipientName: string, typeName: string, awardedOn: string, awardedPrecision: 'day' | 'year', awardedFor: string | null, citation: string | null, visibility: 'public' | 'members' | 'hidden', listingPending: boolean, defaultVisibility: 'public' | 'members' | 'hidden' }
 
 const { t } = useT()
@@ -39,13 +37,6 @@ async function showCard(award: Mine) {
     // Box office is off: the card is shown without a code.
   }
 }
-// The code as an SVG path, one unit square per dark module, with a quiet border of four.
-const qr = computed(() => {
-  if (!doorCode.value) return null
-  const { size, data } = encode(doorCode.value, { border: 4, ecc: 'M' }) // not-policy: the quiet border a code needs
-  const path = data.flatMap((row, y) => row.map((dark, x) => dark ? `M${x} ${y}h1v1h-1z` : '')).join('')
-  return { size, path }
-})
 </script>
 
 <template>
@@ -139,21 +130,14 @@ const qr = computed(() => {
             centred
             :facts="[{ label: t('awards.screens.award.awarded-on'), value: awardDate(showing) }]"
           />
-          <svg
-            v-if="qr"
-            :viewBox="`0 0 ${qr.size} ${qr.size}`"
-            class="aspect-square w-72 max-w-full rounded-md bg-white"
-            shape-rendering="crispEdges"
-            role="img"
-            :aria-label="t('awards.screens.mine.card-code')"
-          >
-            <path
-              :d="qr.path"
-              fill="black"
-            />
-          </svg>
+          <QrCode
+            v-if="doorCode"
+            :value="doorCode"
+            :label="t('awards.screens.mine.card-code')"
+            class="w-72!"
+          />
           <p class="text-sm text-muted">
-            {{ t(qr ? 'core.card.show' : 'core.card.show-no-code') }}
+            {{ t(doorCode ? 'core.card.show' : 'core.card.show-no-code') }}
           </p>
         </div>
       </template>

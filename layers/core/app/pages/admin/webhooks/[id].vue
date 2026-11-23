@@ -67,24 +67,20 @@ const body = computed(() => isNew.value
   : { name: form.name, format: form.format, events: form.events, ...(form.url.trim() ? { url: form.url } : {}) })
 const title = computed(() => isNew.value ? t('core.webhooks.new') : (hook.value?.name ?? t('core.webhooks.webhook')))
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const busy = ref<string | null>(null)
 
-async function act<T>(name: string, run: () => Promise<T>): Promise<T | undefined> {
+// Each button shows its own wait (loading-auto), so the screen keeps no flag for it.
+async function act<T>(run: () => Promise<T>): Promise<T | undefined> {
   refusal.value = null
-  busy.value = name
   try {
     return await run()
   }
   catch (e) {
     refusal.value = toRefusal(e)
   }
-  finally {
-    busy.value = null
-  }
 }
 
 async function save() {
-  await act('save', async () => {
+  await act(async () => {
     if (isNew.value) {
       const made = await $api<{ id: string, secret: string | null }>('/api/core/webhooks', { method: 'POST', body: body.value })
       if (made.secret) shown.value = { id: made.id, secret: made.secret }
@@ -101,7 +97,7 @@ async function save() {
 }
 
 async function sendTest() {
-  const result = await act('test', () => $api<TestResult>(`/api/core/webhooks/${id.value}/test` as '/api/core/webhooks/:id/test', { method: 'POST', body: {} }))
+  const result = await act(() => $api<TestResult>(`/api/core/webhooks/${id.value}/test` as '/api/core/webhooks/:id/test', { method: 'POST', body: {} }))
   if (!result) return
   if (result.ok) toast.add({ title: t('core.webhooks.test-ok', { status: result.status ?? '' }), color: 'success' })
   else toast.add({ title: t('core.webhooks.test-failed'), description: result.error && result.error !== 'status' ? t(`core.webhooks.test-${result.error}`) : t('core.webhooks.test-status', { status: result.status ?? '' }), color: 'error' })
@@ -110,7 +106,7 @@ async function sendTest() {
 async function setPaused(paused: boolean) {
   if (!hook.value) return
   const name = hook.value.name
-  const done = await act('state', () => $api(`/api/core/webhooks/${id.value}/state` as '/api/core/webhooks/:id/state', { method: 'POST', body: { paused } }).then(() => true))
+  const done = await act(() => $api(`/api/core/webhooks/${id.value}/state` as '/api/core/webhooks/:id/state', { method: 'POST', body: { paused } }).then(() => true))
   if (!done) return
   // Pausing and resuming undo each other, so the toast offers the other.
   undo.offer(t(paused ? 'core.webhooks.paused-toast' : 'core.webhooks.resumed-toast', { name }), () => setPaused(!paused))
@@ -119,7 +115,7 @@ async function setPaused(paused: boolean) {
 
 async function rotate() {
   if (!hook.value || !await confirm({ verb: t('core.webhooks.rotate'), thing: hook.value.name, consequence: t('core.webhooks.rotate-consequence'), button: t('core.webhooks.rotate') })) return
-  const made = await act('rotate', () => $api<{ secret: string }>(`/api/core/webhooks/${id.value}/rotate` as '/api/core/webhooks/:id/rotate', { method: 'POST', body: {} }))
+  const made = await act(() => $api<{ secret: string }>(`/api/core/webhooks/${id.value}/rotate` as '/api/core/webhooks/:id/rotate', { method: 'POST', body: {} }))
   if (made) {
     shown.value = { id: id.value, secret: made.secret }
     copied.value = false
@@ -130,7 +126,7 @@ async function remove() {
   if (!hook.value) return
   const name = hook.value.name
   if (!await confirm({ verb: t('core.webhooks.delete'), thing: name, consequence: t('core.webhooks.delete-consequence'), button: t('core.webhooks.delete') })) return
-  const done = await act('delete', () => $api(`/api/core/webhooks/${id.value}` as '/api/core/webhooks/:id', { method: 'DELETE', body: {} }).then(() => true))
+  const done = await act(() => $api(`/api/core/webhooks/${id.value}` as '/api/core/webhooks/:id', { method: 'DELETE', body: {} }).then(() => true))
   if (!done) return
   toast.add({ title: t('core.webhooks.deleted', { name }), color: 'success' })
   await refresh()
@@ -147,6 +143,7 @@ const { data: log, refresh: refreshLog } = await useAPI<{ rows: WebhookDelivery[
   watch: [id, page],
 })
 const deliveryTone = { queued: 'info', sending: 'info', sent: 'success', retrying: 'warning', failed: 'danger' } as const
+const toneOf = (d: WebhookDelivery) => deliveryTone[d.state]
 const columns = computed(() => [
   { accessorKey: 'createdAt', header: t('core.webhooks.log-when') },
   { accessorKey: 'eventName', header: t('core.webhooks.log-event') },
@@ -160,7 +157,7 @@ function answer(d: WebhookDelivery): string {
   return d.responseStatus ? String(d.responseStatus) : t('core.webhooks.log-no-answer')
 }
 async function retry(d: WebhookDelivery) {
-  const done = await act(`retry:${d.id}`, () => $api(`/api/core/webhooks/${id.value}/deliveries/${d.id}/retry` as '/api/core/webhooks/:id/deliveries/:delivery/retry', { method: 'POST', body: {} }).then(() => true))
+  const done = await act(() => $api(`/api/core/webhooks/${id.value}/deliveries/${d.id}/retry` as '/api/core/webhooks/:id/deliveries/:delivery/retry', { method: 'POST', body: {} }).then(() => true))
   if (!done) return
   toast.add({ title: t('core.webhooks.retried'), color: 'success' })
   await refreshLog()
@@ -331,7 +328,7 @@ async function retry(d: WebhookDelivery) {
           <UButton
             type="submit"
             :label="isNew ? t('core.webhooks.new') : t('core.webhooks.save')"
-            :loading="busy === 'save'"
+            loading-auto
           />
         </UForm>
 
@@ -345,7 +342,7 @@ async function retry(d: WebhookDelivery) {
               variant="outline"
               icon="i-lucide-send"
               :label="t('core.webhooks.test')"
-              :loading="busy === 'test'"
+              loading-auto
               @click="sendTest()"
             />
             <UButton
@@ -353,7 +350,7 @@ async function retry(d: WebhookDelivery) {
               variant="outline"
               :icon="hook.state === 'active' ? 'i-lucide-pause' : 'i-lucide-play'"
               :label="hook.state === 'active' ? t('core.webhooks.pause') : t('core.webhooks.resume')"
-              :loading="busy === 'state'"
+              loading-auto
               @click="setPaused(hook.state === 'active')"
             />
             <UButton
@@ -362,7 +359,7 @@ async function retry(d: WebhookDelivery) {
               variant="outline"
               icon="i-lucide-key-round"
               :label="t('core.webhooks.rotate')"
-              :loading="busy === 'rotate'"
+              loading-auto
               @click="rotate()"
             />
             <UButton
@@ -370,7 +367,7 @@ async function retry(d: WebhookDelivery) {
               variant="outline"
               icon="i-lucide-trash-2"
               :label="t('core.webhooks.delete')"
-              :loading="busy === 'delete'"
+              loading-auto
               @click="remove()"
             />
           </div>
@@ -388,11 +385,39 @@ async function retry(d: WebhookDelivery) {
             {{ t('core.webhooks.log-empty') }}
           </p>
           <template v-else>
-            <UTable
-              :data="log.rows"
+            <TableOrList
+              :rows="log.rows"
               :columns="columns"
-              :caption="t('core.webhooks.log')"
+              :label="t('core.webhooks.log')"
             >
+              <template #item="{ row: d }">
+                <RecordListItem
+                  :name="d.eventName"
+                  :description="[brief(d.createdAt), t('core.webhooks.log-tries-count', { count: d.attempts }), answer(d)].join(' · ')"
+                >
+                  <StatusBadge
+                    :tone="toneOf(d)"
+                    :label="t(`core.webhooks.delivery.${d.state}`)"
+                  />
+                  <UButton
+                    v-if="d.state === 'failed'"
+                    size="sm"
+                    color="neutral"
+                    variant="outline"
+                    :label="t('core.webhooks.retry')"
+                    loading-auto
+                    @click="retry(d)"
+                  />
+                  <template
+                    v-if="d.state === 'retrying' && d.nextAttemptAt"
+                    #below
+                  >
+                    <p class="text-xs text-muted">
+                      {{ t('core.webhooks.log-next', { when: brief(d.nextAttemptAt) }) }}
+                    </p>
+                  </template>
+                </RecordListItem>
+              </template>
               <template #createdAt-cell="{ row }">
                 {{ brief(row.original.createdAt) }}
               </template>
@@ -401,7 +426,7 @@ async function retry(d: WebhookDelivery) {
               </template>
               <template #state-cell="{ row }">
                 <StatusBadge
-                  :tone="deliveryTone[row.original.state]"
+                  :tone="toneOf(row.original)"
                   :label="t(`core.webhooks.delivery.${row.original.state}`)"
                 />
                 <p
@@ -421,11 +446,11 @@ async function retry(d: WebhookDelivery) {
                   color="neutral"
                   variant="outline"
                   :label="t('core.webhooks.retry')"
-                  :loading="busy === `retry:${row.original.id}`"
+                  loading-auto
                   @click="retry(row.original)"
                 />
               </template>
-            </UTable>
+            </TableOrList>
             <UPagination
               v-if="log.total > PAGE_SIZE"
               v-model:page="page"

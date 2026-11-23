@@ -284,13 +284,10 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
                   :aria-label="t('forms.screens.problems.has')"
                 />
               </UButton>
-              <UDropdownMenu :items="calculationMenu(c.id, i, figureName(c))">
-                <IconButton
-                  icon="i-lucide-ellipsis-vertical"
-                  size="sm"
-                  :label="t('forms.screens.builder.actions-for', { name: figureName(c) })"
-                />
-              </UDropdownMenu>
+              <RowActions
+                :items="calculationMenu(c.id, i, figureName(c))"
+                :label="t('forms.screens.builder.actions-for', { name: figureName(c) })"
+              />
             </li>
           </ul>
           <UButton

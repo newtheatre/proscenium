@@ -80,6 +80,13 @@ const parentItems = computed(() => {
   return [{ value: 'none', label: t('bar.screens.products.parent-none') }, ...tops.map(c => ({ value: c.id, label: c.name }))]
 })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+// A modal's Save sits outside its form, where loading-auto cannot see the submit, so it spins on this.
+const submitting = ref(false)
+async function submit(run: () => Promise<unknown>) {
+  submitting.value = true
+  try { await run() }
+  finally { submitting.value = false }
+}
 const categoryEl = useTemplateRef<{ setErrors: (errors: FieldError[]) => void }>('categoryEl')
 async function editCategory(c?: Category) {
   refusal.value = null
@@ -195,15 +202,8 @@ async function move(p: Product, to: number) {
           icon="i-lucide-beer"
           :title="t('bar.screens.products.empty-title')"
           :description="t('bar.screens.products.empty')"
-        >
-          <template #actions>
-            <UButton
-              :label="t('bar.screens.products.new-category')"
-              icon="i-lucide-plus"
-              @click="editCategory()"
-            />
-          </template>
-        </EmptyState>
+          :action="{ label: t('bar.screens.products.new-category'), icon: 'i-lucide-plus', onClick: () => editCategory() }"
+        />
         <template v-else>
           <UAlert
             v-if="uncheckedOnly"
@@ -284,7 +284,7 @@ async function move(p: Product, to: number) {
           :validate="() => bodyErrors(categoryInput, categoryBody())"
           class="space-y-4"
           novalidate
-          @submit="saveCategory"
+          @submit="submit(saveCategory)"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -309,9 +309,10 @@ async function move(p: Product, to: number) {
             :help="t('bar.screens.products.parent-help')"
             name="parentId"
           >
-            <USelect
+            <USelectMenu
               v-model="category.parentId"
               :items="parentItems"
+              value-key="value"
             />
           </UFormField>
           <UCheckbox
@@ -324,9 +325,10 @@ async function move(p: Product, to: number) {
             :help="t('bar.screens.products.usual-preset-help')"
             name="usualPreset"
           >
-            <USelect
+            <USelectMenu
               v-model="category.usualPreset"
               :items="presetItems"
+              value-key="value"
             />
           </UFormField>
         </UForm>
@@ -335,7 +337,7 @@ async function move(p: Product, to: number) {
         <UButton
           type="submit"
           form="bar-category"
-          loading-auto
+          :loading="submitting"
           :label="t('bar.screens.save')"
         />
       </template>

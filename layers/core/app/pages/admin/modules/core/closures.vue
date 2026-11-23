@@ -6,30 +6,31 @@
 interface Closure { id: string, venueId: string | null, spaceId: string | null, kind: 'closure' | 'public_holiday', title: string, startsAt: number, endsAt: number, allDay: boolean, blocksPerformances: boolean, source: 'manual' | 'feed' }
 interface Place { id: string, name: string, spaces: { id: string, name: string }[] }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const { data, status, error, refresh } = await useAPI<{ rows: Closure[], places: Place[] }>('/api/core/closures', { key: 'core:closures' })
 const dates = useDates()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
-const toast = useToast()
 const { offer } = useUndo()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 // An all-day closure ends at the start of the day after its last; show the last day itself.
 const when = (c: Closure) => c.allDay ? dates.range(c.startsAt, c.endsAt - 1, 'dayNamed') : dates.range(c.startsAt, c.endsAt, 'dateTime')
 function where(c: Closure): string {
-  if (!c.venueId) return 'The whole theatre'
+  if (!c.venueId) return t('core.closures.whole-theatre')
   const venue = data.value?.places.find(p => p.id === c.venueId)
-  if (!c.spaceId) return venue?.name ?? 'A venue'
+  if (!c.spaceId) return venue?.name ?? t('core.closures.a-venue')
   const space = venue?.spaces.find(s => s.id === c.spaceId)
-  return space ? `${space.name}, ${venue!.name}` : venue?.name ?? 'A space'
+  return space ? `${space.name}, ${venue!.name}` : venue?.name ?? t('core.closures.a-space')
 }
 
 const WHOLE = 'theatre'
+const DAY = 10 // not-policy: the length of a date, as 2027-09-01
 const adding = ref(false)
 const form = reactive({ scope: WHOLE, title: '', allDay: true, days: { start: '', end: '' }, from: null as number | null, to: null as number | null, blocksPerformances: true })
 const scopes = computed(() => [
-  { value: WHOLE, label: 'The whole theatre' },
+  { value: WHOLE, label: t('core.closures.whole-theatre') },
   ...(data.value?.places ?? []).flatMap(v => [
     { value: v.id, label: v.name },
     ...(v.spaces.length > 1 ? v.spaces.map(s => ({ value: `${v.id}/${s.id}`, label: `${v.name}: ${s.name}` })) : []),
@@ -49,7 +50,7 @@ async function add() {
     const { id } = await $api<{ id: string }>('/api/core/closures', { method: 'POST', body: { venueId, spaceId, title: form.title, allDay: form.allDay, from, to, blocksPerformances: form.blocksPerformances } })
     adding.value = false
     await refresh()
-    offer('Closure added', async () => {
+    offer(t('core.closures.added'), async () => {
       await $api(`/api/core/closures/${id}` as string, { method: 'DELETE' })
       await refresh()
     })
@@ -59,12 +60,17 @@ async function add() {
   }
 }
 async function remove(c: Closure) {
-  if (!await confirm({ verb: 'Delete', thing: `the closure ${c.title}`, consequence: 'Performances can be scheduled in this time again.', button: 'Delete closure' })) return
+  if (!await confirm({ verb: t('core.closures.delete'), thing: t('core.closures.delete-thing', { title: c.title }), consequence: t('core.closures.delete-consequence'), button: t('core.closures.delete-button') })) return
   refusal.value = null
   try {
     await $api(`/api/core/closures/${c.id}` as string, { method: 'DELETE' })
     await refresh()
-    toast.add({ title: 'Closure deleted', color: 'success' })
+    // Undoing a delete adds the same closure again, in the days or the local times the route takes.
+    const [from, to] = c.allDay ? [dates.toLocal(c.startsAt).slice(0, DAY), dates.toLocal(c.endsAt - 1).slice(0, DAY)] : [dates.toLocal(c.startsAt), dates.toLocal(c.endsAt)]
+    offer(t('core.closures.deleted'), async () => {
+      await $api('/api/core/closures', { method: 'POST', body: { venueId: c.venueId, spaceId: c.spaceId, title: c.title, allDay: c.allDay, from, to, blocksPerformances: c.blocksPerformances } })
+      await refresh()
+    })
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -74,13 +80,13 @@ async function remove(c: Closure) {
 
 <template>
   <PageFrame
-    title="Closures"
-    description="Times when the theatre, a venue or a space is shut. A closure that blocks performances stops one being scheduled inside it."
+    :title="t('core.closures.closures')"
+    :description="t('core.closures.description-times-when-the')"
     width="reading"
   >
     <template #primary>
       <UButton
-        label="New closure"
+        :label="t('core.closures.new-closure')"
         icon="i-lucide-plus"
         @click="openAdd"
       />
@@ -98,13 +104,13 @@ async function remove(c: Closure) {
         />
         <EmptyState
           v-if="!data?.rows.length"
-          title="No closures coming up"
-          description="Add a closure for a holiday shutdown, building work or anything else that keeps the doors shut."
+          :title="t('core.closures.no-closures-coming-up')"
+          :description="t('core.closures.description-add-a-closure')"
           icon="i-lucide-calendar-x"
         />
         <RecordList
           v-else
-          label="Closures"
+          :label="t('core.closures.closures')"
         >
           <RecordListItem
             v-for="c in data.rows"
@@ -116,18 +122,18 @@ async function remove(c: Closure) {
             <StatusBadge
               v-if="c.kind === 'public_holiday'"
               tone="neutral"
-              label="Public holiday"
+              :label="t('core.closures.public-holiday')"
             />
             <StatusBadge
               v-else-if="c.blocksPerformances"
               tone="warning"
-              label="Blocks performances"
+              :label="t('core.closures.blocks-performances')"
             />
             <IconButton
               v-if="c.source === 'manual'"
               icon="i-lucide-trash-2"
               size="sm"
-              :label="`Delete ${c.title}`"
+              :label="t('core.closures.delete-named', { title: c.title })"
               @click="remove(c)"
             />
           </RecordListItem>
@@ -137,7 +143,7 @@ async function remove(c: Closure) {
 
     <UModal
       v-model:open="adding"
-      title="New closure"
+      :title="t('core.closures.new-closure')"
     >
       <template #body>
         <UForm
@@ -151,16 +157,16 @@ async function remove(c: Closure) {
           <RefusalNotice :refusal="refusal" />
           <UFormField
             name="title"
-            label="What it is"
+            :label="t('core.closures.what-it-is')"
             required
           >
             <UInput
               v-model="form.title"
-              placeholder="Christmas shutdown"
+              :placeholder="t('core.closures.christmas-shutdown')"
               maxlength="120"
             />
           </UFormField>
-          <UFormField label="Where">
+          <UFormField :label="t('core.closures.where')">
             <USelectMenu
               v-model="form.scope"
               value-key="value"
@@ -169,14 +175,14 @@ async function remove(c: Closure) {
           </UFormField>
           <UCheckbox
             v-model="form.allDay"
-            label="Whole days"
-            description="Untick to give a start and an end time."
+            :label="t('core.closures.whole-days')"
+            :description="t('core.closures.description-untick-to-give')"
           />
           <UFormField
             v-if="form.allDay"
             name="days"
-            label="Days"
-            help="Choose one day, or a first and a last day."
+            :label="t('core.closures.days')"
+            :help="t('core.closures.help-choose-one-day')"
             required
           >
             <FieldDateRange v-model="form.days" />
@@ -187,14 +193,14 @@ async function remove(c: Closure) {
           >
             <UFormField
               name="from"
-              label="From"
+              :label="t('core.closures.from')"
               required
             >
               <FieldDateTime v-model="form.from" />
             </UFormField>
             <UFormField
               name="to"
-              label="Until"
+              :label="t('core.closures.until')"
               required
             >
               <FieldDateTime
@@ -205,8 +211,8 @@ async function remove(c: Closure) {
           </div>
           <UCheckbox
             v-model="form.blocksPerformances"
-            label="Blocks performances"
-            description="Turn off to show the closure on the calendar as a warning only."
+            :label="t('core.closures.blocks-performances')"
+            :description="t('core.closures.description-turn-off-to')"
           />
         </UForm>
       </template>
@@ -214,7 +220,7 @@ async function remove(c: Closure) {
         <UButton
           type="submit"
           form="new-closure"
-          label="Add closure"
+          :label="t('core.closures.add-closure')"
         />
       </template>
     </UModal>

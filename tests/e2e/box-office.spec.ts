@@ -517,9 +517,9 @@ test.describe('complimentary tickets', () => {
     // The form is behind the page's one button, in a dialog.
     await asking.getByRole('button', { name: 'Ask for complimentary tickets' }).first().click()
     const form = asking.getByRole('dialog', { name: 'Ask for complimentary tickets' })
-    await form.getByRole('combobox', { name: 'Performance' }).click()
+    await form.getByLabel(/^Performance/).click()
     await asking.getByRole('option', { name: /The Desk Show/ }).first().click()
-    await form.getByRole('combobox', { name: 'Why' }).click()
+    await form.getByLabel(/^Why/).click()
     await asking.getByRole('option', { name: 'Press' }).click()
     await form.getByLabel('Their name').fill('Rita Reviewer')
     await form.getByLabel('Their email address').fill(`rita.${stamp}@example.org`)

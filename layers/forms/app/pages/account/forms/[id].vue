@@ -56,18 +56,15 @@ async function send(kept: Answers): Promise<boolean> {
 }
 // Taking it back, where the form allows it: asked twice, because it cannot be undone.
 const withdrawing = ref(false)
-const taking = ref(false)
 const withdrawFailure = ref<{ reason: string, remedy?: string } | null>(null)
 async function withdraw() {
   withdrawFailure.value = null
-  taking.value = true
   try {
     await $api(`/api/forms/mine/${encodeURIComponent(own.value.response.id)}/withdraw` as string, { method: 'POST', body: {} })
   }
   catch (e) {
     const refusal = toRefusal(e)
     withdrawFailure.value = { reason: refusal.reason, remedy: refusal.remedy }
-    taking.value = false
     return
   }
   toast.add({ title: t('forms.screens.mine.withdrawn', { reference: own.value.response.reference }), color: 'success' })
@@ -216,7 +213,7 @@ async function withdraw() {
         <UButton
           :label="t('forms.screens.mine.withdraw-confirm')"
           color="error"
-          :loading="taking"
+          loading-auto
           @click="withdraw"
         />
         <UButton
