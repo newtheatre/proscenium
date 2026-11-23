@@ -6,6 +6,7 @@ import { rowSlots, slotRows, slotsInWords, type RunSlot, type SlotRow } from '..
 
 interface Preset { id: string, name: string, slots: RunSlot[], spaces: number }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const { data, status, error, refresh } = await useAPI<{ rows: Preset[], usual: string | null }>('/api/core/run-presets', { key: 'core:run-presets' })
 const { toRefusal } = useRefusal()
@@ -54,31 +55,33 @@ async function save() {
   const before = data.value?.rows.find(p => p.id === id)
   const put = (to: typeof body) => $api<unknown>(`/api/core/run-presets/${id}` as string, { method: 'PUT', body: to })
   const ok = id
-    ? await run(() => put(body), 'Preset saved', before ? () => put({ name: before.name, slots: before.slots }) : undefined)
-    : await run(() => $api<{ id: string }>('/api/core/run-presets' as string, { method: 'POST', body }), 'Preset added', made => $api<unknown>(`/api/core/run-presets/${made.id}` as string, { method: 'DELETE' }))
+    ? await run(() => put(body), t('core.run-presets.saved'), before ? () => put({ name: before.name, slots: before.slots }) : undefined)
+    : await run(() => $api<{ id: string }>('/api/core/run-presets' as string, { method: 'POST', body }), t('core.run-presets.added'), made => $api<unknown>(`/api/core/run-presets/${made.id}` as string, { method: 'DELETE' }))
   if (ok) editing.value = false
 }
 async function remove(p: Preset) {
-  const used = p.spaces ? ` ${p.spaces === 1 ? 'One space uses' : `${p.spaces} spaces use`} it and will start from the theatre's usual preset instead.` : ''
-  if (!await confirm({ verb: 'Delete', thing: p.name, consequence: `Runs already added keep their performances.${used}`, button: 'Delete preset' })) return
-  await run(() => $api<unknown>(`/api/core/run-presets/${p.id}` as string, { method: 'DELETE' }), 'Preset deleted')
+  const consequence = p.spaces ? t('core.run-presets.delete-consequence-used', { count: p.spaces }) : t('core.run-presets.delete-consequence')
+  if (!await confirm({ verb: t('core.run-presets.delete'), thing: p.name, consequence, button: t('core.run-presets.delete-button') })) return
+  // With no space using it, adding the same preset again is a clean reverse.
+  const again = () => $api<unknown>('/api/core/run-presets' as string, { method: 'POST', body: { name: p.name, slots: p.slots } })
+  await run(() => $api<unknown>(`/api/core/run-presets/${p.id}` as string, { method: 'DELETE' }), t('core.run-presets.deleted'), p.spaces ? undefined : again)
 }
-const describe = (p: Preset) => [slotsInWords(p.slots), ...(p.spaces ? [`usual for ${p.spaces === 1 ? 'one space' : `${p.spaces} spaces`}`] : [])].join(' · ')
+const describe = (p: Preset) => [slotsInWords(p.slots), ...(p.spaces ? [t('core.run-presets.usual-for', { count: p.spaces })] : [])].join(' · ')
 const actions = (p: Preset) => [[
-  { label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => open(p) },
-  { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove(p) },
+  { label: t('core.run-presets.edit'), icon: 'i-lucide-pencil', onSelect: () => open(p) },
+  { label: t('core.run-presets.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove(p) },
 ]]
 </script>
 
 <template>
   <PageFrame
-    title="Run presets"
-    description="Start times, each with its days, that Add a run starts from. Anyone who adds runs can save one there."
+    :title="t('core.run-presets.run-presets')"
+    :description="t('core.run-presets.description-start-times-each')"
     width="reading"
   >
     <template #primary>
       <UButton
-        label="New preset"
+        :label="t('core.run-presets.new-preset')"
         icon="i-lucide-plus"
         @click="open()"
       />
@@ -96,13 +99,13 @@ const actions = (p: Preset) => [[
         />
         <EmptyState
           v-if="!data?.rows.length"
-          title="No run presets yet"
-          description="A preset fills in a run's start times, such as evenings Tuesday to Saturday with a Saturday matinee."
+          :title="t('core.run-presets.no-run-presets-yet')"
+          :description="t('core.run-presets.description-a-preset-fills')"
           icon="i-lucide-calendar-clock"
         />
         <RecordList
           v-else
-          label="Run presets"
+          :label="t('core.run-presets.run-presets')"
         >
           <RecordListItem
             v-for="p in data.rows"
@@ -112,13 +115,13 @@ const actions = (p: Preset) => [[
           >
             <UBadge
               v-if="p.id === data.usual"
-              label="The theatre's usual"
+              :label="t('core.run-presets.the-theatres-usual')"
               color="neutral"
               variant="subtle"
             />
             <RowActions
               :items="actions(p)"
-              :label="`Actions for ${p.name}`"
+              :label="t('core.run-presets.actions-for', { name: p.name })"
             />
           </RecordListItem>
         </RecordList>
@@ -127,7 +130,7 @@ const actions = (p: Preset) => [[
 
     <UModal
       v-model:open="editing"
-      :title="editId ? 'Change preset' : 'New preset'"
+      :title="editId ? t('core.run-presets.change-preset') : t('core.run-presets.new-preset')"
       :ui="{ content: 'sm:max-w-2xl' }"
     >
       <template #body>
@@ -141,7 +144,7 @@ const actions = (p: Preset) => [[
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
-            label="Name"
+            :label="t('core.run-presets.name')"
             name="name"
             required
           >
@@ -151,8 +154,8 @@ const actions = (p: Preset) => [[
             />
           </UFormField>
           <UFormField
-            label="Performances"
-            help="One line for each start time, with the days it runs on."
+            :label="t('core.run-presets.performances')"
+            :help="t('core.run-presets.help-one-line-for')"
             name="slots"
             required
           >
@@ -164,7 +167,7 @@ const actions = (p: Preset) => [[
         <UButton
           type="submit"
           form="run-preset-form"
-          :label="editId ? 'Save preset' : 'Add preset'"
+          :label="editId ? t('core.run-presets.save-preset') : t('core.run-presets.add-preset')"
         />
       </template>
     </UModal>
