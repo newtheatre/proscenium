@@ -19,8 +19,10 @@ export interface BookingAnswer {
   state: BookingState
   /** Where the button goes. Absent for a state with nowhere to go, such as closed. */
   link?: string
-  /** For `limited`: how many seats are left. */
+  /** For `limited`: how many seats are left, only where the theatre says the number. */
   seatsLeft?: number
+  /** For `available`: half the house or more is sold, where the theatre says so. */
+  sellingFast?: true
   /** For `not-yet`: when sales open, as an instant. */
   opensAt?: number
   /** For `sold-out`: where to join the waiting list, when the theatre keeps one. */

@@ -40,8 +40,11 @@ export default defineModule({
     'sales.desk-email': setting.boolean({ default: false, change, audience: 'staff' }),
     // The email providers the till's buyer box offers after a typed name ("Use sam@gmail.com"). Filed
     // under Till rather than among the closing times it once sat with.
-    // Show "N seats left" only at or under this many; 0 never shows it.
-    'availability.show-remaining-under': setting.integer({ default: 20, min: 0, max: 1000, change, audience: 'public' }),
+    // How much the public pages say about seats left (seats-left.ts); staff screens always show the count.
+    'availability.seats-left': setting.choice({ default: 'count', options: ['count', 'progress', 'nearly-full', 'sold-out'], change, audience: 'public' }),
+    'availability.threshold-unit': setting.choice({ default: 'share', options: ['share', 'seats'], change, audience: 'public' }),
+    'availability.threshold-share': setting.integer({ default: 10, min: 1, max: 100, unit: 'box-office.units.percent-of-house', change, audience: 'public' }),
+    'availability.show-remaining-under': setting.integer({ default: 20, min: 0, max: 1000, unit: 'box-office.units.seats', change, audience: 'public' }),
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),
     // What is in force is `reserve` whenever no online payment provider is connected, whatever this says.
     'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public', onChange: 'confirm' }),
