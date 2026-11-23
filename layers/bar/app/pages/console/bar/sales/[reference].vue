@@ -202,11 +202,10 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
               :label="t('bar.screens.sale.how-many')"
               :name="`quantity-${l.id}`"
             >
-              <UInputNumber
+              <FieldNumber
                 v-model="form.lines[l.id]!.quantity"
                 :min="0"
                 :max="l.quantity - l.reversedQuantity"
-                class="w-32"
               />
             </UFormField>
           </div>

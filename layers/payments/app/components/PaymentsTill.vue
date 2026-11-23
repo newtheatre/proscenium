@@ -1871,7 +1871,7 @@ function ended() {
                       :help="t('payments.screens.till.tendered-help')"
                     >
                       <div class="space-y-2">
-                        <UInputNumber
+                        <FieldNumber
                           v-model="tendered"
                           :min="0"
                           :step="0.01"

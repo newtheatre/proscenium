@@ -3,7 +3,7 @@
 // is listed, and gives no ticket benefit until an account is linked. Nobody issues their own.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
-import { defineRoute, first, refuse, siteUrl, useSetting } from '#kit'
+import { defineRoute, first, ownRecordExempt, refuse, siteUrl, useSetting } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { findOrCreateAccount, notify } from '#modules/core'
 import { awardFields, writeAward } from '../../../../awards'
@@ -36,7 +36,7 @@ export default defineRoute({
     const found = await findOrCreateAccount(unit, { address: input.address, name, origin: 'staff' })
     accountId = found.accountId
   }
-  if (accountId && actor.accountId && await first(`SELECT 1 WHERE ?1 IN (${accountScopeSql('?2')})`, accountId, actor.accountId))
+  if (accountId && actor.accountId && await first(`SELECT 1 WHERE ?1 IN (${accountScopeSql('?2')})`, accountId, actor.accountId) && !(await ownRecordExempt(actor)))
     refuse('awards.award.own', 'You cannot issue an award to your own account.', { status: 403, remedy: 'Ask somebody else who may issue awards.' })
   if (accountId && type.onePerPerson) {
     const held = await first<{ id: string }>(`SELECT id FROM awards_awards WHERE type_id = ?1 AND state = 'current' AND account_id IN (${accountScopeSql('?2')}) LIMIT 1`, type.id, accountId) // not-policy: numbered parameters

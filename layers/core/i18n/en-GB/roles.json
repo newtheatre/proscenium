@@ -33,6 +33,7 @@
   "core.roles.editor.unconfirmed": "Not yet confirmed",
   "core.roles.editor.full-control": "Full control",
   "core.roles.editor.module-off": "switched off",
+  "core.roles.editor.ticked": "{count} of {total} ticked",
   "core.roles.editor.tick-all": "Tick all",
   "core.roles.editor.untick-all": "Untick all",
   "core.roles.editor.tick-all-in": "Tick all in {group}",

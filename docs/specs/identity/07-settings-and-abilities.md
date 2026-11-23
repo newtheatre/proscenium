@@ -177,7 +177,7 @@ One more, which makes twenty: `core.account.find`. It lets its holder narrow a l
 
 `core.account.find` is declared `impliable: true`, which is what lets another module's ability imply it under the foundations rule: the implied ability is of standard risk and its owner is core or a module the implying module requires. It is identity's only impliable ability. The audit entry for a call records the grant of the implying ability as what allowed it.
 
-- **"Owner" in the Owner column means the person whose account it is.** `grants` gives everyone these abilities over their own account with no role; `refuses` stops staff disabling, merging or recovering their own.
+- **"Owner" in the Owner column means the person whose account it is.** `grants` gives everyone these abilities over their own account with no role; `refuses` stops staff disabling, merging or recovering their own. A holder of the Owner role is exempt (23 November 2026): an Owner has nobody above them to ask, and the last-Owner guard still stops them disabling or erasing the last Owner who can sign in.
 - **`core.grant.manage` at a record scope is delegation.** A producer who holds it on one production can add their team to that production and nowhere else. They can give only roles whose abilities they hold there.
 - **Four further limits apply whatever is held:** nobody grants themselves a role; nobody gives what they do not have; an Owner's grant is changed only by another Owner; no change may leave the theatre without a usable Owner.
 - That makes 17 rows in this table, with the access scheme's two abilities below; `core.retention.arm` is deliberately held by no preset role.

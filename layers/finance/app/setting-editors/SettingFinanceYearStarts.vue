@@ -15,7 +15,7 @@ const set = (m: number, d: number) => { model.value = `${pad(m)}-${pad(Math.min(
 
 <template>
   <UFieldGroup>
-    <UInputNumber
+    <FieldNumber
       :model-value="day"
       :min="1"
       :max="28"

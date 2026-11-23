@@ -382,7 +382,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </div>
             <div class="grid gap-4 sm:grid-cols-3">
               <UFormField :label="t('box-office.setup.window.max-per-order')">
-                <BoxOfficeDefaultedNumber
+                <DefaultedNumber
                   v-model="windowForm.maxPerOrder"
                   :fallback="d.defaults.maxPerOrder"
                   :min="1"
@@ -474,7 +474,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     :label="sectioned ? b.name : t('box-office.setup.capacity.whole')"
                     :help="seatsHelp(d, b)"
                   >
-                    <UInputNumber
+                    <FieldNumber
                       v-model="capacity[b.id]"
                       class="w-40"
                       :min="0"

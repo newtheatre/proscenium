@@ -433,10 +433,9 @@ const actions = (p: PassType) => [[
                   :help="t('box-office.passes.field.uses-help')"
                   name="uses"
                 >
-                  <UInputNumber
+                  <FieldNumber
                     :model-value="form.uses ?? undefined"
                     :min="1"
-                    class="w-32"
                     @update:model-value="form.uses = $event ?? null"
                   />
                 </UFormField>

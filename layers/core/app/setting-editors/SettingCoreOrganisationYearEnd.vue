@@ -33,14 +33,13 @@ function set(m: number | undefined, d: number | null | undefined) {
 
 <template>
   <UFieldGroup>
-    <UInputNumber
+    <FieldNumber
       :model-value="day"
       :min="1"
       :max="month ? lastDay(month) : 31"
       :disabled="disabled"
       :placeholder="t('core.day-of-year.day')"
       :aria-label="t('core.day-of-year.day')"
-      class="w-32"
       @update:model-value="set(month, $event)"
     />
     <USelect

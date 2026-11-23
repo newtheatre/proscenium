@@ -1,4 +1,4 @@
-<!-- A count that takes the theatre's value until it is given its own, the sibling of the kit's
+<!-- A count that takes the theatre's value until it is given its own, the sibling of
      DefaultedMinutes: left to the theatre it shows that value with a "Theatre default" badge and
      Change; once changed it is an ordinary number box, with a way back to the theatre's. -->
 <script setup lang="ts">
@@ -15,17 +15,17 @@ const inherits = computed(() => model.value === null && props.fallback !== null 
   >
     <span class="text-sm text-highlighted">{{ fallback }}</span>
     <UBadge
-      :label="t('box-office.setup.default.badge')"
+      :label="t('core.defaulted.badge')"
       color="neutral"
       variant="subtle"
       size="sm"
     />
     <UButton
-      :label="t('box-office.setup.default.change')"
+      :label="t('core.defaulted.change')"
       color="neutral"
       variant="link"
       size="sm"
-      :aria-label="t('box-office.setup.default.change-label', { label: label.toLowerCase() })"
+      :aria-label="t('core.defaulted.change-label', { label: label.toLowerCase() })"
       @click="model = fallback!"
     />
   </div>
@@ -33,7 +33,7 @@ const inherits = computed(() => model.value === null && props.fallback !== null 
     v-else
     class="space-y-1"
   >
-    <UInputNumber
+    <FieldNumber
       v-model="model"
       class="w-40"
       :min="min"
@@ -42,7 +42,7 @@ const inherits = computed(() => model.value === null && props.fallback !== null 
     />
     <UButton
       v-if="fallback !== null && fallback !== undefined"
-      :label="t('box-office.setup.default.use', { value: fallback })"
+      :label="t('core.defaulted.use', { value: fallback })"
       color="neutral"
       variant="link"
       size="sm"

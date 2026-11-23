@@ -6,7 +6,7 @@
 // membership-fees.charge.waive. Taking the fee at the desk is a later slice.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
-import { can, defineRoute, first, refuse, siteUrl, today } from '#kit'
+import { can, defineRoute, first, ownRecordExempt, refuse, siteUrl, today } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { findOrCreateAccount, notify } from '#modules/core'
 import { charger } from '../../../../charge'
@@ -47,8 +47,8 @@ export default defineRoute({
   else {
     accountId = (await findOrCreateAccount(unit, { address: input.address!, name: input.name, origin: 'staff' })).accountId
   }
-  // G3: never one's own account, whichever account in a merge it is.
-  if (actor.accountId && await first(`SELECT 1 WHERE ?1 IN (${accountScopeSql('?2')})`, accountId, actor.accountId))
+  // G3: never one's own account, whichever account in a merge it is; an Owner has nobody else to ask.
+  if (actor.accountId && await first(`SELECT 1 WHERE ?1 IN (${accountScopeSql('?2')})`, accountId, actor.accountId) && !(await ownRecordExempt(actor)))
     refuse('membership.membership.own', 'You cannot add a membership to your own account.', { status: 403, remedy: 'Ask another membership officer.' })
   // A reference on a scheme checked against a list is checked and claimed like a member joining (V4); the entry's end date is used unless staff set one (D9).
   const list = input.reference ? await schemeList(scheme) : null

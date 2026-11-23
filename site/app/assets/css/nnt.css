@@ -269,7 +269,6 @@ html.dark .nnt-button-poster:hover {
 /* What's on: the layout draws the band with the page's heading, so upstream's plain header goes,
    and the filters become pills. */
 .nnt-whats-on [data-slot="root"]:has(> [data-slot="container"] > [data-slot="wrapper"] > h1) { display: none; }
-.nnt-whats-on nav ul a { border-radius: 9999px; }
 
 /* Upstream's show top and what's on spotlight, in the house's dress: the spotlight on stage black,
    square corners, the poster in a gold frame and the name in the display face. */

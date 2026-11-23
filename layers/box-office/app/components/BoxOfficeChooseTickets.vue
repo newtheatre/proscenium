@@ -601,7 +601,7 @@ async function hold() {
         @token="challenge = $event"
       />
       <!-- The button stays in reach while the list scrolls, on the page and in the drawer. -->
-      <div class="sticky bottom-0 z-10 border-t border-default bg-default py-3">
+      <div class="sticky-bar">
         <UButton
           size="xl"
           class="justify-center max-sm:w-full"
