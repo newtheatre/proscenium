@@ -406,11 +406,15 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
                       :label="t('core.person.email.audience')"
                     />
                   </div>
-                  <RowActions
+                  <template
                     v-if="p.actions.update"
-                    :items="addressActions(a)"
-                    :label="t('core.person.email.actions', { address: a.address })"
-                  />
+                    #trailing
+                  >
+                    <RowActions
+                      :items="addressActions(a)"
+                      :label="t('core.person.email.actions', { address: a.address })"
+                    />
+                  </template>
                 </RecordListItem>
               </RecordList>
             </FieldGroup>
