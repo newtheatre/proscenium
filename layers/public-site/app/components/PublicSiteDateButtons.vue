@@ -3,7 +3,7 @@
      over the page; with scripts off, or a new tab asked for, the link is followed. `more` is where the
      rest of the dates are. -->
 <script setup lang="ts">
-interface Booking { state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed', link?: string, external?: true, drawer?: string }
+interface Booking { state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed', link?: string, external?: true, drawer?: string, seatsLeft?: number, sellingFast?: true }
 interface Performance { id: string, startsAt: number, state: 'scheduled' | 'cancelled' | 'completed', booking: Booking | null }
 
 const props = defineProps<{ performances: Performance[], title: string, more: string, shown?: number }>()
@@ -15,7 +15,8 @@ const upcoming = computed(() => props.performances.filter(p => p.state === 'sche
 const dates = computed(() => upcoming.value.slice(0, props.shown ?? 4)) // not-policy: how many dates fit on one line
 const rest = computed(() => upcoming.value.length - dates.value.length)
 const bookable = (b: Booking | null) => !!b?.link && (b.state === 'available' || b.state === 'limited')
-const note = (b: Booking | null) => b?.state === 'limited' ? t('public-site.booking.last-few') : b?.state === 'sold-out' ? t('public-site.booking.sold-out') : b?.state === 'not-yet' ? t('public-site.booking.not-yet') : b?.state === 'closed' ? t('public-site.booking.closed') : ''
+// The same words as the booking button, shorter: "12 left" fits under a date.
+const note = (b: Booking | null) => b?.state === 'limited' ? (b.seatsLeft ? t('public-site.booking.left', { count: b.seatsLeft }) : t('public-site.booking.last-few')) : b?.state === 'available' && b.sellingFast ? t('public-site.booking.selling-fast') : b?.state === 'sold-out' ? t('public-site.booking.sold-out') : b?.state === 'not-yet' ? t('public-site.booking.not-yet') : b?.state === 'closed' ? t('public-site.booking.closed') : ''
 
 const drawn = ref<{ booking: Booking, startsAt: number } | null>(null)
 const open = ref(false)

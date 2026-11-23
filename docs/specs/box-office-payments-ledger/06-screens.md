@@ -35,7 +35,7 @@ Every public address sits under `/book`, which Foundations reserves, so no theat
 
 What the three screens must get right:
 
-- **Choose tickets.** The button says what it will do and what it costs. "14 seats left" appears only at or below `box-office.availability.show-remaining-under`. A companion ticket cannot be added without a paid ticket. Pressing the button runs the claim batch, and that is the moment the hold starts; if the house filled in the meantime the screen says how many are left and offers the waiting list.
+- **Choose tickets.** The button says what it will do and what it costs. How full the house is heads the bands, and with more than one band each says its own beside its name ("Selling fast", "Last few seats", "14 seats left"), each only as far as `box-office.availability.seats-left` allows (part 5, "The booking action in the core's states"). A companion ticket cannot be added without a paid ticket. Pressing the button runs the claim batch, and that is the moment the hold starts; if the house filled in the meantime the screen says how many are left and offers the waiting list.
 - **Check and pay.** The countdown is first seen here, is always visible, and is announced to screen readers at fixed points, not every second. With one minute left a button offers the one extension (part 3). When the countdown ends the screen says the seats were released and offers Try again, which claims afresh from the lines the browser remembered. The access-needs question is one optional field with a plain explanation of who will read it.
 - **Booked.** Shown only after the order is confirmed in the database. If the provider sends the buyer back before its answer has arrived, the screen waits and polls rather than guessing.
 

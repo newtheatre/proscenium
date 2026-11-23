@@ -1,12 +1,13 @@
 // Box office's answer for the booking button on the public pages (Box office specification, part 5,
 // "The booking action in the core's states"). One call answers every date on a page, in three
 // reads whatever their number. A date with no sales record, or a draft with no opening time, is left
-// out, so the core falls back to the external link. Seats left are given only at or under the
-// theatre's setting, never the house's size.
+// out, so the core falls back to the external link. How full a date is comes only as far as the
+// theatre's availability.seats-left allows (seats-left.ts), never the house's size.
 import { all, nowMs, requirements, useSetting } from '#kit'
 import type { BookingAction, BookingAnswer, PriceSummary } from '#modules/core'
 import { pricesFor, WHEELCHAIR_TYPE } from '../../prices'
 import { sellableTypes, soldOn } from '../../ticket-types'
+import { seatsLeftRule, seatsLeftSay } from '../../seats-left'
 
 /** Choose tickets and Check and pay, in a drawer over the show's page (BoxOfficeBookingDrawer.global.vue). */
 const DRAWER = 'BoxOfficeBookingDrawer'
@@ -22,17 +23,17 @@ async function actions(subjects: Parameters<BookingAction['actions']>[0]): Promi
     all<Sale>('SELECT performance_id, state, on_sale_at, off_sale_at FROM box_office_performance_sales WHERE performance_id IN (SELECT value FROM json_each(?))', ids),
     // Free seats as a buyer would find them: a lapsed hold nobody has swept is free (see availability.ts).
     // Wheelchair spaces are not seats, and are offered beside them.
-    all<{ performance_id: string, free: number }>(
-      `SELECT o.performance_id, sum(max(0, o.capacity - o.claimed + (SELECT count(*) FROM box_office_claims c JOIN box_office_holds h ON h.id = c.hold_id
+    all<{ performance_id: string, free: number, capacity: number }>(
+      `SELECT o.performance_id, sum(o.capacity) AS capacity, sum(max(0, o.capacity - o.claimed + (SELECT count(*) FROM box_office_claims c JOIN box_office_holds h ON h.id = c.hold_id
           WHERE c.pool_id = o.id AND c.state = 'held' AND c.expires_at IS NOT NULL AND c.expires_at <= ?1 AND h.kind <> 'payment'))) AS free
         FROM box_office_pools o WHERE o.performance_id IN (SELECT value FROM json_each(?2))
           AND o.band_id NOT IN (SELECT id FROM box_office_bands WHERE kind = 'wheelchair') GROUP BY o.performance_id`, at, ids),
     all<{ id: string, slug: string }>('SELECT id, slug FROM core_productions WHERE id IN (SELECT value FROM json_each(?))', productionIds),
   ])
   const saleOf = new Map(sales.map(s => [s.performance_id, s]))
-  const freeOf = new Map(free.map(f => [f.performance_id, f.free]))
+  const freeOf = new Map(free.map(f => [f.performance_id, f]))
   const slugOf = new Map(slugs.map(p => [p.id, p.slug]))
-  const under = await useSetting('box-office.availability.show-remaining-under') as number
+  const rule = await seatsLeftRule()
   const closeBefore = (await useSetting('box-office.sales.close-before') as number) * 1000 // not-policy: seconds to milliseconds
 
   const out: Record<string, BookingAnswer> = {}
@@ -50,10 +51,9 @@ async function actions(subjects: Parameters<BookingAction['actions']>[0]): Promi
       out[subject.id] = { state: 'closed' }
       continue
     }
-    const left = freeOf.get(subject.id) ?? 0
-    out[subject.id] = left <= 0
-      ? { state: 'sold-out' }
-      : left <= under ? { state: 'limited', link, seatsLeft: left, drawer: DRAWER } : { state: 'available', link, drawer: DRAWER }
+    const house = freeOf.get(subject.id)
+    const say = seatsLeftSay(rule, house?.free ?? 0, house?.capacity ?? 0)
+    out[subject.id] = say.state === 'sold-out' ? { state: 'sold-out' } : { ...say, link, drawer: DRAWER }
   }
   return out
 }

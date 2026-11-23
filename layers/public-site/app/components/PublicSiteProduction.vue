@@ -8,7 +8,7 @@
 <script setup lang="ts">
 interface Image { url: string, alt: string, width: number | null, height: number | null }
 interface Note { termId: string, label: string, detail: string | null }
-interface Booking { state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed', link?: string, seatsLeft?: number, opensAt?: number, waitingList?: string, label?: string, external?: true }
+interface Booking { state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed', link?: string, seatsLeft?: number, sellingFast?: true, opensAt?: number, waitingList?: string, label?: string, external?: true }
 interface Performance {
   id: string
   startsAt: number
