@@ -15,6 +15,7 @@
 <script setup lang="ts">
 import { createReusableTemplate } from '@vueuse/core'
 import { answerVerdict, itemVerdict, type AllergenFacts, type Verdict } from '../../shared/allergen-verdict'
+import { matrixAnswer } from '../../shared/allergen-matrix'
 
 // The choice fields (`groupIds`, `baseMinor` and the menu's `groups`) are absent from a
 // server without choices, and then every product is as it was: sizes only.
@@ -556,14 +557,10 @@ const dot = (colour: string | null) => ({ backgroundColor: colour ? shade(colour
 
 // Allergens: what the customer avoids is tapped once and kept for the sale. A product is never
 // called free of anything: at best nothing of what they avoid is recorded for it.
-const ALLERGENS = ['gluten', 'crustaceans', 'eggs', 'fish', 'peanuts', 'soya', 'milk', 'nuts', 'celery', 'mustard', 'sesame', 'sulphites', 'lupin', 'molluscs']
 const hasAllergens = computed(() => cats.value.some(c => c.items.some(i => i.allergens)))
 const allergensOpen = ref(false)
 const avoid = ref<string[]>([])
 const avoids = (key: string) => avoid.value.includes(key)
-function toggleAvoid(key: string) {
-  avoid.value = avoids(key) ? avoid.value.filter(k => k !== key) : [...avoid.value, key]
-}
 const names = (keys: string[]) => keys.map(k => t(`bar.allergen.${k}`)).join(', ')
 const hit = (keys: string[]) => keys.filter(k => !avoid.value.length || avoids(k))
 type Tone = 'error' | 'warning' | 'success' | 'neutral'
@@ -583,10 +580,28 @@ function verdict(list: (Allergens | undefined)[]): { tone: Tone, text: string, s
   if (checked.some(a => a.dependsOnChoice)) return { tone: 'warning', short: t('bar.desk.allergens.tile-depends'), text: t('bar.desk.allergens.depends') }
   return { tone: 'success', short: '', text: avoid.value.length ? t('bar.desk.allergens.none-of-these') : t('bar.desk.allergens.none') }
 }
-/** The products the sheet lists: those in view, or all of them from the front of the till. */
-const allergenRows = computed(() => {
-  const inView = layout.value === 'folders' ? (subFolder.value ? [subFolder.value] : folder.value ? [folder.value, ...subsOf(folder.value)] : null) : current.value ? [current.value, ...subsOf(current.value)] : null
-  return (inView ?? cats.value).flatMap(c => tiles(c)).map(tile => ({ key: tile.key, name: tile.name, ...verdict(tile.items.map(i => i.allergens)) }))
+function noteOf(tile: Tile, checked: 'all' | 'some'): { tone: Tone, text: string } | null {
+  if (avoid.value.length) return verdict(tile.items.map(i => i.allergens))
+  if (checked === 'some') return { tone: 'neutral', text: t('bar.desk.allergens.not-checked') }
+  return tile.items.some(i => i.allergens?.dependsOnChoice) ? { tone: 'warning', text: t('bar.desk.allergens.depends') } : null
+}
+/**
+ * The matrix's rows: the products in view, or all of them from the front of the till, under their
+ * categories. While nothing is avoided a row's note says only what the squares cannot: not checked, or
+ * depends on what is picked.
+ */
+const allergenSections = computed(() => {
+  const inView = layout.value === 'folders'
+    ? (subFolder.value ? [{ id: subFolder.value.id, heading: null, tiles: tiles(subFolder.value) }] : folder.value ? sectionsOf(folder.value, false) : null)
+    : current.value ? sectionsOf(current.value, false) : null
+  return (inView ?? tops.value.flatMap(c => sectionsOf(c, tops.value.length > 1))).filter(s => s.tiles.length).map(s => ({
+    key: s.id,
+    heading: s.heading,
+    rows: s.tiles.map((tile) => {
+      const answer = matrixAnswer(tile.items.map(i => i.allergens))
+      return { key: tile.key, name: tile.name, ...answer, note: answer.checked === 'none' ? null : noteOf(tile, answer.checked) }
+    }),
+  }))
 })
 /** An answer as the shared verdict takes it: none recorded is not checked. */
 const facts = (a: Allergens | undefined): AllergenFacts => a ?? { contains: [], mayContain: [], checked: false }
@@ -955,54 +970,26 @@ watch([avoid, refused], keep, { deep: true })
       </div>
     </template>
 
-    <!-- The allergens sheet: tap what the customer avoids, and each product in view says where it stands. -->
+    <!-- The allergens sheet: a matrix of the products in view against the 14; tapping an allergen marks it as avoided. -->
     <UModal
       v-model:open="allergensOpen"
       :title="t('bar.desk.allergens.title')"
       :description="t('bar.desk.allergens.help')"
-      :ui="{ header: 'pe-14' }"
+      :ui="{ header: 'pe-14', content: 'sm:max-w-5xl', body: 'flex min-h-0 flex-col gap-3 overflow-hidden' }"
     >
       <template #body>
-        <div class="grid grid-cols-[minmax(0,1fr)] gap-4">
-          <div
-            role="group"
-            :aria-label="t('bar.desk.allergens.avoids')"
-            class="flex flex-wrap gap-2"
-          >
-            <UButton
-              v-for="k in ALLERGENS"
-              :key="k"
-              color="neutral"
-              :variant="avoids(k) ? 'solid' : 'outline'"
-              :aria-pressed="avoids(k)"
-              :label="t(`bar.allergen.${k}`)"
-              @click="toggleAvoid(k)"
-            />
-          </div>
-          <ul class="divide-y divide-default">
-            <li
-              v-for="row in allergenRows"
-              :key="row.key"
-              class="flex items-start justify-between gap-3 py-2"
-            >
-              <span class="min-w-0 font-medium">{{ row.name }}</span>
-              <UBadge
-                :color="row.tone"
-                variant="subtle"
-                class="max-w-[60%] shrink-0 text-start whitespace-normal"
-                :ui="{ label: 'whitespace-normal! overflow-visible! break-words' }"
-                :icon="row.tone === 'error' ? 'i-lucide-octagon-alert' : row.tone === 'warning' ? 'i-lucide-triangle-alert' : row.tone === 'success' ? 'i-lucide-check' : 'i-lucide-circle-help'"
-                :label="row.text"
-              />
-            </li>
-          </ul>
-          <p
-            v-if="menu?.allergenStatement"
-            class="text-sm text-muted"
-          >
-            {{ menu.allergenStatement }}
-          </p>
-        </div>
+        <BarAllergenMatrix
+          v-model:avoid="avoid"
+          :sections="allergenSections"
+          :caption="t('bar.desk.allergens.caption')"
+          class="min-h-0"
+        />
+        <p
+          v-if="menu?.allergenStatement"
+          class="text-sm text-muted"
+        >
+          {{ menu.allergenStatement }}
+        </p>
       </template>
       <template
         v-if="avoid.length"
