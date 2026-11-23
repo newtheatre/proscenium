@@ -36,6 +36,13 @@ const retired = computed(() => shown.value.filter(l => !l.active))
 
 const form = ref<{ id: string | null, standard: boolean, name: string, restricted: boolean, fallsBack: boolean } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+// A modal's Save sits outside its form, where loading-auto cannot see the submit, so it spins on this.
+const submitting = ref(false)
+async function submit(run: () => Promise<unknown>) {
+  submitting.value = true
+  try { await run() }
+  finally { submitting.value = false }
+}
 type FormRef = { setErrors: (errors: FieldError[]) => void }
 const formEl = useTemplateRef<FormRef>('formEl')
 function edit(l?: List) {
@@ -137,15 +144,8 @@ async function setActive(l: List, active: boolean) {
           icon="i-lucide-tags"
           :title="t('bar.screens.lists.empty-title')"
           :description="t('bar.screens.lists.empty')"
-        >
-          <template #actions>
-            <UButton
-              icon="i-lucide-plus"
-              :label="t('bar.screens.lists.new')"
-              @click="edit()"
-            />
-          </template>
-        </EmptyState>
+          :action="{ label: t('bar.screens.lists.new'), icon: 'i-lucide-plus', onClick: () => edit() }"
+        />
         <div
           v-else
           class="space-y-4"
@@ -230,7 +230,7 @@ async function setActive(l: List, active: boolean) {
           :validate="validate"
           class="space-y-4"
           novalidate
-          @submit="save"
+          @submit="submit(save)"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -258,7 +258,7 @@ async function setActive(l: List, active: boolean) {
         <UButton
           type="submit"
           form="bar-list"
-          loading-auto
+          :loading="submitting"
           :label="t('bar.screens.save')"
         />
       </template>

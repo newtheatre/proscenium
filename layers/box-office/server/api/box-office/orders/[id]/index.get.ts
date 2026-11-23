@@ -1,12 +1,13 @@
 // One order for staff (Box office specification, part 6, "Order"): its tickets with whether each was
-// admitted, its cancellations, and which of release, keep, cancel and refund the viewer may do.
+// admitted, its cancellations, and which of release, keep, cancel, refund and recording a late payment the viewer may do.
 import { getRouterParam } from 'h3'
 import { all, can, defineRoute, first, refuse, useSetting } from '#kit'
 import { accountLabel, addressFor, getPerformance, getProduction, getTerm } from '#modules/core'
-import { paymentsOf } from '#modules/payments'
+import { outsideAccounts, paymentsOf } from '#modules/payments'
 import { passOf } from '../../../../orders'
 import { mayReadPassCodes, passesOnOrder } from '../../../../pass-holding'
 import { withSections } from '../../../../line-names'
+import { latePaymentBlocked } from '../../../../late-payment'
 
 interface Order { id: string, reference: string, state: string, channel: string, account_id: string | null, sold_by: string | null, currency: string, total_minor: number, keep: number, release_at: number | null, reserved_at: number | null, confirmed_at: number | null, cancelled_at: number | null, created_at: number }
 interface Line { id: string, kind: string, performance_id: string | null, band_id: string | null, ticket_type_id: string | null, band: string | null, ticket_type: string | null, amount_minor: number, state: string, admitted_at: number | null, ticket_state: string | null, requirement_evidence_id: string | null, pass_entry: number }
@@ -84,6 +85,9 @@ export default defineRoute({
       exchange: (order.state === 'reserved' || order.state === 'confirmed') && await allowed('box-office.order.exchange'),
       assign: !order.account_id && ['reserved', 'awaiting_payment', 'confirmed'].includes(order.state) && await allowed('box-office.order.exchange'),
       comp: order.state === 'reserved' && !!performanceId && (await can(actor, 'box-office.comp.request', ['core.performance', performanceId])).allowed,
+      recordPayment: order.state === 'expired' && await allowed('box-office.order.take-payment') && (await can(actor, 'payments.attempt.reconcile')).allowed && !await latePaymentBlocked(id),
     },
+    // Where a payment taken outside the site may be recorded, for a booking that lapsed unpaid.
+    outsideAccounts: order.state === 'expired' ? await outsideAccounts() : [],
   }
 })

@@ -150,6 +150,7 @@ const showRetired = ref(false)
 // A search that opens from its icon. Rows that do not match are hidden rather than left out, so
 // dragging still counts every row.
 const search = ref('')
+const searching = ref(false)
 const words = computed(() => search.value.trim().toLowerCase())
 const matches = (type: TicketType) => !words.value || type.name.toLowerCase().includes(words.value)
 const matchingRetired = computed(() => retired.value.filter(matches))
@@ -249,11 +250,13 @@ function describe(type: TicketType): string {
       <SearchToggle
         v-if="(data?.ticketTypes.length ?? 0) > 1"
         v-model="search"
+        v-model:open="searching"
         :label="t('box-office.ticket-types.search')"
       />
       <UButton
         icon="i-lucide-plus"
         :label="t('box-office.ticket-types.new')"
+        :ui="{ label: searching ? 'max-sm:sr-only' : '' }"
         @click="startAdd"
       />
     </template>

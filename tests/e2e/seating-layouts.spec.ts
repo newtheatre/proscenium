@@ -91,7 +91,7 @@ test('a manager gives a space a seating layout, and its performance takes the wh
   await expect(page.getByRole('dialog', { name: 'Box office settings' }).getByRole('heading', { name: 'Seating layouts', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'New layout' }).click()
   const dialog = page.getByRole('dialog', { name: 'New layout' })
-  await dialog.getByRole('combobox', { name: 'Space' }).click()
+  await dialog.getByLabel(/^Space/).click()
   await page.getByRole('option', { name: new RegExp(venueName) }).click()
   await dialog.getByRole('textbox', { name: 'Name' }).fill('End-on')
   await expect(dialog.getByRole('spinbutton', { name: 'Wheelchair spaces' })).toHaveValue('2')

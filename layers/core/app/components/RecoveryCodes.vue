@@ -14,12 +14,13 @@ const props = defineProps<{
 const emit = defineEmits<{ kept: [code: string] }>()
 // Made by Vue, so two of these on one page (or one in a dialogue over another) never share an id.
 const headingId = useId()
+const { t } = useT()
 // Downloading or copying comes first; the tick then says the person has put them somewhere.
 const taken = ref(false)
 const state = reactive({ saved: false })
 const savedSchema = z.object({ saved: z.boolean() }).superRefine((v, ctx) => {
-  if (!taken.value) ctx.addIssue({ code: 'custom', path: ['saved'], message: 'Download or copy the codes first.' })
-  else if (!v.saved) ctx.addIssue({ code: 'custom', path: ['saved'], message: 'Tick this once you have saved them.' })
+  if (!taken.value) ctx.addIssue({ code: 'custom', path: ['saved'], message: t('core.recovery-codes.take-first') })
+  else if (!v.saved) ctx.addIssue({ code: 'custom', path: ['saved'], message: t('core.recovery-codes.tick') })
 })
 const toast = useToast()
 const { data: brand } = await useBrand()
@@ -33,10 +34,10 @@ function asText(): string {
   const site = brand.value?.name || window.location.host
   const made = dayLong(Date.now())
   return [
-    `${site}: recovery codes`,
-    `Saved ${made}. Each code works once, if you lose your passkey.`,
+    t('core.recovery-codes.file.heading', { site }),
+    t('core.recovery-codes.file.saved', { date: made }),
     '',
-    ...props.codes.map((code, i) => isUsed(i) ? `${code}  (used)` : code),
+    ...props.codes.map((code, i) => isUsed(i) ? `${code}  ${t('core.recovery-codes.used')}` : code),
     '',
   ].join('\n')
 }
@@ -44,7 +45,7 @@ function asText(): string {
 function download() {
   const site = (brand.value?.name || window.location.host).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   const url = URL.createObjectURL(new Blob([asText()], { type: 'text/plain;charset=utf-8' }))
-  const link = Object.assign(document.createElement('a'), { href: url, download: `${site || 'site'}-recovery-codes.txt` })
+  const link = Object.assign(document.createElement('a'), { href: url, download: `${site || 'site'}-${t('core.recovery-codes.file.name')}.txt` })
   link.click()
   URL.revokeObjectURL(url)
   taken.value = true
@@ -53,11 +54,11 @@ function download() {
 async function copy() {
   try {
     await navigator.clipboard.writeText(asText())
-    toast.add({ title: 'Recovery codes copied', color: 'success' })
+    toast.add({ title: t('core.recovery-codes.copied'), color: 'success' })
     taken.value = true
   }
   catch {
-    toast.add({ title: 'Your browser did not allow copying. Download the codes instead.', color: 'warning' })
+    toast.add({ title: t('core.recovery-codes.not-copied'), color: 'warning' })
   }
 }
 
@@ -76,19 +77,19 @@ function confirm() {
       :id="headingId"
       class="font-semibold text-highlighted"
     >
-      Your recovery codes
+      {{ t('core.recovery-codes.title') }}
     </h2>
     <p
       v-if="review"
       class="text-sm text-muted"
     >
-      Each one works once, if you lose your passkey. {{ left === 1 ? '1 code is' : `${left} codes are` }} left; used codes are struck through.
+      {{ t('core.recovery-codes.left', { count: left }) }}
     </p>
     <p
       v-else
       class="text-sm text-muted"
     >
-      Keep these somewhere safe, such as your password manager. Each one works once, if you lose your passkey. You can see them again from Signing in, after confirming it is you.
+      {{ t('core.recovery-codes.keep') }}
     </p>
     <ul class="grid grid-cols-2 gap-2 font-mono text-sm">
       <li
@@ -99,7 +100,7 @@ function confirm() {
         {{ code }}<span
           v-if="isUsed(i)"
           class="sr-only"
-        > (used)</span>
+        > {{ t('core.recovery-codes.used') }}</span>
       </li>
     </ul>
     <div class="flex flex-wrap gap-2">
@@ -107,21 +108,21 @@ function confirm() {
         color="neutral"
         variant="outline"
         icon="i-lucide-download"
-        label="Download as a text file"
+        :label="t('core.recovery-codes.download')"
         @click="download()"
       />
       <UButton
         color="neutral"
         variant="outline"
         icon="i-lucide-copy"
-        label="Copy"
+        :label="t('core.recovery-codes.copy')"
         @click="copy()"
       />
     </div>
     <UButton
       v-if="review"
       block
-      label="Done"
+      :label="t('core.recovery-codes.done')"
       @click="emit('kept', '')"
     />
     <UForm
@@ -135,15 +136,14 @@ function confirm() {
       <UFormField name="saved">
         <UCheckbox
           v-model="state.saved"
-          label="I have saved these codes somewhere safe"
+          :label="t('core.recovery-codes.saved')"
         />
       </UFormField>
       <UButton
         type="submit"
         block
-      >
-        Continue
-      </UButton>
+        :label="t('core.recovery-codes.continue')"
+      />
     </UForm>
   </section>
 </template>

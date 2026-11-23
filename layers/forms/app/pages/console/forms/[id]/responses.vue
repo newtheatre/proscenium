@@ -121,7 +121,7 @@ const columns = computed(() => [
   ...(data.value?.form.anonymous ? [] : [{ accessorKey: 'who', header: t('forms.screens.responses.from') }]),
   ...(data.value?.columns ?? []).filter(c => !hidden.value.includes(c.questionId)).map(c => ({ accessorKey: `q:${c.questionId}`, header: c.retired ? t('forms.screens.responses.removed', { name: c.label || c.key }) : c.label || c.key })),
   ...(data.value?.calculations ?? []).map(c => ({ accessorKey: `c:${c.id}`, header: c.label })),
-])
+].map(c => ({ ...c, meta: { class: { td: 'max-w-64 truncate', th: 'max-w-64 truncate' } } })))
 const rows = computed(() => (data.value?.rows ?? []).map(r => ({
   id: r.id,
   reference: r.reference,
@@ -180,13 +180,11 @@ async function runAgain(runId: string) {
 const runTone = { waiting: 'info', done: 'success', skipped: 'neutral', failed: 'danger' } as const
 
 // ---- releasing its reviews to the panel ----
-const releasing = ref(false)
 async function release() {
   if (!one.value?.review) return
   // Releasing ends the reviewing: nobody can hand in or change a review afterwards.
   const { submitted, assigned } = one.value.review
   if (submitted < assigned && !(await confirm({ verb: t('forms.screens.review.release-verb'), thing: t('forms.screens.review.release-thing'), consequence: t('forms.screens.review.release-early', { done: submitted, of: assigned }) }))) return
-  releasing.value = true
   try {
     await $api(`/api/forms/forms/${formId.value}/responses/${one.value.response.id}/release` as string, { method: 'POST' })
     toast.add({ title: t('forms.screens.review.released'), color: 'success' })
@@ -195,14 +193,12 @@ async function release() {
     const refusal = toRefusal(e)
     toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
   }
-  releasing.value = false
   await load()
 }
 
 // ---- moving it to another stage ----
 const moving = ref<Move | null>(null)
 const note = ref('')
-const sending = ref(false)
 const moveOpen = computed({ get: () => !!moving.value, set: (v: boolean) => { if (!v) moving.value = null } })
 const reason = ref('')
 const reasonError = ref<string | undefined>()
@@ -252,7 +248,6 @@ function chooseMany(move: Move) {
 async function moveMany() {
   const picked = moving.value!
   const ids = chosenRows.value.map(r => r.id)
-  sending.value = true
   try {
     const done = await $api<{ moved: number, skipped: { reference: string | null, reason: string }[] }>(`/api/forms/forms/${formId.value}/responses/move` as string, { method: 'POST', body: { responses: ids, move: picked.key, note: note.value.trim() || null, reason: reason.value.trim() || null } })
     const left = done.skipped.map(s => s.reference ? `${s.reference}: ${s.reason}` : s.reason).join(' ')
@@ -268,7 +263,6 @@ async function moveMany() {
     toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
   }
   moving.value = null
-  sending.value = false
   await refresh()
 }
 async function move() {
@@ -282,7 +276,6 @@ async function move() {
   // A decision that must carry a reason says so beside the box, and nothing is sent without one.
   reasonError.value = moving.value.needsReason && !reason.value.trim() ? t('forms.screens.responses.reason-needed') : undefined
   if (reasonError.value) return
-  sending.value = true
   try {
     await $api(`/api/forms/forms/${formId.value}/responses/${one.value.response.id}/move` as string, { method: 'POST', body: { move: moving.value.key, note: note.value.trim() || null, reason: reason.value.trim() || null } })
     toast.add({ title: t('forms.screens.responses.moved', { reference: one.value.response.reference, stage: moving.value.to }), color: 'success' })
@@ -293,7 +286,6 @@ async function move() {
     toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
     moving.value = null
   }
-  sending.value = false
   await Promise.all([load(), refresh()])
 }
 /** What the reviewing says against a decision about to be made: not enough reviews in, or a vote that went the other way. */
@@ -505,34 +497,27 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             @click="chosen = {}"
           />
         </div>
-        <RecordList
-          v-if="phone"
+        <TableOrList
+          :rows="rows"
+          :columns="columns"
           :label="t('forms.screens.responses.title')"
         >
-          <RecordListItem
-            v-for="row in rows"
-            :key="row.id"
-            :to="openTo(row.id)"
-            :name="row.who || row.reference"
-          >
-            <template #description>
-              <span class="block">{{ row.who ? `${row.reference} · ${row.sent}` : row.sent }}</span>
-              <StatusBadge
-                v-if="row.stage"
-                class="mt-1"
-                :tone="formsStageTone(row.stage.kind)"
-                :label="row.stage.name"
-              />
-            </template>
-          </RecordListItem>
-        </RecordList>
-        <UTable
-          v-else
-          :data="rows"
-          :columns="columns"
-          :caption="t('forms.screens.responses.title')"
-          :ui="{ td: 'max-w-64 truncate', th: 'max-w-64 truncate' }"
-        >
+          <template #item="{ row }">
+            <RecordListItem
+              :to="openTo(row.id)"
+              :name="row.who || row.reference"
+            >
+              <template #description>
+                <span class="block">{{ row.who ? `${row.reference} · ${row.sent}` : row.sent }}</span>
+                <StatusBadge
+                  v-if="row.stage"
+                  class="mt-1"
+                  :tone="formsStageTone(row.stage.kind)"
+                  :label="row.stage.name"
+                />
+              </template>
+            </RecordListItem>
+          </template>
           <template #select-header>
             <UCheckbox
               :model-value="allChosen"
@@ -563,7 +548,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
               :label="row.original.stage.name"
             />
           </template>
-        </UTable>
+        </TableOrList>
         <UPagination
           v-if="data.total > data.pageSize"
           v-model:page="page"
@@ -660,7 +645,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
               size="sm"
               color="neutral"
               variant="outline"
-              :loading="releasing"
+              loading-auto
               @click="release"
             />
           </section>
@@ -845,7 +830,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
         />
         <UButton
           :label="moving?.label"
-          :loading="sending"
+          loading-auto
           @click="move"
         />
       </template>

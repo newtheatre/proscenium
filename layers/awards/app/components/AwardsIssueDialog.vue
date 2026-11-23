@@ -99,8 +99,9 @@ async function issue() {
           :label="t('awards.screens.issue.type')"
           required
         >
-          <USelect
+          <USelectMenu
             v-model="form.typeId"
+            value-key="value"
             :items="types.map(x => ({ value: x.id, label: x.name }))"
           />
         </UFormField>

@@ -50,14 +50,14 @@ const { t } = useT()
           />
         </UFormField>
         <UFormField :label="t('membership.screens.list.shortest')">
-          <UInputNumber
+          <FieldNumber
             v-model="min"
             :min="1"
             :max="40"
           />
         </UFormField>
         <UFormField :label="t('membership.screens.list.longest')">
-          <UInputNumber
+          <FieldNumber
             v-model="max"
             :min="1"
             :max="40"

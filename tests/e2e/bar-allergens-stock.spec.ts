@@ -45,6 +45,10 @@ async function visit(page: Page, url: string) {
 }
 async function noViolations(page: Page) {
   await expect(page.getByRole('listbox')).toHaveCount(0)
+  // A heading just tapped is still fading to its pressed colours, and its contrast is judged on the fade.
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter(a => a.effect?.getComputedTiming().iterations !== Infinity)
+    .map(a => a.finished.catch(() => null))))
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }
@@ -77,9 +81,13 @@ test.describe('the public chart', () => {
     await visit(page, '/bar/allergens')
     await expect(page.getByRole('heading', { name: 'Allergens at the bar', level: 1 })).toBeVisible()
     await noViolations(page)
-    await expect(page.getByText(`Fruit cup jug ${stamp}`, { exact: true }).first()).toBeVisible()
-    await page.getByLabel('Sulphur dioxide and sulphites').check()
-    await expect(page.getByText('May contain Sulphur dioxide and sulphites').first()).toBeVisible()
+    const row = page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: `Fruit cup jug ${stamp}` }) })
+    // A matrix: Sulphur dioxide and sulphites is the twelfth of the 14 columns.
+    await expect(row.getByRole('cell').nth(11)).toHaveText('May contain')
+    const heading = row.locator('xpath=ancestor::table').getByRole('button', { name: 'Sulphur dioxide and sulphites' })
+    await heading.click()
+    await expect(heading).toHaveAttribute('aria-pressed', 'true')
+    await expect(row.getByRole('rowheader')).toContainText('May contain Sulphur dioxide and sulphites')
     await noViolations(page)
   })
 })

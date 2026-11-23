@@ -289,19 +289,24 @@ test('a drink with choices opens one window: size, the usual spirit already pick
   await expect(page.getByText('Paid £12.00', { exact: true })).toBeVisible()
 })
 
-test('the allergens sheet says where each product stands against what the customer avoids', async ({ page }) => {
+test('the allergens sheet is a matrix that says where each product stands against what the customer avoids', async ({ page }) => {
   await visit(page, '/live/till')
   await page.getByRole('button', { name: 'Allergens' }).click()
   const sheet = page.getByRole('dialog', { name: 'Allergens' })
-  const row = (name: string) => sheet.getByRole('listitem').filter({ hasText: name })
-  await expect(row(chocolate)).toContainText('Contains Milk. May contain Tree nuts.')
+  const row = (name: string) => sheet.getByRole('row').filter({ has: page.getByRole('rowheader', { name }) })
+  // The columns run in the law's order: Milk is the seventh, Tree nuts the eighth.
+  await expect(sheet.getByRole('row').first().getByRole('columnheader')).toHaveCount(15)
+  await expect(row(chocolate).getByRole('cell').nth(6)).toHaveText('Contains')
+  await expect(row(chocolate).getByRole('cell').nth(7)).toHaveText('May contain')
+  await expect(row(chocolate).getByRole('cell').nth(0)).toHaveText('')
   await expect(row(cola)).toContainText('Not checked: read the label')
   await sheet.getByRole('button', { name: 'Tree nuts' }).click()
-  await expect(row(chocolate)).toContainText('May contain Tree nuts.')
-  await expect(row(chocolate)).not.toContainText('Milk')
+  await expect(sheet.getByRole('button', { name: 'Tree nuts' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(row(chocolate).getByRole('rowheader')).toContainText('May contain Tree nuts.')
+  await expect(row(chocolate).getByRole('rowheader')).not.toContainText('Milk')
   await sheet.getByRole('button', { name: 'Tree nuts' }).click()
   await sheet.getByRole('button', { name: 'Fish' }).click()
-  await expect(row(chocolate)).toContainText('None of these recorded')
+  await expect(row(chocolate).getByRole('rowheader')).toContainText('None of these recorded')
   await noViolations(page)
 })
 

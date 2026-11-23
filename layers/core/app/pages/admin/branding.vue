@@ -64,7 +64,7 @@ const form = useTemplateRef('form')
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const saving = ref(false)
 const HEX = /^#[0-9a-f]{6}$/i
-const validate = () => HEX.test(draft.accent) ? [] : [{ name: 'accent', message: 'Enter a colour as # and six letters or digits, such as #1d4ed8.' }]
+const validate = () => HEX.test(draft.accent) ? [] : [{ name: 'accent', message: t('core.branding-page.accent-invalid') }]
 
 async function put(body: Partial<Look>) {
   await $api('/api/core/branding', { method: 'PUT', body })
@@ -80,7 +80,7 @@ async function save() {
   saving.value = true
   try {
     await put(body)
-    offer('Look and feel saved', () => put(back))
+    offer(t('core.branding-page.saved'), () => put(back))
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -97,8 +97,8 @@ onMounted(() => {
 })
 
 const logoHelp = {
-  logo: 'Shown in the site\'s header, on emails and on PDFs. Without one, the theatre\'s name is shown.',
-  logoDark: 'Optional: a version for dark backgrounds. Without one, the main logo is used there too.',
+  logo: t('core.branding-page.logo-help'),
+  logoDark: t('core.branding-page.logo-dark-help'),
 }
 </script>
 
@@ -115,7 +115,7 @@ const logoHelp = {
       @retry="refresh()"
     >
       <div class="mt-6 space-y-6">
-        <PageSection title="Logo">
+        <PageSection :title="t('core.branding-page.logo')">
           <p
             v-if="ability && !canChange"
             class="text-sm text-muted"
@@ -156,10 +156,10 @@ const logoHelp = {
         >
           <PageSection :title="t('core.settings-sections.brand')">
             <p
-              v-if="ability"
+              v-if="ability && !canChange"
               class="text-sm text-muted"
             >
-              {{ canChange ? t('core.settings-page.who', { ability: t(ability) }) : t('core.settings-page.read-only', { ability: t(ability) }) }}
+              {{ t('core.settings-page.read-only', { ability: t(ability) }) }}
             </p>
             <RefusalNotice :refusal="refusal" />
             <div class="divide-y divide-default">
@@ -198,24 +198,21 @@ const logoHelp = {
                 </UFormField>
               </div>
             </div>
-            <div class="space-y-2 border-t border-default pt-4">
-              <h3 class="text-sm font-medium text-highlighted">
-                Preview
-              </h3>
-              <p class="text-sm text-muted">
-                As people will see it once saved. Status colours, such as warnings, stay the same whatever the brand.
-              </p>
+            <FieldGroup
+              :title="t('core.branding-page.preview')"
+              :description="t('core.branding-page.preview-help')"
+            >
               <BrandPreview
                 :accent="draft.accent"
                 :neutral="draft.neutral"
                 :display-font="draft.displayFont"
                 :body-font="draft.bodyFont"
                 :radius="draft.radius"
-                :name="brand?.name || 'Your theatre'"
+                :name="brand?.name || t('core.branding-page.your-theatre')"
                 :logo="brand?.logo ?? null"
                 :logo-dark="brand?.logoDark ?? null"
               />
-            </div>
+            </FieldGroup>
             <template
               v-if="canChange"
               #footer
@@ -230,12 +227,12 @@ const logoHelp = {
                 v-if="!atDefaults"
                 color="neutral"
                 variant="outline"
-                label="Use the defaults"
+                :label="t('core.branding-page.use-the-defaults')"
                 @click="restoreDefaults()"
               />
               <UButton
                 type="submit"
-                label="Save look and feel"
+                :label="t('core.branding-page.save-look-and-feel')"
                 :loading="saving"
                 :disabled="!changes.length || saving"
               />

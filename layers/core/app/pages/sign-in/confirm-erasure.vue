@@ -4,7 +4,9 @@
 <script setup lang="ts">
 import type { Refusal } from '../../utils/identity'
 
-useSeoMeta({ title: 'Confirm erasure' })
+const { t } = useT()
+const { dayLong } = useDates()
+useSeoMeta({ title: () => t('core.confirm-erasure.title') })
 const refusal = ref<Refusal | null>(null)
 const answer = ref<{ notBefore: number, holds: string[] } | null>(null)
 const token = ref('')
@@ -24,7 +26,7 @@ async function finish() {
 </script>
 
 <template>
-  <IdentityCard title="Confirm erasure">
+  <IdentityCard :title="t('core.confirm-erasure.title')">
     <RefusalNotice :refusal="refusal" />
     <div
       v-if="answer"
@@ -32,16 +34,10 @@ async function finish() {
       aria-live="polite"
     >
       <p>
-        Your erasure is confirmed. It will run on or after <NuxtTime
-          :datetime="answer.notBefore"
-          locale="en-GB"
-          day="numeric"
-          month="long"
-          year="numeric"
-        />. Until then you can cancel it from your account.
+        {{ t('core.confirm-erasure.done', { date: dayLong(answer.notBefore) }) }}
       </p>
       <p v-if="answer.holds.length">
-        Something needs to be settled first. Your account shows what it is.
+        {{ t('core.confirm-erasure.held') }}
       </p>
     </div>
     <UButton
@@ -50,16 +46,15 @@ async function finish() {
       to="/account/data"
       color="neutral"
       variant="outline"
-    >
-      {{ answer ? 'Go to your account' : 'See the request in your account' }}
-    </UButton>
+      :label="answer ? t('core.confirm-erasure.go') : t('core.confirm-erasure.see')"
+    />
     <template v-if="!answer && !refusal">
       <p class="text-sm text-muted">
-        Press Confirm erasure to confirm that you want your account erased.
+        {{ t('core.confirm-erasure.press') }}
       </p>
       <UButton
         block
-        label="Confirm erasure"
+        :label="t('core.confirm-erasure.confirm')"
         loading-auto
         @click="finish()"
       />

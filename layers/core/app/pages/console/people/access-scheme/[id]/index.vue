@@ -38,7 +38,6 @@ const base = computed(() => `/api/core/access-scheme/${encodeURIComponent(id.val
 const { data, status, error, refresh } = await useAPI<Opened>(base, { key: `core:access-application:${id.value}` })
 
 const refusal = ref<RefusalView | null>(null)
-const busy = ref(false)
 const app = computed(() => data.value?.application ?? null)
 const { dayLong: day } = useDates()
 
@@ -62,7 +61,6 @@ const behalf = computed(() => {
 
 /** Sends one action to the application's routes, then reloads it. The path is built at run time. */
 async function act(path: string, method: 'POST' | 'PUT', body: object, done: string): Promise<boolean> {
-  busy.value = true
   refusal.value = null
   try {
     await $api<unknown>(`${base.value}${path}` as string, { method, body })
@@ -73,9 +71,6 @@ async function act(path: string, method: 'POST' | 'PUT', body: object, done: str
   catch (e) {
     refusal.value = toRefusal(e)
     return false
-  }
-  finally {
-    busy.value = false
   }
 }
 
@@ -105,6 +100,12 @@ async function decide() {
 // Verifying.
 const method = ref<'access-card' | 'document' | 'known'>('access-card')
 const methods = computed(() => (['access-card', 'document', 'known'] as const).map(m => ({ value: m, label: t(`core.access.review.method.${m}`) })))
+const timeline = computed(() => (data.value?.history ?? []).map((entry, i) => ({
+  value: i,
+  title: t(`core.access.review.event.${entry.event}`),
+  description: entry.by ?? t('core.access.review.someone'),
+  date: day(entry.at),
+})))
 </script>
 
 <template>
@@ -231,7 +232,7 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
               </UFormField>
               <UButton
                 type="submit"
-                :loading="busy"
+                loading-auto
                 :disabled="!decision.action"
                 :label="decision.action ? t(`core.access.review.do.${decision.action}`) : t('core.access.review.do.choose')"
               />
@@ -255,7 +256,7 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
                 />
               </UFormField>
               <UButton
-                :loading="busy"
+                loading-auto
                 icon="i-lucide-badge-check"
                 :label="t('core.access.review.mark-verified')"
                 @click="act('/verified', 'PUT', { method }, t('core.access.review.marked'))"
@@ -265,7 +266,7 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
               v-else
               color="neutral"
               variant="outline"
-              :loading="busy"
+              loading-auto
               :label="t('core.access.review.remove-mark')"
               @click="act('/verified', 'PUT', { method: null }, t('core.access.review.unmarked'))"
             />
@@ -291,14 +292,11 @@ const methods = computed(() => (['access-card', 'document', 'known'] as const).m
           v-if="data?.history?.length"
           :title="t('core.access.review.history')"
         >
-          <ul class="space-y-1 text-sm">
-            <li
-              v-for="(entry, i) in data?.history ?? []"
-              :key="i"
-            >
-              {{ t('core.access.review.history-line', { date: day(entry.at), what: t(`core.access.review.event.${entry.event}`), by: entry.by ?? t('core.access.review.someone') }) }}
-            </li>
-          </ul>
+          <UTimeline
+            :items="timeline"
+            color="neutral"
+            size="xs"
+          />
         </PageSection>
       </div>
     </DataBoundary>

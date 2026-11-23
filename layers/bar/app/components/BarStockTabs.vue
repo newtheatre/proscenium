@@ -20,14 +20,17 @@ const current = computed({
 </script>
 
 <template>
-  <UTabs
+  <TabStrip
     v-if="items.length > 1"
-    v-model="current"
-    :items="items"
-    :content="false"
-    variant="link"
-    :aria-label="t('bar.screens.stock-tabs.label')"
-    :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
     class="mb-4"
-  />
+  >
+    <UTabs
+      v-model="current"
+      :items="items"
+      :content="false"
+      variant="link"
+      :aria-label="t('bar.screens.stock-tabs.label')"
+      :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
+    />
+  </TabStrip>
 </template>

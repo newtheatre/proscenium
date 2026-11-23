@@ -16,25 +16,27 @@ useSeoMeta({ title: () => data.value?.title, robots: 'noindex' })
 </script>
 
 <template>
-  <UContainer>
-    <UPage>
-      <UPageHeader
-        :title="data?.title"
-        :description="t('core.policies.versions.from', { date: day(data?.createdAt ?? 0) })"
-        :links="[{ label: t('core.policies.versions.current'), to: `/policies/${id}`, variant: 'outline', color: 'neutral' }]"
+  <PageFrame
+    :title="data?.title ?? ''"
+    :description="t('core.policies.versions.from', { date: day(data?.createdAt ?? 0) })"
+  >
+    <template #primary>
+      <UButton
+        :label="t('core.policies.versions.current')"
+        :to="`/policies/${id}`"
+        color="neutral"
+        variant="outline"
       />
-      <UPageBody>
-        <UAlert
-          color="neutral"
-          variant="subtle"
-          icon="i-lucide-history"
-          :title="t('core.policies.versions.old')"
-        />
-        <MDC
-          :value="body"
-          :cache-key="`policy-${id}-${number}`"
-        />
-      </UPageBody>
-    </UPage>
-  </UContainer>
+    </template>
+    <UAlert
+      color="neutral"
+      variant="subtle"
+      icon="i-lucide-history"
+      :title="t('core.policies.versions.old')"
+    />
+    <MDC
+      :value="body"
+      :cache-key="`policy-${id}-${number}`"
+    />
+  </PageFrame>
 </template>

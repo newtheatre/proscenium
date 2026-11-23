@@ -33,7 +33,7 @@
   "core.me.contacts.save": "Save contacts",
   "core.me.contacts.saved": "Your emergency contacts are saved.",
   "core.me.contacts.reads": "When staff read them",
-  "core.me.contacts.read": "{when}, as {capacity}: {reason}",
+  "core.me.contacts.read-as": "As {capacity}",
   "core.me.contacts.reason-unknown": "No reason recorded",
 
   "core.me.email.title": "Email addresses",

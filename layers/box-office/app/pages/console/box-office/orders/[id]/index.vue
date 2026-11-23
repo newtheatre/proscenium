@@ -2,7 +2,7 @@
      and whether each has been used; what was paid, how and by whom, and every refund with where it
      stands; its cancellations; and what may be done with it now. The server says which of collect,
      release, cancel, refund, exchange and assign the viewer may do; a reservation can also be kept past
-     its release time. A booking nobody owns can be given to a person. A reservation is cancelled one way, and a paid booking's tickets another. -->
+     its release time. A booking nobody owns can be given to a person, and one that lapsed unpaid can have money taken outside the site recorded. A reservation is cancelled one way, and a paid booking's tickets another. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 
@@ -39,7 +39,8 @@ interface Order {
   payments: Payment[]
   refunds: Refund[]
   cancellations: Cancellation[]
-  can: { release: boolean, print?: boolean, collect: boolean, cancel: boolean, refund: boolean, exchange: boolean, comp: boolean, assign: boolean }
+  can: { release: boolean, print?: boolean, collect: boolean, cancel: boolean, refund: boolean, exchange: boolean, comp: boolean, assign: boolean, recordPayment?: boolean }
+  outsideAccounts?: { id: string, label: string }[]
 }
 
 const { t } = useT()
@@ -59,6 +60,7 @@ const cancelling = ref(false)
 const exchanging = ref(false)
 const comping = ref(false)
 const assigning = ref(false)
+const recording = ref(false)
 // What can be exchanged: live tickets not yet used at the door.
 const exchangeable = computed(() => (data.value?.lines ?? []).filter(l => l.kind === 'ticket' && l.state === 'live' && !l.admittedAt))
 // What can be cancelled: live tickets. Those used at the door start unticked in the dialogue and stay admitted.
@@ -99,6 +101,7 @@ const actions = computed<DropdownMenuItem[][]>(() => {
   if (!o) return []
   const groups: DropdownMenuItem[][] = []
   if (o.can.print) groups.push([{ label: t('box-office.screens.panel.sold.print'), icon: 'i-lucide-printer', to: `/console/box-office/orders/${encodeURIComponent(o.id)}/print`, target: '_blank' }])
+  if (o.can.recordPayment && o.outsideAccounts?.length) groups.push([{ label: t('box-office.order.late-payment.action'), icon: 'i-lucide-hand-coins', onSelect: () => { recording.value = true } }])
   if (o.can.assign) groups.push([{ label: t('box-office.order.assign.action'), icon: 'i-lucide-user-plus', onSelect: () => { assigning.value = true } }])
   if (o.can.release) groups.push([{ label: t(o.keep ? 'box-office.order.keep.off' : 'box-office.order.keep.on'), icon: 'i-lucide-bookmark', onSelect: () => { void keep(!o.keep) } }])
   if (o.can.comp && !o.compPending) groups.push([{ label: t('box-office.order.comp.action'), icon: 'i-lucide-gift', onSelect: () => { comping.value = true } }])
@@ -209,7 +212,10 @@ const refundDetail = (o: Order, r: Refund) => {
           <div class="space-y-6">
             <RefusalNotice :refusal="refusal" />
             <PageSection :title="t('box-office.order.tickets')">
-              <RecordList :label="t('box-office.order.tickets')">
+              <RecordList
+                :label="t('box-office.order.tickets')"
+                flush
+              >
                 <RecordListItem
                   v-for="{ line, count } in tickets"
                   :key="line.id"
@@ -232,7 +238,10 @@ const refundDetail = (o: Order, r: Refund) => {
               v-if="d.passes.length"
               :title="t('box-office.order.passes.title')"
             >
-              <RecordList :label="t('box-office.order.passes.title')">
+              <RecordList
+                :label="t('box-office.order.passes.title')"
+                flush
+              >
                 <RecordListItem
                   v-for="p in d.passes"
                   :key="p.id"
@@ -260,6 +269,7 @@ const refundDetail = (o: Order, r: Refund) => {
               <RecordList
                 v-else
                 :label="t('box-office.order.payments')"
+                flush
               >
                 <RecordListItem
                   v-for="p in d.payments"
@@ -286,7 +296,10 @@ const refundDetail = (o: Order, r: Refund) => {
               v-if="d.cancellations.length"
               :title="t('box-office.order.cancellations')"
             >
-              <RecordList>
+              <RecordList
+                :label="t('box-office.order.cancellations')"
+                flush
+              >
                 <RecordListItem
                   v-for="c in d.cancellations"
                   :key="c.id"
@@ -316,6 +329,14 @@ const refundDetail = (o: Order, r: Refund) => {
         :reference="d.reference"
         :paid="d.state === 'confirmed'"
         @assigned="refresh()"
+      />
+      <BoxOfficeLatePaymentDialog
+        v-model:open="recording"
+        :order-id="d.id"
+        :reference="d.reference"
+        :amount="money(d.totalMinor, d.currency)"
+        :accounts="d.outsideAccounts ?? []"
+        @recorded="refresh()"
       />
       <BoxOfficeCompDialog
         v-model:open="comping"

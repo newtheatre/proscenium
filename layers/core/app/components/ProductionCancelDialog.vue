@@ -11,6 +11,7 @@ const emit = defineEmits<{ cancelled: [] }>()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const toast = useToast()
+const { t } = useT()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const reach = ref<Reach | null>(null)
 const form = ref({ reasonTermId: '', note: '' })
@@ -35,7 +36,7 @@ async function cancel() {
     const answer = await $api<{ performances: number }>(`/api/core/productions/${props.productionId}/cancel` as string, { method: 'POST', body: form.value })
     open.value = false
     emit('cancelled')
-    toast.add({ title: 'Production cancelled', description: answer.performances ? `${answer.performances} performances were cancelled with it.` : undefined, color: 'success' })
+    toast.add({ title: t('core.production.cancelling.done'), description: answer.performances ? t('core.production.cancelling.with', { count: answer.performances }) : undefined, color: 'success' })
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -46,8 +47,8 @@ async function cancel() {
 <template>
   <UModal
     v-model:open="open"
-    title="Cancel production"
-    :description="`Cancel ${title}? It shows as cancelled at its address.`"
+    :title="t('core.production.cancel')"
+    :description="t('core.production.cancelling.description', { title })"
   >
     <template #body>
       <UForm
@@ -70,7 +71,7 @@ async function cancel() {
             #description
           >
             <ULink :to="reach.refusal.link">
-              See what is holding it
+              {{ t('core.production.cancelling.holding') }}
             </ULink>
           </template>
         </UAlert>
@@ -87,18 +88,19 @@ async function cancel() {
         </ul>
         <UFormField
           name="reasonTermId"
-          label="Reason"
+          :label="t('core.production.cancelling.reason')"
           required
         >
-          <USelect
+          <USelectMenu
             v-model="form.reasonTermId"
+            value-key="value"
             :items="items"
-            placeholder="Choose a reason"
+            :placeholder="t('core.production.cancelling.reason-choose')"
           />
         </UFormField>
         <UFormField
-          label="Note"
-          help="Kept with each cancelled performance, for the team."
+          :label="t('core.production.cancelling.note')"
+          :help="t('core.production.cancelling.note-help')"
         >
           <UTextarea
             v-model="form.note"
@@ -112,7 +114,7 @@ async function cancel() {
       <UButton
         type="submit"
         form="cancel-production"
-        label="Cancel production"
+        :label="t('core.production.cancel')"
         color="error"
         :disabled="!!reach?.refusal"
       />

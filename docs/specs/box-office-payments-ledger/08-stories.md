@@ -118,6 +118,7 @@ This is how the first theatre sells, so all seven are Gate stories. The rules ar
 | PAY-05 | As the system I am not fooled by a repeated or forged webhook | A repeated event changes nothing. An event with a bad signature is stored and never acted on. Events out of order produce the same final state | First. Gate |
 | PAY-06 | As a treasurer I see what each provider charged | Where the provider reports fees, each is posted against the payment; otherwise fees are entered by hand per payout | First: by hand. Later: reported |
 | PAY-07 | As a seller I take one card payment for tickets and items from another module, so the one reader serves the whole sale | The reader takes one total; every part settles in the same batch or none does; the ledger credits each owner's account; a refund cannot exceed its own part. Tested with a stand-in second owner | First |
+| PAY-08 | As a treasurer I record money taken outside the site for a booking that lapsed unpaid, so the records match what was sold | Once the performance is past selling, the order offers it; it needs a note of how and when; the booking stays lapsed; the money is an Other payment and ticket income for the performance; a booking already paid refuses, and a performance still on sale points to the till | First |
 
 ## Finance
 

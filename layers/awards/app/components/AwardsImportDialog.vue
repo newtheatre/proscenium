@@ -55,8 +55,9 @@ async function run() {
       <div class="space-y-4">
         <RefusalNotice :refusal="refusal" />
         <UFormField :label="t('awards.screens.issue.type')">
-          <USelect
+          <USelectMenu
             v-model="chosen"
+            value-key="value"
             :items="types.map(x => ({ value: x.id, label: x.name }))"
           />
         </UFormField>

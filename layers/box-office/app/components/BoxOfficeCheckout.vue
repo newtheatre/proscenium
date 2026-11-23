@@ -156,10 +156,8 @@ function changeTickets() {
   if (props.drawer) return emit('change')
   return navigateTo({ path: remembered.value.back.split('?')[0], query: { change: '1' } })
 }
-const releasing = ref(false)
 async function release() {
   if (!basket.value || !remembered.value) return
-  releasing.value = true
   try {
     await $api(`/api/box-office/baskets/${encodeURIComponent(basket.value.orderId)}/release`, { method: 'POST', body: {}, headers: { 'x-basket-token': remembered.value.token } })
     const back = remembered.value.back
@@ -170,9 +168,6 @@ async function release() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    releasing.value = false
   }
 }
 const canPay = computed(() => free.value || page.value?.timing !== 'reserve')
@@ -386,7 +381,7 @@ watch(title, value => emit('title', value), { immediate: true })
             v-if="basket.state === 'basket'"
             color="neutral"
             variant="ghost"
-            :loading="releasing"
+            loading-auto
             :label="t('box-office.basket.release')"
             @click="release"
           />

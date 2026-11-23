@@ -28,6 +28,8 @@ const outlet = param('outlet')
 const state = param('state')
 const refunded = param('refunded')
 const opening = param('opening')
+const filtersOn = computed(() => [outlet, state, refunded, opening].filter(f => f.value !== ALL).length)
+const clearFilters = () => void router.replace({ query: { ...route.query, outlet: undefined, state: undefined, refunded: undefined, opening: undefined } })
 const search = ref((route.query.q as string | undefined) ?? '')
 watchDebounced(search, v => void router.replace({ query: { ...route.query, q: v.trim() || undefined } }), { debounce: 300 })
 const query = computed(() => ({
@@ -121,11 +123,11 @@ const columns = computed(() => [
     />
     <div
       v-if="!closerOnly"
-      :class="['mb-6 grid grid-cols-2 gap-4', openings.length ? 'sm:grid-cols-5' : 'sm:grid-cols-4']"
+      class="mb-6 flex items-end gap-2"
     >
       <UFormField
         :label="t('bar.screens.sales.find')"
-        class="max-sm:col-span-2"
+        class="min-w-0 flex-1 sm:max-w-xs"
       >
         <UInput
           v-model="search"
@@ -133,36 +135,40 @@ const columns = computed(() => [
           :placeholder="t('bar.screens.sales.find-placeholder')"
         />
       </UFormField>
-      <UFormField :label="t('bar.screens.sales.outlet')">
-        <USelect
-          v-model="outlet"
-          :items="outletItems"
-        />
-      </UFormField>
-      <UFormField
-        v-if="openings.length"
-        :label="t('bar.screens.sales.opening')"
+      <FilterPanel
+        :count="filtersOn"
+        @clear="clearFilters"
       >
-        <USelect
-          v-model="opening"
-          :items="openingItems"
-        />
-      </UFormField>
-      <UFormField :label="t('bar.screens.sales.state-heading')">
-        <USelect
-          v-model="state"
-          :items="stateItems"
-        />
-      </UFormField>
-      <UFormField
-        :label="t('bar.screens.sales.refunds')"
-        :class="openings.length ? '' : 'max-sm:col-span-2'"
-      >
-        <USelect
-          v-model="refunded"
-          :items="refundedItems"
-        />
-      </UFormField>
+        <UFormField :label="t('bar.screens.sales.outlet')">
+          <USelectMenu
+            v-model="outlet"
+            :items="outletItems"
+            value-key="value"
+          />
+        </UFormField>
+        <UFormField
+          v-if="openings.length"
+          :label="t('bar.screens.sales.opening')"
+        >
+          <USelectMenu
+            v-model="opening"
+            :items="openingItems"
+            value-key="value"
+          />
+        </UFormField>
+        <UFormField :label="t('bar.screens.sales.state-heading')">
+          <USelect
+            v-model="state"
+            :items="stateItems"
+          />
+        </UFormField>
+        <UFormField :label="t('bar.screens.sales.refunds')">
+          <USelect
+            v-model="refunded"
+            :items="refundedItems"
+          />
+        </UFormField>
+      </FilterPanel>
     </div>
     <p
       v-if="chosen"

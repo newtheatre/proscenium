@@ -77,16 +77,24 @@ const columns = computed(() => [
             :description="t('front-of-house.hours.empty.description')"
             icon="i-lucide-clock"
           />
-          <UTable
+          <TableOrList
             v-else
-            :data="d.rows"
+            :rows="d.rows"
             :columns="columns"
-            :caption="t('front-of-house.navigation.hours.label')"
+            :label="t('front-of-house.navigation.hours.label')"
           >
             <template #hours-cell="{ row }">
               {{ hours(row.original.minutes) }}
             </template>
-          </UTable>
+            <template #item="{ row }">
+              <RecordListItem
+                :name="row.name"
+                :description="[t('front-of-house.hours.shifts-worked', { count: row.shiftsWorked }), row.noShows ? t('front-of-house.hours.no-shows-count', { count: row.noShows }) : null].filter(Boolean).join(' · ')"
+              >
+                {{ hours(row.minutes) }}
+              </RecordListItem>
+            </template>
+          </TableOrList>
         </div>
       </template>
     </DataBoundary>

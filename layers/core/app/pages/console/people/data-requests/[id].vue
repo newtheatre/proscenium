@@ -168,22 +168,17 @@ const OUTCOMES: Outcome[] = ['nothing-found', 'handled']
                 >
                   {{ t('core.data-request.checklist.waiting') }}
                 </p>
-                <ul class="divide-y divide-default">
-                  <li
+                <RecordList
+                  :label="t('core.data-request.checklist.title')"
+                >
+                  <RecordListItem
                     v-for="line in d.checklist"
                     :key="line.table"
-                    class="flex flex-wrap items-center justify-between gap-3 py-3"
+                    :description="[t(`${line.module}.module.name`), line.tickedAt ? t('core.data-request.checklist.ticked', { when: dateTime(line.tickedAt) }) : null].filter(Boolean).join(' · ')"
                   >
-                    <div class="min-w-0">
-                      <p class="font-mono text-sm break-all">
-                        {{ line.table }}
-                      </p>
-                      <p class="text-xs text-muted">
-                        {{ t(`${line.module}.module.name`) }}<template v-if="line.tickedAt">
-                          · {{ t('core.data-request.checklist.ticked', { when: dateTime(line.tickedAt) }) }}
-                        </template>
-                      </p>
-                    </div>
+                    <template #name>
+                      <span class="font-mono break-all">{{ line.table }}</span>
+                    </template>
                     <URadioGroup
                       :model-value="line.outcome ?? undefined"
                       orientation="horizontal"
@@ -192,8 +187,8 @@ const OUTCOMES: Outcome[] = ['nothing-found', 'handled']
                       :items="OUTCOMES.map(o => ({ value: o, label: t(`core.data-request.checklist.${o}`) }))"
                       @update:model-value="(o: unknown) => tick(line, o as Outcome)"
                     />
-                  </li>
-                </ul>
+                  </RecordListItem>
+                </RecordList>
               </template>
             </PageSection>
           </div>

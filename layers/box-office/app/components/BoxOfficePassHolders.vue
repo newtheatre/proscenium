@@ -28,7 +28,6 @@ const give = ref<{ passPriceId: string | undefined, accountId: string | undefine
 const payingItems = computed(() => (['collect', 'settled', 'gift'] as const).map(value => ({ value, label: t(`box-office.passes.holders.give-paying.${value}`) })))
 const moving = ref(false)
 const moveTo = ref<string | undefined>()
-const busy = ref(false)
 let keys = 0
 const key = () => ({ 'idempotency-key': `pass-holders:${Date.now()}:${++keys}` })
 
@@ -61,7 +60,6 @@ async function show(id: string) {
 async function act(body: Record<string, unknown>, done: string) {
   if (!picked.value) return
   refusal.value = null
-  busy.value = true
   try {
     await $api(`/api/box-office/passes/${picked.value.pass.id}`, { method: 'POST', body, headers: key() })
     toast.add({ title: done, color: 'success' })
@@ -70,9 +68,6 @@ async function act(body: Record<string, unknown>, done: string) {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    busy.value = false
   }
 }
 async function cancel() {
@@ -103,7 +98,6 @@ function startGiving() {
 async function submitGive() {
   if (!props.pass || !give.value.passPriceId) return
   refusal.value = null
-  busy.value = true
   try {
     const made = await $api<{ id: string, code: string }>(`/api/box-office/pass-types/${props.pass.id}/passes`, { method: 'POST', body: { passPriceId: give.value.passPriceId, accountId: give.value.accountId ?? null, settled: give.value.paying === 'settled', gift: give.value.paying === 'gift' }, headers: key() })
     toast.add({ title: t('box-office.passes.holders.given', { code: made.code }), color: 'success' })
@@ -114,9 +108,6 @@ async function submitGive() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    busy.value = false
   }
 }
 const describe = (h: Holder) => [
@@ -215,7 +206,7 @@ const describe = (h: Holder) => [
               <UButton
                 :label="t('box-office.passes.holders.move')"
                 :disabled="!moveTo"
-                :loading="busy"
+                loading-auto
                 @click="move"
               />
             </div>
@@ -238,7 +229,7 @@ const describe = (h: Holder) => [
               variant="outline"
               icon="i-lucide-send"
               :label="t('box-office.passes.holders.send')"
-              :loading="busy"
+              loading-auto
               @click="act({ action: 'send' }, t('box-office.passes.holders.sent'))"
             />
             <UButton
@@ -263,7 +254,7 @@ const describe = (h: Holder) => [
             variant="outline"
             icon="i-lucide-undo-2"
             :label="t('box-office.passes.holders.restore')"
-            :loading="busy"
+            loading-auto
             @click="act({ action: 'restore' }, t('box-office.passes.holders.restored'))"
           />
         </template>
@@ -301,7 +292,7 @@ const describe = (h: Holder) => [
           <div class="flex gap-2">
             <UButton
               :label="t('box-office.passes.holders.give')"
-              :loading="busy"
+              loading-auto
               :disabled="!give.passPriceId"
               @click="submitGive"
             />

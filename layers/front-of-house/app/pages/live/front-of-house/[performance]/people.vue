@@ -24,11 +24,9 @@ const id = computed(() => String(route.params.performance))
 const { data, status, error, refresh } = await useAPI<Board>(() => `/api/front-of-house/performances/${encodeURIComponent(id.value)}/tonight`, { key: `front-of-house:board:${id.value}` })
 useIntervalFn(() => { void refresh() }, REFRESH)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const busy = ref<string | null>(null)
 
 async function arrived(p: Person) {
   refusal.value = null
-  busy.value = p.assignmentId
   try {
     await write(`/api/front-of-house/assignments/${encodeURIComponent(p.assignmentId)}/check-in`, { method: 'POST', body: {} })
     toast.add({ title: t('front-of-house.live.marked-arrived', { name: p.name }), color: 'success' })
@@ -37,14 +35,10 @@ async function arrived(p: Person) {
   catch (e) {
     refusal.value = toRefusal(e)
   }
-  finally {
-    busy.value = null
-  }
 }
 async function notComing(p: Person) {
   if (!(await confirm({ verb: t('front-of-house.live.not-coming-verb'), thing: t('front-of-house.live.not-coming-thing', { name: p.name }), consequence: t('front-of-house.live.not-coming-consequence'), button: t('front-of-house.live.not-coming') }))) return
   refusal.value = null
-  busy.value = `${p.assignmentId}:not`
   try {
     await write(`/api/front-of-house/assignments/${encodeURIComponent(p.assignmentId)}/not-coming`, { method: 'POST', body: {} })
     toast.add({ title: t('front-of-house.live.marked-not-coming', { name: p.name }), color: 'success' })
@@ -52,9 +46,6 @@ async function notComing(p: Person) {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    busy.value = null
   }
 }
 const waiting = (p: Person) => p.state === 'confirmed' || p.state === 'release_requested'
@@ -128,7 +119,7 @@ const context = computed(() => data.value ? [data.value.performance.title, time(
                   v-else-if="p.assignmentId === d.mine"
                   size="xl"
                   icon="i-lucide-check"
-                  :loading="busy === p.assignmentId"
+                  loading-auto
                   :label="t('front-of-house.live.im-here')"
                   @click="arrived(p)"
                 />
@@ -140,7 +131,7 @@ const context = computed(() => data.value ? [data.value.performance.title, time(
                     <UButton
                       size="xl"
                       icon="i-lucide-check"
-                      :loading="busy === p.assignmentId"
+                      loading-auto
                       :label="t('front-of-house.live.mark-arrived-button')"
                       :aria-label="t('front-of-house.live.mark-arrived', { name: p.name })"
                       @click="arrived(p)"
@@ -150,7 +141,7 @@ const context = computed(() => data.value ? [data.value.performance.title, time(
                       color="neutral"
                       variant="outline"
                       icon="i-lucide-user-x"
-                      :loading="busy === `${p.assignmentId}:not`"
+                      loading-auto
                       :label="t('front-of-house.live.not-coming')"
                       :aria-label="t('front-of-house.live.not-coming-for', { name: p.name })"
                       @click="notComing(p)"

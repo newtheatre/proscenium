@@ -8,12 +8,13 @@ const props = defineProps<{ productionId: string }>()
 
 const { data } = await useProductionMedia(props.productionId)
 const route = useRoute()
+const { t } = useT()
 const waiting = computed(() => (data.value?.waiting ?? []).filter(f => f.slot === POSTER))
 // What the card says about a poster not yet in use: being checked, refused, or waiting for its description.
 const status = computed(() => {
-  if (waiting.value.some(f => f.state === 'pending')) return { icon: 'i-lucide-loader-circle', spin: true, text: 'Checking the new poster…' }
-  if (waiting.value.some(f => f.state === 'ready')) return { icon: 'i-lucide-pencil', spin: false, text: 'A new poster is waiting for its description.' }
-  if (waiting.value.some(f => f.state === 'rejected')) return { icon: 'i-lucide-circle-x', spin: false, text: 'The new poster was refused.' }
+  if (waiting.value.some(f => f.state === 'pending')) return { icon: 'i-lucide-loader-circle', spin: true, text: t('core.poster.checking') }
+  if (waiting.value.some(f => f.state === 'ready')) return { icon: 'i-lucide-pencil', spin: false, text: t('core.poster.waiting') }
+  if (waiting.value.some(f => f.state === 'rejected')) return { icon: 'i-lucide-circle-x', spin: false, text: t('core.poster.refused') }
   return null
 })
 const media = computed(() => ({ query: { ...route.query, tab: 'media' } }))
@@ -21,17 +22,10 @@ const onMedia = computed(() => route.query.tab === 'media')
 </script>
 
 <template>
-  <section
+  <SidePanel
     v-if="data"
-    aria-labelledby="side-poster-heading"
-    class="space-y-3 rounded-lg border border-default p-4"
+    :title="t('core.poster.title')"
   >
-    <h2
-      id="side-poster-heading"
-      class="text-sm font-semibold text-highlighted"
-    >
-      Poster
-    </h2>
     <img
       v-if="data.poster"
       :src="data.poster.url!"
@@ -42,7 +36,7 @@ const onMedia = computed(() => route.query.tab === 'media')
       v-else-if="!status"
       class="text-sm text-muted"
     >
-      No poster yet.
+      {{ t('core.poster.none') }}
     </p>
     <p
       v-if="status"
@@ -58,7 +52,7 @@ const onMedia = computed(() => route.query.tab === 'media')
     </p>
     <UButton
       v-if="!onMedia"
-      :label="status ? 'Open the Media tab' : data.poster ? 'Change on the Media tab' : 'Add on the Media tab'"
+      :label="status ? t('core.poster.open') : data.poster ? t('core.poster.change') : t('core.poster.add')"
       :to="media"
       replace
       color="neutral"
@@ -66,5 +60,5 @@ const onMedia = computed(() => route.query.tab === 'media')
       size="sm"
       trailing-icon="i-lucide-arrow-right"
     />
-  </section>
+  </SidePanel>
 </template>

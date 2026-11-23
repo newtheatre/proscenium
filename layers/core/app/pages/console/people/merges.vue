@@ -38,7 +38,6 @@ const { dateTime: when } = useDates()
 const nameOf = (a: { name: string | null }) => a.name ?? t('core.merges.unnamed')
 const TONE: Record<State, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = { moving: 'info', complete: 'success', undoing: 'info', undone: 'neutral', closed: 'neutral' }
 const refusal = ref<RefusalView | null>(null)
-const undoing = ref<string | null>(null)
 
 async function undo(merge: Merge) {
   if (!await confirm({
@@ -47,7 +46,6 @@ async function undo(merge: Merge) {
     consequence: t('core.merges.undo-consequence'),
     button: t('core.merges.undo-button'),
   })) return
-  undoing.value = merge.id
   refusal.value = null
   try {
     await $api(`/api/core/accounts/merges/${merge.id}/undo` as '/api/core/accounts/merges/:id/undo', { method: 'POST', body: {} })
@@ -56,9 +54,6 @@ async function undo(merge: Merge) {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    undoing.value = null
   }
 }
 </script>
@@ -130,7 +125,7 @@ async function undo(merge: Merge) {
                 color="neutral"
                 variant="outline"
                 icon="i-lucide-undo-2"
-                :loading="undoing === m.id"
+                loading-auto
                 :label="t('core.merges.undo')"
                 @click="undo(m)"
               />

@@ -10,11 +10,12 @@ interface Sender {
   automatic: { proposed: string | null, unavailable: 'no-token' | 'workers-dev' | 'local' | null }
 }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
 const { data: publicSettings } = usePublicSettings()
 // The footer's preview draws the email's own frame: the theatre's name over a rule in the brand colour.
-const theatreName = computed(() => (publicSettings.value?.['core.site.name']?.value as string | null | undefined) || 'Your theatre')
+const theatreName = computed(() => (publicSettings.value?.['core.site.name']?.value as string | null | undefined) || t('core.email.your-theatre'))
 const accent = computed(() => (publicSettings.value?.['core.brand.accent']?.value as string | undefined) ?? '#2563eb')
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
@@ -24,9 +25,9 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const toast = useToast()
 
 const UNAVAILABLE = {
-  'workers-dev': 'This site is on workers.dev, which cannot send email from its own address. Add a custom domain to the Worker and open the site there to set email up automatically.',
-  'local': 'This site has no public domain yet, so email cannot be set up automatically here. Give the Worker a custom domain in Cloudflare, then record it as the site\'s address.',
-  'no-token': 'First save a Cloudflare API token with Email Sending edit and Zone read, just above. Then a button here sets the domain up.',
+  'workers-dev': t('core.email.unavailable.workers-dev'),
+  'local': t('core.email.unavailable.local'),
+  'no-token': t('core.email.unavailable.no-token'),
 } as const
 
 async function act(kind: 'set-up' | 'verify', body: Record<string, unknown> = {}) {
@@ -38,10 +39,10 @@ async function act(kind: 'set-up' | 'verify', body: Record<string, unknown> = {}
     toast.add({
       color: 'success',
       icon: 'i-lucide-circle-check',
-      title: kind === 'set-up' ? `Cloudflare is setting up ${answer.domain}` : `A test message went from ${answer.domain}`,
+      title: kind === 'set-up' ? t('core.email.setting-up', { domain: answer.domain }) : t('core.email.test-went', { domain: answer.domain }),
       description: kind === 'set-up'
-        ? 'A test message goes to the contact address in a few minutes, once Cloudflare accepts it.'
-        : 'It went to the contact address. Email can now be sent.',
+        ? t('core.email.setting-up-detail')
+        : t('core.email.test-went-detail'),
     })
     await refresh()
     changing.value = false
@@ -68,8 +69,8 @@ const picked = ref<Way | null>(null)
 const way = computed<Way>({ get: () => picked.value ?? startsOn.value, set: (v) => { picked.value = v } })
 const changing = ref(false)
 const ways = [
-  { label: 'Set it up for me', value: 'automatic' },
-  { label: 'I already have one', value: 'own' },
+  { label: t('core.email.way.automatic'), value: 'automatic' },
+  { label: t('core.email.way.own'), value: 'own' },
 ]
 const choosing = computed(() => !data.value?.verified || changing.value)
 const highlight = computed(() => typeof route.query.setting === 'string' ? route.query.setting : undefined)
@@ -86,10 +87,10 @@ async function setUp() {
   if (!sender?.automatic.proposed) return
   if (sender.domain && sender.domain !== sender.automatic.proposed) {
     const sure = await confirm({
-      verb: 'Replace',
-      thing: `the sending domain ${sender.domain}`,
-      consequence: `Email will come from ${sender.automatic.proposed} instead, once Cloudflare has set it up and a test message has passed.`,
-      button: `Send from ${sender.automatic.proposed}`,
+      verb: t('core.email.replace'),
+      thing: t('core.email.replace-thing', { domain: sender.domain }),
+      consequence: t('core.email.replace-consequence', { domain: sender.automatic.proposed }),
+      button: t('core.email.replace-button', { domain: sender.automatic.proposed }),
     })
     if (!sure) return
     return act('set-up', { replace: true })
@@ -100,9 +101,9 @@ async function setUp() {
 
 <template>
   <PageFrame
-    title="Email sending"
+    :title="t('core.email.email-sending')"
     width="reading"
-    description="Where the theatre's email comes from. Nothing is sent, including sign-in links, until the sending domain is verified."
+    :description="t('core.email.description-where-the-theatres')"
   >
     <DataBoundary
       :data="data"
@@ -115,30 +116,30 @@ async function setUp() {
         <RefusalNotice :refusal="refusal" />
 
         <PageSection
-          title="Sending domain"
+          :title="t('core.email.sending-domain')"
           :description="data.domain ?? undefined"
         >
           <template #actions>
             <StatusBadge
               :tone="data.verified ? 'success' : data.domain ? 'warning' : 'neutral'"
-              :label="data.verified ? 'Verified' : data.domain ? 'Not verified yet' : 'Not set'"
+              :label="data.verified ? t('core.email.state.verified') : data.domain ? t('core.email.state.unverified') : t('core.email.state.unset')"
             />
           </template>
           <p class="text-sm text-muted">
             {{ data.verified
-              ? 'Email is sent from this domain.'
+              ? t('core.email.says.verified')
               : !data.domain
-                ? 'No domain is set, so nothing is sent yet. Choose how to set one up.'
+                ? t('core.email.says.unset')
                 : data.contactSet
-                  ? 'A test message goes to the theatre\'s contact email.'
-                  : 'Set the theatre\'s contact email in the organisation settings first: the test message goes there.' }}
+                  ? t('core.email.says.test')
+                  : t('core.email.says.no-contact') }}
           </p>
           <UTabs
             v-if="choosing"
             v-model="way"
             :items="ways"
             :content="false"
-            aria-label="How to set up the sending domain"
+            :aria-label="t('core.email.label-how-to-set')"
           />
           <template
             v-if="(data.domain && !data.verified) || !choosing"
@@ -146,14 +147,14 @@ async function setUp() {
           >
             <UButton
               v-if="!choosing"
-              label="Change the sending domain"
+              :label="t('core.email.change-the-sending-domain')"
               color="neutral"
               variant="outline"
               @click="changing = true"
             />
             <UButton
               v-if="data.domain && !data.verified"
-              label="Send a test message"
+              :label="t('core.email.send-a-test-message')"
               color="neutral"
               variant="outline"
               :loading="busy === 'verify'"
@@ -169,12 +170,12 @@ async function setUp() {
             :names="['CORE_CLOUDFLARE_TOKEN']"
             @saved="refresh()"
           />
-          <PageSection title="Set up automatically">
+          <PageSection :title="t('core.email.set-up-automatically')">
             <p
               v-if="data.automatic.unavailable === null || data.automatic.unavailable === 'no-token'"
               class="text-sm text-muted"
             >
-              Proscenium asks Cloudflare to set up <strong class="text-highlighted">{{ data.automatic.proposed }}</strong> for sending and to add its DNS records, then sends a test message once Cloudflare accepts it. The word before the site's address is the sending label, below.
+              {{ t('core.email.automatic-help', { domain: data.automatic.proposed ?? '' }) }}
             </p>
             <UAlert
               v-if="data.automatic.unavailable"
@@ -182,7 +183,7 @@ async function setUp() {
               icon="i-lucide-info"
               :description="UNAVAILABLE[data.automatic.unavailable]"
               :actions="data.automatic.unavailable === 'local' || data.automatic.unavailable === 'workers-dev'
-                ? [{ label: 'The site\'s address', to: '/admin/theatre?setting=core.site.origin', color: 'neutral', variant: 'outline', trailingIcon: 'i-lucide-arrow-right' }]
+                ? [{ label: t('core.email.site-address'), to: '/admin/theatre?setting=core.site.origin', color: 'neutral', variant: 'outline', trailingIcon: 'i-lucide-arrow-right' }]
                 : undefined"
             />
             <template
@@ -190,7 +191,7 @@ async function setUp() {
               #footer
             >
               <UButton
-                :label="data.domain === data.automatic.proposed ? `Set up ${data.automatic.proposed} again` : `Set up ${data.automatic.proposed}`"
+                :label="data.domain === data.automatic.proposed ? t('core.email.set-up-again', { domain: data.automatic.proposed ?? '' }) : t('core.email.set-up', { domain: data.automatic.proposed ?? '' })"
                 icon="i-lucide-wand-sparkles"
                 :loading="busy === 'set-up'"
                 :disabled="busy !== null"
@@ -204,7 +205,7 @@ async function setUp() {
     <SettingsSections
       v-if="data && choosing && way === 'automatic' && (data.automatic.unavailable === null || data.automatic.unavailable === 'no-token')"
       screen="/admin/email"
-      heading="Sending label"
+      :heading="t('core.email.heading.label')"
       :omit="[KEYS.verified, KEYS.domain, KEYS.footer]"
       :highlight="highlight"
       @saved="refresh()"
@@ -215,21 +216,21 @@ async function setUp() {
           color="warning"
           variant="subtle"
           icon="i-lucide-triangle-alert"
-          :description="`Email keeps coming from ${data.domain}. A new label only takes effect the next time the domain is set up automatically.`"
+          :description="t('core.email.label-note', { domain: data.domain })"
         />
       </template>
     </SettingsSections>
     <SettingsSections
       v-if="data && choosing && way === 'own'"
       screen="/admin/email"
-      heading="Your sending domain"
+      :heading="t('core.email.heading.own')"
       :omit="[KEYS.verified, KEYS.label, KEYS.footer]"
       :highlight="highlight"
       @saved="refresh()"
     />
     <SettingsSections
       screen="/admin/email"
-      heading="Email footer"
+      :heading="t('core.email.heading.footer')"
       :omit="[KEYS.verified, KEYS.domain, KEYS.label]"
       :highlight="highlight"
       @saved="refresh()"
@@ -237,7 +238,7 @@ async function setUp() {
       <template #after-field="{ value }">
         <figure class="space-y-1">
           <figcaption class="text-sm text-muted">
-            How the end of every email looks
+            {{ t('core.email.preview-caption') }}
           </figcaption>
           <!-- Email is always white, whatever the screen's mode, so the preview is too: fixed colours, not tokens. -->
           <!-- eslint-disable better-tailwindcss/no-restricted-classes -->
@@ -249,7 +250,7 @@ async function setUp() {
               {{ theatreName }}
             </p>
             <p class="mb-3">
-              Thank you for booking with us. We look forward to seeing you.
+              {{ t('core.email.preview-body') }}
             </p>
             <p
               v-if="typeof value === 'string' && value.trim()"
@@ -261,7 +262,7 @@ async function setUp() {
               v-else
               class="mt-4 text-xs text-stone-600 italic"
             >
-              No footer is added.
+              {{ t('core.email.preview-none') }}
             </p>
           </div>
         <!-- eslint-enable better-tailwindcss/no-restricted-classes -->
