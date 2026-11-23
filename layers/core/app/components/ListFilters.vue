@@ -137,18 +137,19 @@ watch(() => props.values, () => { for (const name of names.value) if (!/^\d{4}-/
         v-else-if="filters[name]!.kind === 'dates'"
         class="space-y-2"
       >
-        <div class="flex flex-wrap gap-1.5">
-          <UButton
-            v-for="p in filters[name]!.presets"
-            :key="p.value"
-            size="sm"
-            color="neutral"
-            :variant="values[name] === p.value ? 'solid' : 'outline'"
-            :aria-pressed="values[name] === p.value"
-            :label="p.label"
-            @click="setValue(name, values[name] === p.value ? '' : p.value)"
-          />
-        </div>
+        <!-- Pressing the chosen one again clears it. -->
+        <UToggleGroup
+          :model-value="String(values[name] ?? '')"
+          :items="filters[name]!.presets"
+          size="sm"
+          color="neutral"
+          variant="outline"
+          active-color="neutral"
+          active-variant="solid"
+          class="flex flex-wrap gap-1.5"
+          :aria-label="filters[name]!.label"
+          @update:model-value="setValue(name, ($event as string | undefined) ?? '')"
+        />
         <div class="grid grid-cols-2 gap-2">
           <UFormField :label="t('core.list.from')">
             <FieldDate

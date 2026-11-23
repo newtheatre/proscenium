@@ -361,6 +361,17 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
   refuses an icon-only `UButton`.
 - `RowActions`: the ellipsis menu a row or a record ends with. It takes `items` and a `label`
   ("Actions for Hamlet") and draws nothing when there are no items.
+- **Right-click menus.** A row's right-click menu is its ellipsis menu, never a second list: a
+  `RowActions` inside a `RecordListItem` (or a `SortableRow`) tells the row its items, and the row
+  offers the same ones on a right click, followed by "Open in a new tab" where the row is a link.
+  `PageList` does the same for its table rows from `row-actions` and `row-to`. A row with no actions
+  has no menu of ours, so the browser's own shows; so do a table's headings, and a touch screen,
+  where a long press stays the browser's. The ellipsis button stays: the right click is an extra
+  path, not the only one. `rowMenu()` (`app/utils/row-menu.ts`) builds the items for a screen that
+  draws its own rows. Nothing is declared twice and no page writes a `UContextMenu` for a row.
+- A group of buttons of which one is pressed (the appearance choice, a date filter's presets) is a
+  `UToggleGroup`, not buttons with `aria-pressed` set by hand. A fixed choice in a form is still a
+  dropdown.
 - `PageActions`: a page's actions for PageFrame's `primary` slot when there are more than one. It
   takes `actions` (`label`, `icon`, `to` or `onSelect`, `loading`, `disabled`, `lesser`); every one is
   a worded button from 640 pixels, and on a phone the first stays a button while the rest fold into
