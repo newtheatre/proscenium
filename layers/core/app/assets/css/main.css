@@ -44,12 +44,14 @@
 
 /* Things that stay in view while a page scrolls. A panel beside the content sticks at the top of the
    scrolling body (top: 0, since the body's padding is already above it); a bar of actions sticks at
-   the foot, drawn over the content it follows. */
+   the foot, drawn over the content it follows and down through the body's own padding, so nothing
+   shows beneath it. */
 @utility sticky-panel { position: sticky; top: 0; align-self: flex-start; }
 @utility sticky-bar {
-  position: sticky; bottom: 0; z-index: 10;
-  padding-block: 0.75rem;
+  position: sticky; bottom: -1rem; z-index: 10;
+  padding-block: 0.75rem 1.75rem;
   background: var(--ui-bg); border-top: 1px solid var(--ui-border);
+  @media (width >= 40rem) { bottom: -1.5rem; padding-block-end: 2.25rem; }
 }
 
 /* A focus ring for plain elements. Nuxt UI controls ([data-slot]) draw their own in the brand
