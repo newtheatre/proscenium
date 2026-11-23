@@ -10,6 +10,7 @@ interface Booking {
   state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed'
   link?: string
   seatsLeft?: number
+  sellingFast?: true
   opensAt?: number
   waitingList?: string
   label?: string
@@ -24,6 +25,7 @@ const note = computed(() => {
   const b = props.booking
   if (!b) return null
   if (b.state === 'limited') return b.seatsLeft ? t('public-site.booking.seats-left', { count: b.seatsLeft }) : t('public-site.booking.last-few')
+  if (b.state === 'available' && b.sellingFast) return t('public-site.booking.selling-fast')
   if (b.state === 'sold-out') return t('public-site.booking.sold-out')
   if (b.state === 'not-yet') return b.opensAt ? t('public-site.booking.opens', { when: dateTime(b.opensAt) }) : t('public-site.booking.not-yet')
   if (b.state === 'closed') return t('public-site.booking.closed')

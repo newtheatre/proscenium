@@ -1,6 +1,6 @@
 // The public Choose tickets page's read (Box office specification, part 6, "Choose tickets"): only a
 // published production's scheduled performance is shown, with each band's prices and whether it is
-// sold out, never a count of seats; complimentary tickets are never offered.
+// sold out, and a count of seats only where availability.seats-left says one; complimentary tickets are never offered.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { inContext, person, rows } from '../../../../tests/integration/helpers'
 import { buy, house, ready, req, type House } from './stage'
@@ -39,6 +39,9 @@ describe('the public booking page', () => {
     expect(page.body.production.id).toBe(h.productionId)
     expect(page.body.bands).toHaveLength(1)
     expect(page.body.bands[0].soldOut).toBe(false)
+    // How full it is, as far as the theatre's level allows: two seats, nearly full at one.
+    expect(page.body.seats).toEqual({ state: 'available' })
+    expect(page.body.bands[0].seats).toEqual({ state: 'available' })
     expect(page.body.bands[0].types.map((t: { amountMinor: number }) => t.amountMinor).sort((a: number, b: number) => a - b)).toEqual([800, 1200])
     expect(JSON.stringify(page.body)).not.toMatch(/capacity|"free"|claimed/)
     expect(page.body.production).toMatchObject({ ageMin: null, ageRestricted: false })
@@ -57,6 +60,7 @@ describe('the public booking page', () => {
     expect(held.ok).toBe(true)
     const page = await read(h)
     expect(page.body.bands[0].soldOut).toBe(true)
+    expect(page.body.seats).toEqual({ state: 'sold-out' })
   })
 
   it('does not show an unknown performance', async () => {
