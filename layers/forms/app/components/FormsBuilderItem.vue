@@ -71,6 +71,7 @@ const menu = computed(() => [
   ],
   [{ label: t('forms.screens.builder.remove'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove() }],
 ])
+const touch = useScreenQuery('(hover: none)')
 const logic = (q: { visibleWhen?: Question['visibleWhen'] }) => q.visibleWhen ? t('forms.screens.builder.shown-when', { when: formsConditionSentence(q.visibleWhen, def.value) }) : ''
 </script>
 
@@ -80,98 +81,75 @@ const logic = (q: { visibleWhen?: Question['visibleWhen'] }) => q.visibleWhen ? 
     class="group/card relative"
     :class="isDragging ? 'opacity-40' : ''"
   >
-    <div
-      class="flex items-stretch rounded-lg border bg-default"
-      :class="selected(item.id) ? 'border-primary ring-1 ring-primary' : 'border-default hover:border-accented'"
+    <!-- A right click on a card offers what its ellipsis does; a long press on a touch screen stays the browser's. -->
+    <UContextMenu
+      :modal="false"
+      :items="rowMenu(menu, undefined, '')"
+      :disabled="touch"
     >
       <div
-        ref="handle"
-        class="flex w-9 shrink-0 cursor-grab touch-none items-center justify-center rounded-l-lg text-dimmed hover:bg-elevated hover:text-default sm:w-7"
-        :aria-label="t('forms.screens.builder.drag-named', { name })"
+        class="flex items-stretch rounded-lg border bg-default"
+        :class="selected(item.id) ? 'border-primary ring-1 ring-primary' : 'border-default hover:border-accented'"
       >
-        <UIcon name="i-lucide-grip-vertical" />
-      </div>
+        <div
+          ref="handle"
+          class="flex w-9 shrink-0 cursor-grab touch-none items-center justify-center rounded-l-lg text-dimmed hover:bg-elevated hover:text-default sm:w-7"
+          :aria-label="t('forms.screens.builder.drag-named', { name })"
+        >
+          <UIcon name="i-lucide-grip-vertical" />
+        </div>
 
-      <!-- A question -->
-      <button
-        v-if="item.kind === 'question'"
-        type="button"
-        class="min-w-0 flex-1 p-3 text-left"
-        :aria-pressed="selected(item.id)"
-        @click="builder.select(item.id)"
-      >
-        <FormsQuestionCard
-          :question="item"
-          :logic="logic(item)"
-        />
-      </button>
-
-      <!-- Two questions side by side -->
-      <div
-        v-else-if="item.kind === 'row'"
-        class="grid min-w-0 flex-1 gap-px sm:grid-cols-2"
-      >
+        <!-- A question -->
         <button
-          v-for="q in item.items"
-          :key="q.id"
+          v-if="item.kind === 'question'"
           type="button"
-          class="min-w-0 rounded-md p-3 text-left"
-          :class="selected(q.id) ? 'bg-primary/5 ring-1 ring-primary' : ''"
-          :aria-pressed="selected(q.id)"
-          @click="builder.select(q.id)"
+          class="min-w-0 flex-1 p-3 text-left"
+          :aria-pressed="selected(item.id)"
+          @click="builder.select(item.id)"
         >
           <FormsQuestionCard
-            :question="q"
-            :logic="logic(q)"
+            :question="item"
+            :logic="logic(item)"
           />
         </button>
-      </div>
 
-      <!-- A block of text -->
-      <button
-        v-else-if="item.kind === 'content'"
-        type="button"
-        class="min-w-0 flex-1 p-3 text-left"
-        :aria-pressed="selected(item.id)"
-        @click="builder.select(item.id)"
-      >
-        <p class="flex items-center gap-1.5 text-xs font-medium text-muted">
-          <UIcon name="i-lucide-text" />{{ t('forms.screens.palette.content') }}
-        </p>
-        <p
-          class="mt-1 line-clamp-3 whitespace-pre-line text-sm"
-          :class="item.text.trim() ? '' : 'text-muted'"
+        <!-- Two questions side by side -->
+        <div
+          v-else-if="item.kind === 'row'"
+          class="grid min-w-0 flex-1 gap-px sm:grid-cols-2"
         >
-          {{ item.text.trim() || t('forms.screens.builder.empty-content') }}
-        </p>
-        <p
-          v-if="item.visibleWhen"
-          class="mt-1 text-xs text-muted"
-        >
-          {{ logic(item) }}
-        </p>
-        <FormsProblemBadge :at="item.id" />
-      </button>
+          <button
+            v-for="q in item.items"
+            :key="q.id"
+            type="button"
+            class="min-w-0 rounded-md p-3 text-left"
+            :class="selected(q.id) ? 'bg-primary/5 ring-1 ring-primary' : ''"
+            :aria-pressed="selected(q.id)"
+            @click="builder.select(q.id)"
+          >
+            <FormsQuestionCard
+              :question="q"
+              :logic="logic(q)"
+            />
+          </button>
+        </div>
 
-      <!-- A repeating group -->
-      <div
-        v-else
-        class="min-w-0 flex-1 p-3"
-      >
+        <!-- A block of text -->
         <button
+          v-else-if="item.kind === 'content'"
           type="button"
-          class="block w-full text-left"
+          class="min-w-0 flex-1 p-3 text-left"
           :aria-pressed="selected(item.id)"
           @click="builder.select(item.id)"
         >
           <p class="flex items-center gap-1.5 text-xs font-medium text-muted">
-            <UIcon name="i-lucide-repeat" />{{ t('forms.screens.palette.group') }}
+            <UIcon name="i-lucide-text" />{{ t('forms.screens.palette.content') }}
           </p>
           <p
-            class="mt-1 font-medium"
-            :class="item.label.trim() ? '' : 'text-muted'"
+            class="mt-1 line-clamp-3 whitespace-pre-line text-sm"
+            :class="item.text.trim() ? '' : 'text-muted'"
           >
-            {{ name }}
+            {{ item.text.trim() || t('forms.screens.builder.empty-content') }}
           </p>
           <p
             v-if="item.visibleWhen"
@@ -181,30 +159,57 @@ const logic = (q: { visibleWhen?: Question['visibleWhen'] }) => q.visibleWhen ? 
           </p>
           <FormsProblemBadge :at="item.id" />
         </button>
-        <FormsBuilderList
-          class="mt-3"
-          :list-key="`group:${item.id}`"
-          :accept="['question']"
-          :empty="t('forms.screens.builder.empty-group')"
-        />
-        <FormsAddMenu
-          class="mt-3"
-          questions-only
-          :label="t('forms.screens.builder.add-to-group')"
-          @add="emit('add', { kind: $event, into: item.id })"
-        />
-      </div>
 
-      <div class="p-1.5">
-        <UDropdownMenu :items="menu">
-          <IconButton
-            icon="i-lucide-ellipsis-vertical"
-            size="sm"
+        <!-- A repeating group -->
+        <div
+          v-else
+          class="min-w-0 flex-1 p-3"
+        >
+          <button
+            type="button"
+            class="block w-full text-left"
+            :aria-pressed="selected(item.id)"
+            @click="builder.select(item.id)"
+          >
+            <p class="flex items-center gap-1.5 text-xs font-medium text-muted">
+              <UIcon name="i-lucide-repeat" />{{ t('forms.screens.palette.group') }}
+            </p>
+            <p
+              class="mt-1 font-medium"
+              :class="item.label.trim() ? '' : 'text-muted'"
+            >
+              {{ name }}
+            </p>
+            <p
+              v-if="item.visibleWhen"
+              class="mt-1 text-xs text-muted"
+            >
+              {{ logic(item) }}
+            </p>
+            <FormsProblemBadge :at="item.id" />
+          </button>
+          <FormsBuilderList
+            class="mt-3"
+            :list-key="`group:${item.id}`"
+            :accept="['question']"
+            :empty="t('forms.screens.builder.empty-group')"
+          />
+          <FormsAddMenu
+            class="mt-3"
+            questions-only
+            :label="t('forms.screens.builder.add-to-group')"
+            @add="emit('add', { kind: $event, into: item.id })"
+          />
+        </div>
+
+        <div class="p-1.5">
+          <RowActions
+            :items="menu"
             :label="t('forms.screens.builder.actions-for', { name })"
           />
-        </UDropdownMenu>
+        </div>
       </div>
-    </div>
+    </UContextMenu>
     <FormsPairZone
       v-if="pairable"
       :item-id="item.id"

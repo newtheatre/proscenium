@@ -49,7 +49,6 @@ const close = () => router.replace({ query: { ...route.query, version: undefined
 const panel = computed({ get: () => !!openNumber.value, set: (v: boolean) => { if (!v) close() } })
 
 // ---- making an earlier version the draft again: nothing is published, and it can be undone ----
-const working = ref(false)
 async function putDraft(definition: Definition) {
   const now = await $api<{ draft: { definition: Definition, editRevision: number } }>(`/api/forms/forms/${formId.value}` as string)
   await $api(`/api/forms/forms/${formId.value}/draft` as string, { method: 'PUT', body: { definition, editRevision: now.draft.editRevision } })
@@ -58,7 +57,6 @@ async function putDraft(definition: Definition) {
 async function restore() {
   if (!shown.value) return
   const number = shown.value.number
-  working.value = true
   try {
     const before = await putDraft(shown.value.definition)
     undo.offer(t('forms.screens.versions.restored', { n: number }), async () => { await putDraft(before) })
@@ -68,7 +66,6 @@ async function restore() {
     const refusal = toRefusal(e)
     toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
   }
-  working.value = false
 }
 </script>
 
@@ -190,7 +187,7 @@ async function restore() {
           icon="i-lucide-undo-2"
           color="neutral"
           variant="subtle"
-          :loading="working"
+          loading-auto
           @click="restore"
         />
         <span class="text-sm text-muted">{{ t('forms.screens.versions.restore-help') }}</span>

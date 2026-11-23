@@ -167,7 +167,7 @@ const setCriterion = (id: string, change: Partial<Criterion>, merge?: string) =>
               />
             </UFormField>
             <UFormField :label="t('forms.screens.review.max')">
-              <UInputNumber
+              <FieldNumber
                 :model-value="c.max"
                 :min="1"
                 :max="100"
@@ -175,7 +175,7 @@ const setCriterion = (id: string, change: Partial<Criterion>, merge?: string) =>
               />
             </UFormField>
             <UFormField :label="t('forms.screens.review.weight')">
-              <UInputNumber
+              <FieldNumber
                 :model-value="c.weight ?? 1"
                 :min="0"
                 :max="100"
