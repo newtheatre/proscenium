@@ -252,25 +252,35 @@ export const identityContributions = {
     uses: 'all' as const,
     note: true,
   }],
-  // The barriers a person can tick (part 3, "Storage and sharing"). Not locked: a theatre can edit it.
+  // What would help a person, which they tick when they apply to the access scheme (part 3, "Storage
+  // and sharing"). Not locked: a theatre can edit it. The first seven keys are the Access Card's categories.
   'core.vocabulary': [{
     id: 'core.access-need',
     label: 'Access needs',
-    description: 'The barriers a person can tick when they apply to the access scheme. Barriers, never diagnoses.',
+    description: 'What would help a person at a visit, which they tick when they apply to the access scheme. Help, never diagnoses.',
+    groups: ['Getting in and out', 'Your seat', 'Seeing and hearing the show', 'More about your visit'],
     terms: [
-      { slug: 'standing', label: 'Standing or queueing', description: 'You find it hard to stand for long or wait in a queue.' },
-      { slug: 'crowds', label: 'Crowds and busy spaces', description: 'You find crowds, noise or busy foyers hard to cope with.' },
-      { slug: 'level-access', label: 'Steps and stairs', description: 'You cannot use steps or stairs, so you need a ramp, a lift or a level route.' },
-      { slug: 'distance', label: 'Walking distances', description: 'You can only walk a short way, so a seat near the entrance helps.' },
-      { slug: 'urgent-toilet', label: 'Getting to a toilet quickly', description: 'You may need to leave at short notice, so a seat near the door and a toilet helps.' },
-      { slug: 'visual-information', label: 'Hearing what is said', description: 'You need spoken information shown or written down, for example captions or a written note.' },
-      { slug: 'audible-information', label: 'Seeing or reading information', description: 'You need written or visual information read out or described, for example audio description.' },
+      { slug: 'standing', label: 'No queueing, and a seat while you wait', description: 'We let you in without queueing and find you somewhere to sit.', group: 'Getting in and out' },
+      { slug: 'crowds', label: 'A calmer way in', description: 'Go in before the crowds, and have somewhere quiet to take a break.', group: 'Getting in and out' },
+      { slug: 'level-access', label: 'A step-free route', description: 'A level way in, and a seat you can reach without steps or stairs.', group: 'Getting in and out' },
+      { slug: 'distance', label: 'A short walk to your seat', description: 'A seat close to the entrance.', group: 'Your seat' },
+      { slug: 'urgent-toilet', label: 'An aisle seat near an exit', description: 'So you can step out and back easily, for example to use a toilet.', group: 'Your seat' },
+      // The Access Card's names, kept as keys: visual information is what a Deaf person needs.
+      { slug: 'visual-information', label: 'Captions, and things written down', description: 'Captioned performances, and anything we would tell you aloud given to you in writing.', group: 'Seeing and hearing the show' },
+      { slug: 'audible-information', label: 'Audio description, and things read out', description: 'Audio-described performances and touch tours, and anything written read out to you.', group: 'Seeing and hearing the show' },
       // Not ticked on the form: set from its companions question and its "anything else" box.
-      { slug: 'essential-companion', label: 'Needs a companion to help', description: 'Set when the person asks for a companion ticket.' },
-      { slug: 'other', label: 'Something else (see their note)', description: 'Set when the person writes something in "anything else".' },
+      { slug: 'essential-companion', label: 'Needs a companion to help', description: 'Set when the person asks for a companion ticket.', group: 'More about your visit' },
+      { slug: 'other', label: 'Something else (see their note)', description: 'Set when the person writes something in "anything else".', group: 'More about your visit' },
       // Asked as its own question: "I use a wheelchair", then whether they stay in it or transfer.
-      { slug: 'wheelchair-stays', label: 'Wheelchair user, stays in their wheelchair', description: 'They need a wheelchair space.' },
-      { slug: 'wheelchair-transfers', label: 'Wheelchair user, transfers to a seat', description: 'They move to an ordinary seat, and their wheelchair needs storing.' },
+      { slug: 'wheelchair-stays', label: 'Wheelchair user, stays in their wheelchair', description: 'They need a wheelchair space.', group: 'More about your visit' },
+      { slug: 'wheelchair-transfers', label: 'Wheelchair user, transfers to a seat', description: 'They move to an ordinary seat, and their wheelchair needs storing.', group: 'More about your visit' },
+      // Added after the first release (Matt, 23 November 2026), so they follow on an existing site.
+      { slug: 'meet-and-guide', label: 'Someone to meet you', description: 'A member of the team meets you at the door and shows you to your seat.', group: 'Getting in and out' },
+      { slug: 'emergency-help', label: 'Help to leave in an emergency', description: 'Someone to help you out of the building if the alarm sounds.', group: 'Getting in and out' },
+      { slug: 'near-stage', label: 'A seat near the stage', description: 'For example to lip-read, or to see the stage more clearly.', group: 'Your seat' },
+      { slug: 'bsl', label: 'BSL interpretation', description: 'BSL-interpreted performances, with a seat where you can see the interpreter.', group: 'Seeing and hearing the show' },
+      // Asked as its own question: "I come with an assistance dog".
+      { slug: 'assistance-dog', label: 'Comes with an assistance dog', description: 'A seat with room for the dog, and water ready.', group: 'More about your visit' },
     ],
   }],
   // The companions a person on the scheme may book (ID-43), as core.access-scheme:companions.
