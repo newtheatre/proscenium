@@ -138,10 +138,10 @@ As a member, I record who to ring for me, so that the theatre can reach them if 
 
 ### ID-38 Apply to the access scheme (first release)
 
-As somebody who faces barriers at the theatre, I apply once and say what I need, so that I am not asked every time I book.
+As somebody who faces barriers at the theatre, I apply once and say what would help, so that I am not asked every time I book.
 
 - The "Apply" button on the public page `/access` opens the application form, and My account's Access scheme page is that form until the person has applied. A signed-out person signs in or signs up first and lands on the form, not on the home page.
-- The form offers the access-needs list as square tick boxes, each with a plain description and an optional note; asks "I use a wheelchair" separately and, once ticked, whether the person would rather stay in it or move to a seat; asks how many companions are needed (none, one or two); and asks for no diagnosis and no upload.
+- The form asks "What would help you?" and offers the access-needs list as square tick boxes under its headings, each naming the help with a plain description and an optional note; asks "I use a wheelchair" separately and, once ticked, whether the person would rather stay in it or move to a seat; asks "I come with an assistance dog"; asks how many companions are needed (none, one or two); and asks for no diagnosis and no upload.
 - Before sending, the form says who will read the application and that the box office will use it for the person's bookings.
 - Sending makes the application Submitted, emails the person a confirmation, and puts it in the reviewers' queue. A second application cannot be started while one is open.
 - My account shows the application's state in plain words at every stage.
@@ -207,6 +207,7 @@ As a person on the scheme, I keep my details right and can leave.
 - After `core.access-scheme.review-after` the person is asked to confirm their details are still right. Confirming resets the date; no answer after two reminders puts the application in the reviewers' queue, and it stays in force meanwhile.
 - Leaving deletes the application and the sharing choices at once, after a confirmation that says bookings already made keep what they were given.
 - The person can see every read of their application by staff, with when, in what capacity and for which purpose.
+- An entry added to the list after the person last sent their details is pointed out once on their Access scheme page, until they choose it, send a change or say none of the new entries helps.
 
 ### ID-45 Check an Access Card with Nimbus online (later)
 

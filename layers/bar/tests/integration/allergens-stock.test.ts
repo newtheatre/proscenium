@@ -10,6 +10,7 @@ import itemAllergensGet from '../../server/api/bar/stock/items/[id]/allergens.ge
 import productAllergensPost from '../../server/api/bar/products/[id]/allergens.post'
 import productAllergensGet from '../../server/api/bar/products/[id]/allergens.get'
 import chartGet from '../../server/api/bar/allergens/chart.get'
+import uncheckedGet from '../../server/api/bar/allergens/unchecked.get'
 import uncheckedCount from '../../server/contributions/core.count/allergens-unchecked'
 import { labelsDue } from '../../server/allergen-chart'
 import standardListener from '../../server/listeners/standard-price-list'
@@ -25,6 +26,7 @@ const handle = server({
   'POST /api/bar/products/:id/allergens': productAllergensPost,
   'GET /api/bar/products/:id/allergens': productAllergensGet,
   'GET /api/bar/allergens/chart': chartGet,
+  'GET /api/bar/allergens/unchecked': uncheckedGet,
 })
 const manager = person(['bar.sale.sell', 'bar.allergens.manage'], { reassertedAt: NOW })
 
@@ -163,6 +165,22 @@ describe('step 3: the public chart, the home card and the re-check prompt', () =
     expect(row(c.body, water).allergens.checked).toBe(false)
     expect(await inContext(() => uncheckedCount.value(manager))).toBe(before + 1)
     expect(await inContext(() => uncheckedCount.value(person(['bar.sale.sell'])))).toBe(0)
+  })
+
+  it('lists the same sizes the home card counts, so its link never lands on an empty list', async () => {
+    // A product with no recipe answers with its own label, so it is listed though no stock item is unchecked.
+    const juice = await commit(async (unit) => {
+      const category = (await rows<{ category_id: string }>('SELECT category_id FROM bar_products WHERE id = ?', s.crispsProduct))[0]!.category_id
+      return await addProduct(unit.view(), { categoryId: category, name: 'Stock allergen juice' }, { amountMinor: 150 }, manager.accountId!)
+    })
+    const count = await inContext(() => uncheckedCount.value(manager))
+    const list = await send('GET', '/api/bar/allergens/unchecked')
+    expect(list.status).toBe(200)
+    expect(list.body.sizes).toHaveLength(count)
+    expect(list.body.sizes).toContainEqual(juice)
+    expect(list.body.sizes).not.toContainEqual({ variantId: s.crisps, productId: s.crispsProduct })
+    const seller = await call(handle, 'GET', '/api/bar/allergens/unchecked', { actor: person(['bar.sale.sell']) })
+    expect(seller.status).toBe(403)
   })
 
   it('asks for a label read again once the re-check period has passed, or when it never was', async () => {

@@ -20,10 +20,8 @@ const href = computed(() => (form.from && form.to ? `/api/finance/export?${new U
 // The file downloads by its link; a refusal (too many lines, the range backwards) is fetched and
 // shown here instead, so the person never lands on a page of JSON.
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const busy = ref(false)
 async function download() {
   if (!href.value) return
-  busy.value = true
   refusal.value = null
   try {
     const csv = await $api<string>(href.value, { responseType: 'text' })
@@ -36,9 +34,6 @@ async function download() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    busy.value = false
   }
 }
 </script>
@@ -95,7 +90,7 @@ async function download() {
     <UButton
       type="submit"
       icon="i-lucide-file-down"
-      :loading="busy"
+      loading-auto
       :label="t('finance.screens.export.button')"
     />
   </UForm>

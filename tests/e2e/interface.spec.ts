@@ -487,14 +487,16 @@ test.describe('the access scheme screens', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Apply' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Send application' })).toBeVisible()
-    // Needs are square ticks; the wheelchair question asks its follow-up only once ticked.
-    await expect(page.getByRole('checkbox', { name: 'Steps and stairs' })).toBeVisible()
+    // What would help is square ticks under the list's headings; the wheelchair question asks its follow-up only once ticked.
+    await expect(page.getByRole('checkbox', { name: 'A step-free route' })).toBeVisible()
+    await expect(page.getByRole('group', { name: 'Seeing and hearing the show' }).getByRole('checkbox', { name: 'BSL interpretation' })).toBeVisible()
+    await expect(page.getByRole('checkbox', { name: 'I come with an assistance dog' })).toBeVisible()
     await expect(page.getByRole('radio', { name: 'Move to a seat' })).toHaveCount(0)
     await page.getByRole('checkbox', { name: 'I use a wheelchair' }).click()
     await expect(page.getByRole('radio', { name: 'Stay in my wheelchair' })).toBeVisible()
     await expect(page.getByRole('radio', { name: 'Move to a seat' })).toBeVisible()
     // The needs question heads the form; a divider and "More about your visit" lead the rest.
-    await expect(page.getByRole('heading', { level: 2, name: 'Which of these make a visit harder for you?' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'What would help you?' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2, name: 'More about your visit' })).toBeVisible()
     // A companion is a tick box that asks how many only once ticked.
     await expect(page.getByRole('combobox', { name: 'How many people come with you?' })).toHaveCount(0)

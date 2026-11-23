@@ -67,6 +67,10 @@ const performanceColumns = computed<TableColumn<PerformanceLine>[]>(() => [
   { id: 'performance', header: t('finance.screens.statement.performance') },
   ...amounts<PerformanceLine>(false),
 ])
+const actions = computed(() => [
+  ...(data.value?.ticketReport ? [{ label: t('finance.screens.statement.tickets'), icon: 'i-lucide-ticket', to: `/console/box-office/reports/sales?productionId=${data.value.production.id}`, lesser: true }] : []),
+  { label: t('finance.screens.statement.postings'), icon: 'i-lucide-book-open', to: `/console/finance/ledger?production=${data.value?.production.id}`, lesser: true },
+])
 const performanceName = (p: PerformanceLine) => {
   const when = p.startsAt ? dateTime(p.startsAt) : t('finance.screens.statement.performance-gone')
   return p.label ? `${when}, ${p.label}` : when
@@ -82,21 +86,7 @@ const performanceName = (p: PerformanceLine) => {
       v-if="data"
       #primary
     >
-      <UButton
-        v-if="data.ticketReport"
-        :to="{ path: '/console/box-office/reports/sales', query: { productionId: data.production.id } }"
-        :label="t('finance.screens.statement.tickets')"
-        icon="i-lucide-ticket"
-        color="neutral"
-        variant="outline"
-      />
-      <UButton
-        :to="{ path: '/console/finance/ledger', query: { production: data.production.id } }"
-        :label="t('finance.screens.statement.postings')"
-        icon="i-lucide-book-open"
-        color="neutral"
-        variant="outline"
-      />
+      <PageActions :actions="actions" />
     </template>
     <DataBoundary
       :data="data"

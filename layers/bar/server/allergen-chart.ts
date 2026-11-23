@@ -59,15 +59,20 @@ export async function allergenChart(): Promise<Chart | null> {
 
 /** How many sizes on sale have not had every label read: for the bar managers' home card. */
 export async function uncheckedSizes(): Promise<number> {
+  return (await uncheckedSizeList()).length
+}
+
+/** The sizes on sale that have not had every label read, so the card's count and its list agree. */
+export async function uncheckedSizeList(): Promise<{ variantId: string, productId: string }[]> {
   const settings = await allergenSettings()
-  if (!settings.enabled) return 0
+  if (!settings.enabled) return []
   const answers = await allergenAnswers()
   const links = await stockLinks()
   const sizes = await all<{ id: string, product_id: string }>(
     `SELECT v.id, v.product_id FROM bar_variants v JOIN bar_products p ON p.id = v.product_id
       WHERE v.active = 1 AND p.active = 1 AND v.mixer_measure = 0`,
   )
-  return sizes.filter(v => !sizeAnswer(answers, links, v.id, v.product_id)?.checked).length
+  return sizes.filter(v => !sizeAnswer(answers, links, v.id, v.product_id)?.checked).map(v => ({ variantId: v.id, productId: v.product_id }))
 }
 
 /**

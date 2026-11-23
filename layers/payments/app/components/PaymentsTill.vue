@@ -1923,8 +1923,9 @@ function ended() {
                       :label="t('payments.screens.test.reader')"
                       required
                     >
-                      <USelect
+                      <USelectMenu
                         v-model="readerId"
+                        value-key="value"
                         :items="(chosen.readers ?? []).map(r => ({ value: r.id, label: r.label }))"
                       />
                     </UFormField>
@@ -2058,7 +2059,7 @@ function ended() {
 
             <aside
               v-if="beside"
-              :class="live ? 'hidden min-[900px]:sticky min-[900px]:top-16 min-[900px]:block min-[900px]:self-start' : 'hidden lg:sticky lg:top-4 lg:block lg:self-start'"
+              :class="live ? 'hidden min-[900px]:sticky min-[900px]:top-16 min-[900px]:block min-[900px]:self-start' : 'hidden lg:sticky-panel lg:block'"
               :aria-label="t('payments.screens.till.total-label')"
             >
               <PageSection :title="t('payments.screens.till.sale', { count })">

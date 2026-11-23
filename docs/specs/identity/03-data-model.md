@@ -387,6 +387,7 @@ A person's application to the access scheme and, once accepted, the needs in for
 | `verified_by` | id | Null; an actor reference | Internal | Row deleted |
 | `verified_method` | enum | Null; `access-card`, `document`, `known` | Special category | Row deleted |
 | `review_due` | date | Null; set on acceptance | Internal | Row deleted |
+| `options_seen_at` | timestamp | Null; when the person said none of the entries added since they applied helps | Internal | Row deleted |
 | `updated_at` | timestamp | Not null | Internal | Row deleted |
 
 - Withdrawing deletes the row, so `withdrawn` is not a stored status.
