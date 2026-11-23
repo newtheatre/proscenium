@@ -451,7 +451,7 @@ useLeaveGuard(() => dirty.value && !saved.value)
                   >
                     <legend
                       v-if="part.label"
-                      class="mb-3 text-xs font-semibold text-dimmed"
+                      class="mb-3 text-xs font-semibold text-muted"
                     >
                       {{ part.label }}
                     </legend>
