@@ -10,8 +10,8 @@ import { inContext, rows, sent, setModule } from '../../../../../tests/integrati
 import { restartStalledMerges } from '../../../server/identity/merge-move'
 import { closeMerges } from '../../../server/identity/merge-undo'
 
-// Front of house brings a real merge handler. A switched-off module's chain waits for it to come
-// back, so it is on here, as it would be on any theatre whose rows it holds.
+// Front of house brings a real merge handler, so it is on here as it would be on any theatre whose
+// rows it holds; a describe below switches it off.
 beforeAll(async () => {
   await useIdentity()
   await setModule('front-of-house', true)
@@ -161,6 +161,15 @@ describe('stage two of a merge', () => {
         expect((await mergeOf(mergedAccountId)).completed_at).not.toBeNull()
       })
 
+      it('does not wait for a module with a handler but no handler columns, when nothing of it names the account', async () => {
+        column!.meta.account.onMerge = 'alias'
+        const { admin, survivorId, mergedAccountId } = await twoAccounts()
+        expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+        expect(await deliver()).not.toContain('deferred')
+        expect(calls).toEqual([])
+        expect((await mergeOf(mergedAccountId)).completed_at).not.toBeNull()
+      })
+
       it('waits for it while a handler column still names the merged-away account', async () => {
         const { admin, survivorId, mergedAccountId } = await twoAccounts()
         await ledgerRow(mergedAccountId)
@@ -171,6 +180,32 @@ describe('stage two of a merge', () => {
         expect(await rows('SELECT last_error FROM core_jobs WHERE name = \'core.merge-move\' AND state = \'queued\'')).toEqual([{ last_error: 'deferred: core.merge.module-off' }])
       })
     })
+  })
+})
+
+describe('a merge on a theatre that never switched front of house on', () => {
+  beforeEach(() => setModule('front-of-house', false))
+  afterEach(() => setModule('front-of-house', true))
+
+  it('completes without waiting for front of house when none of its rows names the account', async () => {
+    const { admin, survivorId, mergedAccountId } = await twoAccounts()
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+    expect(await deliver()).not.toContain('deferred')
+    const merge = await mergeOf(mergedAccountId)
+    expect(merge.completed_at).not.toBeNull()
+    const listed = ((await admin.browser.get('/api/core/accounts/merges')).body.merges as { id: string }[]).find(m => m.id === merge.id)
+    expect(listed).toEqual(expect.objectContaining({ state: 'complete', waitingOn: [] }))
+  })
+
+  it('waits for front of house while one of its move columns still names the account', async () => {
+    const { admin, survivorId, mergedAccountId } = await twoAccounts()
+    await env.DB.prepare('INSERT INTO front_of_house_calendar_feeds (account_id, token_hash, generation, created_at) VALUES (?, ?, 1, ?)').bind(mergedAccountId, newId('tok'), Date.now()).run()
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+    expect(await deliver()).toContain('deferred')
+    const merge = await mergeOf(mergedAccountId)
+    expect(merge.completed_at).toBeNull()
+    expect(await rows('SELECT json_extract(payload, \'$.module\') AS module, last_error FROM core_jobs WHERE name = \'core.merge-move\' AND state = \'queued\' AND json_extract(payload, \'$.mergeId\') = ?', merge.id))
+      .toEqual([{ module: 'front-of-house', last_error: 'deferred: core.merge.module-off' }])
   })
 })
 
