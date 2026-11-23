@@ -7,6 +7,7 @@ interface Link { label: string, to: string }
 interface Meta {
   banner?: string
   headline?: string
+  departmentsTitle?: string
   flash?: string
   join?: Link
   more?: Link
@@ -63,7 +64,7 @@ const external = (to: string) => (/^https:/.test(to) ? '_blank' : undefined)
     <UContainer class="py-16">
       <section v-if="departments.length">
         <h2 class="nnt-headline text-3xl text-highlighted sm:text-4xl">
-          Pick your department <span class="text-lg font-normal text-muted">(or several)</span>
+          {{ meta.departmentsTitle ?? 'Pick your department' }}
         </h2>
         <ul class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <li

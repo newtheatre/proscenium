@@ -195,7 +195,7 @@ const setupNeeded = computed(() => setup.value?.needed === true && !viewer.value
                 {{ name }}
               </p>
               <p class="max-w-xs text-sm text-muted">
-                England's only entirely student-run theatre, in Nottingham.
+                England's only student-run theatre, in Nottingham.
               </p>
               <UBadge
                 color="secondary"

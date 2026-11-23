@@ -1,29 +1,28 @@
 ---
 title: About us
-description: Who the Nottingham New Theatre is, who runs it, and how to get in touch.
+description: Who are the Nottingham New Theatre? How do I get in touch?
 banner: /images/banners/about.webp
 ---
 
-The Nottingham New Theatre is the student theatre of the University of Nottingham, and a society
-of the University of Nottingham Students' Union. Students direct, produce, design, build, light,
-stage manage and sell every show we put on.
+The NNT is the University of Nottingham's theatre, a student-run service within the Students' Union.
+Students direct, produce, design, build, light, stage manage and sell every show we put on.
 
-## What we do
+## Our Seasons
 
-Our year runs through the In-House and Studio seasons, with Creatives alongside them. We take work
-to the Edinburgh Festival Fringe and, when the membership chooses, to the National Student Drama
-Festival, and we run StuFF, the Student Fringe Festival. Every member can take part, whatever their
-experience: see [get involved](/get-involved).
+We run two seasons of shows per year, in the Autumn and Spring. Both seasons present auditioned
+In-House and Independent shows, and our unauditioned group Creatives runs alongside them. We take two
+shows each year to Edinburgh Fringe, have presented work at the National Student Drama Festival and
+run our own Student Fringe Festival, StuFF. Every member is welcome, regardless of experience; see how
+you can get involved [here](/get-involved).
 
-## Where we perform
+## Our Spaces
 
-Our own building on University Park has been closed since 2023. For now we perform in the Portland
-Studio, opposite Mooch on University Park, which has step-free access. The campaign to save the
-building is at [savennt.com](https://savennt.com/).
+Since our own building on University Park was shut down in 2023, we took up residence in the Portland
+Studio, opposite the Goose & Oar, which has step-free access. More information on the campaign to save
+the building can be found at [savennt.com](https://savennt.com/), and more about the theatre's past on
+our [history](/history) page.
 
-There is more about the theatre's past on [our history](/history) page.
-
-## The committee
+## Who we are: The Committee 26/27
 
 A committee elected by the members each year runs the theatre, under our constitution.
 
