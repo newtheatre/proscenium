@@ -3,8 +3,15 @@ import type { InjectionKey } from 'vue'
 
 type Items = DropdownMenuItem[] | DropdownMenuItem[][]
 
-/** How a row's RowActions tells the row what its menu holds, so the right-click menu is the same one. */
-export const ROW_MENU: InjectionKey<(items: () => Items) => () => void> = Symbol('core:row-menu')
+/**
+ * How a row's RowActions tells the row what its menu holds, so the right-click menu is the same one.
+ * `shape` is reactive and changes only when the menu's words do; `items` is read without tracking.
+ */
+export interface RowMenuSource { shape: () => string, items: () => Items }
+export const ROW_MENU: InjectionKey<(source: RowMenuSource) => () => void> = Symbol('core:row-menu')
+
+/** A menu's words and states without its handlers: equal for two renders of the same menu. */
+export const menuShape = (items: Items): string => JSON.stringify(items, (_key, value: unknown) => typeof value === 'function' ? undefined : value)
 
 /**
  * A row's right-click menu: what its ellipsis menu offers, then "Open in a new tab" where the row

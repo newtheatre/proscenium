@@ -5,7 +5,6 @@
      row ends with wraps under the name rather than squeezing it. `trailing` sits beside the link.
      A right click on a row that holds a RowActions opens the same actions; on a touch screen it does not. -->
 <script setup lang="ts">
-import type { DropdownMenuItem } from '@nuxt/ui'
 import { NuxtLink } from '#components'
 
 defineOptions({ inheritAttrs: false })
@@ -13,12 +12,18 @@ const props = defineProps<{ to?: string, icon?: string, name?: string, descripti
 const slots = defineSlots<{ default?: () => unknown, leading?: () => unknown, name?: () => unknown, description?: () => unknown, below?: () => unknown, /** Beside the row's link and not inside it: a second link or a button on a row that is itself a link. */ trailing?: () => unknown }>()
 const { t } = useT()
 // What the row's own RowActions offers, said once there and read here.
-const actions = shallowRef<(() => DropdownMenuItem[] | DropdownMenuItem[][]) | null>(null)
-provide(ROW_MENU, (items) => {
-  actions.value = items
-  return () => { if (actions.value === items) actions.value = null }
+const actions = shallowRef<RowMenuSource | null>(null)
+provide(ROW_MENU, (source) => {
+  actions.value = source
+  return () => { if (actions.value === source) actions.value = null }
 })
-const menu = computed(() => rowMenu(actions.value?.(), props.to, t('core.list.open-new-tab')))
+// Read again on each right click, so the handlers are the row's latest; between them only a change of words redraws.
+const asked = ref(0)
+const menu = computed(() => {
+  void asked.value
+  void actions.value?.shape()
+  return rowMenu(actions.value?.items(), props.to, t('core.list.open-new-tab'))
+})
 // A long press on a touch screen keeps the browser's own behaviour.
 const touch = useScreenQuery('(hover: none)')
 </script>
@@ -32,6 +37,7 @@ const touch = useScreenQuery('(hover: none)')
       <div
         class="flex"
         :class="[align === 'start' ? 'items-start' : 'items-center', to && 'hover:bg-elevated/50', muted && 'text-muted']"
+        @contextmenu.capture="asked++"
       >
         <component
           :is="to ? NuxtLink : 'div'"
