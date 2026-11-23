@@ -124,11 +124,13 @@ test('what\'s on bills the soonest show at the top with its next dates, and not 
 
 test('what\'s on filters from one toolbar over the list, and a chip takes a filter off', async ({ page }) => {
   await visit(page, '/whats-on?month=2031-03')
-  const toolbar = page.getByRole('search', { name: 'Filter what\'s on' })
+  const toolbar = page.getByRole('group', { name: 'Filter what\'s on' })
   await expect(page.getByRole('heading', { name: /^Coming up/, level: 2 })).toBeVisible()
-  await expect(toolbar.getByLabel('Month')).toHaveValue('2031-03')
-  await expect(toolbar.getByRole('button', { name: 'Show' })).toBeHidden()
-  await toolbar.getByLabel('Month').selectOption('')
+  await expect(toolbar.getByRole('combobox', { name: 'Month' })).toContainText('March 2031')
+  // The plain form is the scripts-off fallback only.
+  await expect(page.getByRole('search', { name: 'Filter what\'s on' })).toBeHidden()
+  await toolbar.getByRole('combobox', { name: 'Month' }).click()
+  await page.getByRole('option', { name: 'Any' }).click()
   await expect(page).toHaveURL(/\/whats-on$/)
   await visit(page, '/whats-on?month=2031-03')
   await page.getByRole('link', { name: /^Remove filter: / }).click()
@@ -139,12 +141,13 @@ test('what\'s on filters from one toolbar over the list, and a chip takes a filt
 test('on a phone the filters open in a sheet', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await visit(page, '/whats-on?month=2031-03')
-  await expect(page.getByRole('search', { name: 'Filter what\'s on' })).toBeHidden()
+  await expect(page.getByRole('group', { name: 'Filter what\'s on' })).toBeHidden()
   await page.getByRole('button', { name: /^Filter/ }).click()
   const sheet = page.getByRole('dialog')
-  await expect(sheet.getByLabel('Month')).toHaveValue('2031-03')
+  await expect(sheet.getByRole('combobox', { name: 'Month' })).toContainText('March 2031')
   await noViolations(page)
-  await sheet.getByLabel('Month').selectOption('')
+  await sheet.getByRole('combobox', { name: 'Month' }).click()
+  await page.getByRole('option', { name: 'Any' }).click()
   await expect(page).toHaveURL(/\/whats-on$/)
   await sheet.getByRole('button', { name: /^Show \d+ shows?$/ }).click()
   await expect(sheet).toBeHidden()
@@ -197,7 +200,7 @@ test('what\'s on works with scripts off', async ({ browser }) => {
   const page = await context.newPage()
   await page.goto('/whats-on')
   await expect(page.getByRole('link', { name: new RegExp(title) })).toHaveAttribute('href', `/whats-on/${slug}`)
-  // The filters are a GET form whose Show button appears only without scripts.
+  // Without scripts the toolbar is a plain GET form with a Show button.
   await page.goto('/whats-on?venue=no-such-venue-here&month=2031-03')
   const toolbar = page.getByRole('search', { name: 'Filter what\'s on' })
   await toolbar.getByLabel('Venue').selectOption('')

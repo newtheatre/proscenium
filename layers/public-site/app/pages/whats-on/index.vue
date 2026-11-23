@@ -76,11 +76,10 @@ const chips = computed(() => groups.value.flatMap((g) => {
 }))
 const listed = computed(() => months.value.reduce((n, m) => n + m.shows.length, 0))
 
-// Native selects in a GET form, so the filters still work with scripts off (C-38); with scripts on a
-// choice applies at once and the Show button is hidden by the noscript style below.
+// A choice applies at once. With scripts off the noscript style swaps in a plain GET form instead (C-38).
 const pick = (key: Key, value: string) => navigateTo(link(key, value || undefined), { replace: true })
 const sheet = ref(false)
-useHead({ noscript: [{ key: 'whats-on-filters', innerHTML: '<style>.whats-on-filters{display:flex!important}.whats-on-apply{display:inline-flex!important}.whats-on-filter-open{display:none!important}</style>' }] })
+useHead({ noscript: [{ key: 'whats-on-filters', innerHTML: '<style>.whats-on-nojs{display:flex!important}.whats-on-filters,.whats-on-filter-open{display:none!important}</style>' }] })
 </script>
 
 <template>
@@ -105,10 +104,10 @@ useHead({ noscript: [{ key: 'whats-on-filters', innerHTML: '<style>.whats-on-fil
               {{ t('public-site.whats-on.coming-up') }}
               <span class="ms-2 text-sm font-normal text-muted">{{ t('public-site.whats-on.month-count', { count: listed }) }}</span>
             </h2>
-            <PublicSiteFilterForm
+            <div
               v-if="groups.length"
-              action="/whats-on"
-              :label="t('public-site.whats-on.filters')"
+              role="group"
+              :aria-label="t('public-site.whats-on.filters')"
               class="whats-on-filters hidden flex-wrap items-center gap-2 sm:flex"
             >
               <PublicSiteWhatsOnFilter
@@ -121,12 +120,29 @@ useHead({ noscript: [{ key: 'whats-on-filters', innerHTML: '<style>.whats-on-fil
                 :value="chosen[g.key]"
                 @pick="pick(g.key, $event)"
               />
+            </div>
+            <PublicSiteFilterForm
+              v-if="groups.length"
+              action="/whats-on"
+              :label="t('public-site.whats-on.filters')"
+              class="whats-on-nojs hidden flex-wrap items-center gap-3"
+            >
+              <PublicSiteWhatsOnFilter
+                v-for="g in groups"
+                :key="g.key"
+                :name="g.key"
+                :label="g.label"
+                :any="t('public-site.whats-on.filter-any')"
+                :options="g.options"
+                :value="chosen[g.key]"
+                native
+              />
               <UButton
                 type="submit"
                 :label="t('public-site.whats-on.apply')"
                 color="neutral"
                 variant="outline"
-                class="whats-on-apply hidden"
+                size="sm"
               />
             </PublicSiteFilterForm>
             <UButton
