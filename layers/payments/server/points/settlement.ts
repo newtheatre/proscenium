@@ -68,8 +68,8 @@ export interface Settlement {
    */
   release?: (unit: UnitView, part: Part) => Promise<void> | void
   /**
-   * Money for this part that could not be settled is kept after all: the buyer had what it paid for
-   * outside the site, such as being let in at the door. Return the income entries, as on a settle,
+   * Money for this part that could not be settled is kept after all, or was taken outside the site for
+   * a record that lapsed: the buyer had what it paid for, such as being let in at the door. Return the income entries, as on a settle,
    * completing the record where it is still waiting, or refuse (for one paid another way since).
    */
   kept?: (unit: UnitView, part: Part) => Promise<OwnerEntry[]> | OwnerEntry[]

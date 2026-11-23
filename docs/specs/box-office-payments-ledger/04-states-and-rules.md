@@ -283,6 +283,12 @@ Keeping is one batch and is all or nothing:
 
 Training covers the cause: a card charged on the reader outside the site is recorded at the till as an Other payment there and then, so nothing needs keeping later.
 
+### A payment taken outside the site
+
+The opposite case has no payment in the site at all: the reservation lapsed unpaid (released at its time, or by hand at the door) while the buyer paid some other way, such as on the card machine's own app, and came to the show. Once the performance is past selling (completed, or past `box-office.sales.desk-until-after` after its start), so that it can no longer be seated again and sold at the till, a person who may take payment for the order (`box-office.order.take-payment`) and answer for payments with no answer (`payments.attempt.reconcile`) records it from the order: "Record a payment taken outside the site", with how and when it was paid. A performance still on sale refuses, pointing to seating them again and taking the payment on the till; a cancelled performance refuses.
+
+It is one batch: a desk intent for the order's total with one `other_attested` attempt on an active live Other account, answered succeeded in the person's name with their note; the intent and its part settled; the owner's `kept(unit, part)` books the income (Box office: the booking stays lapsed and the money is deferred ticket income for its tickets' performances, recognised by the daily task as usual); and one posting from `payments.other` to those accounts. A record already paid for, and not refunded in full, refuses, with the guard on the statement so a race cannot record it twice.
+
 ## A refund
 
 | Transition | Guard |
