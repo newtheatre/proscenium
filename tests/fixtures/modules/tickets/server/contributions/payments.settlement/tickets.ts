@@ -1,6 +1,6 @@
 // A fixture settlement handler: an order is paid if it is still held, and its income is split
 // between earned and deferred, tagged with its performance.
-import { first, type UnitView } from '#kit'
+import { first, refuse, type UnitView } from '#kit'
 import type { OwnerEntry, Part, Settlement } from '#modules/payments'
 
 async function order(id: string) {
@@ -28,6 +28,15 @@ export default {
   async refunded(_unit: UnitView, part: Part, refund: { amountMinor: number }) {
     const o = await order(part.record)
     return [{ account: { key: 'tickets.income' }, amountMinor: refund.amountMinor, performanceId: o?.performance_id ?? null }]
+  },
+  // Kept after all: an order paid since refuses, as its money really is owed back; any other is income.
+  async kept(unit: UnitView, part: Part) {
+    const o = await first<{ amount_minor: number, deferred_minor: number, performance_id: string | null, state: string }>('SELECT * FROM tickets_orders WHERE id = ?', part.record)
+    if (!o) throw new Error('no such order')
+    if (o.state === 'paid') refuse('tickets.order.paid', 'This order was paid another way.', { status: 409 })
+    unit.add({ sql: "UPDATE tickets_orders SET state = 'kept' WHERE id = ? AND state <> 'paid'", params: [part.record] })
+      .expect(1, { code: 'tickets.order.paid', reason: 'This order was paid another way.' })
+    return entries(o, -1)
   },
   release(unit: UnitView, part: Part) {
     unit.add({ sql: "UPDATE tickets_orders SET state = 'released', releases = releases + 1 WHERE id = ? AND state = 'held'", params: [part.record] })
