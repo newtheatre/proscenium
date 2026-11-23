@@ -239,7 +239,8 @@ async function setUp() {
           <figcaption class="text-sm text-muted">
             How the end of every email looks
           </figcaption>
-          <!-- Email is always white, whatever the screen's mode, so the preview is too. -->
+          <!-- Email is always white, whatever the screen's mode, so the preview is too: fixed colours, not tokens. -->
+          <!-- eslint-disable better-tailwindcss/no-restricted-classes -->
           <div class="max-w-md rounded-md border border-default bg-white p-4 text-sm text-stone-900">
             <p
               class="mb-3 border-b-[3px] pb-2 font-semibold"
@@ -263,6 +264,7 @@ async function setUp() {
               No footer is added.
             </p>
           </div>
+        <!-- eslint-enable better-tailwindcss/no-restricted-classes -->
         </figure>
       </template>
     </SettingsSections>

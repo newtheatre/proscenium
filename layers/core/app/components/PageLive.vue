@@ -32,24 +32,16 @@ const out = computed(() => {
 
 <template>
   <div class="flex min-h-full flex-1 flex-col">
-    <header class="sticky top-0 z-10 flex items-center gap-3 border-b border-default bg-elevated px-3 py-1">
-      <!-- The way out of live mode is worded: an arrow alone is easy to miss on a phone. -->
-      <UButton
-        v-if="out.leaves"
-        :to="out.to"
-        icon="i-lucide-log-out"
-        color="neutral"
-        variant="outline"
-        size="lg"
-        :label="t('core.live.leave-short')"
-        :aria-label="out.label"
-      />
+    <!-- The strip lines up with the page below it and stands as tall as the console's navbar. Going
+         back is at the start, as a trail's back is; leaving live mode is an exit, so it sits at the end. -->
+    <header class="sticky top-0 z-10 flex min-h-(--ui-header-height) items-center gap-3 border-b border-default bg-elevated px-4 py-2 sm:px-6">
       <IconButton
-        v-else
+        v-if="!out.leaves"
         :to="out.to"
         icon="i-lucide-arrow-left"
         size="xl"
         :label="out.label"
+        class="-ms-2"
       />
       <div class="min-w-0 flex-1">
         <h1 class="truncate text-lg font-semibold text-highlighted">
@@ -77,6 +69,17 @@ const out = computed(() => {
         :icon="online ? 'i-lucide-wifi' : 'i-lucide-wifi-off'"
         :label="online ? t('core.live.online') : t('core.live.offline')"
         role="status"
+      />
+      <!-- Worded, because an icon alone is easy to miss on a phone. -->
+      <UButton
+        v-if="out.leaves"
+        :to="out.to"
+        icon="i-lucide-log-out"
+        color="neutral"
+        variant="ghost"
+        :label="t('core.live.leave-short')"
+        :aria-label="out.label"
+        class="-me-2"
       />
     </header>
     <UAlert

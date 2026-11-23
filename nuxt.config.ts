@@ -38,7 +38,7 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   content: { database: { type: 'd1', bindingName: 'DB' }, experimental: { sqliteConnector: 'native' } },
   // Fonts and icons are bundled: nothing loads from a third party (UI-24, Part B).
-  ui: { fonts: false },
+  ui: { fonts: false, eslint: true },
   dir: { public: 'site/public' },
   srcDir: 'site/app',
   serverDir: 'site/server',

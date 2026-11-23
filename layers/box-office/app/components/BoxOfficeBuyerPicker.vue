@@ -62,10 +62,14 @@ const items = computed<Item[]>(() => {
   return list
 })
 
+// Choosing clears the search before the choice arrives, taking a typed address out of the list:
+// what was offered is remembered, so the choice is still found.
+const offered = new Map<string, Item['buyer']>()
+watch(items, (list) => { for (const i of list) offered.set(i.id, i.buyer) }, { immediate: true, flush: 'sync' })
 const selected = computed({
   get: () => model.value ? idOf(model.value) : undefined,
   set: (id: string | undefined) => {
-    model.value = id ? items.value.find(i => i.id === id)?.buyer : undefined
+    model.value = id ? items.value.find(i => i.id === id)?.buyer ?? offered.get(id) : undefined
   },
 })
 const shown = computed(() => {
