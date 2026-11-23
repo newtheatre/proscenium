@@ -321,6 +321,57 @@ describe('a member price by reference', () => {
     expect(await priced([m.number])).toMatchObject([{ amountMinor: 500, requirement: { ref: 'membership:any', evidence: m.membershipId, accountId: m.accountId } }])
   })
 
+  it('lets a signed-in member book their own and a friend\'s, the friend\'s by reference (V14)', async () => {
+    const { h, type } = await memberHouse()
+    const me = await referenced()
+    const friend = await referenced()
+    const actor = person([], { accountId: me.accountId })
+    // Past their own, a member's untyped ticket is still refused; typing the friend's is not.
+    expect(await buyWith(h, type.id, ['', ''], actor)).toMatchObject({ ok: false, code: 'box-office.requirement.limit' })
+    const both = await buyWith(h, type.id, ['', friend.number], actor)
+    expect(both.ok, JSON.stringify(both)).toBe(true)
+    const lines = await rows<{ requirement_evidence_id: string, requirement_account_id: string }>('SELECT requirement_evidence_id, requirement_account_id FROM box_office_order_lines WHERE order_id = ? ORDER BY requirement_account_id = ? DESC', (both as { orderId: string }).orderId, me.accountId)
+    expect(lines).toEqual([
+      { requirement_evidence_id: me.membershipId, requirement_account_id: me.accountId },
+      { requirement_evidence_id: friend.membershipId, requirement_account_id: friend.accountId },
+    ])
+  })
+
+  it('refuses a member\'s own reference typed for a friend\'s ticket, and never offers a manual check for a friend', async () => {
+    const { h, type } = await memberHouse()
+    const me = await referenced()
+    const actor = person([], { accountId: me.accountId })
+    expect(await buyWith(h, type.id, ['', me.number], actor)).toMatchObject({ ok: false, code: 'box-office.requirement.reference-used' })
+    const missing = await inContext(async () => {
+      resetRateLimits()
+      try {
+        await pricedLines(h.performanceId, [{ bandId: h.bandId, ticketTypeId: type.id, quantity: 2, references: ['', 'M-999999'] }], Date.now(), { channel: 'online', account: me.accountId })
+        return null
+      }
+      catch (error: any) {
+        return { code: error.code as string, fields: error.fields as Record<string, string> }
+      }
+    }, actor)
+    expect(missing).toMatchObject({ code: 'box-office.requirement.reference-not-met', fields: { reference: 'not-met' } })
+  })
+
+  it('lets a member who already holds theirs book for friends, all by reference', async () => {
+    const { h, type } = await memberHouse()
+    const me = await referenced()
+    const friend = await referenced()
+    const actor = person([], { accountId: me.accountId })
+    const mine = await buyWith(h, type.id, [''], actor)
+    expect(mine.ok, JSON.stringify(mine)).toBe(true)
+    const kept = (mine as { orderId: string }).orderId
+    await rows("UPDATE box_office_claims SET state = 'confirmed', expires_at = NULL WHERE hold_id IN (SELECT id FROM box_office_holds WHERE order_id = ?)", kept)
+    await rows("UPDATE box_office_orders SET state = 'reserved', expires_at = NULL, account_id = ? WHERE id = ?", me.accountId, kept)
+    await publish(h)
+    const page = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, actor)
+    expect(page.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ most: 1, own: 0, reference: { field: expect.any(String) } })
+    const theirs = await buyWith(h, type.id, [friend.number], actor)
+    expect(theirs.ok, JSON.stringify(theirs)).toBe(true)
+  })
+
   it('is offered on the booking page with the scheme\'s own words for the reference', async () => {
     const { h, type } = await memberHouse()
     await referenced()

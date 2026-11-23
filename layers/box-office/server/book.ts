@@ -2,7 +2,8 @@
 // one performance of a published production, whether it is on sale, and each band's ticket types
 // and prices. It never says how many seats the house holds or how many are sold: a band is either
 // available or sold out.
-import { refuse, requirements, useContext, useSetting } from '#kit'
+import { first, refuse, requirements, useContext, useSetting } from '#kit'
+import { accountScopeSql } from '#kit/accounts'
 import { getPerformance, getProduction, latecomersAt, placeName, placeOf, type LatecomerRule } from '#modules/core'
 import { availability } from './availability'
 import { timingFor, type PaymentTiming } from './reservations'
@@ -35,9 +36,11 @@ export interface BookingPage {
      * `reference`: then the visitor may type one for each ticket instead, such as a student ID,
      * worded by the source ("NNT member? Enter your student ID"). `unmetHelp` is the source's own
      * link for someone who could qualify, such as the access scheme's application. `remedy` is a
-     * labelled way to put it right (join, renew) where the source gives one.
+     * labelled way to put it right (join, renew) where the source gives one. A type the visitor
+     * meets that takes a `reference` too can be booked for friends (Membership V14): `own` is how
+     * many more their own membership covers here, and each ticket past those takes a friend's reference.
      */
-    types: { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, shape: string } }[]
+    types: { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, own?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, noun?: string, shape: string } }[]
   }[]
 }
 
@@ -53,12 +56,17 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
   // What the visitor may have of each type with requirements, judged for them alone. A type whose
   // source is off is withheld; a companion type is shown only to someone it is for.
   const account = useContext().actor.accountId ?? null
-  const judged = new Map<string, { most?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, shape: string } } | null>()
+  const judged = new Map<string, { most?: number, own?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, noun?: string, shape: string } } | null>()
   for (const type of types.values()) {
     if (!type.requirementRefs.length) continue
     const answers = await requirements.check({ accounts: [account], refs: type.requirementRefs, record: ['core.performance', performanceId], whenUnavailable: 'not-met' })
     const met = answers.find(a => a.verdict === 'met' && !a.unavailable)
-    if (met) judged.set(type.id, { most: met.quantity ?? type.maxPerHolder })
+    if (met) {
+      const most = met.quantity ?? type.maxPerHolder
+      const described = await requirements.describe(type.requirementRefs)
+      const reference = type.requirementRefs.map(ref => described[ref]?.presentable).find(Boolean)
+      judged.set(type.id, { most, ...(reference && account ? { own: Math.max(0, most - await heldOf(performanceId, type.id, account)), reference } : {}) })
+    }
     // A type that is not for this visitor at all (the source gives no reason, such as the Access
     // ticket for a wheelchair user, who has the Wheelchair space) is left out too.
     else if (answers.every(a => a.unavailable) || type.kind === 'companion' || !answers.some(a => a.reason)) judged.set(type.id, null)
@@ -95,4 +103,12 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
       }).sort((a, b) => a.restricted - b.restricted || a.sort - b.sort || a.name.localeCompare(b.name)).map(({ sort: _, restricted: __, ...type }) => type),
     })).filter(b => b.types.length),
   }
+}
+
+/** Live tickets of a type this account already holds for a performance, as the claim's limit counts them. */
+async function heldOf(performanceId: string, typeId: string, account: string): Promise<number> {
+  const row = await first<{ n: number }>(`SELECT count(*) AS n FROM box_office_order_lines l JOIN box_office_claims c ON c.id = l.claim_id
+    WHERE l.performance_id = ?1 AND l.ticket_type_id = ?2 AND l.state = 'live' AND c.state IN ('held', 'confirmed')
+      AND l.requirement_account_id IN (${accountScopeSql('?3')})`, performanceId, typeId, account)
+  return row?.n ?? 0
 }

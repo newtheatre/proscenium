@@ -1,5 +1,11 @@
 {
   "box-office.book.most.one": "One per person.",
   "box-office.book.most.other": "Up to {count} per person.",
+  "box-office.book.friends.either": "{noun} or member number",
+  "box-office.book.friends.number": "member number",
+  "box-office.book.friends.note.one": "Your membership covers one. For each other ticket, type the {whose} of the member it is for.",
+  "box-office.book.friends.note.other": "Your membership covers {count}. For each other ticket, type the {whose} of the member it is for.",
+  "box-office.book.friends.none": "You already have yours for this performance. For each ticket here, type the {whose} of the member it is for.",
+  "box-office.book.friends.reference": "The {whose} of the member for ticket {n}",
   "box-office.book.sign-in": "Sign in"
 }
