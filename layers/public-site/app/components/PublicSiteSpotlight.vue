@@ -18,7 +18,7 @@ interface Listing {
   poster: { url: string, alt: string, width: number | null, height: number | null } | null
   price: PriceSummaryView | null
 }
-interface Booking { state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed', link?: string, external?: true, drawer?: string }
+interface Booking { state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed', link?: string, external?: true, drawer?: string, seatsLeft?: number, sellingFast?: true }
 interface Production {
   companyName: string | null
   runningMinutes: number | null
