@@ -12,7 +12,7 @@ const emit = defineEmits<{ (e: 'applied'): void }>()
 const { t } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
-interface Form { accountId: string, label: string, applied: boolean, needs: { id: string, key: string, label: string, description: string | null }[], allowNote: boolean }
+interface Form { accountId: string, label: string, applied: boolean, needs: { id: string, key: string, label: string, description: string | null, group: string | null }[], allowNote: boolean }
 const form = ref<Form | null>(null)
 const error = ref<string | null>(null)
 
@@ -50,6 +50,7 @@ async function submit(values: Record<string, unknown>) {
     v-else-if="form"
     :key="form.accountId"
     v-model:open="open"
+    always-panel
     :title="t('box-office.screens.panel.access.title', { name: form.label })"
     :description="t('box-office.screens.panel.access.description')"
     :submit-label="t('box-office.screens.panel.access.send')"

@@ -5,11 +5,14 @@ import { z } from 'zod'
 /** Asked as "I use a wheelchair", then one or the other. */
 export const WHEELCHAIR = { stays: 'wheelchair-stays', transfers: 'wheelchair-transfers' } as const
 
+/** Asked as "I come with an assistance dog". */
+export const ASSISTANCE_DOG = 'assistance-dog'
+
 /** Set from the companions question and from "anything else"; never ticked. */
 export const DERIVED = { companion: 'essential-companion', other: 'other' } as const
 
 /** The entries the tick list leaves out, because the form asks about them another way. */
-export const NOT_TICKED: readonly string[] = [WHEELCHAIR.stays, WHEELCHAIR.transfers, DERIVED.companion, DERIVED.other]
+export const NOT_TICKED: readonly string[] = [WHEELCHAIR.stays, WHEELCHAIR.transfers, ASSISTANCE_DOG, DERIVED.companion, DERIVED.other]
 
 /** Somebody brought in by staff (ID-42), by email link or in person: what both routes and the dialogue check. */
 export const accessPersonInput = z.object({
