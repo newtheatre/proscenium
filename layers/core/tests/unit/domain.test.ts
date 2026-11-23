@@ -1,11 +1,12 @@
 // Pure parts of the core domain: brand colours (C-35), file inspection and cleaning (C-23, C-36),
 // the operating day (C-37), email rendering (C-27) and the fork-site check (C-40).
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { contrast, nearestShade, over, solidFill } from '../../shared/colour'
 import { themeCss, tokensFor, type BrandChoice } from '../../server/brand/theme'
+import { BRAND_FONTS, type BrandFont } from '../../shared/brand-fonts'
 import { clean, cleanSvg, sniff, Rejected } from '../../server/files/inspect'
 import { operatingDayAt, operatingDayBounds } from '../../server/calendar'
 import { hasLink, linkPath, render, variablesIn, isSafeUrl } from '../../server/notifications/render'
@@ -15,10 +16,11 @@ import { findRedirect } from '../../shared/redirects'
 const ascii = (s: string) => [...s].map(c => c.charCodeAt(0))
 const u32be = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]
 const u32le = (n: number) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]
+const PUBLIC_FONTS = new URL('../../public/fonts', import.meta.url).pathname
 const text = (b: Uint8Array) => new TextDecoder('latin1').decode(b)
 
 describe('brand colours (C-35)', () => {
-  const choice = (accent: string): BrandChoice => ({ accent, neutral: 'slate', displayFont: 'system', radius: 'medium' })
+  const choice = (accent: string): BrandChoice => ({ accent, neutral: 'slate', displayFont: 'system', bodyFont: 'system', radius: 'medium' })
   const colours = ['#ffff00', '#00ff00', '#ffffff', '#000000', '#2563eb', '#f4a7b9', '#7c3aed', '#0e7490', '#fde047', '#808080']
 
   it.each(colours)('keeps text readable whatever colour is chosen: %s', (accent) => {
@@ -45,6 +47,32 @@ describe('brand colours (C-35)', () => {
     expect(css).toContain(':root{--brand-radius:0.5rem')
     expect(css).toContain(`--brand-link:${tokens.light.link}`)
     expect(css).toMatch(new RegExp(`html\\.dark\\{[^}]*--brand-link:${tokens.dark.link}`))
+  })
+
+  it('asks for no font file while both fonts are the device\'s own, and leaves the body font alone', () => {
+    const css = themeCss(tokensFor(choice('#2563eb')))
+    expect(css).not.toContain('@font-face')
+    expect(css).not.toContain('public-shell')
+  })
+
+  it('serves a chosen font from the site itself, and only the fonts chosen', () => {
+    const tokens = tokensFor({ ...choice('#2563eb'), displayFont: 'bricolage-grotesque', bodyFont: 'figtree' })
+    const css = themeCss(tokens)
+    expect(tokens.displayFont).toMatch(/^"Bricolage Grotesque Variable", /)
+    expect(css).toContain('src:url(/fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2)')
+    expect(css).toContain('src:url(/fonts/figtree/figtree-latin-ext-wght-normal.woff2)')
+    expect(css).not.toMatch(/inter|fraunces/)
+    expect(css).not.toMatch(/https?:\/\//)
+    expect(css).toContain(`body.public-shell{font-family:${tokens.bodyFont}}`)
+  })
+
+  it('has every served font\'s files and licence in public/fonts', () => {
+    for (const font of Object.values(BRAND_FONTS) as BrandFont[]) {
+      if (!font.served) continue
+      const folder = join(PUBLIC_FONTS, font.served.folder)
+      expect(readFileSync(join(folder, 'OFL.txt'), 'utf8')).toContain('SIL OPEN FONT LICENSE Version 1.1')
+      for (const subset of ['latin', 'latin-ext']) expect(existsSync(join(folder, `${font.served.folder}-${subset}-wght-normal.woff2`))).toBe(true)
+    }
   })
 
   it('gives Nuxt UI a primary that reads under its inverted text and on the page, in both modes', () => {
