@@ -305,6 +305,7 @@ async function archive() {
         color="error"
         variant="outline"
         :label="t('core.roles.archive')"
+        loading-auto
         @click="archive"
       />
       <UButton

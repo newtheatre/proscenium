@@ -13,8 +13,8 @@ const { data, status, error, refresh } = await useAPI<{ rows: Row[] }>('/api/cor
 })
 const creating = ref(false)
 const fields = [
-  { name: 'label', label: 'Name', kind: 'text' as const },
-  { name: 'description', label: 'Description', kind: 'textarea' as const, optional: true },
+  { name: 'label', label: t('core.lists.name'), kind: 'text' as const },
+  { name: 'description', label: t('core.lists.field-description'), kind: 'textarea' as const, optional: true },
 ]
 const create = (values: Record<string, unknown>) => $api<{ key: string }>('/api/core/vocabularies', { method: 'POST', body: { ...values, description: values.description || null } })
 const created = (result: unknown) => navigateTo(`/admin/vocabularies/${encodeURIComponent((result as { key: string }).key)}`)
@@ -23,13 +23,13 @@ const line = (row: Row) => [row.description, t('core.counts.terms', { count: row
 
 <template>
   <PageFrame
-    title="Lists"
-    description="Lists of options of the theatre's own, for forms and records to choose from. The lists a module uses, such as its reasons for a refund, are on that module's page under Modules, on its Lists tab."
+    :title="t('core.lists.lists')"
+    :description="t('core.lists.description-lists-of-options')"
     width="reading"
   >
     <template #primary>
       <UButton
-        label="New list"
+        :label="t('core.lists.new-list')"
         icon="i-lucide-plus"
         @click="creating = true"
       />
@@ -43,12 +43,12 @@ const line = (row: Row) => [row.description, t('core.counts.terms', { count: row
       <EmptyState
         v-if="!data?.rows.length"
         icon="i-lucide-list-tree"
-        title="No lists of your own yet"
-        description="Make one when a form or a record needs its own set of options to choose from."
+        :title="t('core.lists.title-no-lists-of')"
+        :description="t('core.lists.description-make-one-when')"
       />
       <RecordList
         v-else
-        label="Lists"
+        :label="t('core.lists.lists')"
       >
         <RecordListItem
           v-for="row in data.rows"
@@ -59,7 +59,7 @@ const line = (row: Row) => [row.description, t('core.counts.terms', { count: row
         />
       </RecordList>
       <UButton
-        label="Modules"
+        :label="t('core.lists.modules')"
         trailing-icon="i-lucide-arrow-right"
         color="neutral"
         variant="link"
@@ -70,9 +70,9 @@ const line = (row: Row) => [row.description, t('core.counts.terms', { count: row
 
     <PageForm
       v-model:open="creating"
-      title="New list"
-      description="A list of options of the theatre's own, for forms and records to choose from."
-      submit-label="Create list"
+      :title="t('core.lists.new-list')"
+      :description="t('core.lists.description-a-list-of')"
+      :submit-label="t('core.lists.create-list')"
       :schema="vocabularyInput"
       :fields="fields"
       :initial="{ label: '', description: '' }"

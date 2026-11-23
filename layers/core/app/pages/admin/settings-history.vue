@@ -36,6 +36,12 @@ const people = computed(() => {
   return [{ value: ALL, label: t('core.settings-history.everyone') }, ...[...seen].map(([value, label]) => ({ value, label }))]
 })
 watch(module, () => { page.value = ALL })
+const filtersOn = computed(() => [module.value, page.value, actor.value].filter(v => v !== ALL).length)
+function clearFilters() {
+  module.value = ALL
+  page.value = ALL
+  actor.value = ALL
+}
 
 const query = computed(() => ({
   module: module.value === ALL ? undefined : module.value,
@@ -50,29 +56,34 @@ const query = computed(() => ({
     :description="t('core.settings-history.description')"
     width="reading"
   >
-    <div class="mb-6 grid gap-4 sm:grid-cols-3">
-      <UFormField :label="t('core.settings-history.filter-module')">
-        <USelect
-          v-model="module"
-          :items="moduleItems"
-          value-key="value"
-        />
-      </UFormField>
-      <UFormField :label="t('core.settings-history.filter-page')">
-        <USelect
-          v-model="page"
-          :items="pageItems"
-          value-key="value"
-        />
-      </UFormField>
-      <UFormField :label="t('core.settings-history.filter-person')">
-        <USelect
-          v-model="actor"
-          :items="people"
-          value-key="value"
-        />
-      </UFormField>
-    </div>
+    <template #toolbar>
+      <FilterPanel
+        :count="filtersOn"
+        @clear="clearFilters"
+      >
+        <UFormField :label="t('core.settings-history.filter-module')">
+          <USelectMenu
+            v-model="module"
+            :items="moduleItems"
+            value-key="value"
+          />
+        </UFormField>
+        <UFormField :label="t('core.settings-history.filter-page')">
+          <USelectMenu
+            v-model="page"
+            :items="pageItems"
+            value-key="value"
+          />
+        </UFormField>
+        <UFormField :label="t('core.settings-history.filter-person')">
+          <USelectMenu
+            v-model="actor"
+            :items="people"
+            value-key="value"
+          />
+        </UFormField>
+      </FilterPanel>
+    </template>
     <SettingChanges :query="query" />
   </PageFrame>
 </template>

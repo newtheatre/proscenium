@@ -108,7 +108,7 @@ const finished = computed(() => sections.value.filter(s => !s.lines.length))
     >
       <div
         v-if="data"
-        class="space-y-8"
+        class="space-y-4"
       >
         <UAlert
           :color="data.hidden ? 'warning' : 'success'"
@@ -119,25 +119,21 @@ const finished = computed(() => sections.value.filter(s => !s.lines.length))
           :actions="notice"
         />
         <RefusalNotice :refusal="refusal" />
-        <section
+        <PageSection
           v-for="section in outstanding"
           :key="section.id"
-          :aria-labelledby="`readiness-${section.id}`"
-          class="space-y-3"
+          :title="t(`public-site.readiness.${section.id}.title`)"
         >
-          <div class="flex items-center justify-between gap-3">
-            <h2
-              :id="`readiness-${section.id}`"
-              class="text-base font-semibold text-highlighted"
-            >
-              {{ t(`public-site.readiness.${section.id}.title`) }}
-            </h2>
+          <template #actions>
             <StatusBadge
               tone="warning"
               :label="t('public-site.readiness.to-do', { count: section.lines.length })"
             />
-          </div>
-          <RecordList :label="t(`public-site.readiness.${section.id}.title`)">
+          </template>
+          <RecordList
+            flush
+            :label="t(`public-site.readiness.${section.id}.title`)"
+          >
             <RecordListItem
               v-for="line in section.lines"
               :key="line.id"
@@ -146,19 +142,15 @@ const finished = computed(() => sections.value.filter(s => !s.lines.length))
               :to="line.to"
             />
           </RecordList>
-        </section>
-        <section
+        </PageSection>
+        <PageSection
           v-if="finished.length"
-          aria-labelledby="readiness-finished"
-          class="space-y-3"
+          :title="t('public-site.readiness.finished')"
         >
-          <h2
-            id="readiness-finished"
-            class="text-base font-semibold text-highlighted"
+          <RecordList
+            flush
+            :label="t('public-site.readiness.finished')"
           >
-            {{ t('public-site.readiness.finished') }}
-          </h2>
-          <RecordList :label="t('public-site.readiness.finished')">
             <RecordListItem
               v-for="section in finished"
               :key="section.id"
@@ -167,7 +159,7 @@ const finished = computed(() => sections.value.filter(s => !s.lines.length))
               :description="t(`public-site.readiness.${section.id}.none`)"
             />
           </RecordList>
-        </section>
+        </PageSection>
       </div>
     </DataBoundary>
   </PageFrame>
