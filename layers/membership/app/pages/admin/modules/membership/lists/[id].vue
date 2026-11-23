@@ -168,6 +168,11 @@ const facts = computed(() => {
     { label: t('membership.screens.list.fact-used-by'), value: data.value?.schemes.length ? data.value.schemes.map(s => s.name).join(', ') : t('membership.screens.list.fact-no-scheme'), to: data.value?.schemes.length === 1 ? `/admin/modules/membership/schemes/${data.value.schemes[0]!.id}` : undefined },
   ]
 })
+// Loading the file is what the page is for; adding one entry by hand is the exception.
+const pageActions = computed(() => [
+  { label: t('membership.screens.list.load'), icon: 'i-lucide-upload', disabled: !data.value?.keySet, onSelect: () => { loading.value = true } },
+  { label: t('membership.screens.list.add-entry'), icon: 'i-lucide-plus', onSelect: openAdd },
+])
 </script>
 
 <template>
@@ -180,19 +185,7 @@ const facts = computed(() => {
       v-if="list"
       #primary
     >
-      <UButton
-        icon="i-lucide-plus"
-        color="neutral"
-        variant="outline"
-        :label="t('membership.screens.list.add-entry')"
-        @click="openAdd"
-      />
-      <UButton
-        icon="i-lucide-upload"
-        :label="t('membership.screens.list.load')"
-        :disabled="!data?.keySet"
-        @click="loading = true"
-      />
+      <PageActions :actions="pageActions" />
       <RowActions
         :items="actions"
         :label="t('membership.screens.list.actions', { list: list.name })"

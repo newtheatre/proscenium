@@ -104,8 +104,9 @@ async function submit() {
           :label="t('membership.screens.add-member.scheme')"
           required
         >
-          <USelect
+          <USelectMenu
             :model-value="member.schemeId || undefined"
+            value-key="value"
             :items="choices.map(s => ({ value: s.id, label: s.name }))"
             :placeholder="t('membership.screens.add-member.scheme-placeholder')"
             @update:model-value="pick($event as string)"

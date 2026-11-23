@@ -124,6 +124,18 @@ async function revoke() {
     revokeEl.value?.setErrors(fieldErrors(revokeRefusal.value))
   }
 }
+function openRevoke() {
+  reason.value = ''
+  revokeRefusal.value = null
+  revoking.value = true
+}
+// Neither is the page's primary action: both change the record, and reading it is the common case.
+const pageActions = computed(() => a.value?.state !== 'current'
+  ? []
+  : [
+      ...(data.value?.canUpdate ? [{ label: t('awards.screens.award.correct'), icon: 'i-lucide-pencil', lesser: true, onSelect: openEdit }] : []),
+      ...(data.value?.canRevoke ? [{ label: t('awards.screens.award.revoke'), icon: 'i-lucide-undo-2', lesser: true, onSelect: openRevoke }] : []),
+    ])
 </script>
 
 <template>
@@ -144,22 +156,7 @@ async function revoke() {
       v-if="a"
       #primary
     >
-      <UButton
-        v-if="data?.canUpdate && a.state === 'current'"
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-pencil"
-        :label="t('awards.screens.award.correct')"
-        @click="openEdit()"
-      />
-      <UButton
-        v-if="data?.canRevoke && a.state === 'current'"
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-undo-2"
-        :label="t('awards.screens.award.revoke')"
-        @click="revoking = true; reason = ''; revokeRefusal = null"
-      />
+      <PageActions :actions="pageActions" />
     </template>
     <DataBoundary
       :data="data"
