@@ -1,12 +1,10 @@
-<!-- Report an incident (Front of house specification, part 5, "Live mode"; FH-27, IN-1): four short
-     steps, what happened (and what kind); when and where; who was involved; what was done straight
-     away, first aid, emergency services and whether it is serious. The time is a day (today, or
-     yesterday for something just before midnight) and a clock time, both in the theatre's time zone
-     whatever the phone's. Who is optional: someone working the performance, found by search when the
-     report comes from its board, or anyone else by name (an audience member, say) with a way to
-     reach them, each with how they were involved. Welfare details are left to whoever reviews it.
-     Then "Sent" with its number. Sending needs a connection for now: while the device is offline
-     the steps can be filled in but the send button waits, and says why. -->
+<!-- Report an incident (Front of house specification, part 5, "Live mode"; FH-27, IN-1): one page,
+     with the only thing a report must have at the top: what happened, and what kind. Under it what was
+     done straight away, first aid, emergency services and whether it is serious; then when and where,
+     which start as now and here; then who was involved, which is optional. "Send the report" stays in
+     reach at the foot the whole time. The time is a day and a clock time in the theatre's time zone
+     whatever the phone's. Welfare details are left to whoever reviews it. Sending needs a connection:
+     offline the page can be filled in but the send button waits, and says why. -->
 <script setup lang="ts">
 import { CalendarDateTime, now as nowIn, Time, toZoned } from '@internationalized/date'
 import { useOnline } from '@vueuse/core'
@@ -32,7 +30,6 @@ const at = shallowRef(new Time(started.hour, started.minute))
 const day = ref<'today' | 'yesterday'>('today')
 const days = computed(() => (['today', 'yesterday'] as const).map(value => ({ value, label: t(`front-of-house.live.incident.${value}`) })))
 const form = ref({ whatHappened: '', whereNote: '', kind: 'incident' as 'incident' | 'near_miss', immediateAction: '', firstAidGiven: false, emergencyServicesCalled: false, serious: false })
-const step = ref(0)
 
 // Who was involved (IN-1). People are added one at a time: someone working the performance the report
 // is about, found by search, or anyone else by name. Without a performance there is no one to search.
@@ -63,6 +60,7 @@ function addPerson() {
   })
   person.value = { ...blank(), source: p.source }
   unnamed.value = false
+  adding.value = false
 }
 watch(() => [person.value.source, person.value.accountId, person.value.name], () => { unnamed.value = false })
 const sent = ref<{ reference: string } | null>(null)
@@ -71,12 +69,6 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 // One key for this report, kept across a retried send, so a report is never made twice.
 let reportKey: string | undefined
 
-const steps = computed(() => [
-  { title: t('front-of-house.live.incident.step-what'), icon: 'i-lucide-pen-line' },
-  { title: t('front-of-house.live.incident.step-when'), icon: 'i-lucide-clock' },
-  { title: t('front-of-house.live.incident.step-who'), icon: 'i-lucide-users' },
-  { title: t('front-of-house.live.incident.step-help'), icon: 'i-lucide-heart-pulse' },
-])
 const kinds = computed(() => (['incident', 'near_miss'] as const).map(value => ({ value, label: t(`front-of-house.incident-kinds.${value}`) })))
 /** The day and clock time given, in the theatre's time zone. */
 function occurredAt(): number {
@@ -87,18 +79,26 @@ function occurredAt(): number {
 // Only a time still to come is refused: something at 23:50 reported at 00:10 is yesterday's.
 const later = ref(false)
 watch([at, day], () => { later.value = false })
-const canGo = computed(() => step.value !== 0 || form.value.whatHappened.trim().length > 0)
-function next() {
-  if (step.value === 1 && occurredAt() > Date.now()) {
-    later.value = true
-    return
-  }
-  // Someone filled in but not yet added is added on the way, rather than lost.
-  if (step.value === 2 && (person.value.accountId || person.value.name.trim())) addPerson()
-  step.value++
+const untold = ref(false)
+watch(() => form.value.whatHappened, () => { untold.value = false })
+const adding = ref(false)
+
+/** Shows the first thing in the way, rather than a send button that does nothing. */
+function reveal(id: string) {
+  void nextTick(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
 }
 
 async function send() {
+  if (!form.value.whatHappened.trim()) {
+    untold.value = true
+    return reveal('fh-incident-what')
+  }
+  if (occurredAt() > Date.now()) {
+    later.value = true
+    return reveal('fh-incident-when')
+  }
+  // Someone filled in but not yet added is added on the way, rather than lost.
+  if (person.value.accountId || person.value.name.trim()) addPerson()
   refusal.value = null
   sending.value = true
   try {
@@ -156,176 +156,38 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
         />
       </template>
       <template v-else>
-        <UStepper
-          v-model="step"
-          :items="steps"
-          size="sm"
-          disabled
-        />
         <RefusalNotice :refusal="refusal" />
+        <UAlert
+          v-if="!online"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-wifi-off"
+          :title="t('front-of-house.live.incident.offline')"
+        />
 
-        <div
-          v-if="step === 0"
-          class="space-y-4"
-        >
-          <UFormField :label="t('front-of-house.live.incident.kind')">
-            <URadioGroup
-              v-model="form.kind"
-              :items="kinds"
-              size="xl"
-              variant="card"
-            />
-          </UFormField>
+        <div class="space-y-4">
           <UFormField
+            id="fh-incident-what"
             :label="t('front-of-house.live.incident.what')"
             :help="t('front-of-house.live.incident.what-help')"
+            :error="untold ? t('front-of-house.live.incident.what-needed') : undefined"
             required
           >
             <UTextarea
               v-model="form.whatHappened"
               :maxlength="4000"
-              :rows="5"
+              :rows="4"
               autoresize
               size="xl"
             />
           </UFormField>
-        </div>
-
-        <div
-          v-else-if="step === 1"
-          class="space-y-4"
-        >
-          <UFormField
-            :label="t('front-of-house.live.incident.day')"
-          >
+          <UFormField :label="t('front-of-house.live.incident.kind')">
             <URadioGroup
-              v-model="day"
-              :items="days"
+              v-model="form.kind"
+              :items="kinds"
               orientation="horizontal"
               size="xl"
               variant="card"
-            />
-          </UFormField>
-          <UFormField
-            :label="t('front-of-house.live.incident.when')"
-            :help="t('front-of-house.live.incident.when-help')"
-            :error="later ? t('front-of-house.live.incident.later') : undefined"
-          >
-            <UInputTime
-              v-model="at"
-              size="xl"
-            />
-          </UFormField>
-          <UFormField :label="t('front-of-house.live.incident.where')">
-            <UInput
-              v-model="form.whereNote"
-              :maxlength="120"
-              size="xl"
-            />
-          </UFormField>
-        </div>
-
-        <div
-          v-else-if="step === 2"
-          class="space-y-4"
-        >
-          <p class="text-muted">
-            {{ t('front-of-house.live.incident.who-help') }}
-          </p>
-          <RecordList
-            v-if="people.length"
-            :label="t('front-of-house.live.incident.who-list')"
-          >
-            <RecordListItem
-              v-for="(p, i) in people"
-              :key="p.key"
-              icon="i-lucide-user"
-              :name="p.name"
-              :description="[t(`front-of-house.involvements.${p.involvement}`), p.contact].filter(Boolean).join(' · ')"
-            >
-              <IconButton
-                icon="i-lucide-x"
-                size="lg"
-                :label="t('front-of-house.live.incident.who-remove', { name: p.name })"
-                @click="people.splice(i, 1)"
-              />
-            </RecordListItem>
-          </RecordList>
-          <div class="space-y-4 rounded-md border border-default p-4">
-            <URadioGroup
-              v-if="crew"
-              v-model="person.source"
-              :items="sources"
-              orientation="horizontal"
-              size="xl"
-              variant="card"
-              :aria-label="t('front-of-house.live.incident.who-source')"
-            />
-            <UFormField
-              v-if="crew && person.source === 'system'"
-              :label="t('front-of-house.live.incident.who-person')"
-              :error="unnamed ? t('front-of-house.live.incident.who-choose') : undefined"
-            >
-              <PersonPicker
-                v-model="person.accountId"
-                :endpoint="crew ?? undefined"
-                :exclude="picked"
-                size="xl"
-                @picked="p => person.label = p?.label ?? ''"
-              />
-            </UFormField>
-            <template v-else>
-              <UFormField
-                :label="t('front-of-house.live.incident.who-name')"
-                :error="unnamed ? t('front-of-house.live.incident.who-name-needed') : undefined"
-              >
-                <UInput
-                  v-model="person.name"
-                  :maxlength="120"
-                  size="xl"
-                />
-              </UFormField>
-              <UFormField
-                :label="t('front-of-house.live.incident.who-contact')"
-                :help="t('front-of-house.live.incident.who-contact-help')"
-              >
-                <UInput
-                  v-model="person.contact"
-                  :maxlength="200"
-                  size="xl"
-                />
-              </UFormField>
-            </template>
-            <UFormField :label="t('front-of-house.live.incident.who-involvement')">
-              <URadioGroup
-                v-model="person.involvement"
-                :items="involvements"
-                size="xl"
-                variant="card"
-              />
-            </UFormField>
-            <UButton
-              color="neutral"
-              variant="outline"
-              size="xl"
-              block
-              icon="i-lucide-user-plus"
-              :label="t('front-of-house.live.incident.who-add')"
-              @click="addPerson"
-            />
-          </div>
-        </div>
-
-        <div
-          v-else
-          class="space-y-4"
-        >
-          <UFormField :label="t('front-of-house.live.incident.done-straight-away')">
-            <UTextarea
-              v-model="form.immediateAction"
-              :maxlength="2000"
-              autoresize
-              size="xl"
             />
           </UFormField>
           <USwitch
@@ -344,14 +206,153 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
             :label="t('front-of-house.live.incident.serious')"
             :description="t('front-of-house.live.incident.serious-help')"
           />
-          <UAlert
-            v-if="!online"
-            color="warning"
-            variant="subtle"
-            icon="i-lucide-wifi-off"
-            :title="t('front-of-house.live.incident.offline')"
-          />
+          <UFormField :label="t('front-of-house.live.incident.done-straight-away')">
+            <UTextarea
+              v-model="form.immediateAction"
+              :maxlength="2000"
+              autoresize
+              size="xl"
+            />
+          </UFormField>
         </div>
+
+        <PageSection
+          :title="t('front-of-house.live.incident.section-when')"
+          :description="t('front-of-house.live.incident.section-when-help')"
+        >
+          <div class="space-y-4">
+            <UFormField :label="t('front-of-house.live.incident.day')">
+              <URadioGroup
+                v-model="day"
+                :items="days"
+                orientation="horizontal"
+                size="xl"
+                variant="card"
+              />
+            </UFormField>
+            <UFormField
+              id="fh-incident-when"
+              :label="t('front-of-house.live.incident.when')"
+              :help="t('front-of-house.live.incident.when-help')"
+              :error="later ? t('front-of-house.live.incident.later') : undefined"
+            >
+              <UInputTime
+                v-model="at"
+                size="xl"
+              />
+            </UFormField>
+            <UFormField :label="t('front-of-house.live.incident.where')">
+              <UInput
+                v-model="form.whereNote"
+                :maxlength="120"
+                size="xl"
+              />
+            </UFormField>
+          </div>
+        </PageSection>
+
+        <PageSection
+          :title="t('front-of-house.live.incident.section-who')"
+          :description="t('front-of-house.live.incident.who-help')"
+        >
+          <div class="space-y-4">
+            <RecordList
+              v-if="people.length"
+              :label="t('front-of-house.live.incident.who-list')"
+            >
+              <RecordListItem
+                v-for="(p, i) in people"
+                :key="p.key"
+                icon="i-lucide-user"
+                :name="p.name"
+                :description="[t(`front-of-house.involvements.${p.involvement}`), p.contact].filter(Boolean).join(' · ')"
+              >
+                <IconButton
+                  icon="i-lucide-x"
+                  size="lg"
+                  :label="t('front-of-house.live.incident.who-remove', { name: p.name })"
+                  @click="people.splice(i, 1)"
+                />
+              </RecordListItem>
+            </RecordList>
+            <UButton
+              v-if="!adding"
+              color="neutral"
+              variant="outline"
+              size="xl"
+              block
+              icon="i-lucide-user-plus"
+              :label="t(people.length ? 'front-of-house.live.incident.who-another' : 'front-of-house.live.incident.who-start')"
+              @click="adding = true"
+            />
+            <div
+              v-else
+              class="space-y-4 rounded-md border border-default p-4"
+            >
+              <URadioGroup
+                v-if="crew"
+                v-model="person.source"
+                :items="sources"
+                orientation="horizontal"
+                size="xl"
+                variant="card"
+                :aria-label="t('front-of-house.live.incident.who-source')"
+              />
+              <UFormField
+                v-if="crew && person.source === 'system'"
+                :label="t('front-of-house.live.incident.who-person')"
+                :error="unnamed ? t('front-of-house.live.incident.who-choose') : undefined"
+              >
+                <PersonPicker
+                  v-model="person.accountId"
+                  :endpoint="crew ?? undefined"
+                  :exclude="picked"
+                  size="xl"
+                  @picked="p => person.label = p?.label ?? ''"
+                />
+              </UFormField>
+              <template v-else>
+                <UFormField
+                  :label="t('front-of-house.live.incident.who-name')"
+                  :error="unnamed ? t('front-of-house.live.incident.who-name-needed') : undefined"
+                >
+                  <UInput
+                    v-model="person.name"
+                    :maxlength="120"
+                    size="xl"
+                  />
+                </UFormField>
+                <UFormField
+                  :label="t('front-of-house.live.incident.who-contact')"
+                  :help="t('front-of-house.live.incident.who-contact-help')"
+                >
+                  <UInput
+                    v-model="person.contact"
+                    :maxlength="200"
+                    size="xl"
+                  />
+                </UFormField>
+              </template>
+              <UFormField :label="t('front-of-house.live.incident.who-involvement')">
+                <URadioGroup
+                  v-model="person.involvement"
+                  :items="involvements"
+                  size="xl"
+                  variant="card"
+                />
+              </UFormField>
+              <UButton
+                color="neutral"
+                variant="outline"
+                size="xl"
+                block
+                icon="i-lucide-user-plus"
+                :label="t('front-of-house.live.incident.who-add')"
+                @click="addPerson"
+              />
+            </div>
+          </div>
+        </PageSection>
       </template>
     </div>
 
@@ -359,32 +360,13 @@ const back = computed(() => board.value ? `/live/front-of-house/${encodeURICompo
       v-if="!sent"
       #footer
     >
-      <div class="mx-auto flex max-w-2xl gap-3">
+      <div class="mx-auto max-w-2xl">
         <UButton
-          v-if="step > 0"
-          color="neutral"
-          variant="outline"
-          size="xl"
-          icon="i-lucide-arrow-left"
-          :label="t('front-of-house.live.incident.back')"
-          @click="step--"
-        />
-        <UButton
-          v-if="step < 3"
-          size="xl"
-          class="flex-1 justify-center"
-          trailing-icon="i-lucide-arrow-right"
-          :disabled="!canGo"
-          :label="t('front-of-house.live.incident.continue')"
-          @click="next"
-        />
-        <UButton
-          v-else
           size="xl"
           color="warning"
-          class="flex-1 justify-center"
+          block
           icon="i-lucide-send"
-          :disabled="!online || !form.whatHappened.trim()"
+          :disabled="!online"
           :loading="sending"
           :label="t('front-of-house.live.incident.send')"
           @click="send"

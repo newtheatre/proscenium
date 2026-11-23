@@ -47,7 +47,9 @@ async function load(append = false) {
     const answer = await $api<{ changes: SettingChange[], next: string | null }>('/api/core/settings/history', {
       query: { ...Object.fromEntries(Object.entries(props.query).filter(([, v]) => v)), before: append ? next.value ?? undefined : undefined },
     })
-    rows.value = append ? [...rows.value, ...answer.changes] : answer.changes
+    // A save that left the value as it was is not a change worth reading (a sensitive one hides both).
+    const real = answer.changes.filter(c => c.sensitive || JSON.stringify(c.before ?? null) !== JSON.stringify(c.after ?? null))
+    rows.value = append ? [...rows.value, ...real] : real
     next.value = answer.next
     status.value = 'ready'
   }
@@ -77,7 +79,11 @@ function valueText(value: unknown, kind?: string): string {
     return t('core.settings-page.rate', { count, period: formatDuration(per) })
   }
   if (Array.isArray(value)) return value.join(', ') || t('core.settings-history.empty')
-  if (typeof value === 'object') return JSON.stringify(value)
+  // A value of several parts reads as its parts, never as stored JSON.
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([part, v]) => `${part}: ${valueText(v)}`).join('; ') || t('core.settings-history.empty')
+  }
   return String(value)
 }
 

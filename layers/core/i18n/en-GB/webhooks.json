@@ -7,7 +7,7 @@
   "core.webhooks.empty": "No webhooks yet",
   "core.webhooks.empty-help": "Add one to send events such as a production being published to another system.",
   "core.webhooks.missing": "There is no such webhook",
-  "core.webhooks.settings": "Webhook settings",
+  "core.webhooks.settings": "Delivery limits",
   "core.webhooks.state.active": "Active",
   "core.webhooks.state.paused": "Paused",
   "core.webhooks.state.failing": "Paused after failures",

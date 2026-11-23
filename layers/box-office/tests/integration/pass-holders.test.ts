@@ -11,6 +11,7 @@ import givePost from '../../server/api/box-office/pass-types/[id]/passes.post'
 import passGet from '../../server/api/box-office/passes/[id]/index.get'
 import passPost from '../../server/api/box-office/passes/[id]/index.post'
 import mineGet from '../../server/api/box-office/passes/mine.get'
+import myPassesCount from '../../server/contributions/core.count/my-passes'
 import { createBasket } from '../../server/baskets'
 import { scan } from '../../server/door'
 import { ensureManagedTicketTypes } from '../../server/ticket-types'
@@ -59,6 +60,9 @@ describe('the people who hold a pass', () => {
     const mine = await api('GET', '/api/box-office/passes/mine', undefined, holder)
     expect(mine.body.passes).toMatchObject([{ id: passId, name: 'Season Pass', priceName: 'Adult', code, owedMinor: 3500, entries: [], open: [{ productionId: a.productionId }] }])
     expect((await api('GET', '/api/box-office/passes/mine', undefined, friend)).body.passes).toEqual([])
+    // My account lists Passes only for somebody who holds one.
+    expect(await inContext(() => myPassesCount.value(holder))).toBe(1)
+    expect(await inContext(() => myPassesCount.value(friend))).toBe(0)
     expect((await api('GET', `/api/box-office/pass-types/${typeId}/passes`, undefined, holder)).status).toBe(403)
   })
 

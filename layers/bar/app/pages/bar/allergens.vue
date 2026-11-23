@@ -54,7 +54,9 @@ function shown(rows: Row[]): Shown[] {
     if (found) found.sizes.push(row.size)
     else out.push({ key, row, sizes: [row.size] })
   }
-  return out.map(o => ({ key: o.key, name: `${o.row.product} · ${o.sizes.join(t('bar.chart.sizes-separator'))}`, row: o.row }))
+  // A product sold one way has a single size called Each, which says nothing: the name stands alone.
+  const sizesOf = (sizes: string[]) => sizes.length === 1 && sizes[0] === 'Each' ? '' : ` · ${sizes.join(t('bar.chart.sizes-separator'))}`
+  return out.map(o => ({ key: o.key, name: `${o.row.product}${sizesOf(o.sizes)}`, row: o.row }))
 }
 function print() {
   window.print()
@@ -104,8 +106,8 @@ function print() {
               v-model="avoid"
               :items="avoidItems"
               orientation="horizontal"
-              class="flex-wrap"
-              :ui="{ fieldset: 'flex-wrap gap-x-4 gap-y-2' }"
+              size="lg"
+              :ui="{ fieldset: 'grid grid-cols-2 gap-x-4 gap-y-3 sm:flex sm:flex-wrap sm:gap-y-2' }"
             />
           </UFormField>
           <p

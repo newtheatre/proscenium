@@ -77,7 +77,7 @@ test.describe('the public chart', () => {
     await visit(page, '/bar/allergens')
     await expect(page.getByRole('heading', { name: 'Allergens at the bar', level: 1 })).toBeVisible()
     await noViolations(page)
-    await expect(page.getByText(`Fruit cup jug ${stamp} · Each`).first()).toBeVisible()
+    await expect(page.getByText(`Fruit cup jug ${stamp}`, { exact: true }).first()).toBeVisible()
     await page.getByLabel('Sulphur dioxide and sulphites').check()
     await expect(page.getByText('May contain Sulphur dioxide and sulphites').first()).toBeVisible()
     await noViolations(page)

@@ -47,6 +47,11 @@ const groups = computed(() => {
   for (const e of data.value?.events ?? []) by.set(e.module, [...(by.get(e.module) ?? []), e])
   return [...by].map(([module, events]) => ({ module, name: moduleName(module), events })).sort((a, b) => a.name.localeCompare(b.name))
 })
+// An event in words ("Night report signed off"); its exact name stays beneath for whoever wires the receiver.
+function eventWords(e: DeliverableEvent): string {
+  const words = e.name.slice(e.module.length + 1).replace(/[.-]/g, ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
 const has = (name: string) => form.events.includes(name)
 function choose(name: string, on: boolean | 'indeterminate') {
   form.events = on === true ? [...new Set([...form.events, name])] : form.events.filter(e => e !== name)
@@ -165,6 +170,7 @@ async function retry(d: WebhookDelivery) {
 <template>
   <PageFrame
     :title="title"
+    :trail="[{ label: t('core.webhooks.title'), to: '/admin/webhooks' }]"
     width="reading"
   >
     <template #status>
@@ -311,8 +317,9 @@ async function retry(d: WebhookDelivery) {
                       :id="`webhook-event-${e.name}`"
                       :key="e.name"
                       :model-value="has(e.name)"
-                      :label="e.name"
-                      :ui="{ label: 'font-mono text-xs' }"
+                      :label="eventWords(e)"
+                      :description="e.name"
+                      :ui="{ description: 'font-mono text-xs break-all' }"
                       @update:model-value="choose(e.name, $event)"
                     />
                   </div>

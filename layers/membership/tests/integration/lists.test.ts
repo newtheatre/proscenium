@@ -4,7 +4,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { first, requirements } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
-import { inContext, person } from '../../../../tests/integration/helpers'
+import { inContext, person, saveKey } from '../../../../tests/integration/helpers'
 import { namesAgree } from '../../server/lists'
 import { applicant, ready, req, scheme } from './stage'
 
@@ -32,6 +32,18 @@ async function listScheme(fields: Record<string, unknown> = {}, lengths?: number
 const check = (listId: string, value: string) => req('POST', `/api/membership/lists/${listId}/check`, { value })
 
 describe('a verification list', () => {
+  it('makes the list key with the first list, and leaves a saved key alone', async () => {
+    await saveKey('MEMBERSHIP_LIST_KEY', null)
+    expect((await req('GET', '/api/membership/lists')).body.keySet).toBe(false)
+    const id = await makeList()
+    expect((await req('GET', '/api/membership/lists')).body.keySet).toBe(true)
+    expect((await check(id, '20123456')).body).toMatchObject({ found: true })
+    // A second list keeps the key the first was hashed with, so the first still matches.
+    await makeList()
+    expect((await check(id, '20123456')).body).toMatchObject({ found: true })
+    await saveKey('MEMBERSHIP_LIST_KEY', 'test-list-key-not-secret')
+  })
+
   it('loads a file after a dry run, keeping no ID, and says which lines it left out', async () => {
     const made = await req('POST', '/api/membership/lists', { name: 'Dry', keyKind: 'reference', referenceLabel: 'NNT member? Enter your University of Nottingham student ID', referenceNoun: 'student ID', referenceShape: { kind: 'digits', min: 8, max: 8 } })
     const id = made.body.listId

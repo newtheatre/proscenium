@@ -1,7 +1,7 @@
 <!-- Providers and readers (Box office specification, part 5; PAY-01, PAY-02): the payment providers
-     this site can use; the accounts set up with them, each a small card of one size; and payouts
-     entered by hand from the provider's statement. An account's keys (on the KeysCard every page
-     uses), notification address, card readers, test payment and taking it out of use open in a
+     this site can use, chosen from when an account is added; and the accounts set up with them, each
+     a small card of one size. Payouts are entered on Reconciliation. An account's keys (on the
+     KeysCard every page uses), notification address, card readers, test payment and taking it out of use open in a
      slide-over from its card. -->
 <script setup lang="ts">
 interface Provider { id: string, capabilities: string[], methods: { method: string, channels: string[] }[], pairsReaders: boolean }
@@ -130,31 +130,6 @@ async function checkTest(a: Account) {
 const keyId = (name: string) => name.toLowerCase().replaceAll('_', '-')
 const keyLabel = (name: string) => t(`payments.screens.providers.keys.${keyId(name)}.label`)
 const keyItems = (a: Account) => a.keys.map(k => ({ ...k, label: keyLabel(k.name), help: t(`payments.screens.providers.keys.${keyId(k.name)}.help`) }))
-
-// A payout entered by hand.
-const paying = ref(false)
-const payout = reactive({ providerAccountId: '', paidMinor: null as number | null, feesMinor: 0 as number | null, paidOn: '', reference: '', key: '' })
-const payoutRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-function openPayout() {
-  Object.assign(payout, { providerAccountId: data.value?.accounts.find(a => a.active && a.mode === 'live')?.id ?? '', paidMinor: null, feesMinor: 0, paidOn: '', reference: '', key: crypto.randomUUID() })
-  payoutRefusal.value = null
-  paying.value = true
-}
-async function recordPayout() {
-  busy.value = true
-  payoutRefusal.value = null
-  try {
-    await $api('/api/payments/payouts', { method: 'POST', body: { providerAccountId: payout.providerAccountId, paidMinor: payout.paidMinor ?? 0, feesMinor: payout.feesMinor ?? 0, paidOn: payout.paidOn, reference: payout.reference }, headers: { 'idempotency-key': payout.key } })
-    paying.value = false
-    toast.add({ title: t('payments.screens.payouts.recorded', { amount: money(payout.paidMinor ?? 0) }), color: 'success' })
-  }
-  catch (e) {
-    payoutRefusal.value = toRefusal(e)
-  }
-  finally {
-    busy.value = false
-  }
-}
 </script>
 
 <template>
@@ -178,17 +153,6 @@ async function recordPayout() {
             :title="t('payments.screens.providers.accounts-title')"
             :description="t('payments.screens.providers.accounts-help')"
           >
-            <template #actions>
-              <UButton
-                v-if="loaded.accounts.length"
-                :label="t('payments.screens.payouts.record')"
-                icon="i-lucide-landmark"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                @click="openPayout"
-              />
-            </template>
             <EmptyState
               v-if="!loaded.accounts.length"
               :title="t('payments.screens.providers.empty')"
@@ -272,20 +236,6 @@ async function recordPayout() {
                 </UCard>
               </li>
             </ul>
-          </PageSection>
-
-          <PageSection
-            :title="t('payments.screens.providers.available-title')"
-            :description="t('payments.screens.providers.available-help')"
-          >
-            <RecordList :label="t('payments.screens.providers.available-title')">
-              <RecordListItem
-                v-for="p in loaded.providers"
-                :key="p.id"
-                :name="providerName(p.id)"
-                :description="t(`payments.screens.providers.about.${p.id}`)"
-              />
-            </RecordList>
           </PageSection>
         </div>
       </template>
@@ -433,17 +383,12 @@ async function recordPayout() {
             :label="t('payments.screens.providers.provider')"
             required
           >
-            <USelect
+            <URadioGroup
               v-model="form.provider"
-              :items="(data?.providers ?? []).map(p => ({ value: p.id, label: providerName(p.id) }))"
+              variant="card"
+              :items="(data?.providers ?? []).map(p => ({ value: p.id, label: providerName(p.id), description: t(`payments.screens.providers.about.${p.id}`) }))"
             />
           </UFormField>
-          <p
-            v-if="chosen"
-            class="text-sm text-muted"
-          >
-            {{ t(`payments.screens.providers.about.${chosen.id}`) }}
-          </p>
           <UFormField
             name="label"
             :label="t('payments.screens.providers.label')"
@@ -494,79 +439,6 @@ async function recordPayout() {
           form="add-provider"
           :loading="busy"
           :label="t('payments.screens.providers.add-button')"
-        />
-      </template>
-    </UModal>
-
-    <UModal
-      v-model:open="paying"
-      :title="t('payments.screens.payouts.record')"
-      :description="t('payments.screens.payouts.help')"
-    >
-      <template #body>
-        <UForm
-          id="record-payout"
-          class="space-y-4"
-          :state="payout"
-          :validate="() => needs({ providerAccountId: payout.providerAccountId, paidMinor: payout.paidMinor, paidOn: payout.paidOn, reference: payout.reference })"
-          novalidate
-          @submit="recordPayout"
-        >
-          <RefusalNotice :refusal="payoutRefusal" />
-          <UFormField
-            name="providerAccountId"
-            :label="t('payments.screens.payouts.account')"
-            required
-          >
-            <USelect
-              v-model="payout.providerAccountId"
-              :items="(data?.accounts ?? []).filter(a => a.mode === 'live').map(a => ({ value: a.id, label: a.label }))"
-            />
-          </UFormField>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField
-              name="paidMinor"
-              :label="t('payments.screens.payouts.paid')"
-              :help="t('payments.screens.payouts.paid-help')"
-              required
-            >
-              <FieldMoney v-model="payout.paidMinor" />
-            </UFormField>
-            <UFormField
-              :label="t('payments.screens.payouts.fees')"
-              :help="t('payments.screens.payouts.fees-help')"
-            >
-              <FieldMoney v-model="payout.feesMinor" />
-            </UFormField>
-          </div>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField
-              name="paidOn"
-              :label="t('payments.screens.payouts.paid-on')"
-              required
-            >
-              <FieldDate v-model="payout.paidOn" />
-            </UFormField>
-            <UFormField
-              name="reference"
-              :label="t('payments.screens.payouts.reference')"
-              required
-              :error="payoutRefusal?.code === 'payments.payout.already-entered' ? payoutRefusal.reason : undefined"
-            >
-              <UInput
-                v-model="payout.reference"
-                maxlength="120"
-              />
-            </UFormField>
-          </div>
-        </UForm>
-      </template>
-      <template #footer>
-        <UButton
-          type="submit"
-          form="record-payout"
-          :loading="busy"
-          :label="t('payments.screens.payouts.record-button')"
         />
       </template>
     </UModal>

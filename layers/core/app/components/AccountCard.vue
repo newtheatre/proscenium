@@ -21,22 +21,30 @@ const props = defineProps<{
     :title="props.title"
     :description="props.description"
     orientation="horizontal"
-    :ui="{ container: 'lg:grid-cols-[1fr_auto]' }"
+    :ui="{ container: 'grid grid-cols-[1fr_auto] lg:grid-cols-[1fr_auto] items-center gap-4' }"
   >
     <template #title>
       <h3 :id="props.headingId">
         {{ props.title }}
       </h3>
     </template>
-    <div class="flex items-center justify-end gap-2">
+    <template
+      v-if="props.description || props.status"
+      #description
+    >
+      <span
+        v-if="props.description"
+        class="block"
+      >{{ props.description }}</span>
       <StatusBadge
         v-if="props.status"
         v-bind="props.status"
+        class="mt-2"
       />
-      <UIcon
-        name="i-lucide-chevron-right"
-        class="size-5 text-dimmed"
-      />
-    </div>
+    </template>
+    <UIcon
+      name="i-lucide-chevron-right"
+      class="size-5 text-dimmed"
+    />
   </UPageCard>
 </template>

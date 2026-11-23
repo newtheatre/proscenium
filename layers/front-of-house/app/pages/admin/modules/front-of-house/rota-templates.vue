@@ -24,9 +24,9 @@ interface Choices {
 const { t } = useT()
 const write = useAct()
 const { toRefusal } = useRefusal()
-const { confirm } = useConfirm()
+const undo = useUndo()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ templates: Template[] }>('/api/front-of-house/rota-templates', { key: 'front-of-house:rota-templates' })
+const { data, status, error, refresh } = await useAPI<{ templates: Template[], archived?: Template[] }>('/api/front-of-house/rota-templates', { key: 'front-of-house:rota-templates' })
 const { data: choices } = await useAPI<Choices>('/api/front-of-house/choices', { key: 'front-of-house:choices' })
 
 const ANY = 'any'
@@ -39,14 +39,19 @@ const blank = () => ({ name: '', venueId: ANY, isDefault: false, lines: [] as Li
 const form = ref(blank())
 const editing = ref<Template | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const open = ref(false)
 
 function edit(template: Template) {
   editing.value = template
   form.value = { name: template.name, venueId: template.venueId ?? ANY, isDefault: template.isDefault, lines: template.lines.map(l => ({ ...l })) }
+  refusal.value = null
+  open.value = true
 }
-function stop() {
+function add() {
   editing.value = null
   form.value = blank()
+  refusal.value = null
+  open.value = true
 }
 function addLine() {
   const free = dutyItems.value.find(d => !form.value.lines.some(l => l.dutyId === d.value))
@@ -60,7 +65,7 @@ async function save() {
     if (editing.value) await write(`/api/front-of-house/rota-templates/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
     else await write('/api/front-of-house/rota-templates', { method: 'POST', body })
     toast.add({ title: t(editing.value ? 'front-of-house.templates.saved' : 'front-of-house.templates.added', { name: body.name }), color: 'success' })
-    stop()
+    open.value = false
     await refresh()
   }
   catch (e) {
@@ -68,22 +73,27 @@ async function save() {
   }
 }
 
-async function archive(template: Template) {
-  if (!await confirm({ verb: t('front-of-house.archive.verb'), thing: t('front-of-house.templates.thing', { name: template.name }), consequence: t('front-of-house.templates.archive-consequence'), button: t('front-of-house.archive.button') })) return
+// Archiving asks nothing first: it is undone from its own toast, or later from the archived list.
+async function setArchived(template: Template, archived: boolean) {
   refusal.value = null
+  const call = (to: boolean) => write(`/api/front-of-house/rota-templates/${encodeURIComponent(template.id)}/${to ? 'archive' : 'restore'}`, { method: 'POST', body: {} })
   try {
-    await write(`/api/front-of-house/rota-templates/${encodeURIComponent(template.id)}/archive`, { method: 'POST', body: {} })
-    toast.add({ title: t('front-of-house.templates.archived', { name: template.name }), color: 'success' })
+    await call(archived)
+    undo.offer(t(archived ? 'front-of-house.templates.archived' : 'front-of-house.templates.restored', { name: template.name }), async () => {
+      await call(!archived)
+      await refresh()
+    })
     await refresh()
   }
   catch (e) {
     refusal.value = toRefusal(e)
   }
 }
+const showArchived = ref(false)
 
 const actions = (template: Template): DropdownMenuItem[][] => [
   [{ label: t('front-of-house.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(template) }],
-  [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void archive(template) } }],
+  [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void setArchived(template, true) } }],
 ]
 const describe = (template: Template) => [
   venueName(template.venueId),
@@ -97,8 +107,18 @@ const describe = (template: Template) => [
     :title="t('front-of-house.navigation.rota-templates.label')"
     :description="t('front-of-house.templates.description')"
   >
-    <div class="space-y-8">
-      <RefusalNotice :refusal="refusal" />
+    <template #primary>
+      <UButton
+        icon="i-lucide-plus"
+        :label="t('front-of-house.templates.add-button')"
+        @click="add"
+      />
+    </template>
+    <div class="space-y-4">
+      <RefusalNotice
+        v-if="!open"
+        :refusal="refusal"
+      />
       <DataBoundary
         :data="data"
         :status="status"
@@ -106,39 +126,74 @@ const describe = (template: Template) => [
         @retry="refresh()"
       >
         <template #default="{ data: d }">
-          <EmptyState
-            v-if="!d.templates.length"
-            :title="t('front-of-house.templates.empty.title')"
-            :description="t('front-of-house.templates.empty.description')"
-            icon="i-lucide-layout-list"
-          />
-          <RecordList
-            v-else
-            :label="t('front-of-house.navigation.rota-templates.label')"
-          >
-            <RecordListItem
-              v-for="template in d.templates"
-              :key="template.id"
-              :name="template.name"
-              :description="describe(template)"
+          <div class="space-y-4">
+            <EmptyState
+              v-if="!d.templates.length"
+              :title="t('front-of-house.templates.empty.title')"
+              :description="t('front-of-house.templates.empty.description')"
+              icon="i-lucide-layout-list"
+            />
+            <RecordList
+              v-else
+              :label="t('front-of-house.navigation.rota-templates.label')"
             >
-              <RowActions
-                :items="actions(template)"
-                :label="t('front-of-house.actions-for', { name: template.name })"
-              />
-            </RecordListItem>
-          </RecordList>
+              <RecordListItem
+                v-for="template in d.templates"
+                :key="template.id"
+                :name="template.name"
+                :description="describe(template)"
+              >
+                <RowActions
+                  :items="actions(template)"
+                  :label="t('front-of-house.actions-for', { name: template.name })"
+                />
+              </RecordListItem>
+            </RecordList>
+            <CollapsibleDivider
+              v-model:open="showArchived"
+              :label="t('front-of-house.archived.label')"
+              :count="d.archived?.length ?? 0"
+            >
+              <RecordList :label="t('front-of-house.templates.archived-list')">
+                <RecordListItem
+                  v-for="template in d.archived"
+                  :key="template.id"
+                  :name="template.name"
+                  :description="describe(template)"
+                  muted
+                >
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    icon="i-lucide-archive-restore"
+                    :label="t('front-of-house.restore.button')"
+                    :aria-label="t('front-of-house.restore.named', { name: template.name })"
+                    loading-auto
+                    @click="setArchived(template, false)"
+                  />
+                </RecordListItem>
+              </RecordList>
+            </CollapsibleDivider>
+          </div>
         </template>
       </DataBoundary>
+    </div>
 
-      <PageSection :title="editing ? t('front-of-house.templates.edit-title', { name: editing.name }) : t('front-of-house.templates.add-title')">
+    <UModal
+      v-model:open="open"
+      :title="editing ? t('front-of-house.templates.edit-title', { name: editing.name }) : t('front-of-house.templates.add-title')"
+    >
+      <template #body>
         <UForm
+          id="fh-template"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ name: form.name })"
           novalidate
           @submit="save"
         >
+          <RefusalNotice :refusal="refusal" />
           <UFormField
             name="name"
             :label="t('front-of-house.templates.name')"
@@ -204,21 +259,15 @@ const describe = (template: Template) => [
               @click="addLine"
             />
           </fieldset>
-          <div class="flex gap-2">
-            <UButton
-              type="submit"
-              :label="editing ? t('front-of-house.save') : t('front-of-house.templates.add-button')"
-            />
-            <UButton
-              v-if="editing"
-              color="neutral"
-              variant="ghost"
-              :label="t('front-of-house.cancel')"
-              @click="stop"
-            />
-          </div>
         </UForm>
-      </PageSection>
-    </div>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="fh-template"
+          :label="editing ? t('front-of-house.save') : t('front-of-house.templates.add-button')"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>

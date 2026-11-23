@@ -290,7 +290,7 @@ export const identityContributions = {
     { id: 'core.unconfirmed-addresses', file: 'unconfirmed-addresses' },
   ],
   // What needs the person on My account's overview.
-  'core.account-notice': [{ id: 'core.unconfirmed-addresses', file: 'unconfirmed-addresses' }],
+  'core.account-notice': [{ id: 'core.unconfirmed-addresses', file: 'unconfirmed-addresses' }, { id: 'core.passkey-offer', file: 'passkey-offer' }],
   'core.account-section': [
     { id: 'core.access-scheme', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'CoreAccessScheme', order: 40, to: '/account/access', icon: 'i-lucide-accessibility', count: 'core.access-scheme-offered', hideEmpty: true },
   ],
@@ -365,10 +365,10 @@ export const identityContributions = {
     channels: ['email' as const, 'inbox' as const],
     lane: 'prompt' as const,
     variables: { scheme: 'text' as const },
-    link: '/account',
+    link: '/account/access',
     wording: {
       'en-GB': {
-        subject: 'Thanks, we\'ve got your answer',
+        subject: 'We have your answer: {{ scheme }}',
         body: 'Thank you for answering. {{ theatre }} has your answer about your application to the {{ scheme }}, and the people who run it will read it and let you know.\n\nYou can see where it is in your account.',
         action: 'See my application',
       },

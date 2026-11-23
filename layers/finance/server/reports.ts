@@ -146,6 +146,20 @@ export function toCsv(rows: readonly Record<string, unknown>[], columns: readonl
   return `${lines.join('\r\n')}\r\n`
 }
 
+export interface PayoutLine { postingId: string, name: string, currency: string, outMinor: number, feesMinor: number, occurredAt: number }
+
+/** The latest payouts entered, newest first: what each took out of its clearing account and the fees within that. */
+export async function recentPayouts(limit = 10): Promise<PayoutLine[]> { // not-policy: how many fit under the balances
+  const rows = await all<{ id: string, name: string, currency: string, out: number, fees: number, occurred_at: number }>(
+    `SELECT p.id, a.name, e.currency, -sum(e.amount_minor) AS out, p.occurred_at,
+      (SELECT coalesce(sum(x.amount_minor), 0) FROM finance_entries x JOIN finance_accounts b ON b.id = x.account_id
+        WHERE x.posting_id = p.id AND b.kind = 'expense' AND x.currency = e.currency) AS fees
+      FROM finance_postings p JOIN finance_entries e ON e.posting_id = p.id JOIN finance_accounts a ON a.id = e.account_id
+      WHERE p.kind = 'payout' AND e.amount_minor < 0 AND ${SEALED}
+      GROUP BY p.id, a.id, e.currency ORDER BY p.occurred_at DESC, p.id DESC LIMIT ?`, limit)
+  return rows.map(r => ({ postingId: r.id, name: r.name, currency: r.currency, outMinor: r.out, feesMinor: r.fees, occurredAt: r.occurred_at }))
+}
+
 export interface ClearingLine { accountId: string, code: string, name: string, scope: string | null, currency: string, balanceMinor: number, paidOutMinor: number, lastPayoutAt: number | null }
 
 /**

@@ -143,6 +143,16 @@ export async function priceLayers(productionId: string, performanceId: string, a
   return [...out.values()]
 }
 
+/** The performances of a production that charge a price of their own just now. */
+export async function withOwnPrices(productionId: string, at = nowMs()): Promise<Set<string>> {
+  const rows = await all<{ performance_id: string }>(
+    `SELECT DISTINCT p.performance_id FROM box_office_prices p
+      WHERE p.production_id = ?1 AND p.performance_id IS NOT NULL AND p.inherits = 0 AND p.effective_from <= ?2 AND ${NEWEST('p')} -- not-policy: numbered parameters
+    `,
+    productionId, at)
+  return new Set(rows.map(r => r.performance_id))
+}
+
 interface Row { id: string, band_id: string, ticket_type_id: string, performance_id: string | null, amount_minor: number | null, inherits: number, effective_from: number }
 const COLUMNS = 'p.id, p.band_id, p.ticket_type_id, p.performance_id, p.amount_minor, p.inherits, p.effective_from'
 

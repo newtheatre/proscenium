@@ -46,7 +46,7 @@ useHead({ title: () => `${t('box-office.door-print.title')}: ${heading.value}` }
               color="neutral"
               variant="outline"
               size="xl"
-              :label="t('core.live.back')"
+              :label="t('box-office.door-print.back')"
             />
             <UButton
               icon="i-lucide-printer"
@@ -64,7 +64,7 @@ useHead({ title: () => `${t('box-office.door-print.title')}: ${heading.value}` }
         </p>
         <table
           v-else
-          class="w-full border-collapse text-sm"
+          class="w-full border-collapse text-sm max-sm:text-xs"
         >
           <thead>
             <tr class="border-b-2 border-default text-start print:border-black">
@@ -95,7 +95,7 @@ useHead({ title: () => `${t('box-office.door-print.title')}: ${heading.value}` }
                 {{ nameOf(row) }}
                 <span
                   v-if="row.unpaid"
-                  class="ms-2 font-semibold"
+                  class="block font-semibold sm:ms-2 sm:inline print:ms-2 print:inline"
                 >{{ t('box-office.door-print.not-paid', { amount: money(row.unpaid.amountDueMinor, row.unpaid.currency) }) }}</span>
               </td>
               <td class="py-2 pe-3 font-mono">

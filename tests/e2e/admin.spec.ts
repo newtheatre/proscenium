@@ -213,9 +213,9 @@ test.describe('on a phone, in dark mode', () => {
 
   test('has one header with one menu button, and the drawer opens from it', async ({ page }) => {
     await visit(page, '/admin')
-    // The Admin mark gives way to the page's own name on a phone.
+    // The Admin mark shows at every width; on a phone it is its icon, with the word kept for a screen reader.
     await expect(page.locator('#main').getByRole('heading', { level: 1 })).toBeVisible()
-    await expect(page.locator('#main').getByText('Admin', { exact: true }).first()).toBeHidden()
+    await expect(page.locator('#main').getByText('Admin', { exact: true }).first()).toHaveClass(/sr-only/)
     const toggle = page.getByRole('button', { name: 'Open sidebar' })
     await expect(toggle).toHaveCount(1)
     await toggle.click()
@@ -295,8 +295,8 @@ test.describe('the Branding screen', () => {
     await expect(page.getByRole('button', { name: 'Upload a logo' })).toHaveCount(2)
     await expect(page.getByText('Brand revision')).toHaveCount(0)
     await expect(page.getByText('Set on the brand screen')).toHaveCount(0)
-    // Who may change the brand is said once for each section, not under every field.
-    await expect(page.getByText('Changed by people who can: Change the brand.')).toHaveCount(2)
+    // Who may change the brand is said only to someone who may not.
+    await expect(page.getByText(/Changed by people who can/)).toHaveCount(0)
     await expect(page.getByRole('figure').filter({ hasText: 'Light' })).toBeVisible()
     await page.getByRole('combobox', { name: 'Corners' }).click()
     await page.getByRole('option', { name: 'Square' }).click()

@@ -47,8 +47,8 @@ test('published versions are listed, read as they were, and one is made the draf
   await expect(page.getByText('Version 2 is published', { exact: false }).first()).toBeVisible()
 
   // ---- the history ----
-  await page.getByRole('button', { name: 'More' }).click()
-  await page.getByRole('menuitem', { name: 'Version history' }).click()
+  // History is a tab of the form, beside Build and Responses.
+  await page.getByRole('navigation', { name: 'Parts of this form' }).getByRole('link', { name: 'History' }).click()
   await page.waitForURL(/\/versions$/)
   const list = page.getByRole('list', { name: 'Version history' })
   await expect(list.getByText('Version 2', { exact: true })).toBeVisible()
@@ -58,13 +58,13 @@ test('published versions are listed, read as they were, and one is made the draf
   await axe(page)
 
   // Version 2 says what changed; version 1 reads as it was, with one question.
-  await page.getByRole('button', { name: 'Open version 2' }).click()
+  await page.getByRole('link', { name: /^Version 2/ }).click()
   const panel = page.getByRole('dialog', { name: 'Version 2' })
   await expect(panel.getByText('Have you been before?').first()).toBeVisible()
   await expect(panel.getByText('New question')).toBeVisible()
   await axe(page)
   await panel.getByRole('button', { name: 'Close' }).click()
-  await page.getByRole('button', { name: 'Open version 1' }).click()
+  await page.getByRole('link', { name: /^Version 1/ }).click()
   const first = page.getByRole('dialog', { name: 'Version 1' })
   await expect(first.getByLabel('Your name?')).toBeVisible()
   await expect(first.getByText('Have you been before?')).toHaveCount(0)
@@ -75,6 +75,6 @@ test('published versions are listed, read as they were, and one is made the draf
   await visit(page, builder)
   await expect(page.getByText('Your name?').first()).toBeVisible()
   await expect(page.getByText('Have you been before?')).toHaveCount(0)
-  await expect(page.getByText('Version 2', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('Not shared yet').first()).toBeVisible()
+  // Version 2 is still the live one, shared since the first publish.
+  await expect(page.getByText('Version 2 is live', { exact: true }).first()).toBeVisible()
 })

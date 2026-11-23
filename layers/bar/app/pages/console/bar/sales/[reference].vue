@@ -93,6 +93,7 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
 <template>
   <PageFrame
     :title="data ? t('bar.screens.sale.title', { reference: data.sale.reference }) : t('bar.navigation.sales.label')"
+    long-title
     :trail="trail"
   >
     <template #status>
@@ -134,8 +135,10 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
               v-for="l in data.sale.lines"
               :key="l.id"
               :name="l.quantity > 1 ? `${l.quantity} × ${l.label}` : l.label"
-              :description="[money(l.amountMinor), ...l.reversals.map(reversalText)].join(' · ')"
-            />
+              :description="l.reversals.map(reversalText).join(' · ') || undefined"
+            >
+              <span class="text-sm font-medium tabular-nums">{{ money(l.amountMinor) }}</span>
+            </RecordListItem>
           </RecordList>
         </PageSection>
         <PageSection

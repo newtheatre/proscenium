@@ -87,6 +87,7 @@ const summary = computed(() => {
   const r = data.value?.request
   if (!r) return []
   return [
+    { label: t('core.data-requests.column.person'), value: r.person, to: `/console/people/${encodeURIComponent(r.accountId)}` },
     { label: t('core.data-request.asked'), value: day(r.requestedAt) },
     { label: t('core.data-request.asked-by'), value: r.requestedBy ?? t('core.data-request.themselves') },
     ...(r.identityCheck ? [{ label: t('core.data-request.identity-check'), value: t(`core.data-request.identity-checks.${r.identityCheck}`) }] : []),
@@ -117,17 +118,6 @@ const OUTCOMES: Outcome[] = ['nothing-found', 'handled']
         :tabs="[{ id: 'overview', label: t('core.data-request.overview') }]"
         :trail="trail"
       >
-        <template #aside>
-          <PageSection :title="t('core.data-requests.column.person')">
-            <ULink
-              :to="`/console/people/${encodeURIComponent(d.request.accountId)}`"
-              class="text-sm"
-            >
-              {{ t('core.data-request.person') }}
-            </ULink>
-          </PageSection>
-        </template>
-
         <template #tab-overview>
           <div class="space-y-6">
             <RefusalNotice :refusal="refusal" />

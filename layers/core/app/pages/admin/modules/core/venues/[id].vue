@@ -347,12 +347,12 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             <div
               v-for="f in shownFeatures"
               :key="f.id"
-              class="flex flex-wrap items-center gap-3"
+              class="flex flex-wrap items-center gap-x-3 gap-y-1"
             >
               <UCheckbox
                 v-model="chosen[f.id]!.on"
                 :label="f.label"
-                class="w-56"
+                class="max-sm:basis-full sm:w-56"
               />
               <UInput
                 v-if="chosen[f.id]!.on"
@@ -361,7 +361,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 :aria-label="`Note on ${f.label}`"
                 maxlength="200"
                 size="sm"
-                class="flex-1"
+                class="flex-1 max-sm:ms-6"
               />
             </div>
           </UForm>
@@ -370,8 +370,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               type="submit"
               form="venue-access"
               label="Save access features"
-              color="neutral"
-              variant="outline"
             />
           </template>
         </PageSection>

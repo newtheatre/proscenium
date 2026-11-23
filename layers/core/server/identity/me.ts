@@ -1,5 +1,5 @@
 // What a signed-in person's own screens read: their account, how they sign in, and what to offer.
-import { all, credential, first, nowMs, useSetting } from '#kit'
+import { all, credential, first, nowMs, useContext, useSetting } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { accountById, verifiedAddressesOf } from './accounts'
 import { kitGrantsOf } from './grants'
@@ -19,6 +19,16 @@ export async function hasOtherWayIn(accountId: string): Promise<boolean> {
 export async function holdsPrivileged(accountId: string): Promise<boolean> {
   const registry = useRegistry()
   return (await kitGrantsOf(accountId)).some(g => g.ability && registry.abilities.get(g.ability)?.decl.risk === 'privileged')
+}
+
+/** Whether the account can sign in strongly at all: a passkey, or an authenticator app where the theatre accepts one as strong. */
+export async function strongSignInSetUp(accountId: string): Promise<boolean> {
+  const cache = useContext().cache
+  const key = `identityStrongSetUp:${accountId}`
+  return await ((cache[key] as Promise<boolean> | undefined) ?? (cache[key] = (async () => {
+    const passkeys = (await first<{ n: number }>('SELECT count(*) AS n FROM core_passkeys WHERE account_id = ?', accountId))?.n ?? 0
+    return passkeys > 0 || (!!(await authenticatorOf(accountId)) && !!(await useSetting('core.sign-in.authenticator-is-strong')))
+  })()))
 }
 
 // The ways in a signed-out browser is offered, so the page asks for an address first and then shows
@@ -60,6 +70,9 @@ export async function describeMe(session: CurrentSession) {
     // ID-03: staff holding a privileged ability are told before they meet a refusal.
     // An authenticator app stands in for the passkey where the theatre accepts it as strong.
     consoleNeedsPasskey: privileged && passkeys === 0 && !(await authenticatorOf(session.accountId) && await useSetting('core.sign-in.authenticator-is-strong')),
+    // Holding something that needs a strong sign-in while signed in at basic: 'set-up' when nothing
+    // is set up to make it strong, 'confirm' when a passkey or the app would. Null when all is well.
+    strongerSignIn: privileged && session.assurance !== 'strong' ? (await strongSignInSetUp(session.accountId) ? 'confirm' as const : 'set-up' as const) : null,
     at: nowMs(),
   }
 }

@@ -8,6 +8,9 @@ export function useModuleWords() {
   // A name a module lists that is a part of the platform rather than a module, such as Communications, is named as its menu group is.
   const nameOf = (id: string) => te(`${id}.module.name`) ? t(`${id}.module.name`) : te(`core.navigation.groups.${id}.label`) ? t(`core.navigation.groups.${id}.label`) : id
   const descriptionOf = (id: string) => te(`${id}.module.description`) ? t(`${id}.module.description`) : undefined
+  // A module's page in Admin may go by what an administrator looks for there (Core's is "Programme and people").
+  const pageNameOf = (id: string) => te(`core.modules.page.${id}.name`) ? t(`core.modules.page.${id}.name`) : nameOf(id)
+  const pageDescriptionOf = (id: string) => te(`core.modules.page.${id}.description`) ? t(`core.modules.page.${id}.description`) : descriptionOf(id)
   const listOf = (items: string[]) => new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(items)
   const screensOf = (m: Pick<ModuleView, 'screens'>) => (m.screens ?? [])
     .filter(s => te(entryLabelKey(s.id)))
@@ -42,5 +45,5 @@ export function useModuleWords() {
     walk(m.requires)
     return [...seen]
   }
-  return { nameOf, descriptionOf, listOf, screensOf, keptOnBy, needsOf, dependantsOf }
+  return { nameOf, descriptionOf, pageNameOf, pageDescriptionOf, listOf, screensOf, keptOnBy, needsOf, dependantsOf }
 }

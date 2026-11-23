@@ -121,6 +121,11 @@ const secondary = computed<Action | null>(() => {
   return null
 })
 
+// On the night, the way from the shift to the screens it is worked from.
+const board = computed(() => {
+  const s = data.value
+  return s?.state === 'published' && s.performanceId && s.mine && LIVE.includes(s.mine.state) && inWindow.value ? `/live/front-of-house/${encodeURIComponent(s.performanceId)}` : null
+})
 const summary = computed(() => {
   const s = data.value
   if (!s) return []
@@ -190,8 +195,20 @@ const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label
             {{ clashName }}
           </p>
           <FactStrip :facts="summary" />
-          <div v-if="secondary">
+          <div
+            v-if="secondary || board"
+            class="flex flex-wrap gap-3"
+          >
             <UButton
+              v-if="board"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-drama"
+              :to="board"
+              :label="t('front-of-house.shift.open-board')"
+            />
+            <UButton
+              v-if="secondary"
               color="neutral"
               variant="outline"
               :icon="secondary.icon"
@@ -216,16 +233,16 @@ const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label
               </p>
             </div>
           </PageSection>
-          <PageSection :title="t('front-of-house.shift.who-else')">
+          <PageSection :title="t(s.mine ? 'front-of-house.shift.who-else-too' : 'front-of-house.shift.who-else')">
             <p
               v-if="!s.people.length"
               class="text-muted"
             >
-              {{ t('front-of-house.shift.nobody-yet') }}
+              {{ t(s.mine ? 'front-of-house.shift.nobody-else-yet' : 'front-of-house.shift.nobody-yet') }}
             </p>
             <RecordList
               v-else
-              :label="t('front-of-house.shift.who-else')"
+              :label="t(s.mine ? 'front-of-house.shift.who-else-too' : 'front-of-house.shift.who-else')"
             >
               <RecordListItem
                 v-for="(p, i) in s.people"

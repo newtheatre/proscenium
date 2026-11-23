@@ -20,8 +20,9 @@ export default defineAppConfig({
     select: { slots: { base: 'w-full', placeholder: 'text-muted' } },
     selectMenu: { slots: { base: 'w-full', placeholder: 'text-muted' } },
     // An empty part of a date or time (dd, mm) is readable text too, so it meets 4.5:1 as well.
-    inputDate: { slots: { base: 'w-full', segment: 'data-placeholder:text-muted' } },
-    inputTime: { slots: { base: 'w-full', segment: 'data-placeholder:text-muted' } },
+    // Each part is its own target, so it stands at least 24px tall (WCAG 2.5.8).
+    inputDate: { slots: { base: 'w-full', segment: 'data-placeholder:text-muted not-data-[segment=literal]:min-h-6 not-data-[segment=literal]:min-w-6 not-data-[segment=literal]:leading-6' } },
+    inputTime: { slots: { base: 'w-full', segment: 'data-placeholder:text-muted not-data-[segment=literal]:min-h-6 not-data-[segment=literal]:min-w-6 not-data-[segment=literal]:leading-6' } },
     // A tick box is square whatever the brand's corner radius, so a choice of many never looks like
     // a choice of one (round is for radio buttons only). A rounder brand can make rounded-sm a circle.
     checkbox: { slots: { base: 'rounded-[0.1875rem]' } },

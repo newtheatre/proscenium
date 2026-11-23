@@ -1,6 +1,7 @@
 <!-- One checklist tonight (Front of house specification, part 5, "Live mode"; FH-25): one item per
      row with a large tick, "Problem" (a reason and a note) and "Not needed"; a reading takes a number.
-     Progress at the top, "Complete" once every required item has an entry. Starting it fixes its items. -->
+     Progress at the top, "Complete" once every required item has an entry. The first answer starts it,
+     which fixes its items. -->
 <script setup lang="ts">
 type Outcome = 'done' | 'exception' | 'not_applicable'
 interface Item { id: string, label: string, help: string | null, kind: 'tick' | 'reading', unit: string | null, required: boolean, entry: { outcome: Outcome, reading: number | null, reasonCode: string | null, reasonNote: string | null, doneAt: number } | null }
@@ -28,7 +29,8 @@ watch(data, (d) => {
   for (const i of d?.items ?? []) if (i.kind === 'reading' && !(i.id in readings.value)) readings.value[i.id] = i.entry?.reading ?? null
 }, { immediate: true })
 
-const editable = computed(() => data.value?.state === 'open' && !!board.value?.can.checklists)
+// The first answer starts the checklist; there is nothing to press beforehand.
+const editable = computed(() => (data.value?.state === 'open' || data.value?.state === 'not_started') && !!board.value?.can.checklists)
 const required = computed(() => (data.value?.items ?? []).filter(i => i.required))
 const entered = computed(() => required.value.filter(i => i.entry).length)
 const problems = computed(() => required.value.filter(i => i.entry?.outcome === 'exception').length)
@@ -54,8 +56,10 @@ async function run(key: string, call: () => Promise<unknown>, done?: string) {
 }
 const enter = (item: Item, outcome: Outcome, extra: Record<string, unknown> = {}) =>
   run(item.id, () => write(`${base.value}/items/${encodeURIComponent(item.id)}`, { method: 'PUT', body: { outcome, ...extra } }))
-const start = () => run('start', () => write(`${base.value}/open`, { method: 'POST', body: {} }))
-const complete = () => run('complete', () => write(`${base.value}/complete`, { method: 'POST', body: {} }), t('front-of-house.live.checklist-completed'))
+// Pressed with answers missing, it says how many rather than sitting greyed out.
+const complete = () => !ready.value
+  ? toast.add({ title: t('front-of-house.live.complete-needs', { count: required.value.length - entered.value }), color: 'warning', icon: 'i-lucide-list-checks' })
+  : run('complete', () => write(`${base.value}/complete`, { method: 'POST', body: {} }), t('front-of-house.live.checklist-completed'))
 const reopen = () => run('reopen', () => write(`${base.value}/reopen`, { method: 'POST', body: {} }), t('front-of-house.live.checklist-reopened'))
 async function saveProblem() {
   const p = problem.value!
@@ -64,6 +68,8 @@ async function saveProblem() {
 }
 const reasonLabel = (code: string | null) => reasons.value?.terms.find(r => r.id === code)?.label ?? ''
 const reasonItems = computed(() => (reasons.value?.terms ?? []).map(r => ({ value: r.id, label: r.label })))
+// An answer here can also mark the person arrived, so the board reads again on the way back.
+onBeforeUnmount(() => { void refreshNuxtData(`front-of-house:board:${performance.value}`) })
 const context = computed(() => board.value ? [board.value.performance.title, time(board.value.performance.startsAt)].join(' · ') : undefined)
 </script>
 
@@ -130,12 +136,16 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                 v-if="editable"
                 #below
               >
-                <div class="flex flex-wrap gap-2">
-                  <template v-if="item.kind === 'reading'">
+                <!-- On a phone the answer that is nearly always right fills the row, with the other two side by side under it. -->
+                <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                  <div
+                    v-if="item.kind === 'reading'"
+                    class="col-span-2 flex gap-2"
+                  >
                     <UInputNumber
                       v-model="readings[item.id]"
                       size="xl"
-                      class="w-40"
+                      class="min-w-0 flex-1 sm:w-40 sm:flex-none"
                       :aria-label="item.unit ? t('front-of-house.live.reading-in', { item: item.label, unit: item.unit }) : t('front-of-house.live.reading-of', { item: item.label })"
                     />
                     <UButton
@@ -146,10 +156,11 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                       :label="t('front-of-house.live.save-reading')"
                       @click="enter(item, 'done', { reading: readings[item.id] })"
                     />
-                  </template>
+                  </div>
                   <UButton
                     v-else
                     size="xl"
+                    class="col-span-2 justify-center"
                     icon="i-lucide-check"
                     :variant="item.entry?.outcome === 'done' ? 'solid' : 'outline'"
                     :aria-pressed="item.entry?.outcome === 'done'"
@@ -161,6 +172,7 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                   <UButton
                     size="xl"
                     color="warning"
+                    class="justify-center"
                     :variant="item.entry?.outcome === 'exception' ? 'solid' : 'outline'"
                     :aria-pressed="item.entry?.outcome === 'exception'"
                     icon="i-lucide-triangle-alert"
@@ -171,6 +183,7 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                   <UButton
                     size="xl"
                     color="neutral"
+                    class="justify-center"
                     :variant="item.entry?.outcome === 'not_applicable' ? 'solid' : 'outline'"
                     :aria-pressed="item.entry?.outcome === 'not_applicable'"
                     :label="t('front-of-house.live.outcome.not_applicable')"
@@ -191,20 +204,10 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
     >
       <div class="mx-auto max-w-3xl">
         <UButton
-          v-if="data.state === 'not_started'"
-          size="xl"
-          block
-          icon="i-lucide-play"
-          :loading="busy === 'start'"
-          :label="t('front-of-house.live.start-checklist')"
-          @click="start"
-        />
-        <UButton
-          v-else-if="data.state === 'open'"
+          v-if="data.state === 'open' || data.state === 'not_started'"
           size="xl"
           block
           icon="i-lucide-circle-check"
-          :disabled="!ready"
           :loading="busy === 'complete'"
           :label="t('front-of-house.live.complete')"
           @click="complete"

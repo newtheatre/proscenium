@@ -2,7 +2,8 @@
      still lacks. Pages still holding starter text, missing brand items, images with no text
      description, components whose module is off, quoted settings still unset, venues with no access
      recorded and productions left unfinished. Each line links to where it is put right, or names the
-     file to edit. Search engines are turned away until the theatre says the site is ready, here.
+     file to edit. Search engines are turned away until the theatre says the site is ready, with the
+     button on the notice at the top (Matt, 21 November 2026: the switch sits where the warning is).
      Needs public-site.readiness.view. -->
 <script setup lang="ts">
 import type { SiteReadiness } from '../../../server/readiness'
@@ -11,7 +12,41 @@ interface Line { id: string, name: string, description: string, to?: string }
 interface Section { id: string, lines: Line[] }
 
 const { t, te } = useT()
-const route = useRoute()
+const { $api } = useNuxtApp()
+const { confirm } = useConfirm()
+const { offer } = useUndo()
+const { toRefusal } = useRefusal()
+const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const HIDDEN = 'public-site.search.hidden'
+// Whether this person may let search engines in: the setting's own answer, so the button and the server agree.
+const { data: own } = await useAPI<{ settings: { key: string, canChange: boolean }[] }>('/api/core/settings', { query: { screen: '/admin/site-readiness' }, key: 'public-site:readiness:settings' })
+const mayChange = computed(() => !!own.value?.settings.find(s => s.key === HIDDEN)?.canChange)
+
+async function set(hidden: boolean) {
+  await $api(`/api/core/settings/${HIDDEN}` as string, { method: 'PUT', body: { value: hidden, confirm: true } })
+  await refresh()
+}
+async function change(hidden: boolean) {
+  const left = data.value?.outstanding ?? 0
+  const sure = await confirm(hidden
+    ? { verb: t('public-site.readiness.hide.verb'), thing: t('public-site.readiness.hide.thing'), consequence: t('public-site.readiness.hide.consequence'), button: t('public-site.readiness.hide.button') }
+    : { verb: t('public-site.readiness.show.verb'), thing: t('public-site.readiness.show.thing'), consequence: left ? t('public-site.readiness.show.consequence-outstanding', { count: left }) : t('public-site.readiness.show.consequence'), button: t('public-site.readiness.show.button'), tone: 'primary' })
+  if (!sure) return
+  refusal.value = null
+  try {
+    await set(hidden)
+    offer(t(hidden ? 'public-site.readiness.hide.done' : 'public-site.readiness.show.done'), () => set(!hidden))
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+const notice = computed(() => {
+  const hidden = !!data.value?.hidden
+  return mayChange.value
+    ? [{ label: t(hidden ? 'public-site.readiness.show.button' : 'public-site.readiness.hide.button'), color: 'neutral' as const, variant: 'outline' as const, onClick: () => { void change(!hidden) } }]
+    : undefined
+})
 const { nameOf } = useModuleWords()
 const { data, status, error, refresh } = await useAPI<SiteReadiness>('/api/public-site/readiness', { key: 'public-site:readiness' })
 
@@ -55,6 +90,9 @@ const sections = computed<Section[]>(() => {
     },
   ]
 })
+// What still needs doing comes first; what is finished folds into one short list beneath.
+const outstanding = computed(() => sections.value.filter(s => s.lines.length))
+const finished = computed(() => sections.value.filter(s => !s.lines.length))
 </script>
 
 <template>
@@ -78,9 +116,11 @@ const sections = computed<Section[]>(() => {
           :icon="data.hidden ? 'i-lucide-eye-off' : 'i-lucide-search-check'"
           :title="t(data.hidden ? 'public-site.readiness.hidden.title' : 'public-site.readiness.visible.title')"
           :description="t(data.hidden ? (data.outstanding ? 'public-site.readiness.hidden.outstanding' : 'public-site.readiness.hidden.ready') : 'public-site.readiness.visible.description')"
+          :actions="notice"
         />
+        <RefusalNotice :refusal="refusal" />
         <section
-          v-for="section in sections"
+          v-for="section in outstanding"
           :key="section.id"
           :aria-labelledby="`readiness-${section.id}`"
           class="space-y-3"
@@ -93,14 +133,11 @@ const sections = computed<Section[]>(() => {
               {{ t(`public-site.readiness.${section.id}.title`) }}
             </h2>
             <StatusBadge
-              :tone="section.lines.length ? 'warning' : 'success'"
-              :label="section.lines.length ? t('public-site.readiness.to-do', { count: section.lines.length }) : t('public-site.readiness.done')"
+              tone="warning"
+              :label="t('public-site.readiness.to-do', { count: section.lines.length })"
             />
           </div>
-          <RecordList
-            v-if="section.lines.length"
-            :label="t(`public-site.readiness.${section.id}.title`)"
-          >
+          <RecordList :label="t(`public-site.readiness.${section.id}.title`)">
             <RecordListItem
               v-for="line in section.lines"
               :key="line.id"
@@ -109,20 +146,29 @@ const sections = computed<Section[]>(() => {
               :to="line.to"
             />
           </RecordList>
-          <p
-            v-else
-            class="text-sm text-muted"
+        </section>
+        <section
+          v-if="finished.length"
+          aria-labelledby="readiness-finished"
+          class="space-y-3"
+        >
+          <h2
+            id="readiness-finished"
+            class="text-base font-semibold text-highlighted"
           >
-            {{ t(`public-site.readiness.${section.id}.none`) }}
-          </p>
+            {{ t('public-site.readiness.finished') }}
+          </h2>
+          <RecordList :label="t('public-site.readiness.finished')">
+            <RecordListItem
+              v-for="section in finished"
+              :key="section.id"
+              icon="i-lucide-check"
+              :name="t(`public-site.readiness.${section.id}.title`)"
+              :description="t(`public-site.readiness.${section.id}.none`)"
+            />
+          </RecordList>
         </section>
       </div>
     </DataBoundary>
-    <SettingsSections
-      screen="/admin/site-readiness"
-      :heading="t('public-site.readiness.settings-heading')"
-      :highlight="typeof route.query.setting === 'string' ? route.query.setting : undefined"
-      @saved="refresh()"
-    />
   </PageFrame>
 </template>

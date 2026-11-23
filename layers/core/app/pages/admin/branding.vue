@@ -114,15 +114,12 @@ const logoHelp = {
       @retry="refresh()"
     >
       <div class="mt-6 space-y-6">
-        <PageSection
-          title="Logo"
-          description="People see it at the top of every page, on emails and on PDFs."
-        >
+        <PageSection title="Logo">
           <p
-            v-if="ability"
+            v-if="ability && !canChange"
             class="text-sm text-muted"
           >
-            {{ canChange ? t('core.settings-page.who', { ability: t(ability) }) : t('core.settings-page.read-only', { ability: t(ability) }) }}
+            {{ t('core.settings-page.read-only', { ability: t(ability) }) }}
           </p>
           <div class="grid gap-6 sm:grid-cols-2">
             <BrandLogoField

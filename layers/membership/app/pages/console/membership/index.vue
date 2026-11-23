@@ -1,7 +1,8 @@
 <!-- Members (tab 5, "Members"): one row per membership with the person, their number, the scheme,
      the status worked out from today, and until when. Current memberships are the default view.
      Search finds a member number, or a person by name or address. The view on screen exports as a
-     CSV file for holders of membership.membership.export (MEM-27). -->
+     CSV file for holders of membership.membership.export (MEM-27). Applications waiting on staff
+     are drawn above the rows. -->
 <script setup lang="ts">
 import { membersList } from '../../../../shared/lists'
 import type { MembershipSchemeChoice } from '../../../../shared/scheme-choice'
@@ -69,6 +70,9 @@ const list = computed(() => ({
         :label="t('membership.screens.import.action')"
         @click="importing = true"
       />
+    </template>
+    <template #before>
+      <MembershipWaiting @decided="reload" />
     </template>
     <MembershipAddMemberModal
       v-model:open="adding"

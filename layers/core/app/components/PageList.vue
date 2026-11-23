@@ -13,6 +13,8 @@ export interface BulkAction { label: string, icon?: string, run: (rows: any[]) =
 
 const props = withDefaults(defineProps<{
   title: string
+  /** One line under the title saying what the list holds. */
+  description?: string
   trail?: { label: string, to: string }[]
   /** The module's data route: answers { rows, total } for the query it is sent. */
   route: string
@@ -48,7 +50,7 @@ const props = withDefaults(defineProps<{
   subRowsAllTo?: (row: Row) => string
   subRowLabel?: (row: Row) => string
   subRowTo?: (row: Row) => string
-}>(), { trail: undefined, subRows: undefined, subRowsNoun: undefined, subRowsTotal: undefined, subRowsAllTo: undefined, subRowLabel: undefined, subRowTo: undefined, list: undefined, filterOptions: undefined, columns: () => [], filters: () => [], rowKey: 'id', rowTo: undefined, rowActions: undefined, bulkActions: undefined, exportRoute: undefined, canExport: false, exportCeiling: 10_000, sort: undefined, order: 'asc', width: 'standard' }) // not-policy: the row ceiling's default
+}>(), { description: undefined, trail: undefined, subRows: undefined, subRowsNoun: undefined, subRowsTotal: undefined, subRowsAllTo: undefined, subRowLabel: undefined, subRowTo: undefined, list: undefined, filterOptions: undefined, columns: () => [], filters: () => [], rowKey: 'id', rowTo: undefined, rowActions: undefined, bulkActions: undefined, exportRoute: undefined, canExport: false, exportCeiling: 10_000, sort: undefined, order: 'asc', width: 'standard' }) // not-policy: the row ceiling's default
 
 defineSlots<{
   'primary'?: () => unknown
@@ -143,11 +145,14 @@ async function resolveLookups(on: Record<string, string>) {
   }
 }
 watch(panel, endVisit)
-// A built-in view's own filters count as on, so the panel and the chips tell the truth about the rows.
-const effective = computed(() => ({ ...(state.value.view ? decl.value.views?.[state.value.view]?.filters : undefined), ...state.value.filters }))
+// A built-in view's own filters fill the panel's fields, so the panel tells the truth about the rows.
+const preset = computed<Record<string, string>>(() => (state.value.view ? decl.value.views?.[state.value.view]?.filters : undefined) ?? {})
+const effective = computed(() => ({ ...preset.value, ...state.value.filters }))
+// The view's tab already says what it filters by: only what the person added is a chip or counted.
+const added = computed(() => Object.fromEntries(Object.entries(state.value.filters).filter(([name, value]) => value && preset.value[name] !== value)))
 const chips = computed(() => Object.entries(decl.value.filters).flatMap(([name, def]) => {
   if (data.value?.dropped?.includes(name)) return []
-  const value = effective.value[name]
+  const value = added.value[name]
   const text = value ? filterChipText(def, value, { yes: t('core.list.yes'), no: t('core.list.no'), lookup: lookupLabels[name]?.[value] }) : null
   return text ? [{ name, text }] : []
 }))
@@ -251,11 +256,22 @@ const exportHref = computed(() => {
 })
 const exportBlocked = computed(() => total.value > props.exportCeiling)
 
-const cardColumns = computed(() => Object.entries(decl.value.columns).filter(([, c]) => c.card).slice(0, 3).map(([key, c]) => ({ key, ...c })))
+const cardColumns = computed(() => Object.entries(decl.value.columns).filter(([, c]) => c.card).map(([key, c]) => ({ key, ...c })))
+// A card's title already says the row's name, so a column holding the same words is not said twice.
+function cardColumnsOf(row: Row) {
+  const title = props.rowLabel(row)
+  return cardColumns.value.filter((c) => {
+    const value = row[c.key]
+    return !(typeof value === 'string' && value.trim().length > 2 && title.includes(value.trim()))
+  }).slice(0, 4)
+}
 function open(_event: Event, row: TableRow<Row>) {
   if (props.rowTo) void navigateTo(props.rowTo(row.original))
 }
-const pageLabel = computed(() => t('core.list.page-of', { page: state.value.page, pages: pages.value, total: total.value }))
+// A list that fits on one page says only how many there are, and draws no pager.
+const pageLabel = computed(() => pages.value > 1
+  ? t('core.list.page-of', { page: state.value.page, pages: pages.value, total: total.value })
+  : t('core.list.total', { total: total.value }))
 
 // A filter, a search or a new page changes only the query, so the route announcer says nothing:
 // the new count is announced here.
@@ -268,6 +284,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
 <template>
   <PageFrame
     :title="title"
+    :description="description"
     :trail="trail"
     :width="width"
   >
@@ -298,7 +315,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
           v-model:open="panel"
           :filters="decl.filters"
           :values="effective"
-          :count="Object.keys(effective).length"
+          :count="Object.keys(added).length"
           :lookup-labels="lookupLabels"
           @change="onFilter"
           @clear="set({ filters: Object.fromEntries(Object.keys(state.filters).map(k => [k, ''])) })"
@@ -317,6 +334,9 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
         />
       </form>
     </template>
+
+    <!-- Something the page shows above its rows, such as Sessions' "Your session" card. -->
+    <slot name="before" />
 
     <!-- Built-in views, when the list declares any: tabs kept in the address as view=. -->
     <!-- Scrolls sideways on a phone rather than cutting each tab's name short. Never upwards: the
@@ -382,9 +402,6 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
       {{ searchNote }}
     </p>
 
-    <!-- Something the page shows above its rows, such as Sessions' "Your session" card. -->
-    <slot name="before" />
-
     <DataBoundary
       :data="data"
       :status="status"
@@ -428,10 +445,6 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
               color="neutral"
               variant="outline"
               @click="clear()"
-            />
-            <slot
-              v-else
-              name="primary"
             />
           </template>
         </EmptyState>
@@ -627,7 +640,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
                     <ULink
                       v-if="rowTo"
                       :to="rowTo(row)"
-                      class="min-w-0 truncate font-medium text-highlighted hover:underline"
+                      class="-my-2 min-w-0 truncate py-2 font-medium text-highlighted hover:underline"
                     >
                       {{ rowLabel(row) }}
                     </ULink>
@@ -659,11 +672,11 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
                   {{ matchLine(row) }}
                 </p>
                 <dl
-                  v-if="cardColumns.length"
+                  v-if="cardColumnsOf(row).length"
                   class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
                 >
                   <template
-                    v-for="c in cardColumns"
+                    v-for="c in cardColumnsOf(row)"
                     :key="c.key"
                   >
                     <dt class="text-muted">
@@ -723,6 +736,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
               {{ pageLabel }}
             </p>
             <UPagination
+              v-if="pages > 1"
               :page="state.page"
               :total="total"
               :items-per-page="state.pageSize"

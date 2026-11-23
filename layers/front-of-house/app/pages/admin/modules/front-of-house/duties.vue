@@ -19,9 +19,9 @@ interface Duty {
 const { t, te } = useT()
 const write = useAct()
 const { toRefusal } = useRefusal()
-const { confirm } = useConfirm()
+const undo = useUndo()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ duties: Duty[], requirementOptions?: { value: string, label: string }[], requirementLabels?: Record<string, string> }>('/api/front-of-house/duties', { key: 'front-of-house:duties' })
+const { data, status, error, refresh } = await useAPI<{ duties: Duty[], archived?: Duty[], requirementOptions?: { value: string, label: string }[], requirementLabels?: Record<string, string> }>('/api/front-of-house/duties', { key: 'front-of-house:duties' })
 // A fact's label arrives as its translation key.
 const said = (label: string) => te(label) ? t(label) : label
 const requirementItems = computed(() => (data.value?.requirementOptions ?? []).map(o => ({ value: o.value, label: said(o.label) })))
@@ -31,14 +31,19 @@ const blank = () => ({ name: '', description: '', isLead: false, callBeforeMinut
 const form = ref(blank())
 const editing = ref<Duty | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const open = ref(false)
 
 function edit(duty: Duty) {
   editing.value = duty
   form.value = { name: duty.name, description: duty.description ?? '', isLead: duty.isLead, callBeforeMinutes: duty.callBeforeMinutes, stayAfterMinutes: duty.stayAfterMinutes, requirements: [...duty.requirements] }
+  refusal.value = null
+  open.value = true
 }
-function stop() {
+function add() {
   editing.value = null
   form.value = blank()
+  refusal.value = null
+  open.value = true
 }
 
 async function save() {
@@ -48,7 +53,7 @@ async function save() {
     if (editing.value) await write(`/api/front-of-house/duties/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
     else await write('/api/front-of-house/duties', { method: 'POST', body })
     toast.add({ title: t(editing.value ? 'front-of-house.duties.saved' : 'front-of-house.duties.added', { name: body.name }), color: 'success' })
-    stop()
+    open.value = false
     await refresh()
   }
   catch (e) {
@@ -56,22 +61,27 @@ async function save() {
   }
 }
 
-async function archive(duty: Duty) {
-  if (!await confirm({ verb: t('front-of-house.archive.verb'), thing: t('front-of-house.duties.thing', { name: duty.name }), consequence: t('front-of-house.duties.archive-consequence'), button: t('front-of-house.archive.button') })) return
+// Archiving asks nothing first: it is undone from its own toast, or later from the archived list.
+async function setArchived(duty: Duty, archived: boolean) {
   refusal.value = null
+  const call = (to: boolean) => write(`/api/front-of-house/duties/${encodeURIComponent(duty.id)}/${to ? 'archive' : 'restore'}`, { method: 'POST', body: {} })
   try {
-    await write(`/api/front-of-house/duties/${encodeURIComponent(duty.id)}/archive`, { method: 'POST', body: {} })
-    toast.add({ title: t('front-of-house.duties.archived', { name: duty.name }), color: 'success' })
+    await call(archived)
+    undo.offer(t(archived ? 'front-of-house.duties.archived' : 'front-of-house.duties.restored', { name: duty.name }), async () => {
+      await call(!archived)
+      await refresh()
+    })
     await refresh()
   }
   catch (e) {
     refusal.value = toRefusal(e)
   }
 }
+const showArchived = ref(false)
 
 const actions = (duty: Duty): DropdownMenuItem[][] => [
   [{ label: t('front-of-house.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(duty) }],
-  [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void archive(duty) } }],
+  [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void setArchived(duty, true) } }],
 ]
 const minutes = (n: number) => t('front-of-house.minutes', { count: n })
 </script>
@@ -81,8 +91,18 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
     :title="t('front-of-house.navigation.duties.label')"
     :description="t('front-of-house.duties.description')"
   >
-    <div class="space-y-8">
-      <RefusalNotice :refusal="refusal" />
+    <template #primary>
+      <UButton
+        icon="i-lucide-plus"
+        :label="t('front-of-house.duties.add-button')"
+        @click="add"
+      />
+    </template>
+    <div class="space-y-4">
+      <RefusalNotice
+        v-if="!open"
+        :refusal="refusal"
+      />
       <DataBoundary
         :data="data"
         :status="status"
@@ -90,39 +110,74 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
         @retry="refresh()"
       >
         <template #default="{ data: d }">
-          <EmptyState
-            v-if="!d.duties.length"
-            :title="t('front-of-house.duties.empty.title')"
-            :description="t('front-of-house.duties.empty.description')"
-            icon="i-lucide-badge-check"
-          />
-          <RecordList
-            v-else
-            :label="t('front-of-house.navigation.duties.label')"
-          >
-            <RecordListItem
-              v-for="duty in d.duties"
-              :key="duty.id"
-              :name="duty.name"
-              :description="[duty.isLead ? t('front-of-house.duties.leads') : null, t('front-of-house.duties.times', { before: minutes(duty.callBeforeMinutes), after: minutes(duty.stayAfterMinutes) }), duty.requirements.length ? t('front-of-house.duties.only-for', { what: duty.requirements.map(requirementLabel).join(t('front-of-house.duties.and')) }) : null, duty.description].filter(Boolean).join(' · ')"
+          <div class="space-y-4">
+            <EmptyState
+              v-if="!d.duties.length"
+              :title="t('front-of-house.duties.empty.title')"
+              :description="t('front-of-house.duties.empty.description')"
+              icon="i-lucide-badge-check"
+            />
+            <RecordList
+              v-else
+              :label="t('front-of-house.navigation.duties.label')"
             >
-              <RowActions
-                :items="actions(duty)"
-                :label="t('front-of-house.actions-for', { name: duty.name })"
-              />
-            </RecordListItem>
-          </RecordList>
+              <RecordListItem
+                v-for="duty in d.duties"
+                :key="duty.id"
+                :name="duty.name"
+                :description="[duty.isLead ? t('front-of-house.duties.leads') : null, t('front-of-house.duties.times', { before: minutes(duty.callBeforeMinutes), after: minutes(duty.stayAfterMinutes) }), duty.requirements.length ? t('front-of-house.duties.only-for', { what: duty.requirements.map(requirementLabel).join(t('front-of-house.duties.and')) }) : null, duty.description].filter(Boolean).join(' · ')"
+              >
+                <RowActions
+                  :items="actions(duty)"
+                  :label="t('front-of-house.actions-for', { name: duty.name })"
+                />
+              </RecordListItem>
+            </RecordList>
+            <CollapsibleDivider
+              v-model:open="showArchived"
+              :label="t('front-of-house.archived.label')"
+              :count="d.archived?.length ?? 0"
+            >
+              <RecordList :label="t('front-of-house.duties.archived-list')">
+                <RecordListItem
+                  v-for="duty in d.archived"
+                  :key="duty.id"
+                  :name="duty.name"
+                  :description="[duty.isLead ? t('front-of-house.duties.leads') : null, t('front-of-house.duties.times', { before: minutes(duty.callBeforeMinutes), after: minutes(duty.stayAfterMinutes) }), duty.requirements.length ? t('front-of-house.duties.only-for', { what: duty.requirements.map(requirementLabel).join(t('front-of-house.duties.and')) }) : null, duty.description].filter(Boolean).join(' · ')"
+                  muted
+                >
+                  <UButton
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    icon="i-lucide-archive-restore"
+                    :label="t('front-of-house.restore.button')"
+                    :aria-label="t('front-of-house.restore.named', { name: duty.name })"
+                    loading-auto
+                    @click="setArchived(duty, false)"
+                  />
+                </RecordListItem>
+              </RecordList>
+            </CollapsibleDivider>
+          </div>
         </template>
       </DataBoundary>
+    </div>
 
-      <PageSection :title="editing ? t('front-of-house.duties.edit-title', { name: editing.name }) : t('front-of-house.duties.add-title')">
+    <UModal
+      v-model:open="open"
+      :title="editing ? t('front-of-house.duties.edit-title', { name: editing.name }) : t('front-of-house.duties.add-title')"
+    >
+      <template #body>
         <UForm
+          id="fh-duty"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ name: form.name })"
           novalidate
           @submit="save"
         >
+          <RefusalNotice :refusal="refusal" />
           <UFormField
             name="name"
             :label="t('front-of-house.duties.name')"
@@ -181,21 +236,15 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
               :placeholder="t('front-of-house.duties.requirements-none')"
             />
           </UFormField>
-          <div class="flex gap-2">
-            <UButton
-              type="submit"
-              :label="editing ? t('front-of-house.save') : t('front-of-house.duties.add-button')"
-            />
-            <UButton
-              v-if="editing"
-              color="neutral"
-              variant="ghost"
-              :label="t('front-of-house.cancel')"
-              @click="stop"
-            />
-          </div>
         </UForm>
-      </PageSection>
-    </div>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="fh-duty"
+          :label="editing ? t('front-of-house.save') : t('front-of-house.duties.add-button')"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>

@@ -5,7 +5,7 @@
 import { getRouterParam } from 'h3'
 import { all, defineRoute } from '#kit'
 import { getProduction, listPerformances } from '#modules/core'
-import { priceLayers } from '../../../../../prices'
+import { priceLayers, scheduledPrices, withOwnPrices } from '../../../../../prices'
 import { runSeats } from '../../../../../run-setup'
 import { listBands } from '../../../../../setup'
 
@@ -25,6 +25,7 @@ export default defineRoute({
   const run = runSeats(performances.filter(p => p.state === 'scheduled' || p.state === 'draft').map(p => ({ id: p.id, pools: pools.filter(o => o.performance_id === p.id) })))
   const seats = new Map((await all<{ performance_id: string, capacity: number, claimed: number }>(
     `SELECT performance_id, sum(capacity) AS capacity, sum(claimed) AS claimed FROM box_office_pools WHERE performance_id IN (SELECT value FROM json_each(?)) AND ${seating} GROUP BY performance_id`, ids)).map(s => [s.performance_id, s]))
+  const ownPrices = await withOwnPrices(production.id)
   const rows = performances.map(p => ({
     id: p.id,
     label: p.label,
@@ -37,6 +38,7 @@ export default defineRoute({
     pools: pools.filter(o => o.performance_id === p.id).map(o => ({ bandId: o.band_id, capacity: o.capacity, claimed: o.claimed })),
     // Seats of its own, set for this night alone, rather than the run's.
     ownSeats: run.own.has(p.id),
+    ownPrices: ownPrices.has(p.id),
   }))
   return {
     production: { id: production.id, title: production.title, state: production.state },
@@ -45,6 +47,8 @@ export default defineRoute({
     runSeats: run.seats,
     // The production's own prices, which every performance charges unless it has its own.
     runPrices: (await priceLayers(production.id, '')).filter(l => l.production !== null).map(l => ({ bandId: l.bandId, ticketTypeId: l.ticketTypeId, amountMinor: l.production! })),
+    // The run's price changes set for later; one night's own are on its set-up.
+    scheduledPrices: (await scheduledPrices(production.id, '')).filter(s => s.performanceId === null),
     performances: rows,
     totals: {
       performances: rows.length,

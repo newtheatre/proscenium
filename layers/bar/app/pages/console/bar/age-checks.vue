@@ -5,17 +5,19 @@
 type Outcome = 'not_needed' | 'id_checked' | 'self_attested' | 'refused'
 interface Row { id: string, at: number, outlet: string, outcome: Outcome, reason: string | null, product: string | null, scope: 'restricted' | 'all' | null, idType: string | null, by: string, sale: string | null, description: string | null }
 interface Review { id: string, outlet: string | null, fromDay: string, toDay: string, refusals: number, by: string, at: number }
-interface Register { rows: Row[], reviews: Review[], outlets: { id: string, name: string }[], canReview: boolean, describing: boolean, ages: { minimum: number, challenge: number } }
+interface Register { rows: Row[], reviews: Review[], nextReview: { fromDay: string, toDay: string }, outlets: { id: string, name: string }[], canReview: boolean, describing: boolean, ages: { minimum: number, challenge: number } }
 
 const { t } = useT()
 const route = useRoute()
 const router = useRouter()
 const { $api } = useNuxtApp()
-const { dateTime, range: dayRange } = useDates()
+const { dateTime, day, range: dayRange } = useDates()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 
+// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
+const phone = useScreenQuery('(max-width: 639px)')
 // Filters live in the address.
 const ALL = 'all'
 const range = computed({
@@ -79,9 +81,13 @@ async function erase(row: Row) {
 // Signing: choose the days (and an outlet, or every outlet), see how many refusals they cover, confirm.
 const signing = ref<{ days: { start: string, end: string }, outlet: string } | null>(null)
 const covered = ref<number | null>(null)
+// The signature that reaches latest, which the offered days follow on from.
+const lastSigned = computed(() => [...(data.value?.reviews ?? [])].sort((a, b) => b.toDay.localeCompare(a.toDay))[0])
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function startSigning() {
-  signing.value = { days: { start: '', end: '' }, outlet: ALL }
+  // The days not yet signed, up to today: the usual signature, and the dates can still be changed.
+  const next = data.value?.nextReview
+  signing.value = { days: { start: next?.fromDay ?? '', end: next?.toDay ?? '' }, outlet: ALL }
   covered.value = null
   refusal.value = null
 }
@@ -133,8 +139,11 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
     >
       {{ t('bar.screens.age-checks.ages', { minimum: data.ages.minimum, challenge: data.ages.challenge }) }}
     </p>
-    <div class="mb-6 grid gap-4 sm:grid-cols-3">
-      <UFormField :label="t('bar.screens.age-checks.days-filter')">
+    <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <UFormField
+        :label="t('bar.screens.age-checks.days-filter')"
+        class="max-sm:col-span-2"
+      >
         <FieldDateRange v-model="range" />
       </UFormField>
       <UFormField :label="t('bar.screens.age-checks.outlet')">
@@ -177,8 +186,46 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
             :description="t('bar.screens.age-checks.empty.description')"
             icon="i-lucide-id-card"
           />
+          <!-- On a phone: one row a check, what happened first and the rest under it. -->
+          <RecordList
+            v-if="d.rows.length && phone"
+            :label="t('bar.navigation.age-checks.label')"
+          >
+            <RecordListItem
+              v-for="r in d.rows"
+              :key="r.id"
+              :name="[r.reason ?? (r.idType ? idTypeLabel(r.idType) : null), r.scope === 'all' ? t('bar.screens.age-checks.whole-sale') : r.product].filter(Boolean).join(' · ') || outcomeLabel(r.outcome)"
+              :description="[dateTime(r.at), r.outlet, r.by, r.sale].filter(Boolean).join(' · ')"
+            >
+              <StatusBadge
+                v-if="r.outcome === 'refused'"
+                tone="warning"
+                :label="outcomeLabel(r.outcome)"
+              />
+              <UBadge
+                v-else
+                :color="r.outcome === 'id_checked' ? 'success' : 'neutral'"
+                icon="i-lucide-circle-check"
+                :label="outcomeLabel(r.outcome)"
+              />
+              <template
+                v-if="r.description"
+                #below
+              >
+                <div class="flex items-center gap-2 text-sm">
+                  <span>{{ r.description }}</span>
+                  <IconButton
+                    v-if="d.canReview"
+                    icon="i-lucide-eraser"
+                    :label="t('bar.screens.age-checks.erase')"
+                    @click="erase(r)"
+                  />
+                </div>
+              </template>
+            </RecordListItem>
+          </RecordList>
           <UTable
-            v-else
+            v-else-if="d.rows.length"
             :data="d.rows"
             :columns="columns"
             :caption="t('bar.navigation.age-checks.label')"
@@ -217,7 +264,17 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
               </template>
             </template>
             <template #sale-cell="{ row }">
-              {{ row.original.sale ?? t('bar.screens.age-checks.no-sale') }}
+              <ULink
+                v-if="row.original.sale"
+                :to="`/console/bar/sales/${row.original.sale}`"
+                class="font-medium"
+              >
+                {{ row.original.sale }}
+              </ULink>
+              <span
+                v-else
+                class="text-muted"
+              >{{ t('bar.screens.age-checks.no-sale') }}</span>
             </template>
             <template #description-cell="{ row }">
               <div
@@ -255,6 +312,9 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
           @submit="sign"
         >
           <RefusalNotice :refusal="refusal" />
+          <p class="text-sm text-muted">
+            {{ lastSigned ? t('bar.screens.age-checks.last-signed', { day: day(lastSigned.toDay), name: lastSigned.by }) : t('bar.screens.age-checks.never-signed') }}
+          </p>
           <UFormField
             :label="t('bar.screens.age-checks.days-filter')"
             name="days"

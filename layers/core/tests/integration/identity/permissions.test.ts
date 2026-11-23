@@ -240,8 +240,28 @@ describe('sensitive actions ask again (ID-28)', () => {
       const [method, path] = route.split(' ') as [string, string]
       const sample = samples[route] ?? {}
       const response = await basic.call(method, path.replace(/:[a-z]+/g, id) + (sample.query ?? ''), method === 'GET' ? undefined : (sample.body ?? {}))
-      expect.soft(response.body?.code, route).toBe('core.access.needs-strong-sign-in')
+      // The account has no passkey and no authenticator app, so there is nothing stronger to ask for.
+      expect.soft(response.body?.code, route).toBe('core.access.two-step-not-set-up')
     }
+  })
+
+  it('says which stands in the way: two-step sign-in not set up, or a passkey that was not used', async () => {
+    const to = `two-step-${Date.now()}@example.org`
+    const first = new Browser()
+    const accountId = await signInByEmail(first, to)
+    await grantDirectly(accountId, ['core.modules.manage'])
+    const before = await first.call('PUT', '/api/core/modules/gallery', { on: true })
+    expect(before.status).toBe(403)
+    expect(before.body).toMatchObject({ code: 'core.access.two-step-not-set-up', reason: 'This needs two-step sign-in.' })
+    expect((await first.get('/api/core/me')).body.strongerSignIn).toBe('set-up')
+    // With a passkey on the account, a sign-in by email on another browser is asked to use it.
+    await addPasskey(first, new Authenticator())
+    const second = new Browser()
+    await signInByEmail(second, to)
+    const after = await second.call('PUT', '/api/core/modules/gallery', { on: true })
+    expect(after.status).toBe(403)
+    expect(after.body?.code).toBe('core.access.needs-strong-sign-in')
+    expect((await second.get('/api/core/me')).body.strongerSignIn).toBe('confirm')
   })
 
   it('a strong session that is not fresh is asked to confirm, and after a passkey the same request goes through', async () => {

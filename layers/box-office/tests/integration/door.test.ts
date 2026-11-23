@@ -129,7 +129,10 @@ describe('scanning at the door', () => {
     const codes = await tickets(h, 2)
     await scan(h, codes[0]!)
     const summary = await req('GET', `/api/box-office/performances/${h.performanceId}/door/summary`, undefined, steward)
-    expect(summary.body).toMatchObject({ performance: { id: h.performanceId }, tickets: 2, admitted: 1, unpaid: 0 })
+    expect(summary.body).toMatchObject({ performance: { id: h.performanceId }, tickets: 2, admitted: 1, unpaid: 0, canRelease: false })
+    // Someone who may also release reservations is offered Release unpaid no-shows at the door.
+    const releaser = person(['box-office.ticket.admit', 'box-office.order.release'])
+    expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door/summary`, undefined, releaser)).body.canRelease).toBe(true)
     // Front of house's headline numbers: sold, not yet paid, in, still to come and seats left.
     expect(await inContext(() => tonightNumbers(h.performanceId))).toEqual({ sold: 2, unpaid: 0, admitted: 1, toCome: 1, left: 2 })
     expect((await req('GET', `/api/box-office/performances/${h.performanceId}/door/summary`, undefined, person([]))).status).toBe(403)

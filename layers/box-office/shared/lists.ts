@@ -32,12 +32,12 @@ export const ordersList = defineList('box-office.orders', {
     created: { label: 'Made', type: 'date', natural: 'desc' },
   },
   columns: {
-    reference: { label: 'Reference', always: true, card: true },
+    reference: { label: 'Reference', always: true },
     buyer: { label: 'Buyer', card: true },
     show: { label: 'Performance', card: true },
-    state: { label: 'State', card: true },
+    state: { label: 'State' },
     total: { label: 'Total' },
-    created: { label: 'Made', sort: 'created' },
+    created: { label: 'Made', sort: 'created', card: true },
   },
   views: {
     live: { label: 'Reserved and paid', filters: { state: 'reserved,awaiting_payment,confirmed' } },
@@ -58,7 +58,7 @@ export const doorList = defineList('box-office.door-list', {
   },
   columns: {
     buyer: { label: 'Name', always: true, card: true },
-    reference: { label: 'Reference', sort: 'reference', card: true },
+    reference: { label: 'Reference', sort: 'reference' },
     tickets: { label: 'Tickets', card: true },
     admitted: { label: 'In', card: true },
   },

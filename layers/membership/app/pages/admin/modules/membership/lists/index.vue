@@ -1,5 +1,6 @@
 <!-- Verification lists (MEM-20, MEM-57): lists a scheme checks against, such as a students' union's
-     list of student IDs. Shows each list's name, kind and size, never its contents. -->
+     list of student IDs. Shows each list's name, kind and size, never its contents. The list key
+     is made with the first list and kept under a divider. -->
 <script setup lang="ts">
 interface List { id: string, name: string, keyKind: 'email' | 'reference', entryCount: number, validUntil: string | null }
 
@@ -86,11 +87,32 @@ const describe = (l: List) => [
         />
       </RecordList>
       <KeysCard
+        v-if="data && !data.keySet"
         class="mt-6"
         :names="['MEMBERSHIP_LIST_KEY']"
         :generate="['MEMBERSHIP_LIST_KEY']"
         @saved="refresh()"
       />
+      <UCollapsible
+        v-else-if="data"
+        class="mt-6"
+      >
+        <UButton
+          color="neutral"
+          variant="link"
+          class="px-0"
+          trailing-icon="i-lucide-chevron-down"
+          :label="t('membership.screens.lists.key-toggle')"
+        />
+        <template #content>
+          <KeysCard
+            class="mt-3"
+            :names="['MEMBERSHIP_LIST_KEY']"
+            :generate="['MEMBERSHIP_LIST_KEY']"
+            @saved="refresh()"
+          />
+        </template>
+      </UCollapsible>
     </DataBoundary>
 
     <UModal

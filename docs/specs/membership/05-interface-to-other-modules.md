@@ -166,7 +166,7 @@ No public services. Its whole interface is its two contributions.
 | `payments.settlement` | fees | Handlers for the owner `membership-fees.charge`: `settle`, `cannotSettle`, `refunded` and the optional `release(unit, part)`, safe to call twice (rules P4, P5, P7) |
 | `membership.charge` | fees | The fee collector |
 | `core.account-section` | membership | "Membership" on the audience side of My account, shown to everyone signed in while any scheme is open or they hold any membership. On the console's account page: a person's memberships, shown with `membership.membership.view` |
-| `core.navigation` | membership | Console group "Membership": Members, Applications (with a count of those waiting on staff), Schemes, Verification lists. Nothing in the `members` shell |
+| `core.navigation` | membership | Console group "Membership": Members (with a count of the applications waiting on staff), Schemes, Verification lists. Nothing in the `members` shell |
 | `core.home-card` | membership | For the holder: "Your membership ends on 31 July. Renew". For staff: applications waiting |
 | `core.record-tab` | membership | "Membership" on the console page of an account |
 | `core.public-component` | membership | `MembershipSchemes`: the open schemes with their summaries, fees and a join button, for a theatre's own "Join us" page |
@@ -220,7 +220,7 @@ All are safe to run twice: each is a guarded update or records what it has done 
 
 | Secret | Needed | For |
 | --- | --- | --- |
-| `MEMBERSHIP_LIST_KEY` | when-used | The key for hashing verification-list entries. Needed only by the list verifier, which stays unavailable until it is set |
+| `MEMBERSHIP_LIST_KEY` | when-used | The key for hashing verification-list entries. Needed only by the list verifier, which stays unavailable until it is set. Made at random with the first verification list (Matt, 21 November 2026); a theatre may replace it on Verification lists |
 
 ## Routes that are not behind an ability
 

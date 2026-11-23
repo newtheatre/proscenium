@@ -122,5 +122,6 @@ describe('reconciliation (FIN-06, totals)', () => {
   it('shows what each clearing account holds after its payouts', async () => {
     const body = JSON.parse((await get('/api/finance/reconcile', person(['finance.ledger.view']))).text)
     expect(body.accounts).toEqual([expect.objectContaining({ code: 'tickets.clearing.ppa_card', balanceMinor: 2000 + 1500 - 500 + 900 - 3000, paidOutMinor: 3000, lastPayoutAt: NOV_16 })])
+    expect(body.payouts).toEqual([{ postingId: expect.any(String), name: expect.any(String), currency: 'GBP', outMinor: 3000, feesMinor: 0, occurredAt: NOV_16 }])
   })
 })

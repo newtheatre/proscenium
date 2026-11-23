@@ -1,5 +1,5 @@
 // A production's tickets at a glance, read once for its Tickets tab and its summary fact.
-export interface ProductionTicketsRow { id: string, label: string | null, startsAt: number, scheduled: boolean, past: boolean, sales: SaleState | null, capacity: number, taken: number, pools: { bandId: string, capacity: number, claimed: number }[], ownSeats: boolean }
+export interface ProductionTicketsRow { id: string, label: string | null, startsAt: number, scheduled: boolean, past: boolean, sales: SaleState | null, capacity: number, taken: number, pools: { bandId: string, capacity: number, claimed: number }[], ownSeats: boolean, ownPrices?: boolean }
 export interface ProductionTickets {
   production: { id: string, title: string, state: 'draft' | 'published' | 'withdrawn' | 'cancelled' }
   sections: { id: string, name: string, kind: string, sort: number }[]
@@ -7,6 +7,8 @@ export interface ProductionTickets {
   runSeats: Record<string, number>
   /** The production's own prices, which every performance charges unless it has its own. */
   runPrices: { bandId: string, ticketTypeId: string, amountMinor: number }[]
+  /** The run's price changes set to take effect later. Absent from an answer cached before it was added. */
+  scheduledPrices?: { bandId: string, ticketTypeId: string, performanceId: string | null, amountMinor: number | null, inherits: boolean, from: number }[]
   performances: ProductionTicketsRow[]
   totals: { performances: number, onSale: number, taken: number, capacity: number }
 }

@@ -1,7 +1,8 @@
 // The membership fees layer: prices, charges and refunds through Payments. Its server code is found through the registry.
 export default defineNuxtConfig({
   routeRules: {
-    // Fees is a tab of the module's page in Admin; console staff are sent on to the console's settings window.
-    '/console/membership-fees': { redirect: { to: '/admin/modules/membership-fees/prices', statusCode: 301 } },
+    // A scheme's fee is set on the scheme's own page; the old Fees addresses lead to the schemes.
+    '/console/membership-fees': { redirect: { to: '/admin/modules/membership/schemes', statusCode: 301 } },
+    '/admin/modules/membership-fees/prices': { redirect: { to: '/admin/modules/membership/schemes', statusCode: 301 } },
   },
 })

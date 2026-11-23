@@ -88,6 +88,7 @@ export const salesFilters = z.object({
   outlet: z.string().min(1).max(64).optional(), // not-policy: an id's length
   state: z.enum(['open', 'awaiting_payment', 'paid', 'void']).optional(),
   refunded: z.enum(['yes']).optional(),
+  opening: z.string().min(1).max(64).optional(), // not-policy: an id's length
 }).strict()
 
 export interface SaleRow { reference: string, at: number, outlet: string, items: number, totalMinor: number, refundedMinor: number, state: SaleDetail['state'] }
@@ -102,10 +103,10 @@ export async function listSales(filters: z.infer<typeof salesFilters>): Promise<
             coalesce((SELECT sum(quantity) FROM bar_sale_lines WHERE sale_id = s.id), 0) AS items,
             coalesce((SELECT sum(r.amount_minor) FROM bar_sale_reversals r JOIN bar_sale_lines l ON l.id = r.sale_line_id WHERE l.sale_id = s.id AND r.state = 'succeeded'), 0) AS refundedMinor
        FROM bar_sales s JOIN bar_openings o ON o.id = s.opening_id JOIN bar_outlets t ON t.id = o.outlet_id
-      WHERE (? IS NULL OR s.reference LIKE ?) AND (? IS NULL OR o.outlet_id = ?) AND (? IS NULL OR s.state = ?)
+      WHERE (? IS NULL OR s.reference LIKE ?) AND (? IS NULL OR o.outlet_id = ?) AND (? IS NULL OR s.state = ?) AND (? IS NULL OR s.opening_id = ?)
         AND (? IS NULL OR EXISTS (SELECT 1 FROM bar_sale_reversals r JOIN bar_sale_lines l ON l.id = r.sale_line_id WHERE l.sale_id = s.id AND r.state <> 'failed'))
       ORDER BY s.created_at DESC, s.id DESC LIMIT ?`,
-    q, q, filters.outlet ?? null, filters.outlet ?? null, filters.state ?? null, filters.state ?? null, filters.refunded ?? null, PAGE,
+    q, q, filters.outlet ?? null, filters.outlet ?? null, filters.state ?? null, filters.state ?? null, filters.opening ?? null, filters.opening ?? null, filters.refunded ?? null, PAGE,
   )
 }
 

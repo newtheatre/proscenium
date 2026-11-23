@@ -95,12 +95,6 @@ async function add() {
   else needsOverride.value = refusal.value?.code === 'front-of-house.not-eligible'
 }
 
-// Places, changed in place.
-async function setPlaces(s: Shift, places: number | null | undefined) {
-  if (!places || places === s.places) return
-  await act(shiftPath(s), { places }, t('front-of-house.rota.places-saved'), 'PATCH')
-}
-
 // Changing a shift: its times, briefing and places, or cancelling it.
 const editing = ref<Shift | null>(null)
 const shiftForm = ref({ callAt: null as number | null, endsAt: null as number | null, briefing: '', places: 1 })
@@ -166,7 +160,13 @@ const template = ref<string | undefined>()
 watch(() => data.value?.templates, (list) => {
   if (!template.value || !list?.some(x => x.id === template.value)) template.value = list?.find(x => x.isDefault)?.id
 }, { immediate: true })
+const templateError = ref(false)
+const dutyError = ref(false)
 async function applyTemplate() {
+  if (!template.value) {
+    templateError.value = true
+    return
+  }
   refusal.value = null
   try {
     const result = await write<{ added: unknown[] }>(`${base.value}/apply`, { method: 'POST', body: { templateId: template.value } })
@@ -182,6 +182,10 @@ const dutyItems = computed(() => (choices.value?.duties ?? []).map(d => ({ value
 const templateItems = computed(() => (data.value?.templates ?? []).map(x => ({ value: x.id, label: x.isDefault ? t('front-of-house.rota.default-template', { name: x.name }) : x.name })))
 const base = computed(() => `/api/front-of-house/performances/${encodeURIComponent(id.value)}/shifts`)
 async function addShift() {
+  if (!newShift.value.dutyId) {
+    dutyError.value = true
+    return
+  }
   if (await act(base.value, { dutyId: newShift.value.dutyId, places: newShift.value.places }, t('front-of-house.rota.shift-added'))) newShift.value = { dutyId: undefined, places: 2 } // not-policy: a new shift's starting places
 }
 
@@ -203,6 +207,7 @@ const shiftName = (s: Shift) => s.title ? `${s.dutyName}: ${s.title}` : s.dutyNa
         :title="title"
         :trail="trail"
         :description="d.performance?.venue ?? undefined"
+        long-title
       >
         <template #primary>
           <UButton
@@ -225,7 +230,7 @@ const shiftName = (s: Shift) => s.title ? `${s.dutyName}: ${s.title}` : s.dutyNa
             v-for="s in d.shifts"
             :key="s.id"
             :title="shiftName(s)"
-            :description="t('front-of-house.rota.shift-times', { from: time(s.callAt), to: time(s.endsAt) })"
+            :description="`${t('front-of-house.rota.shift-times', { from: time(s.callAt), to: time(s.endsAt) })} · ${t('front-of-house.shift.places-value', { taken: s.placesTaken, places: s.places })}`"
           >
             <template #actions>
               <div class="flex items-center gap-2">
@@ -250,25 +255,6 @@ const shiftName = (s: Shift) => s.title ? `${s.dutyName}: ${s.title}` : s.dutyNa
               </div>
             </template>
             <div class="space-y-4">
-              <div class="flex flex-wrap items-end gap-3">
-                <UFormField :label="t('front-of-house.rota.places-label', { taken: s.placesTaken })">
-                  <UInputNumber
-                    :model-value="s.places"
-                    :min="1"
-                    :max="50"
-                    :disabled="s.state === 'cancelled' || s.state === 'completed'"
-                    @update:model-value="v => setPlaces(s, v)"
-                  />
-                </UFormField>
-                <UButton
-                  v-if="s.state === 'draft' || s.state === 'published'"
-                  icon="i-lucide-user-plus"
-                  color="neutral"
-                  variant="outline"
-                  :label="t('front-of-house.rota.add-person')"
-                  @click="startAdding(s)"
-                />
-              </div>
               <p
                 v-if="s.briefing"
                 class="whitespace-pre-line text-sm text-muted"
@@ -312,53 +298,75 @@ const shiftName = (s: Shift) => s.title ? `${s.dutyName}: ${s.title}` : s.dutyNa
                 :label="showGone[s.id] ? t('front-of-house.rota.hide-gone') : t('front-of-house.rota.show-gone', { count: goneCount(s) })"
                 @click="showGone[s.id] = !showGone[s.id]"
               />
+              <div v-if="s.state === 'draft' || s.state === 'published'">
+                <UButton
+                  icon="i-lucide-user-plus"
+                  color="neutral"
+                  variant="outline"
+                  :label="t('front-of-house.rota.add-person')"
+                  @click="startAdding(s)"
+                />
+              </div>
             </div>
           </PageSection>
 
           <PageSection :title="t('front-of-house.rota.add-shift')">
-            <div class="flex flex-wrap items-end gap-3">
-              <UFormField :label="t('front-of-house.templates.duty')">
-                <USelectMenu
-                  v-model="newShift.dutyId"
-                  :items="dutyItems"
-                  value-key="value"
-                  :placeholder="t('front-of-house.rota.choose-duty')"
+            <div class="flex flex-col gap-4">
+              <!-- With nothing set yet the template is the quick way, so it leads and is the main button. -->
+              <div
+                v-if="templateItems.length"
+                class="flex flex-wrap items-end gap-3"
+                :class="d.shifts.length ? 'order-last' : ''"
+              >
+                <UFormField
+                  name="template"
+                  :label="t('front-of-house.rota.template')"
+                  :error="templateError ? t('front-of-house.rota.choose-template-first') : undefined"
+                >
+                  <USelectMenu
+                    v-model="template"
+                    :items="templateItems"
+                    value-key="value"
+                    :placeholder="t('front-of-house.rota.choose-template')"
+                    @update:model-value="templateError = false"
+                  />
+                </UFormField>
+                <UButton
+                  :color="d.shifts.length ? 'neutral' : 'primary'"
+                  :variant="d.shifts.length ? 'outline' : 'solid'"
+                  :label="t('front-of-house.rota.apply')"
+                  loading-auto
+                  @click="applyTemplate"
                 />
-              </UFormField>
-              <UFormField :label="t('front-of-house.templates.places')">
-                <UInputNumber
-                  v-model="newShift.places"
-                  :min="1"
-                  :max="50"
+              </div>
+              <div class="flex flex-wrap items-end gap-3">
+                <UFormField
+                  :label="t('front-of-house.templates.duty')"
+                  :error="dutyError ? t('front-of-house.rota.choose-duty-first') : undefined"
+                >
+                  <USelectMenu
+                    v-model="newShift.dutyId"
+                    :items="dutyItems"
+                    value-key="value"
+                    :placeholder="t('front-of-house.rota.choose-duty')"
+                    @update:model-value="dutyError = false"
+                  />
+                </UFormField>
+                <UFormField :label="t('front-of-house.templates.places')">
+                  <UInputNumber
+                    v-model="newShift.places"
+                    :min="1"
+                    :max="50"
+                  />
+                </UFormField>
+                <UButton
+                  :color="d.shifts.length || !templateItems.length ? 'primary' : 'neutral'"
+                  :variant="d.shifts.length || !templateItems.length ? 'solid' : 'outline'"
+                  :label="t('front-of-house.rota.add-shift-button')"
+                  loading-auto
+                  @click="addShift"
                 />
-              </UFormField>
-              <UButton
-                :label="t('front-of-house.rota.add-shift-button')"
-                :disabled="!newShift.dutyId"
-                loading-auto
-                @click="addShift"
-              />
-            </div>
-            <div
-              v-if="templateItems.length"
-              class="mt-4 flex flex-wrap items-end gap-3"
-            >
-              <UFormField :label="t('front-of-house.rota.template')">
-                <USelectMenu
-                  v-model="template"
-                  :items="templateItems"
-                  value-key="value"
-                  :placeholder="t('front-of-house.rota.choose-template')"
-                />
-              </UFormField>
-              <UButton
-                color="neutral"
-                variant="outline"
-                :label="t('front-of-house.rota.apply')"
-                :disabled="!template"
-                loading-auto
-                @click="applyTemplate"
-              />
+              </div>
             </div>
           </PageSection>
         </div>

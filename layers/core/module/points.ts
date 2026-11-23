@@ -22,6 +22,8 @@ export const points = {
       hideEmpty: z.boolean().optional(),
       attention: z.string().optional(),
       match: z.string().optional(),
+      // A page reached from another page: it keeps its own ability and address, and is not in the menu.
+      unlisted: z.boolean().optional(),
       // A tab of a module's page in Admin: the console entries or groups whose settings window shows it.
       settingsIn: z.array(z.string()).min(1).optional(),
       // An account entry where somebody who is not a member learns how to become one: the members' area sends them there.

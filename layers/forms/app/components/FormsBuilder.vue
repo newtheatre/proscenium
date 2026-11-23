@@ -33,6 +33,7 @@ onMounted(() => { mounted.value = true })
 const panel = computed({ get: () => !wide.value && builder.selected.value !== null, set: (open: boolean) => { if (!open) builder.selected.value = null } })
 const selectedName = computed(() => {
   const found = builder.selected.value ? find(builder.definition.value, builder.selected.value) : null
+  if (builder.selected.value === FORMS_START || builder.selected.value === FORMS_END) return t(builder.selected.value === FORMS_START ? 'forms.screens.ends.start' : 'forms.screens.ends.end')
   if (!found && builder.definition.value.calculations?.some(c => c.id === builder.selected.value)) return t('forms.screens.calculations.one')
   if (!found) return t(builder.selected.value ? 'forms.screens.endings.one' : 'forms.screens.details.title')
   if (found.kind === 'page') return t('forms.screens.details.kind-page')
@@ -77,20 +78,22 @@ const badges = computed<{ tone: Tone, label: string }[]>(() => [
     : { tone: taking.value ? 'success' : 'info', label: t(taking.value ? 'forms.screens.builder.version' : 'forms.screens.builder.version-only', { n: form.value.liveVersion }) },
   ...(unshared.value ? [{ tone: 'warning' as const, label: t('forms.screens.builder.not-shared') }] : []),
   ...(fields.value ? [{ tone: 'info' as const, label: t('forms.screens.fields.badge') }] : []),
-  ...(form.value.status === 'paused' || form.value.status === 'closed' || form.value.status === 'archived' ? [{ tone: form.value.status === 'paused' ? 'warning' as const : 'neutral' as const, label: t(`forms.screens.status.${form.value.status}`) }] : []),
+  ...(form.value.status === 'archived' || (fields.value && form.value.status === 'closed') ? [{ tone: 'neutral' as const, label: t(`forms.screens.status.${form.value.status}`) }] : []),
 ])
+const live = computed(() => !fields.value && form.value.liveVersion !== null)
+// On a phone the Open control already says the form is live, so its version badge gives way.
+const phoneBadges = computed(() => live.value && !unshared.value && form.value.status !== 'archived' ? badges.value.slice(1) : badges.value)
+// From a tablet up sharing has a button of its own, so the menu leaves it out.
+const roomy = useScreenQuery('(min-width: 768px)')
 const more = computed(() => [[
-  ...(fields.value ? [] : [{ label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } }]),
-  ...(fields.value ? [] : [{ label: t('forms.screens.responses.title'), icon: 'i-lucide-table-2', to: `/console/forms/${form.value.id}/responses` }]),
-  ...(form.value.liveVersion === null ? [] : [{ label: t('forms.screens.versions.title'), icon: 'i-lucide-history', to: `/console/forms/${form.value.id}/versions` }]),
-], [
+  ...(fields.value || form.value.liveVersion === null || (roomy.value && live.value && !unshared.value) ? [] : [{ label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } }]),
   { label: t('forms.screens.settings.title'), icon: 'i-lucide-settings-2', onSelect: () => { settings.value = true } },
   ...(fields.value ? [] : [{ label: t('forms.screens.stages.title'), icon: 'i-lucide-git-branch', onSelect: () => { stages.value = true } }]),
-  { label: t('forms.screens.json.title'), icon: 'i-lucide-braces', onSelect: () => { json.value = true } },
+  { label: t('forms.screens.json.title'), icon: 'i-lucide-file-json', onSelect: () => { json.value = true } },
   ...(props.data.canSaveTemplate ? [{ label: t('forms.screens.templates.save'), icon: 'i-lucide-copy-plus', onSelect: () => { templating.value = true } }] : []),
-], life.value])
+], life.value].filter(group => group.length))
 
-// ---- pausing, closing and archiving ----
+// ---- closing, opening again and archiving ----
 type Status = 'draft' | 'live' | 'paused' | 'closed' | 'archived'
 const undo = useUndo()
 async function setStatus(to: Status, back?: Status) {
@@ -104,21 +107,21 @@ async function setStatus(to: Status, back?: Status) {
     toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
   }
 }
-/** What can be done to the form from where it is now. Each can be undone from its toast. */
+/** Archiving and restoring, from the menu. Opening and closing have a control of their own; each can be undone from its toast. */
 const life = computed(() => {
   const status = form.value.status as Status
   const item = (key: string, icon: string, to: Status) => ({ label: t(`forms.screens.life.${key}`), icon, onSelect: () => { setStatus(to, status) } })
-  if (status === 'live') return [item('pause', 'i-lucide-pause', 'paused'), item('close', 'i-lucide-circle-stop', 'closed')]
-  if (status === 'paused') return [item('resume', 'i-lucide-play', 'live'), item('close', 'i-lucide-circle-stop', 'closed')]
-  if (status === 'closed') return [item('reopen', 'i-lucide-play', 'live'), item('archive', 'i-lucide-archive', 'archived')]
+  if (status === 'closed') return [item('archive', 'i-lucide-archive', 'archived')]
   if (status === 'archived') return [item('restore', 'i-lucide-archive-restore', form.value.liveVersion === null ? 'draft' : 'closed')]
-  return [item('archive', 'i-lucide-archive', 'archived')]
+  // Custom fields have no open control, so closing them stays here.
+  if (fields.value && status === 'live') return [item('close', 'i-lucide-circle-stop', 'closed')]
+  return status === 'draft' ? [item('archive', 'i-lucide-archive', 'archived')] : []
 })
-function published(number: number) {
-  toast.add({ title: t('forms.screens.publish.done', { n: number }), color: 'success' })
+function published(number: number, shared: boolean) {
+  toast.add({ title: t(shared ? 'forms.screens.publish.done-shared' : 'forms.screens.publish.done', { n: number }), color: 'success' })
   emit('changed')
-  // A form published for the first time is in front of nobody yet: offer to share it.
-  if (form.value.liveVersion === null && !fields.value) sharing.value = true
+  // A form shared as it is first published has its address shown to copy.
+  if (shared) sharing.value = true
   if (fields.value) toast.add({ title: t('forms.screens.fields.published'), color: 'info' })
 }
 const saveWords = computed(() => t(`forms.screens.save.${builder.state.value}`))
@@ -158,94 +161,118 @@ const reload = () => window.location.reload()
       />
     </template>
     <template #toolbar>
-      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-        <!-- On a phone the badges sit here, so the header keeps room for the form's name. -->
-        <span class="flex w-full flex-wrap items-center gap-1.5 sm:hidden">
-          <StatusBadge
-            v-for="b in badges"
-            :key="b.label"
-            :tone="b.tone"
-            :label="b.label"
-          />
-        </span>
-        <UFieldGroup>
-          <UButton
-            v-for="v in (['build', 'preview'] as const)"
-            :key="v"
-            :label="t(`forms.screens.builder.view-${v}`)"
-            :icon="v === 'build' ? 'i-lucide-pencil-ruler' : 'i-lucide-eye'"
-            color="neutral"
-            :variant="view === v ? 'solid' : 'outline'"
-            :aria-pressed="view === v"
-            @click="view = v"
-          />
-        </UFieldGroup>
-        <IconButton
-          icon="i-lucide-undo-2"
-          :label="t('forms.screens.builder.undo')"
-          :disabled="!builder.canUndo.value"
-          @click="builder.undo()"
+      <div class="flex min-w-0 flex-1 flex-col gap-1 py-1">
+        <FormsTabs
+          :form-id="form.id"
+          current="build"
+          :responses="live && !!data.canRead"
+          :history="form.liveVersion !== null"
         />
-        <IconButton
-          icon="i-lucide-redo-2"
-          :label="t('forms.screens.builder.redo')"
-          :disabled="!builder.canRedo.value"
-          @click="builder.redo()"
-        />
-        <UPopover :ui="{ content: 'w-96 max-w-[90vw]' }">
-          <UButton
-            :label="t('forms.screens.problems.button', { count: problems.length })"
-            :icon="errors ? 'i-lucide-circle-alert' : problems.length ? 'i-lucide-triangle-alert' : 'i-lucide-circle-check'"
-            :color="errors ? 'error' : problems.length ? 'warning' : 'neutral'"
-            variant="subtle"
-          />
-          <template #content>
-            <div class="max-h-96 overflow-y-auto p-2">
-              <p
-                v-if="!problems.length"
-                class="p-2 text-sm text-muted"
-              >
-                {{ t('forms.screens.problems.none') }}
-              </p>
-              <p
-                v-else
-                class="px-2 pb-1 pt-2 text-xs text-muted"
-              >
-                {{ t('forms.screens.problems.help') }}
-              </p>
-              <button
-                v-for="(p, i) in problems"
-                :key="i"
-                type="button"
-                class="flex w-full items-start gap-2 rounded-md p-2 text-left text-sm hover:bg-elevated"
-                @click="goTo(p.at)"
-              >
-                <UIcon
-                  :name="p.level === 'error' ? 'i-lucide-circle-alert' : 'i-lucide-triangle-alert'"
-                  class="mt-0.5 shrink-0"
-                  :class="p.level === 'error' ? 'text-error' : 'text-warning'"
-                />
-                <span><span class="font-medium">{{ problemName(p.at) }}</span><br>{{ formsProblemWords(builder.definition.value, p, t) }}</span>
-              </button>
-            </div>
-          </template>
-        </UPopover>
-        <span
-          class="ms-auto flex items-center gap-1.5 text-sm text-muted"
-          aria-live="polite"
-        >
-          <UIcon
-            :name="builder.state.value === 'saved' ? 'i-lucide-cloud-check' : builder.state.value === 'stale' || builder.state.value === 'failed' ? 'i-lucide-cloud-alert' : 'i-lucide-cloud-upload'"
-            :class="builder.state.value === 'stale' || builder.state.value === 'failed' ? 'text-error' : ''"
-          />
-          {{ saveWords }}
-        </span>
-        <UDropdownMenu :items="more">
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <UFieldGroup>
+            <UButton
+              v-for="v in (['build', 'preview'] as const)"
+              :key="v"
+              :label="t(`forms.screens.builder.view-${v}`)"
+              :icon="v === 'build' ? 'i-lucide-pencil' : 'i-lucide-eye'"
+              color="neutral"
+              :variant="view === v ? 'solid' : 'outline'"
+              :aria-pressed="view === v"
+              @click="view = v"
+            />
+          </UFieldGroup>
           <IconButton
-            icon="i-lucide-ellipsis"
-            :label="t('forms.screens.builder.more')"
+            icon="i-lucide-undo-2"
+            :label="t('forms.screens.builder.undo')"
+            :disabled="!builder.canUndo.value"
+            @click="builder.undo()"
           />
-        </UDropdownMenu>
+          <IconButton
+            icon="i-lucide-redo-2"
+            :label="t('forms.screens.builder.redo')"
+            :disabled="!builder.canRedo.value"
+            @click="builder.redo()"
+          />
+          <UPopover :ui="{ content: 'w-96 max-w-[90vw]' }">
+            <UButton
+              :label="t('forms.screens.problems.button', { count: problems.length })"
+              :icon="errors ? 'i-lucide-circle-alert' : problems.length ? 'i-lucide-triangle-alert' : 'i-lucide-circle-check'"
+              :color="errors ? 'error' : problems.length ? 'warning' : 'neutral'"
+              variant="subtle"
+            />
+            <template #content>
+              <div class="max-h-96 overflow-y-auto p-2">
+                <p
+                  v-if="!problems.length"
+                  class="p-2 text-sm text-muted"
+                >
+                  {{ t('forms.screens.problems.none') }}
+                </p>
+                <p
+                  v-else
+                  class="px-2 pb-1 pt-2 text-xs text-muted"
+                >
+                  {{ t('forms.screens.problems.help') }}
+                </p>
+                <button
+                  v-for="(p, i) in problems"
+                  :key="i"
+                  type="button"
+                  class="flex w-full items-start gap-2 rounded-md p-2 text-left text-sm hover:bg-elevated"
+                  @click="goTo(p.at)"
+                >
+                  <UIcon
+                    :name="p.level === 'error' ? 'i-lucide-circle-alert' : 'i-lucide-triangle-alert'"
+                    class="mt-0.5 shrink-0"
+                    :class="p.level === 'error' ? 'text-error' : 'text-warning'"
+                  />
+                  <span><span class="font-medium">{{ problemName(p.at) }}</span><br>{{ formsProblemWords(builder.definition.value, p, t) }}</span>
+                </button>
+              </div>
+            </template>
+          </UPopover>
+          <!-- On a phone the badges sit here, so the header keeps room for the form's name. -->
+          <span class="flex flex-wrap items-center gap-1.5 sm:hidden">
+            <StatusBadge
+              v-for="b in phoneBadges"
+              :key="b.label"
+              :tone="b.tone"
+              :label="b.label"
+            />
+          </span>
+          <span
+            class="ms-auto flex items-center gap-1.5 text-sm text-muted"
+            aria-live="polite"
+          >
+            <UIcon
+              :name="builder.state.value === 'saved' ? 'i-lucide-cloud-check' : builder.state.value === 'stale' || builder.state.value === 'failed' ? 'i-lucide-cloud-alert' : 'i-lucide-cloud-upload'"
+              :class="builder.state.value === 'stale' || builder.state.value === 'failed' ? 'text-error' : ''"
+            />
+            <span class="max-sm:sr-only">{{ saveWords }}</span>
+          </span>
+          <UButton
+            v-if="live && !unshared"
+            class="hidden md:inline-flex"
+            :label="t('forms.screens.link.title')"
+            icon="i-lucide-share-2"
+            color="neutral"
+            variant="outline"
+            @click="sharing = true"
+          />
+          <FormsOpenControl
+            v-if="live && !unshared && form.status !== 'archived'"
+            :form-id="form.id"
+            :status="form.status"
+            @set="setStatus($event, form.status === 'live' ? 'live' : 'closed')"
+            @saved="emit('changed')"
+          />
+          <UDropdownMenu :items="more">
+            <IconButton
+              icon="i-lucide-ellipsis"
+              :label="t('forms.screens.builder.more')"
+            />
+          </UDropdownMenu>
+        </div>
       </div>
     </template>
 
@@ -266,7 +293,7 @@ const reload = () => window.location.reload()
     >
       <FormsBuilderCanvas />
       <aside
-        class="hidden xl:block xl:sticky xl:top-4 xl:max-h-[calc(100vh-10rem)] xl:self-start xl:overflow-y-auto xl:rounded-lg xl:border xl:border-default xl:bg-default xl:p-4"
+        class="hidden xl:block xl:sticky xl:top-0 xl:max-h-[calc(100vh-10rem)] xl:self-start xl:overflow-y-auto xl:rounded-lg xl:border xl:border-default xl:bg-default xl:p-4"
         :aria-label="t('forms.screens.details.title')"
       >
         <p class="mb-3 text-xs font-medium uppercase tracking-wide text-muted">
@@ -342,6 +369,7 @@ const reload = () => window.location.reload()
     <FormsPublishDialog
       v-model:open="publishing"
       :form-id="form.id"
+      :first="form.liveVersion === null && !fields"
       @published="published"
       @settings="settings = true"
       @go="goTo"

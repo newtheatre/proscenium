@@ -1,6 +1,6 @@
 <!-- The tonight board (Front of house specification, part 5, "Live mode"; FH-19 to FH-23): the
      performance, time to curtain and the next timing as one large button; then People, Checklists,
-     Figures and Incidents; at the foot, reporting an incident and the emergency card. Someone leading
+     and Figures; at the foot, reporting an incident and the emergency card. Someone leading
      also sees who is coming needing help, can correct a timing, and after curtain down "Extend
      tonight" and the night report. It reads again every half minute. -->
 <script setup lang="ts">
@@ -37,6 +37,9 @@ const id = computed(() => String(route.params.performance))
 const base = computed(() => `/api/front-of-house/performances/${encodeURIComponent(id.value)}`)
 const { data, status, error, refresh } = await useAPI<Board>(() => `${base.value}/tonight`, { key: `front-of-house:board:${id.value}` })
 useIntervalFn(() => { void refresh() }, REFRESH)
+// The emergency card is kept on the device from here, before anyone needs it in a hurry.
+const { fetchAhead } = useKeptCards()
+onMounted(() => { if (data.value?.can.emergency) void fetchAhead() })
 
 const now = ref(Date.now())
 useIntervalFn(() => { now.value = Date.now() }, 15_000) // not-policy: how often the countdown moves
@@ -230,6 +233,16 @@ const checklistLine = (c: Board['checklists'][number]) => c.state.startsWith('co
                 @click="editTimings"
               />
             </div>
+            <UButton
+              v-if="d.can.lead && recorded('curtain_down')"
+              icon="i-lucide-clock-plus"
+              color="neutral"
+              variant="outline"
+              size="xl"
+              block
+              :label="t('front-of-house.live.extend')"
+              @click="extend"
+            />
           </div>
 
           <section
@@ -295,9 +308,9 @@ const checklistLine = (c: Board['checklists'][number]) => c.state.startsWith('co
               </span>
             </UButton>
             <UButton
-              v-if="d.openIncidents !== null"
-              to="/console/front-of-house/incidents"
-              icon="i-lucide-shield-alert"
+              v-if="d.can.report"
+              :to="`/live/front-of-house/${encodeURIComponent(d.performance.id)}/report`"
+              icon="i-lucide-notebook-pen"
               color="neutral"
               variant="outline"
               size="xl"
@@ -305,8 +318,8 @@ const checklistLine = (c: Board['checklists'][number]) => c.state.startsWith('co
               class="min-h-24 justify-start"
             >
               <span class="flex flex-col text-start">
-                <span class="text-lg font-semibold">{{ t('front-of-house.live.incidents') }}</span>
-                <span>{{ t('front-of-house.live.open-incidents', { count: d.openIncidents }) }}</span>
+                <span class="text-lg font-semibold">{{ t('front-of-house.live.night-report') }}</span>
+                <span>{{ t('front-of-house.live.night-report-hint') }}</span>
               </span>
             </UButton>
           </div>
@@ -378,45 +391,27 @@ const checklistLine = (c: Board['checklists'][number]) => c.state.startsWith('co
       v-if="data"
       #footer
     >
-      <div class="mx-auto flex max-w-4xl flex-wrap gap-3">
+      <div class="mx-auto flex max-w-4xl gap-3">
         <UButton
           v-if="data.can.incident"
           :to="`/live/front-of-house/incident?performance=${encodeURIComponent(data.performance.id)}`"
           icon="i-lucide-shield-alert"
           color="warning"
           size="xl"
-          class="flex-1 justify-center"
+          class="min-w-0 flex-1 justify-center"
+          :ui="{ leadingIcon: 'max-sm:hidden' }"
           :label="t('front-of-house.live.report-incident')"
         />
         <UButton
           v-if="data.can.emergency"
-          :to="`/live/front-of-house/emergency/${encodeURIComponent(data.performance.venueId)}`"
+          :to="`/live/front-of-house/emergency/${encodeURIComponent(data.performance.venueId)}?performance=${encodeURIComponent(data.performance.id)}`"
           icon="i-lucide-siren"
           color="error"
           variant="outline"
           size="xl"
-          class="flex-1 justify-center"
+          class="min-w-0 flex-1 justify-center"
+          :ui="{ leadingIcon: 'max-sm:hidden' }"
           :label="t('front-of-house.live.emergency-card')"
-        />
-        <UButton
-          v-if="data.can.lead && recorded('curtain_down')"
-          icon="i-lucide-clock-plus"
-          color="neutral"
-          variant="outline"
-          size="xl"
-          class="flex-1 justify-center"
-          :label="t('front-of-house.live.extend')"
-          @click="extend"
-        />
-        <UButton
-          v-if="data.can.report"
-          :to="`/live/front-of-house/${encodeURIComponent(data.performance.id)}/report`"
-          icon="i-lucide-notebook-pen"
-          color="neutral"
-          variant="outline"
-          size="xl"
-          class="flex-1 justify-center"
-          :label="t('front-of-house.live.night-report')"
         />
       </div>
     </template>

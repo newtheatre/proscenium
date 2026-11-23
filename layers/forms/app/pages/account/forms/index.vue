@@ -16,6 +16,7 @@ const { data, status, error, refresh } = await useAPI<Mine>('/api/forms/mine', {
   <PageFrame
     :title="t('forms.navigation.mine.label')"
     :description="t('forms.screens.mine.help')"
+    :trail="[{ label: t('core.account.title'), to: '/account' }]"
     width="reading"
   >
     <DataBoundary

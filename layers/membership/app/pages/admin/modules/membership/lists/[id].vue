@@ -164,7 +164,8 @@ const facts = computed(() => {
     ...(data.value?.byHand ? [{ label: t('membership.screens.list.fact-by-hand'), value: String(data.value.byHand) }] : []),
     ...(l.validUntil ? [{ label: t('membership.screens.list.valid-until'), value: day(l.validUntil) }] : []),
     { label: t('membership.screens.list.fact-loaded'), value: l.loaded ? day(new Date(l.uploadedAt)) : t('membership.screens.list.fact-never') },
-    { label: t('membership.screens.list.fact-used-by'), value: data.value?.schemes.length ? data.value.schemes.map(s => s.name).join(', ') : t('membership.screens.list.fact-no-scheme') },
+    // One scheme is a link to it; several are named.
+    { label: t('membership.screens.list.fact-used-by'), value: data.value?.schemes.length ? data.value.schemes.map(s => s.name).join(', ') : t('membership.screens.list.fact-no-scheme'), to: data.value?.schemes.length === 1 ? `/admin/modules/membership/schemes/${data.value.schemes[0]!.id}` : undefined },
   ]
 })
 </script>
@@ -172,6 +173,7 @@ const facts = computed(() => {
 <template>
   <PageFrame
     :title="list?.name ?? t('membership.navigation.lists.label')"
+    :trail="[{ label: t('membership.navigation.lists.label'), to: '/admin/modules/membership/lists' }]"
     width="reading"
   >
     <template

@@ -193,14 +193,17 @@ async function act(r: Request, verb: 'approve' | 'decline' | 'withdraw') {
             </CollapsibleDivider>
           </PageSection>
 
-          <PageSection :title="t('box-office.comps.mine')">
-            <EmptyState
-              v-if="!d.mine.length"
-              :title="t('box-office.comps.empty.title')"
-              :description="askWords('empty-description')"
-              icon="i-lucide-gift"
-            />
-            <template v-else>
+          <EmptyState
+            v-if="!d.mine.length"
+            :title="t('box-office.comps.empty.title')"
+            :description="askWords('empty-description')"
+            icon="i-lucide-gift"
+          />
+          <PageSection
+            v-else
+            :title="t('box-office.comps.mine')"
+          >
+            <template v-if="d.mine.length">
               <RecordList
                 v-if="open.length"
                 :label="t('box-office.comps.mine')"

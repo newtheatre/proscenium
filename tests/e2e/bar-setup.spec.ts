@@ -50,10 +50,15 @@ async function noViolations(page: Page) {
   expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }
 
-test('Choices lists each group with its options and has no violations', async ({ page }) => {
+test('Choices are a section of Products, listing each group with its options, with no violations', async ({ page }) => {
+  // The old address of the Choices tab leads to the section.
   await visit(page, '/admin/modules/bar/choices')
-  await expect(page.getByRole('tab', { name: 'Choices', selected: true })).toBeVisible()
-  await expect(page.getByText(`Irish cream ${stamp}`)).toBeVisible()
+  await expect(page).toHaveURL(/\/admin\/modules\/bar\/products#choices$/)
+  await expect(page.getByRole('tab', { name: 'Products', selected: true })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Choices' })).toHaveCount(0)
+  const choices = page.getByRole('region', { name: 'Choices', exact: true })
+  await expect(choices.getByRole('button', { name: 'New choice' })).toBeVisible()
+  await expect(choices.getByText(`Irish cream ${stamp}`)).toBeVisible()
   await expect(page.getByText('Adds £2.00 · Age check · Allergens: not checked yet')).toBeVisible()
   await noViolations(page)
 })
@@ -66,7 +71,7 @@ test('a sub-category shows under its parent on Products', async ({ page }) => {
 
 test('a product records its allergens from the label', async ({ page }) => {
   await visit(page, `/admin/modules/bar/products/${s.product}`)
-  await expect(page.getByText('Allergens: not checked yet')).toBeVisible()
+  await expect(page.getByText('Not checked yet', { exact: true })).toBeVisible()
   await noViolations(page)
   await page.getByRole('button', { name: 'Check the label' }).click()
   const dialog = page.getByRole('dialog')
@@ -79,8 +84,11 @@ test('a product records its allergens from the label', async ({ page }) => {
   await expect(page.getByText('Soya', { exact: true })).toBeVisible()
 })
 
-test('an outlet takes a till layout', async ({ page }) => {
+test('an outlet takes a till layout, and the price lists sit below the outlets', async ({ page }) => {
   await visit(page, '/admin/modules/bar/outlets')
+  await expect(page.getByRole('tab', { name: 'Price lists' })).toHaveCount(0)
+  const lists = page.getByRole('region', { name: 'Price lists', exact: true })
+  await expect(lists.getByRole('link', { name: 'Standard', exact: true })).toHaveAttribute('href', /\/admin\/modules\/bar\/outlets\/price-lists\//)
   await page.getByRole('button', { name: 'New outlet' }).first().click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Name').fill(`Foyer ${stamp}`)

@@ -1,13 +1,14 @@
 <!-- Publishing (FB-207): what would change, how much it matters to answers already given, and
-     anything that stops it, shown before the author confirms. -->
+     anything that stops it, shown before the author confirms. A form's first publish also asks who
+     can answer and shares it in the same step, so its address is ready as soon as it is live. -->
 <script setup lang="ts">
 import type { Problem } from '../../shared/engine'
 
 interface Change { kind: 'added' | 'retired' | 'changed', impact: 'safe' | 'caution' | 'breaking', questionId: string, label: string, what: string[] }
 interface Plan { editRevision: number, number: number, unchanged: boolean, problems: Problem[], refusals: { code: string, reason: string, questionId?: string }[], impact: Change['impact'], changes: Change[] }
 
-const props = defineProps<{ formId: string }>()
-const emit = defineEmits<{ published: [number: number], settings: [], go: [at: string] }>()
+const props = defineProps<{ formId: string, first?: boolean }>()
+const emit = defineEmits<{ published: [number: number, shared: boolean], settings: [], go: [at: string] }>()
 const open = defineModel<boolean>('open', { default: false })
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -18,6 +19,9 @@ const plan = ref<Plan | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const confirmed = ref(false)
 const unconfirmed = ref(false)
+// A form made only to be attached to another record is published without a link of its own.
+const audience = ref<'anyone' | 'signed_in' | 'none'>('anyone')
+const audiences = computed(() => [...(['anyone', 'signed_in'] as const).map(value => ({ value, label: t(`forms.screens.link.audience-${value}`) })), { value: 'none' as const, label: t('forms.screens.publish.share-later') }])
 watch(open, async (now) => {
   if (!now) return
   plan.value = null
@@ -59,8 +63,10 @@ async function publish() {
   refusal.value = null
   try {
     const done = await $api<{ number: number }>(`/api/forms/forms/${props.formId}/publish`, { method: 'POST', body: { editRevision: plan.value.editRevision, confirm: confirmed.value } })
+    // Shared with the choice made here; if that is refused the form is still published, and Share says so.
+    const shared = props.first && audience.value !== 'none' && await $api(`/api/forms/forms/${props.formId}/link` as string, { method: 'PUT', body: { audience: audience.value, opensAt: null, closesAt: null, responseCap: null, onePerPerson: false, status: 'active' } }).then(() => true, () => false)
     open.value = false
-    emit('published', done.number)
+    emit('published', done.number, shared)
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -167,6 +173,17 @@ async function publish() {
             >
               {{ t('forms.screens.publish.warnings', { count: warnings.length }) }}
             </p>
+            <UFormField
+              v-if="first"
+              :label="t('forms.screens.link.audience')"
+              :help="t('forms.screens.publish.share-help')"
+            >
+              <USelect
+                v-model="audience"
+                :items="audiences"
+                class="min-w-56"
+              />
+            </UFormField>
             <UFormField
               v-if="plan.impact === 'breaking'"
               :error="unconfirmed && !confirmed ? t('forms.screens.publish.confirm-needed') : undefined"

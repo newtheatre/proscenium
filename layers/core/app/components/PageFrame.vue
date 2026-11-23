@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<{
   description?: string
   /** The parents of this page, nearest last: where it sits below a navigation entry. Drawn here and nowhere else. */
   trail?: { label: string, to: string }[]
-  /** A record's own name, which can be long: on a phone in the console it takes a line of its own under the bar, where the bar's actions cannot squeeze it. */
+  /** A record's own name, which can be long: on a phone in the console it takes a line of its own under the bar, where the bar's actions cannot squeeze it. A page with a trail does so anyway. */
   longTitle?: boolean
 }>(), { width: 'standard', description: undefined, trail: undefined, longTitle: false })
 
@@ -43,6 +43,8 @@ const { t } = useT()
 const { recall } = useListMemory()
 const parents = computed(() => (props.trail ?? []).map(c => ({ label: c.label, to: recall(c.to), active: false })))
 const nearest = computed(() => parents.value.at(-1))
+// A failed load inside this page offers this as its way back.
+provide('core:page-parent', nearest)
 const dashboard = inject(DASHBOARD_SHELL, false)
 const admin = inject(ADMIN_SHELL, false)
 const widths = { reading: 'width-reading', standard: 'width-standard', full: 'width-full' } as const
@@ -57,6 +59,8 @@ const navbarUi = {
   left: 'max-sm:max-w-full',
   right: 'max-sm:ms-auto',
 }
+// On a phone a page below another has a back button in the bar too, so its title takes the line under it.
+const titleBelow = computed(() => props.longTitle || !!nearest.value)
 const [DefineBody, ReuseBody] = createReusableTemplate()
 </script>
 
@@ -109,7 +113,7 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
     <template #header>
       <UDashboardNavbar
         :title="title"
-        :ui="longTitle ? { ...navbarUi, title: 'max-sm:sr-only' } : navbarUi"
+        :ui="titleBelow ? { ...navbarUi, title: 'max-sm:sr-only' } : navbarUi"
       >
         <template #leading>
           <UDashboardSidebarCollapse />
@@ -119,7 +123,7 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
             :label="t('core.admin.mark')"
             color="neutral"
             variant="subtle"
-            class="max-sm:hidden"
+            :ui="{ label: 'max-sm:sr-only' }"
           />
           <template v-if="nearest">
             <UBreadcrumb
@@ -148,7 +152,10 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
           <ShellTools />
         </template>
       </UDashboardNavbar>
-      <UDashboardToolbar v-if="$slots.toolbar">
+      <UDashboardToolbar
+        v-if="$slots.toolbar"
+        :ui="{ root: 'max-sm:py-2' }"
+      >
         <template #left>
           <slot name="toolbar" />
         </template>
@@ -160,19 +167,29 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
         :class="widths[width]"
       >
         <!-- The heading stays in the bar for assistive technology; this line is what a phone shows. -->
-        <p
-          v-if="longTitle"
-          class="text-lg font-semibold text-pretty text-highlighted sm:hidden"
+        <div
+          v-if="titleBelow"
+          class="sm:hidden"
           aria-hidden="true"
         >
-          {{ title }}
-        </p>
+          <!-- The breadcrumb is a laptop's; on a phone the parent's name sits over the title. -->
+          <p
+            v-if="nearest"
+            class="text-sm text-muted"
+          >
+            {{ nearest.label }}
+          </p>
+          <p class="text-lg font-semibold text-pretty text-highlighted">
+            {{ title }}
+          </p>
+        </div>
         <p
           v-if="description"
           class="text-sm text-muted"
         >
           {{ description }}
         </p>
+        <StrongerSignInNotice />
         <slot />
       </div>
     </template>
@@ -191,6 +208,7 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
       <UPageHeader
         :title="title"
         :description="description"
+        :ui="{ root: 'max-sm:py-5', title: 'max-sm:text-2xl', description: 'max-sm:mt-2 max-sm:text-base', links: 'gap-2', wrapper: 'gap-3' }"
       >
         <template
           v-if="nearest"
@@ -216,7 +234,12 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
         <template #links>
           <slot name="primary" />
         </template>
-        <slot name="status" />
+        <div
+          v-if="$slots.status"
+          class="mt-3 flex flex-wrap items-center gap-2"
+        >
+          <slot name="status" />
+        </div>
       </UPageHeader>
       <div class="space-y-4 py-6">
         <slot name="toolbar" />

@@ -54,7 +54,19 @@ beforeAll(async () => {
   await ready()
 })
 
+describe('reserving as a guest, by default', () => {
+  it('reserves at once, with no address to confirm first', async () => {
+    const h = await house(4)
+    const b = await basket(h, 1)
+    const done = await reserve(b, address())
+    expect(done.status, JSON.stringify(done.body)).toBe(200)
+    expect(done.body).toMatchObject({ state: 'reserved', orderId: b.orderId })
+  })
+})
+
 describe('reserving as a guest, with a confirmed address asked for', () => {
+  beforeAll(() => set('box-office.reservations.confirm-email', true))
+
   it('keeps the basket a basket until the link in the email is pressed, then reserves it and posts nothing', async () => {
     const h = await house(10)
     const before = await money()
@@ -69,6 +81,13 @@ describe('reserving as a guest, with a confirmed address asked for', () => {
 
     const confirm = await mail('box-office.reservation-confirm', b.orderId)
     expect(confirm.link).toMatch(/^http:\/\/test\/book\/confirm\//)
+    // The page the link opens says what is being confirmed, and a wrong link gets the one answer.
+    const shown = await req('GET', '/api/box-office/reservations/confirm', undefined, null, { 'x-confirm-token': tokenOf(confirm.link!) })
+    expect(shown.status, JSON.stringify(shown.body)).toBe(200)
+    expect(shown.body).toEqual({ show: expect.any(String), startsAt: expect.any(Number), tickets: '2 × Full price', totalMinor: b.totalMinor, currency: 'GBP', email, expiresAt: b.expiresAt })
+    const wrong = await req('GET', '/api/box-office/reservations/confirm', undefined, null, { 'x-confirm-token': 'not-a-token' })
+    expect(wrong.status).toBe(404)
+    expect(wrong.body.code).toBe('box-office.reservation.link-invalid')
     const done = await req('POST', '/api/box-office/reservations/confirm', { token: tokenOf(confirm.link!) }, null)
     expect(done.status, JSON.stringify(done.body)).toBe(200)
     expect(done.body).toMatchObject({ state: 'reserved', orderId: b.orderId, reference: b.reference, amountDueMinor: b.totalMinor, releaseAt: expect.any(Number) }) // released ten minutes before the start, by default

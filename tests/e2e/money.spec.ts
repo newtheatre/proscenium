@@ -56,7 +56,6 @@ const SCREENS = [
   ['/console/finance/periods', 'Periods'],
   ['/console/finance/productions', 'Production statements'],
   ['/console/finance/reconcile', 'Reconciliation'],
-  ['/console/finance/export', 'Export'],
 ] as const
 
 for (const [path, title] of SCREENS) {
@@ -129,7 +128,7 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await expect(payButton(page, '£6.00')).toBeEnabled()
   await noViolations(page)
   await cash(page).click()
-  await expect(page.getByText('Still to pay: £6.00')).toBeVisible()
+  await expect(page.getByText('Payment in progress: £6.00 to take')).toBeVisible()
   await page.getByLabel(/^Cash handed over/).fill('10')
   await page.getByLabel(/^Cash handed over/).blur()
   // The change shows while the cash is typed, before the sale is done.
@@ -202,7 +201,7 @@ test('Split is off for a single item, gives every item to someone, and a reload 
   // Nothing is started until someone pays.
   await expect(page.getByRole('button', { name: 'Cancel sale' })).toHaveCount(0)
   await personCash(page, 1).click()
-  await expect(page.getByText('Still to pay: £6.00')).toBeVisible()
+  await expect(page.getByText('Payment in progress: £6.00 to take')).toBeVisible()
   // Reloaded before anyone has paid: the people and what each pays for come back from the sale.
   await page.reload()
   await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
@@ -258,7 +257,7 @@ test('the Till picks a sale up again when the SumUp app sends the seller back', 
   const { intentId } = await made.json() as { intentId: string }
 
   await visit(page, `/live/till?attempt=att_none&intent=${intentId}&result=failed`)
-  await expect(page.getByText('Still to pay: £3.00')).toBeVisible()
+  await expect(page.getByText('Payment in progress: £3.00 to take')).toBeVisible()
   await expect(page.getByText('The payment did not go through')).toBeVisible()
   await expect(page).toHaveURL(/\/live\/till$/)
   await noViolations(page)

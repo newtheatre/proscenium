@@ -30,11 +30,12 @@ const { isDropTarget } = useDroppable({ id: () => props.listKey, element: el, ac
       :accept="accept"
       @add="$emit('add', $event)"
     />
-    <p
+    <div
       v-if="!items.length"
-      class="rounded-lg border border-dashed border-default p-6 text-center text-sm text-muted"
+      class="flex flex-col items-center gap-3 rounded-lg border border-dashed border-default p-6 text-center text-sm text-muted"
     >
-      {{ empty }}
-    </p>
+      <p>{{ empty }}</p>
+      <slot name="empty" />
+    </div>
   </div>
 </template>

@@ -29,6 +29,18 @@ const totals = computed(() => {
   return [...out.values()]
 })
 
+// What has become income and what is still held (liabilities, such as deferred ticket income), per currency.
+const figures = computed(() => {
+  const out = new Map<string, { currency: string, income: number, held: number }>()
+  for (const l of data.value?.lines ?? []) {
+    const f = out.get(l.currency) ?? { currency: l.currency, income: 0, held: 0 }
+    if (l.kind === 'income') f.income += l.netMinor
+    if (l.kind === 'liability') f.held += l.netMinor
+    out.set(l.currency, f)
+  }
+  return [...out.values()].filter(f => f.held !== 0)
+})
+
 // The totals sit in the table's foot, one line per currency.
 const right = { class: { th: 'text-right', td: 'text-right tabular-nums' } }
 type Key = 'salesMinor' | 'refundsMinor' | 'otherMinor' | 'netMinor'
@@ -39,10 +51,12 @@ const amount = <R extends Record<Key, number> & { currency: string }>(key: Key, 
   ...(footer ? { footer: () => totals.value.map(total => money(total[key], total.currency)).join(' · ') } : {}),
   meta: right,
 })
+// Other is left out while nothing sits in it, so Net stays in view on a phone.
+const hasOther = computed(() => [...(data.value?.lines ?? []), ...(data.value?.performances ?? [])].some(l => l.otherMinor !== 0))
 const amounts = <R extends Record<Key, number> & { currency: string }>(footer: boolean): TableColumn<R>[] => [
   amount<R>('salesMinor', t('finance.screens.statement.sales'), footer),
   amount<R>('refundsMinor', t('finance.screens.statement.refunds'), footer),
-  amount<R>('otherMinor', t('finance.screens.statement.other'), footer),
+  ...(hasOther.value ? [amount<R>('otherMinor', t('finance.screens.statement.other'), footer)] : []),
   amount<R>('netMinor', t('finance.screens.statement.net'), footer),
 ]
 const columns = computed<TableColumn<Line>[]>(() => [
@@ -101,6 +115,14 @@ const performanceName = (p: PerformanceLine) => {
           v-else
           class="space-y-4"
         >
+          <FactStrip
+            v-for="f in figures"
+            :key="f.currency"
+            :facts="[
+              { label: t('finance.screens.statement.income'), value: money(f.income, f.currency) },
+              { label: t('finance.screens.statement.held'), value: money(f.held, f.currency) },
+            ]"
+          />
           <h2 class="text-sm font-semibold text-muted">
             {{ t('finance.screens.statement.by-account') }}
           </h2>

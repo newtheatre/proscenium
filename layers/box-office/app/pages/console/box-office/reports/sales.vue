@@ -98,8 +98,10 @@ const csv = computed(() => data.value ? `/api/box-office/reports/sales.csv?produ
       <template #default="{ data: loaded }">
         <div class="space-y-8">
           <UFormField :label="t('box-office.reports.production')">
-            <USelect
+            <USelectMenu
               v-model="chosen"
+              class="sm:w-96"
+              value-key="value"
               :items="productionItems"
             />
           </UFormField>
@@ -115,14 +117,20 @@ const csv = computed(() => data.value ? `/api/box-office/reports/sales.csv?produ
               :columns="performanceColumns"
               :caption="t('box-office.reports.by-performance', { production: loaded.report.production.title })"
             />
-            <PageSection :title="t('box-office.reports.by-type')">
+            <PageSection
+              v-if="loaded.report.byType.length"
+              :title="t('box-office.reports.by-type')"
+            >
               <UTable
                 :data="loaded.report.byType"
                 :columns="typeColumns"
                 :caption="t('box-office.reports.by-type')"
               />
             </PageSection>
-            <PageSection :title="t('box-office.reports.by-channel')">
+            <PageSection
+              v-if="loaded.report.byChannel.length"
+              :title="t('box-office.reports.by-channel')"
+            >
               <UTable
                 :data="loaded.report.byChannel"
                 :columns="channelColumns"

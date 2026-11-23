@@ -136,4 +136,48 @@ describe('the Tickets tab', () => {
     expect(after.runPrices).toEqual([{ bandId: h.bandId, ticketTypeId: h.fullId, amountMinor: 1100 }])
     expect(after.sections.map((x: { name: string }) => x.name)).toEqual(['Stalls'])
   })
+
+  it('lists the run\'s price changes to come, and never one night\'s own', async () => {
+    const h = await house(10, { open: false })
+    const from = NOV_16 + 7 * 86_400_000
+    await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: h.fullId, amountMinor: 1500 }], from })
+    await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: h.fullId, performanceId: h.performanceId, amountMinor: 900 }], from })
+    const tab = (await req('GET', `/api/box-office/productions/${h.productionId}/tickets`)).body
+    expect(tab.scheduledPrices).toEqual([{ bandId: h.bandId, ticketTypeId: h.fullId, performanceId: null, amountMinor: 1500, inherits: false, from }])
+    // A night says it charges its own price only once that price is in force, and not once handed back.
+    const own = async () => (await req('GET', `/api/box-office/productions/${h.productionId}/tickets`)).body.performances.find((p: { id: string }) => p.id === h.performanceId).ownPrices
+    expect(await own()).toBe(false)
+    await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: h.fullId, performanceId: h.performanceId, amountMinor: 800 }] })
+    expect(await own()).toBe(true)
+    await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: h.fullId, performanceId: h.performanceId, amountMinor: null, inherit: true }] })
+    expect(await own()).toBe(false)
+  })
+})
+
+describe('one night\'s set-up', () => {
+  it('says what the run sells, whether this night differs, and the theatre\'s limits it takes when it has none', async () => {
+    const h = await house(10, { open: false })
+    await deliver()
+    const venue = (await req('POST', '/api/core/venues', { name: 'Night venue' })).body
+    const a = await newPerformance(h.productionId, venue, 8, false)
+    const b = await newPerformance(h.productionId, venue, 9, false)
+    await req('PUT', `/api/box-office/performances/${a}/sales`, { pools: [{ bandId: h.bandId, capacity: 10 }] })
+    await req('PUT', `/api/box-office/performances/${b}/sales`, { pools: [{ bandId: h.bandId, capacity: 4 }] })
+    const usual = (await req('GET', `/api/box-office/performances/${a}/sales`)).body
+    expect(usual.run).toEqual({ seats: { [h.bandId]: 10 }, ownSeats: false })
+    expect((await req('GET', `/api/box-office/performances/${b}/sales`)).body.run).toEqual({ seats: { [h.bandId]: 10 }, ownSeats: true })
+    // The settings' defaults, in the units the set-up is typed in.
+    expect(usual.defaults).toEqual({ maxPerOrder: 8, holdMinutes: 10, releaseMinutes: 10 })
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'box-office.baskets.hold-for', 900, { reason: 'test', confirm: true })
+      await unit.commit()
+    })
+    expect((await req('GET', `/api/box-office/performances/${a}/sales`)).body.defaults.holdMinutes).toBe(15)
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'box-office.baskets.hold-for', 600, { reason: 'test', confirm: true })
+      await unit.commit()
+    })
+  })
 })

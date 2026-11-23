@@ -2,14 +2,14 @@
 // long each has waited, payments taken that could not be completed and are not yet refunded, refunds
 // the provider turned down, and till sessions that stopped with cash in them and await their count.
 import { z } from 'zod'
-import { all, defineRoute, nowMs } from '#kit'
+import { all, can, defineRoute, nowMs } from '#kit'
 import { describeSessions } from '../../sessions'
 
 export default defineRoute({
   ability: 'payments.attempt.reconcile',
   rateLimit: 'default',
   input: z.object({}),
-}, async () => {
+}, async (_event, { actor }) => {
   const now = nowMs()
   const unknown = await all<{ id: string, intent_id: string, method: string, amount_minor: number, currency: string, provider_ref: string | null, label: string, started_at: number }>(
     `SELECT a.id, a.intent_id, a.method, a.amount_minor, i.currency, a.provider_ref, p.label, a.started_at FROM payments_attempts a
@@ -22,12 +22,19 @@ export default defineRoute({
   const failed = await all<{ id: string, amount_minor: number, currency: string, method: string, updated_at: number }>(
     `SELECT r.id, r.amount_minor, i.currency, a.method, r.updated_at FROM payments_refunds r JOIN payments_attempts a ON a.id = r.attempt_id
       JOIN payments_intents i ON i.id = a.intent_id WHERE r.state = 'failed' ORDER BY r.updated_at`)
+  // Refunds waiting for a second person, shown only to someone who may approve them.
+  const waiting = (await can(actor, 'payments.refund.approve')).allowed
+    ? await all<{ id: string, amount_minor: number, currency: string, method: string, created_at: number }>(
+        `SELECT r.id, r.amount_minor, i.currency, a.method, r.created_at FROM payments_refunds r JOIN payments_attempts a ON a.id = r.attempt_id
+          JOIN payments_intents i ON i.id = a.intent_id WHERE r.state = 'requested' ORDER BY r.created_at`)
+    : []
   const counting = await all<{ id: string }>("SELECT id FROM payments_sessions WHERE state = 'counting' ORDER BY opened_at")
   const awaiting = await describeSessions(counting.map(s => s.id))
   return {
     awaitingCount: awaiting.map(s => ({ id: s.id, place: s.place, pointLabel: s.pointLabel, openedByName: s.openedByName, openedAt: s.openedAt, expectedCashMinor: s.expectedCashMinor, currency: s.currency })),
     unknown: unknown.map(a => ({ id: a.id, intentId: a.intent_id, method: a.method, amountMinor: a.amount_minor, currency: a.currency, providerRef: a.provider_ref, provider: a.label, waitingMs: now - a.started_at })),
     unfulfilled: unfulfilled.map(i => ({ id: i.id, amountMinor: i.amount_minor, currency: i.currency, sinceMs: now - i.updated_at })),
+    waitingRefunds: waiting.map(r => ({ id: r.id, amountMinor: r.amount_minor, currency: r.currency, method: r.method, sinceMs: now - r.created_at })),
     failedRefunds: failed.map(r => ({ id: r.id, amountMinor: r.amount_minor, currency: r.currency, method: r.method, sinceMs: now - r.updated_at })),
   }
 })

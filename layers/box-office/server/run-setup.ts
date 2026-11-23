@@ -192,6 +192,16 @@ export function runSeats(performances: { id: string, pools: { band_id: string, c
   }
 }
 
+/** The run's seats and the nights with seats of their own, read for one production. */
+export async function runSeatsOf(productionId: string): Promise<{ seats: Record<string, number>, own: Set<string> }> {
+  const rows = await all<{ performance_id: string, band_id: string, capacity: number }>(
+    `SELECT o.performance_id, o.band_id, o.capacity FROM box_office_pools o JOIN core_performances f ON f.id = o.performance_id
+      WHERE f.production_id = ? AND f.state IN ('scheduled', 'draft') AND o.band_id NOT IN (SELECT id FROM box_office_bands WHERE kind = 'wheelchair')`, productionId)
+  const by = new Map<string, { band_id: string, capacity: number }[]>()
+  for (const r of rows) by.set(r.performance_id, [...(by.get(r.performance_id) ?? []), r])
+  return runSeats([...by.entries()].map(([id, pools]) => ({ id, pools })))
+}
+
 /**
  * Sets the seats of every performance of the run that follows the run (or of those named), in one
  * go (the Tickets tab). A performance with seats of its own keeps them unless named; one that has

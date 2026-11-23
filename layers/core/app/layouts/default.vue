@@ -31,6 +31,13 @@ const accountLinks = computed(() => viewer.value.signedIn
       { label: t('core.menu.sign-out'), icon: 'i-lucide-log-out', onSelect: () => { void signOut() } },
     ]
   : [{ label: t('core.menu.sign-in'), icon: 'i-lucide-log-in', to: `/sign-in?next=${encodeURIComponent(route.fullPath)}` }])
+// What modules put beside the account menu (usePublicHeaderItems), such as tickets being held; a name nobody answers to is left out.
+const { vueApp } = useNuxtApp()
+const headerNames = usePublicHeaderItems()
+const headerItems = computed(() => headerNames.value.flatMap((name) => {
+  const component = vueApp.component(name)
+  return component ? [{ name, component }] : []
+}))
 // The footer: the theatre's own links, then every policy the site has (a module that is on adds its
 // own), so a new policy is linked without anyone editing the menu.
 const { data: policies } = await useAPI<{ policies: { id: string, title: string }[] }>('/api/core/policies', { key: 'core:policies', default: () => ({ policies: [] }) })
@@ -80,8 +87,18 @@ const setupNeeded = computed(() => setup.value?.needed === true && !viewer.value
       />
       <template #right>
         <template v-if="!onSetup">
+          <div class="peer contents">
+            <component
+              :is="item.component"
+              v-for="item in headerItems"
+              :key="item.name"
+            />
+          </div>
           <InboxBell side="audience" />
-          <AccountMenu />
+          <!-- On a phone a module's item (tickets held) takes the place of the Sign in icon, which the menu repeats. -->
+          <div :class="viewer.signedIn ? 'contents' : 'peer-has-[a]:max-lg:hidden'">
+            <AccountMenu />
+          </div>
         </template>
       </template>
       <template

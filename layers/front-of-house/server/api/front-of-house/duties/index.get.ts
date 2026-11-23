@@ -8,11 +8,12 @@ import { listDuties } from '../../../shifts'
 const NOT_FOR_DUTIES = new Set(['core.access-scheme'])
 
 export default defineRoute({ ability: 'front-of-house.duty.manage', rateLimit: 'default' }, async () => {
-  const duties = await listDuties()
+  const every = await listDuties({ includeArchived: true })
+  const duties = every.filter(d => d.archivedAt === null)
   const sources = (await usePoint('core.requirement')).map(c => c.id).filter(id => !NOT_FOR_DUTIES.has(id))
   const offered = (await Promise.all(sources.map(id => requirements.options(id, '')))).flat()
-  const described = await requirements.describe([...new Set(duties.flatMap(d => d.requirements))])
+  const described = await requirements.describe([...new Set(every.flatMap(d => d.requirements))])
   const labels: Record<string, string> = Object.fromEntries(offered.map(o => [o.reference, o.label]))
   for (const [ref, d] of Object.entries(described)) labels[ref] = d.label
-  return { duties, requirementOptions: offered.map(o => ({ value: o.reference, label: o.label })), requirementLabels: labels }
+  return { duties, archived: every.filter(d => d.archivedAt !== null), requirementOptions: offered.map(o => ({ value: o.reference, label: o.label })), requirementLabels: labels }
 })
