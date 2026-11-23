@@ -1,6 +1,5 @@
 <!-- The builder once its form has loaded. See pages/console/forms/[id].vue. -->
 <script setup lang="ts">
-import { useMediaQuery } from '@vueuse/core'
 import { find } from '../../shared/builder/edit'
 import { FORM_BUILDER, useFormBuilder, type BuilderData } from '../composables/useFormBuilder'
 import { questionsOf, type Answers } from '../../shared/engine'
@@ -27,7 +26,7 @@ const stages = ref(false)
 const templating = ref(false)
 
 // Beside the canvas on a laptop; a panel that slides over it on anything narrower.
-const wide = useMediaQuery('(min-width: 1280px)')
+const wide = useScreenQuery('(min-width: 1280px)')
 const mounted = ref(false)
 onMounted(() => { mounted.value = true })
 const panel = computed({ get: () => !wide.value && builder.selected.value !== null, set: (open: boolean) => { if (!open) builder.selected.value = null } })
@@ -74,11 +73,11 @@ const taking = computed(() => fields.value || (form.value.status === 'live' && !
 type Tone = 'neutral' | 'success' | 'info' | 'warning'
 const badges = computed<{ tone: Tone, label: string }[]>(() => [
   form.value.liveVersion === null
-    ? { tone: 'neutral', label: t('forms.screens.status.draft') }
+    ? { tone: 'neutral', label: t('core.states.draft') }
     : { tone: taking.value ? 'success' : 'info', label: t(taking.value ? 'forms.screens.builder.version' : 'forms.screens.builder.version-only', { n: form.value.liveVersion }) },
   ...(unshared.value ? [{ tone: 'warning' as const, label: t('forms.screens.builder.not-shared') }] : []),
   ...(fields.value ? [{ tone: 'info' as const, label: t('forms.screens.fields.badge') }] : []),
-  ...(form.value.status === 'archived' || (fields.value && form.value.status === 'closed') ? [{ tone: 'neutral' as const, label: t(`forms.screens.status.${form.value.status}`) }] : []),
+  ...(form.value.status === 'archived' || (fields.value && form.value.status === 'closed') ? [{ tone: 'neutral' as const, label: t(form.value.status === 'archived' ? 'core.states.archived' : 'forms.screens.status.closed') }] : []),
 ])
 const live = computed(() => !fields.value && form.value.liveVersion !== null)
 // On a phone the Open control already says the form is live, so its version badge gives way.
@@ -86,7 +85,7 @@ const phoneBadges = computed(() => live.value && !unshared.value && form.value.s
 // From a tablet up sharing has a button of its own, so the menu leaves it out.
 const roomy = useScreenQuery('(min-width: 768px)')
 const more = computed(() => [[
-  ...(fields.value || form.value.liveVersion === null || (roomy.value && live.value && !unshared.value) ? [] : [{ label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } }]),
+  ...(!live.value || unshared.value || roomy.value ? [] : [{ label: t('forms.screens.link.title'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } }]),
   { label: t('forms.screens.settings.title'), icon: 'i-lucide-settings-2', onSelect: () => { settings.value = true } },
   ...(fields.value ? [] : [{ label: t('forms.screens.stages.title'), icon: 'i-lucide-git-branch', onSelect: () => { stages.value = true } }]),
   { label: t('forms.screens.json.title'), icon: 'i-lucide-file-json', onSelect: () => { json.value = true } },
@@ -124,6 +123,13 @@ function published(number: number, shared: boolean) {
   if (shared) sharing.value = true
   if (fields.value) toast.add({ title: t('forms.screens.fields.published'), color: 'info' })
 }
+// Publish leads; a form published and not yet shared has Share beside it, folded into a menu on a phone.
+const actions = computed(() => [
+  { label: t('forms.screens.publish.button'), icon: 'i-lucide-send', onSelect: () => { publishing.value = true } },
+  ...(unshared.value ? [{ label: t('forms.screens.link.share'), icon: 'i-lucide-share-2', onSelect: () => { sharing.value = true } }] : []),
+])
+const views = computed(() => [{ value: 'build' as const, label: t('forms.screens.builder.view-build'), icon: 'i-lucide-pencil' }, { value: 'preview' as const, label: t('forms.screens.builder.view-preview'), icon: 'i-lucide-eye' }])
+const widths = computed(() => [{ value: 'phone' as const, label: t('forms.screens.preview.phone'), icon: 'i-lucide-smartphone' }, { value: 'desktop' as const, label: t('forms.screens.preview.desktop'), icon: 'i-lucide-monitor' }])
 const saveWords = computed(() => t(`forms.screens.save.${builder.state.value}`))
 const reload = () => window.location.reload()
 </script>
@@ -145,20 +151,7 @@ const reload = () => window.location.reload()
       </span>
     </template>
     <template #primary>
-      <UButton
-        v-if="unshared"
-        class="hidden sm:inline-flex"
-        :label="t('forms.screens.link.share')"
-        icon="i-lucide-share-2"
-        color="neutral"
-        variant="outline"
-        @click="sharing = true"
-      />
-      <UButton
-        :label="t('forms.screens.publish.button')"
-        icon="i-lucide-send"
-        @click="publishing = true"
-      />
+      <PageActions :actions="actions" />
     </template>
     <template #toolbar>
       <div class="flex min-w-0 flex-1 flex-col gap-1 py-1">
@@ -169,18 +162,17 @@ const reload = () => window.location.reload()
           :history="form.liveVersion !== null"
         />
         <div class="flex min-w-0 flex-wrap items-center gap-2">
-          <UFieldGroup>
-            <UButton
-              v-for="v in (['build', 'preview'] as const)"
-              :key="v"
-              :label="t(`forms.screens.builder.view-${v}`)"
-              :icon="v === 'build' ? 'i-lucide-pencil' : 'i-lucide-eye'"
-              color="neutral"
-              :variant="view === v ? 'solid' : 'outline'"
-              :aria-pressed="view === v"
-              @click="view = v"
-            />
-          </UFieldGroup>
+          <UToggleGroup
+            :model-value="view"
+            :items="views"
+            attached
+            color="neutral"
+            variant="outline"
+            active-color="neutral"
+            active-variant="solid"
+            :aria-label="t('forms.screens.builder.view')"
+            @update:model-value="$event && (view = $event)"
+          />
           <IconButton
             icon="i-lucide-undo-2"
             :label="t('forms.screens.builder.undo')"
@@ -266,12 +258,11 @@ const reload = () => window.location.reload()
             @set="setStatus($event, form.status === 'live' ? 'live' : 'closed')"
             @saved="emit('changed')"
           />
-          <UDropdownMenu :items="more">
-            <IconButton
-              icon="i-lucide-ellipsis"
-              :label="t('forms.screens.builder.more')"
-            />
-          </UDropdownMenu>
+          <RowActions
+            :items="more"
+            :label="t('forms.screens.builder.more')"
+            size="md"
+          />
         </div>
       </div>
     </template>
@@ -293,7 +284,7 @@ const reload = () => window.location.reload()
     >
       <FormsBuilderCanvas />
       <aside
-        class="hidden xl:block xl:sticky xl:top-0 xl:max-h-[calc(100vh-10rem)] xl:self-start xl:overflow-y-auto xl:rounded-lg xl:border xl:border-default xl:bg-default xl:p-4"
+        class="hidden xl:block xl:sticky-panel xl:max-h-[calc(100vh-10rem)] xl:self-start xl:overflow-y-auto xl:rounded-lg xl:border xl:border-default xl:bg-default xl:p-4"
         :aria-label="t('forms.screens.details.title')"
       >
         <p class="mb-3 text-xs font-medium uppercase tracking-wide text-muted">
@@ -317,19 +308,18 @@ const reload = () => window.location.reload()
       class="space-y-4"
     >
       <div class="flex flex-wrap items-center justify-center gap-2">
-        <UFieldGroup>
-          <UButton
-            v-for="w in (['phone', 'desktop'] as const)"
-            :key="w"
-            :label="t(`forms.screens.preview.${w}`)"
-            :icon="w === 'phone' ? 'i-lucide-smartphone' : 'i-lucide-monitor'"
-            size="sm"
-            color="neutral"
-            :variant="width === w ? 'solid' : 'outline'"
-            :aria-pressed="width === w"
-            @click="width = w"
-          />
-        </UFieldGroup>
+        <UToggleGroup
+          :model-value="width"
+          :items="widths"
+          attached
+          size="sm"
+          color="neutral"
+          variant="outline"
+          active-color="neutral"
+          active-variant="solid"
+          :aria-label="t('forms.screens.preview.width')"
+          @update:model-value="$event && (width = $event)"
+        />
         <UButton
           :label="t('forms.screens.preview.restart')"
           icon="i-lucide-rotate-ccw"

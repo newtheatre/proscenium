@@ -106,7 +106,7 @@ const about = (f: FormRow) => [
   f.mode === 'record' ? t('forms.screens.list.fields') : `/${f.slug}`,
   f.mode !== 'record' && f.responses !== null && f.published ? t('forms.screens.responses.count', { count: f.responses }) : '',
 ].filter(Boolean).join(' · ')
-const badge = (f: FormRow) => f.mode === 'record' && f.status === 'live' ? t('forms.screens.list.in-use') : t(`forms.screens.status.${f.status}`)
+const badge = (f: FormRow) => f.mode === 'record' && f.status === 'live' ? t('forms.screens.list.in-use') : f.status === 'draft' || f.status === 'archived' ? t(`core.states.${f.status}`) : t(`forms.screens.status.${f.status}`)
 // The template's name is offered as the form's, until the person writes their own.
 let offered = ''
 watch(() => state.template, () => {
