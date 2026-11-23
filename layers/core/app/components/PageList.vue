@@ -268,6 +268,18 @@ function cardColumnsOf(row: Row) {
 function open(_event: Event, row: TableRow<Row>) {
   if (props.rowTo) void navigateTo(props.rowTo(row.original))
 }
+// A right click on a table row opens what its ellipsis menu offers: the same items, read when asked.
+const rowMenuItems = shallowRef<ReturnType<typeof rowMenu>>([])
+const touch = useScreenQuery('(hover: none)')
+function menuFor(event: Event, row: TableRow<Row>) {
+  rowMenuItems.value = row.depth === 0 ? rowMenu(props.rowActions?.(row.original), props.rowTo?.(row.original), t('core.list.open-new-tab')) : []
+  // A row with no actions keeps the browser's own menu.
+  if (!rowMenuItems.value.length) event.stopPropagation()
+}
+// Outside a row (the headings) there is nothing to act on.
+function outsideRow(event: Event) {
+  if (!(event.target as HTMLElement).closest('tbody tr')) event.stopPropagation()
+}
 // A list that fits on one page says only how many there are, and draws no pager.
 const pageLabel = computed(() => pages.value > 1
   ? t('core.list.page-of', { page: state.value.page, pages: pages.value, total: total.value })
@@ -463,164 +475,175 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
             />
           </div>
           <!-- A table above 1024 pixels. -->
-          <UTable
-            v-model:expanded="expanded"
-            :data="result.rows"
-            :columns="tableColumns"
-            :caption="`${title}. ${pageLabel}`"
-            :get-row-id="rowId"
-            :row-selection="rowSelection"
-            :sorting="sorting"
-            :sorting-options="{ manualSorting: true }"
-            :get-sub-rows="subRows ? childrenOf : undefined"
-            :on-select="rowTo ? open : undefined"
-            :ui="{ caption: 'sr-only' }"
-            class="max-lg:hidden"
+          <UContextMenu
+            :modal="false"
+            :items="rowMenuItems"
+            :disabled="!rowActions || touch"
           >
-            <template #expand-header>
-              <span class="sr-only">{{ t('core.list.expand') }}</span>
-            </template>
-            <template #expand-cell="{ row }">
-              <IconButton
-                v-if="row.depth === 0 && canExpand(row.original)"
-                size="sm"
-                :icon="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-                :aria-expanded="row.getIsExpanded()"
-                :label="t(row.getIsExpanded() ? 'core.list.hide-children' : 'core.list.show-children', { what: subRowsNoun ?? t('core.list.details'), row: rowLabel(row.original) })"
-                @click.stop="row.toggleExpanded()"
-              />
-            </template>
-            <template #select-header>
-              <span class="sr-only">{{ t('core.list.select') }}</span>
-            </template>
-            <template #select-cell="{ row }">
-              <UCheckbox
-                v-if="row.depth === 0"
-                :model-value="!!rowSelection[row.id]"
-                :aria-label="t('core.list.select-row', { row: rowLabel(row.original) })"
-                @update:model-value="toggle(row.original, $event === true)"
-              />
-            </template>
-            <template
-              v-for="c in shown"
-              :key="c.key"
-              #[`${c.key}-header`]
+            <div
+              class="max-lg:hidden"
+              @contextmenu.capture="outsideRow"
             >
-              <UButton
-                v-if="c.sort"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                :label="c.label"
-                :trailing-icon="sortIcon(c.sort)"
-                class="-mx-2.5"
-                @click="sortBy(c.sort)"
-              />
-              <template v-else>
-                {{ c.label }}
-              </template>
-            </template>
-            <template
-              v-for="(c, i) in shown"
-              :key="c.key"
-              #[`${c.key}-cell`]="{ row }"
-            >
-              <template v-if="row.depth > 0">
-                <ULink
-                  v-if="subRowTo && i === 0"
-                  :to="subRowTo(row.original)"
-                  class="ps-6 font-medium text-highlighted hover:underline"
+              <UTable
+                v-model:expanded="expanded"
+                :data="result.rows"
+                :columns="tableColumns"
+                :caption="`${title}. ${pageLabel}`"
+                :get-row-id="rowId"
+                :row-selection="rowSelection"
+                :sorting="sorting"
+                :sorting-options="{ manualSorting: true }"
+                :get-sub-rows="subRows ? childrenOf : undefined"
+                :on-select="rowTo ? open : undefined"
+                :on-contextmenu="rowActions ? menuFor : undefined"
+                :ui="{ caption: 'sr-only' }"
+              >
+                <template #expand-header>
+                  <span class="sr-only">{{ t('core.list.expand') }}</span>
+                </template>
+                <template #expand-cell="{ row }">
+                  <IconButton
+                    v-if="row.depth === 0 && canExpand(row.original)"
+                    size="sm"
+                    :icon="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                    :aria-expanded="row.getIsExpanded()"
+                    :label="t(row.getIsExpanded() ? 'core.list.hide-children' : 'core.list.show-children', { what: subRowsNoun ?? t('core.list.details'), row: rowLabel(row.original) })"
+                    @click.stop="row.toggleExpanded()"
+                  />
+                </template>
+                <template #select-header>
+                  <span class="sr-only">{{ t('core.list.select') }}</span>
+                </template>
+                <template #select-cell="{ row }">
+                  <UCheckbox
+                    v-if="row.depth === 0"
+                    :model-value="!!rowSelection[row.id]"
+                    :aria-label="t('core.list.select-row', { row: rowLabel(row.original) })"
+                    @update:model-value="toggle(row.original, $event === true)"
+                  />
+                </template>
+                <template
+                  v-for="c in shown"
+                  :key="c.key"
+                  #[`${c.key}-header`]
                 >
-                  <slot
-                    :name="`subcell-${c.key}`"
-                    :row="row.original"
-                    :parent="row.getParentRow()!.original"
-                  >
-                    {{ subRowLabel?.(row.original) }}
-                  </slot>
-                </ULink>
-                <span
-                  v-else
-                  :class="i === 0 ? 'ps-6' : ''"
+                  <UButton
+                    v-if="c.sort"
+                    color="neutral"
+                    variant="ghost"
+                    size="sm"
+                    :label="c.label"
+                    :trailing-icon="sortIcon(c.sort)"
+                    class="-mx-2.5"
+                    @click="sortBy(c.sort)"
+                  />
+                  <template v-else>
+                    {{ c.label }}
+                  </template>
+                </template>
+                <template
+                  v-for="(c, i) in shown"
+                  :key="c.key"
+                  #[`${c.key}-cell`]="{ row }"
                 >
-                  <slot
-                    :name="`subcell-${c.key}`"
-                    :row="row.original"
-                    :parent="row.getParentRow()!.original"
-                  >
-                    <template v-if="i === 0">{{ subRowLabel?.(row.original) }}</template>
-                  </slot>
-                </span>
-              </template>
-              <template v-else>
-                <ULink
-                  v-if="rowTo && i === 0"
-                  :to="rowTo(row.original)"
-                  class="font-medium text-highlighted hover:underline"
+                  <template v-if="row.depth > 0">
+                    <ULink
+                      v-if="subRowTo && i === 0"
+                      :to="subRowTo(row.original)"
+                      class="ps-6 font-medium text-highlighted hover:underline"
+                    >
+                      <slot
+                        :name="`subcell-${c.key}`"
+                        :row="row.original"
+                        :parent="row.getParentRow()!.original"
+                      >
+                        {{ subRowLabel?.(row.original) }}
+                      </slot>
+                    </ULink>
+                    <span
+                      v-else
+                      :class="i === 0 ? 'ps-6' : ''"
+                    >
+                      <slot
+                        :name="`subcell-${c.key}`"
+                        :row="row.original"
+                        :parent="row.getParentRow()!.original"
+                      >
+                        <template v-if="i === 0">{{ subRowLabel?.(row.original) }}</template>
+                      </slot>
+                    </span>
+                  </template>
+                  <template v-else>
+                    <ULink
+                      v-if="rowTo && i === 0"
+                      :to="rowTo(row.original)"
+                      class="font-medium text-highlighted hover:underline"
+                    >
+                      <slot
+                        :name="`cell-${c.key}`"
+                        :row="row.original"
+                      >
+                        {{ row.original[c.key] }}
+                      </slot>
+                    </ULink>
+                    <slot
+                      v-else
+                      :name="`cell-${c.key}`"
+                      :row="row.original"
+                    >
+                      {{ row.original[c.key] }}
+                    </slot>
+                    <span
+                      v-if="i === 0 && matchLine(row.original)"
+                      class="block text-xs text-muted"
+                    >{{ matchLine(row.original) }}</span>
+                    <ULink
+                      v-if="i === 0 && hasMore(row.original) && subRowsAllTo && row.getIsExpanded()"
+                      :to="subRowsAllTo(row.original)"
+                      class="mt-1 block text-sm text-muted hover:underline"
+                    >
+                      {{ t('core.list.all-children', { count: childTotal(row.original), what: subRowsNoun ?? '' }) }}
+                    </ULink>
+                  </template>
+                </template>
+                <template
+                  v-for="c in extra"
+                  :key="c.key"
+                  #[`${c.key}-cell`]="{ row }"
                 >
-                  <slot
-                    :name="`cell-${c.key}`"
-                    :row="row.original"
-                  >
-                    {{ row.original[c.key] }}
-                  </slot>
-                </ULink>
-                <slot
-                  v-else
-                  :name="`cell-${c.key}`"
-                  :row="row.original"
+                  <component
+                    :is="c.component"
+                    v-if="row.depth === 0"
+                    :list-id="decl.id"
+                    :query="query"
+                    :row-id="rowId(row.original)"
+                  />
+                </template>
+                <template #actions-header>
+                  <span class="sr-only">{{ t('core.list.actions') }}</span>
+                </template>
+                <template #actions-cell="{ row }">
+                  <RowActions
+                    v-if="rowActions && row.depth === 0"
+                    :items="rowActions(row.original)"
+                    :label="t('core.list.actions-for', { row: rowLabel(row.original) })"
+                    size="md"
+                  />
+                </template>
+                <template
+                  v-if="$slots.expanded"
+                  #expanded="{ row }"
                 >
-                  {{ row.original[c.key] }}
-                </slot>
-                <span
-                  v-if="i === 0 && matchLine(row.original)"
-                  class="block text-xs text-muted"
-                >{{ matchLine(row.original) }}</span>
-                <ULink
-                  v-if="i === 0 && hasMore(row.original) && subRowsAllTo && row.getIsExpanded()"
-                  :to="subRowsAllTo(row.original)"
-                  class="mt-1 block text-sm text-muted hover:underline"
-                >
-                  {{ t('core.list.all-children', { count: childTotal(row.original), what: subRowsNoun ?? '' }) }}
-                </ULink>
-              </template>
-            </template>
-            <template
-              v-for="c in extra"
-              :key="c.key"
-              #[`${c.key}-cell`]="{ row }"
-            >
-              <component
-                :is="c.component"
-                v-if="row.depth === 0"
-                :list-id="decl.id"
-                :query="query"
-                :row-id="rowId(row.original)"
-              />
-            </template>
-            <template #actions-header>
-              <span class="sr-only">{{ t('core.list.actions') }}</span>
-            </template>
-            <template #actions-cell="{ row }">
-              <RowActions
-                v-if="rowActions && row.depth === 0"
-                :items="rowActions(row.original)"
-                :label="t('core.list.actions-for', { row: rowLabel(row.original) })"
-                size="md"
-              />
-            </template>
-            <template
-              v-if="$slots.expanded"
-              #expanded="{ row }"
-            >
-              <div class="px-4 py-3 text-sm">
-                <slot
-                  name="expanded"
-                  :row="row.original"
-                />
-              </div>
-            </template>
-          </UTable>
+                  <div class="px-4 py-3 text-sm">
+                    <slot
+                      name="expanded"
+                      :row="row.original"
+                    />
+                  </div>
+                </template>
+              </UTable>
+            </div>
+          </UContextMenu>
 
           <!-- Cards below it. No sideways scrolling of a table on a phone. -->
           <ul class="space-y-3 lg:hidden">
