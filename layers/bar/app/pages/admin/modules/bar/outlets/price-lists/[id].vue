@@ -111,7 +111,10 @@ function onStandard(v: Variant): string {
           :key="c.id"
           :title="c.name"
         >
-          <RecordList :label="c.name">
+          <RecordList
+            flush
+            :label="c.name"
+          >
             <template
               v-for="p in c.products.filter(p => p.active)"
               :key="p.id"
@@ -166,7 +169,7 @@ function onStandard(v: Variant): string {
             :label="t('bar.screens.lists.raise.percent')"
             name="percent"
           >
-            <UInputNumber
+            <FieldNumber
               v-model="raising.percent"
               :min="-90"
               :max="500"

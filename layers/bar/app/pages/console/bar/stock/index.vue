@@ -4,7 +4,7 @@
      moved; its menu writes stock off or moves it between locations. An amount to
      write off or move is typed in the unit people count in, in packs or in base units; taking more
      than a location holds is said plainly and asked about first. Setting up items and locations is
-     in Admin. A table on a laptop, a list on a phone. -->
+     in Admin. A table on a laptop, a list on a phone; a right click on a row is its menu. -->
 <script setup lang="ts">
 import { watchDebounced } from '@vueuse/core'
 
@@ -34,8 +34,6 @@ const { number, amount: stockAmount, entryUnits } = useStockAmounts()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ items: Item[], locations: { id: string, name: string }[], wastageReasons: { id: string, label: string }[], can: { receive: boolean, waste: boolean } }>('/api/bar/stock/levels', { key: 'bar:stock-levels' })
 
-// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
-const phone = useScreenQuery('(max-width: 639px)')
 const ALL = 'all'
 const location = computed({
   get: () => (route.query.location as string | undefined) ?? ALL,
@@ -48,6 +46,8 @@ const showing = computed({
 const search = ref((route.query.q as string | undefined) ?? '')
 watchDebounced(search, v => void router.replace({ query: { ...route.query, q: v.trim() || undefined } }), { debounce: 300 })
 
+const filtersOn = computed(() => Number(location.value !== ALL) + Number(showing.value !== ALL))
+const clearFilters = () => void router.replace({ query: { ...route.query, location: undefined, show: undefined } })
 const locationItems = computed(() => [{ value: ALL, label: t('bar.screens.stock-levels.every-location') }, ...(data.value?.locations ?? []).map(l => ({ value: l.id, label: l.name }))])
 const showItems = computed(() => [
   { value: ALL, label: t('bar.screens.stock-levels.show-all') },
@@ -55,13 +55,14 @@ const showItems = computed(() => [
   { value: 'below-zero', label: t('bar.screens.stock-levels.show-below-zero') },
 ])
 // Null where the location has never held the item: shown as a dash, not as nought.
+const missing = (i: Item) => i.levels.some(l => l.quantity < 0)
 const levelAt = (i: Item, locationId: string) => i.levels.find(l => l.locationId === locationId)?.quantity ?? null
 const shown = (i: Item) => location.value === ALL ? (i.levels.length ? i.total : null) : levelAt(i, location.value)
 const rows = computed(() => (data.value?.items ?? []).filter((i) => {
   const q = ((route.query.q as string | undefined) ?? '').toLowerCase()
   if (q && !i.name.toLowerCase().includes(q)) return false
   if (showing.value === 'low') return i.low
-  if (showing.value === 'below-zero') return i.levels.some(l => l.quantity < 0)
+  if (showing.value === 'below-zero') return missing(i)
   return true
 }))
 
@@ -155,6 +156,21 @@ function actions(i: Item) {
     { label: t('bar.screens.stock-levels.history'), icon: 'i-lucide-history', onSelect: () => openHistory(i) },
   ]
 }
+
+// UTable's row handlers fall through TableOrList; on a phone they land on the list itself, with no row.
+const menuItems = shallowRef<ReturnType<typeof rowMenu>>([])
+const touch = useScreenQuery('(hover: none)')
+function menuFor(event: Event, row?: { original: Item }) {
+  menuItems.value = row?.original ? rowMenu(actions(row.original), undefined, t('core.list.open-new-tab')) : []
+  if (!menuItems.value.length) event.stopPropagation()
+}
+function pressed(_event: Event, row?: { original: Item }) {
+  if (row?.original) void openHistory(row.original)
+}
+// Off a row (the headings) this menu stays shut; a phone's row opens its own and stops there.
+function outsideRow(event: Event) {
+  if (!(event.target as HTMLElement).closest('tbody tr, li')) event.stopPropagation()
+}
 </script>
 
 <template>
@@ -168,10 +184,10 @@ function actions(i: Item) {
       />
     </template>
     <BarStockTabs />
-    <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+    <div class="mb-6 flex items-end gap-2">
       <UFormField
         :label="t('bar.screens.stock-levels.find')"
-        class="max-sm:col-span-2"
+        class="min-w-0 flex-1 sm:max-w-xs"
       >
         <UInput
           v-model="search"
@@ -179,18 +195,24 @@ function actions(i: Item) {
           :placeholder="t('bar.screens.stock-levels.find-placeholder')"
         />
       </UFormField>
-      <UFormField :label="t('bar.screens.stock-levels.location')">
-        <USelect
-          v-model="location"
-          :items="locationItems"
-        />
-      </UFormField>
-      <UFormField :label="t('bar.screens.stock-levels.show')">
-        <USelect
-          v-model="showing"
-          :items="showItems"
-        />
-      </UFormField>
+      <FilterPanel
+        :count="filtersOn"
+        @clear="clearFilters"
+      >
+        <UFormField :label="t('bar.screens.stock-levels.location')">
+          <USelectMenu
+            v-model="location"
+            :items="locationItems"
+            value-key="value"
+          />
+        </UFormField>
+        <UFormField :label="t('bar.screens.stock-levels.show')">
+          <USelect
+            v-model="showing"
+            :items="showItems"
+          />
+        </UFormField>
+      </FilterPanel>
     </div>
     <DataBoundary
       :data="data"
@@ -211,91 +233,92 @@ function actions(i: Item) {
         >
           {{ t('bar.screens.stock-levels.no-match') }}
         </p>
-        <!-- On a phone: one row an item, its level at each location under its name. -->
-        <RecordList
-          v-if="rows.length && phone"
-          :label="t('bar.navigation.stock-levels.label')"
+        <UContextMenu
+          v-if="rows.length"
+          :modal="false"
+          :items="menuItems"
+          :disabled="touch"
         >
-          <RecordListItem
-            v-for="i in rows"
-            :key="i.id"
-            :name="i.name"
+          <div
+            class="[&_tbody_tr]:cursor-pointer"
+            @contextmenu.capture="outsideRow"
           >
-            <template
-              v-if="location === ALL && d.locations.length > 1"
-              #description
+            <TableOrList
+              :rows="rows"
+              :columns="columns"
+              :label="t('bar.navigation.stock-levels.label')"
+              :on-select="pressed"
+              :on-contextmenu="menuFor"
             >
-              <span
+              <!-- On a phone: one row an item, its level at each location under its name. -->
+              <template #item="{ row: i }">
+                <RecordListItem :name="i.name">
+                  <template
+                    v-if="location === ALL && d.locations.length > 1"
+                    #description
+                  >
+                    <span
+                      v-for="l in d.locations"
+                      :key="l.id"
+                      class="block"
+                    >{{ l.name }}: <span :class="['tabular-nums', (levelAt(i, l.id) ?? 0) < 0 && 'text-error']">{{ amount(i, levelAt(i, l.id)) }}</span></span>
+                  </template>
+                  <span :class="['text-sm font-medium tabular-nums', (shown(i) ?? 0) < 0 && 'text-error', shown(i) === null && 'text-muted']">{{ amount(i, shown(i)) }}</span>
+                  <RowActions
+                    :label="t('bar.screens.stock.item-actions', { name: i.name })"
+                    :items="actions(i)"
+                  />
+                  <template
+                    v-if="i.low || missing(i)"
+                    #below
+                  >
+                    <StatusBadge
+                      v-if="missing(i)"
+                      tone="danger"
+                      :label="t('bar.screens.stock-levels.missing')"
+                    />
+                    <StatusBadge
+                      v-else
+                      tone="warning"
+                      :label="t('bar.screens.stock.low')"
+                    />
+                  </template>
+                </RecordListItem>
+              </template>
+              <template #name-cell="{ row }">
+                <span class="font-medium">{{ row.original.name }}</span>
+              </template>
+              <template
                 v-for="l in d.locations"
                 :key="l.id"
-                class="block"
-              >{{ l.name }}: <span :class="['tabular-nums', (levelAt(i, l.id) ?? 0) < 0 && 'text-error']">{{ amount(i, levelAt(i, l.id)) }}</span></span>
-            </template>
-            <span :class="['text-sm font-medium tabular-nums', (shown(i) ?? 0) < 0 && 'text-error', shown(i) === null && 'text-muted']">{{ amount(i, shown(i)) }}</span>
-            <RowActions
-              :label="t('bar.screens.stock.item-actions', { name: i.name })"
-              :items="actions(i)"
-            />
-            <template
-              v-if="i.low || i.levels.some(l => l.quantity < 0)"
-              #below
-            >
-              <StatusBadge
-                v-if="i.levels.some(l => l.quantity < 0)"
-                tone="danger"
-                :label="t('bar.screens.stock-levels.missing')"
-              />
-              <StatusBadge
-                v-else
-                tone="warning"
-                :label="t('bar.screens.stock.low')"
-              />
-            </template>
-          </RecordListItem>
-        </RecordList>
-        <UTable
-          v-else-if="rows.length"
-          :data="rows"
-          :columns="columns"
-          :caption="t('bar.navigation.stock-levels.label')"
-          :ui="{ tr: 'cursor-pointer' }"
-          @select="(_e: Event, row: { original: Item }) => openHistory(row.original)"
-        >
-          <template #name-cell="{ row }">
-            <span class="font-medium">{{ row.original.name }}</span>
-          </template>
-          <template
-            v-for="l in d.locations"
-            :key="l.id"
-            #[`at-${l.id}-cell`]="{ row }"
-          >
-            <span :class="['tabular-nums', (levelAt(row.original, l.id) ?? 0) < 0 && 'text-error', levelAt(row.original, l.id) === null && 'text-muted']">{{ amount(row.original, levelAt(row.original, l.id)) }}</span>
-          </template>
-          <template #total-cell="{ row }">
-            <span :class="['font-medium tabular-nums', (shown(row.original) ?? 0) < 0 && 'text-error', shown(row.original) === null && 'text-muted']">{{ amount(row.original, shown(row.original)) }}</span>
-          </template>
-          <template #state-cell="{ row }">
-            <StatusBadge
-              v-if="row.original.levels.some(l => l.quantity < 0)"
-              tone="danger"
-              :label="t('bar.screens.stock-levels.missing')"
-            />
-            <StatusBadge
-              v-else-if="row.original.low"
-              tone="warning"
-              :label="t('bar.screens.stock.low')"
-            />
-          </template>
-          <template #actions-cell="{ row }">
-            <!-- The menu is its own control: pressing it does not also open the history. -->
-            <div @click.stop>
-              <RowActions
-                :label="t('bar.screens.stock.item-actions', { name: row.original.name })"
-                :items="actions(row.original)"
-              />
-            </div>
-          </template>
-        </UTable>
+                #[`at-${l.id}-cell`]="{ row }"
+              >
+                <span :class="['tabular-nums', (levelAt(row.original, l.id) ?? 0) < 0 && 'text-error', levelAt(row.original, l.id) === null && 'text-muted']">{{ amount(row.original, levelAt(row.original, l.id)) }}</span>
+              </template>
+              <template #total-cell="{ row }">
+                <span :class="['font-medium tabular-nums', (shown(row.original) ?? 0) < 0 && 'text-error', shown(row.original) === null && 'text-muted']">{{ amount(row.original, shown(row.original)) }}</span>
+              </template>
+              <template #state-cell="{ row }">
+                <StatusBadge
+                  v-if="missing(row.original)"
+                  tone="danger"
+                  :label="t('bar.screens.stock-levels.missing')"
+                />
+                <StatusBadge
+                  v-else-if="row.original.low"
+                  tone="warning"
+                  :label="t('bar.screens.stock.low')"
+                />
+              </template>
+              <template #actions-cell="{ row }">
+                <RowActions
+                  :label="t('bar.screens.stock.item-actions', { name: row.original.name })"
+                  :items="actions(row.original)"
+                />
+              </template>
+            </TableOrList>
+          </div>
+        </UContextMenu>
       </template>
     </DataBoundary>
 
@@ -320,9 +343,10 @@ function actions(i: Item) {
             name="locationId"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="act.locationId"
               :items="locationItems.filter(l => l.value !== ALL)"
+              value-key="value"
             />
           </UFormField>
           <UFormField
@@ -331,9 +355,10 @@ function actions(i: Item) {
             name="toLocationId"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="act.toLocationId"
               :items="otherLocations"
+              value-key="value"
             />
           </UFormField>
           <UFormField
@@ -343,7 +368,7 @@ function actions(i: Item) {
             required
           >
             <UFieldGroup>
-              <UInputNumber
+              <FieldNumber
                 v-model="act.quantity"
                 :min="0"
                 :step="act.unit === 'base' ? 1 : 0.1"
@@ -376,9 +401,10 @@ function actions(i: Item) {
             name="reasonId"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="act.reasonId"
               :items="reasonItems"
+              value-key="value"
             />
           </UFormField>
         </UForm>

@@ -23,6 +23,13 @@ const { offer } = useUndo()
 const { data, status, error, refresh } = await useAPI<{ groups: Group[], mixers: { key: string, label: string }[], canAllergens: boolean, allergens: Record<string, Answer>, allergensFromStock: string[], canStock: boolean, stockItems: { id: string, name: string }[], stockOf: Record<string, string> }>('/api/bar/choices', { key: 'bar:choices' })
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+// A modal's Save sits outside its form, where loading-auto cannot see the submit, so it spins on this.
+const submitting = ref(false)
+async function submit(run: () => Promise<unknown>) {
+  submitting.value = true
+  try { await run() }
+  finally { submitting.value = false }
+}
 type FormRef = { setErrors: (errors: FieldError[]) => void }
 const groupEl = useTemplateRef<FormRef>('groupEl')
 const optionEl = useTemplateRef<FormRef>('optionEl')
@@ -271,15 +278,8 @@ async function saveAllergens() {
           icon="i-lucide-list-checks"
           :title="t('bar.screens.choices.empty-title')"
           :description="t('bar.screens.choices.empty')"
-        >
-          <template #actions>
-            <UButton
-              icon="i-lucide-plus"
-              :label="t('bar.screens.choices.new')"
-              @click="editGroup()"
-            />
-          </template>
-        </EmptyState>
+          :action="{ label: t('bar.screens.choices.new'), icon: 'i-lucide-plus', onClick: () => editGroup() }"
+        />
         <PageSection
           v-for="g in data.groups"
           :key="g.id"
@@ -380,7 +380,7 @@ async function saveAllergens() {
           :state="group"
           :validate="validateGroup"
           class="space-y-4"
-          @submit="saveGroup"
+          @submit="submit(saveGroup)"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -411,7 +411,7 @@ async function saveAllergens() {
             :help="t('bar.screens.choices.max-picks-help')"
             name="maxPicks"
           >
-            <UInputNumber
+            <FieldNumber
               v-model="group.maxPicks"
               :min="1"
               :max="10"
@@ -454,7 +454,7 @@ async function saveAllergens() {
         <UButton
           type="submit"
           form="bar-choice"
-          loading-auto
+          :loading="submitting"
           :label="t('bar.screens.save')"
         />
       </template>
@@ -474,7 +474,7 @@ async function saveAllergens() {
           :state="option"
           :validate="() => bodyErrors(optionInput, optionBody())"
           class="space-y-4"
-          @submit="saveOption"
+          @submit="submit(saveOption)"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -519,7 +519,7 @@ async function saveAllergens() {
         <UButton
           type="submit"
           form="bar-choice-option"
-          loading-auto
+          :loading="submitting"
           :label="t('bar.screens.save')"
         />
       </template>
@@ -538,7 +538,7 @@ async function saveAllergens() {
           novalidate
           :state="label"
           class="space-y-4"
-          @submit="saveAllergens"
+          @submit="submit(saveAllergens)"
         >
           <RefusalNotice :refusal="refusal" />
           <p class="text-sm text-muted">
@@ -578,7 +578,7 @@ async function saveAllergens() {
         <UButton
           type="submit"
           form="bar-option-allergens"
-          loading-auto
+          :loading="submitting"
           :label="t('bar.screens.product.allergens-record')"
         />
       </template>
