@@ -23,71 +23,61 @@ onMounted(async () => {
 })
 const result = ref<Result | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const busy = ref(false)
 
 async function go() {
   refusal.value = null
-  busy.value = true
   try {
     result.value = await $api<Result>('/api/box-office/reservations/confirm', { method: 'POST', body: { token: String(route.params.token) }, headers: { 'idempotency-key': crypto.randomUUID() } })
   }
   catch (e) {
     refusal.value = toRefusal(e)
   }
-  finally {
-    busy.value = false
-  }
 }
 </script>
 
 <template>
-  <UContainer>
-    <UPage>
-      <UPageHeader :title="result ? t(`box-office.basket.done.${result.state}.title`) : t('box-office.confirm.title')" />
-      <UPageBody>
-        <div class="max-w-2xl space-y-6">
-          <BoxOfficeBookingDone
-            v-if="result"
-            :outcome="result"
+  <PageFrame :title="result ? t(`box-office.basket.done.${result.state}.title`) : t('box-office.confirm.title')">
+    <div class="max-w-2xl space-y-6">
+      <BoxOfficeBookingDone
+        v-if="result"
+        :outcome="result"
+      />
+      <template v-else>
+        <PageSection
+          v-if="waiting"
+          :title="waiting.show"
+          :description="dateTime(waiting.startsAt)"
+        >
+          <FactStrip
+            :facts="[
+              { label: t('box-office.confirm.tickets'), value: waiting.tickets },
+              { label: t('box-office.confirm.to-pay'), value: waiting.totalMinor === 0 ? t('box-office.manage.free-price') : money(waiting.totalMinor, waiting.currency) },
+            ]"
           />
-          <template v-else>
-            <PageSection
-              v-if="waiting"
-              :title="waiting.show"
-              :description="dateTime(waiting.startsAt)"
-            >
-              <FactStrip
-                :facts="[
-                  { label: t('box-office.confirm.tickets'), value: waiting.tickets },
-                  { label: t('box-office.confirm.to-pay'), value: waiting.totalMinor === 0 ? t('box-office.manage.free-price') : money(waiting.totalMinor, waiting.currency) },
-                ]"
-              />
-              <p
-                v-if="waiting.email"
-                class="text-sm"
-              >
-                <span class="text-muted">{{ t('box-office.confirm.email') }}</span>
-                <span class="ms-1 font-medium text-highlighted [overflow-wrap:anywhere]">{{ waiting.email }}</span>
-              </p>
-              <p
-                v-if="waiting.expiresAt"
-                class="text-sm text-muted"
-              >
-                {{ t('box-office.confirm.until', { until: time(waiting.expiresAt) }) }}
-              </p>
-            </PageSection>
-            <p>{{ t('box-office.confirm.body') }}</p>
-            <RefusalNotice :refusal="refusal" />
-            <UButton
-              size="xl"
-              class="justify-center max-sm:w-full"
-              :loading="busy"
-              :label="t('box-office.confirm.button')"
-              @click="go"
-            />
-          </template>
-        </div>
-      </UPageBody>
-    </UPage>
-  </UContainer>
+          <p
+            v-if="waiting.email"
+            class="text-sm"
+          >
+            <span class="text-muted">{{ t('box-office.confirm.email') }}</span>
+            <span class="ms-1 font-medium text-highlighted [overflow-wrap:anywhere]">{{ waiting.email }}</span>
+          </p>
+          <p
+            v-if="waiting.expiresAt"
+            class="text-sm text-muted"
+          >
+            {{ t('box-office.confirm.until', { until: time(waiting.expiresAt) }) }}
+          </p>
+        </PageSection>
+        <p>{{ t('box-office.confirm.body') }}</p>
+        <RefusalNotice :refusal="refusal" />
+        <UButton
+          size="xl"
+          class="justify-center max-sm:w-full"
+          loading-auto
+          :label="t('box-office.confirm.button')"
+          @click="go"
+        />
+      </template>
+    </div>
+  </PageFrame>
 </template>

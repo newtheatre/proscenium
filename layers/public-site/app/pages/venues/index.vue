@@ -18,60 +18,54 @@ useSeoMeta({ title: () => t('public-site.venues.title'), description: () => t('p
 </script>
 
 <template>
-  <UContainer>
-    <UPage>
-      <UPageHeader
-        :title="t('public-site.venues.title')"
-        :description="t('public-site.venues.description')"
-      />
-      <UPageBody>
-        <ul
-          v-if="venues.length"
-          class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+  <PageFrame
+    :title="t('public-site.venues.title')"
+    :description="t('public-site.venues.description')"
+  >
+    <ul
+      v-if="venues.length"
+      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    >
+      <li
+        v-for="v in venues"
+        :key="v.id"
+      >
+        <UPageCard
+          :to="`/venues/${v.slug}`"
+          :title="v.name"
+          :description="addressOf(v) || undefined"
+          variant="outline"
+          class="h-full"
         >
-          <li
-            v-for="v in venues"
-            :key="v.id"
+          <template
+            v-if="v.access.length"
+            #footer
           >
-            <UPageCard
-              :to="`/venues/${v.slug}`"
-              :title="v.name"
-              :description="addressOf(v) || undefined"
-              variant="outline"
-              class="h-full"
+            <ul
+              class="flex flex-wrap gap-1"
+              :aria-label="t('public-site.venue.access')"
             >
-              <template
-                v-if="v.access.length"
-                #footer
+              <li
+                v-for="a in v.access"
+                :key="a.termId"
               >
-                <ul
-                  class="flex flex-wrap gap-1"
-                  :aria-label="t('public-site.venue.access')"
-                >
-                  <li
-                    v-for="a in v.access"
-                    :key="a.termId"
-                  >
-                    <UBadge
-                      :label="a.label"
-                      :icon="a.icon ?? 'i-lucide-check'"
-                      color="neutral"
-                      variant="outline"
-                      size="sm"
-                    />
-                  </li>
-                </ul>
-              </template>
-            </UPageCard>
-          </li>
-        </ul>
-        <p
-          v-else
-          class="text-muted"
-        >
-          {{ t('public-site.venues.empty') }}
-        </p>
-      </UPageBody>
-    </UPage>
-  </UContainer>
+                <UBadge
+                  :label="a.label"
+                  :icon="a.icon ?? 'i-lucide-check'"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                />
+              </li>
+            </ul>
+          </template>
+        </UPageCard>
+      </li>
+    </ul>
+    <EmptyState
+      v-else
+      :title="t('public-site.venues.empty')"
+      icon="i-lucide-map-pin"
+    />
+  </PageFrame>
 </template>

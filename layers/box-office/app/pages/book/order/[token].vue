@@ -85,107 +85,102 @@ async function cancel(all: boolean) {
 </script>
 
 <template>
-  <UContainer>
-    <UPage>
-      <UPageHeader :title="t('box-office.manage.title')" />
-      <UPageBody>
-        <div class="max-w-2xl space-y-6">
-          <EmptyState
-            v-if="error || !order"
-            :title="t('box-office.manage.not-found.title')"
-            :description="t('box-office.manage.not-found.description')"
-            icon="i-lucide-ticket-x"
-          >
-            <template #actions>
-              <UButton
-                to="/whats-on"
-                color="neutral"
-                variant="outline"
-                :label="t('box-office.basket.none.whats-on')"
-              />
-            </template>
-          </EmptyState>
-          <template v-else>
-            <UAlert
-              v-if="cancelled"
-              color="success"
-              variant="subtle"
-              icon="i-lucide-check"
-              role="status"
-              :title="t('box-office.manage.cancelled', { count: cancelled })"
-              :description="refunded ? t('box-office.manage.refunded', { amount: money(refunded, order.currency) }) : undefined"
-            />
-            <BoxOfficeBookingDetails :booking="order" />
-            <BoxOfficeSendPasses
-              v-if="order.passes"
-              :passes="order.passes"
-              :headers="headers"
-              @sent="order = { ...order!, passes: $event }"
-            />
-            <BoxOfficeAccountCard
-              v-if="order.accountUnclaimed && !viewer.signedIn && ownerOrder === null"
-              :order-token="token"
-            />
+  <PageFrame :title="t('box-office.manage.title')">
+    <div class="max-w-2xl space-y-6">
+      <EmptyState
+        v-if="error || !order"
+        :title="t('box-office.manage.not-found.title')"
+        :description="t('box-office.manage.not-found.description')"
+        icon="i-lucide-ticket-x"
+      >
+        <template #actions>
+          <UButton
+            to="/whats-on"
+            color="neutral"
+            variant="outline"
+            :label="t('box-office.basket.none.whats-on')"
+          />
+        </template>
+      </EmptyState>
+      <template v-else>
+        <UAlert
+          v-if="cancelled"
+          color="success"
+          variant="subtle"
+          icon="i-lucide-check"
+          role="status"
+          :title="t('box-office.manage.cancelled', { count: cancelled })"
+          :description="refunded ? t('box-office.manage.refunded', { amount: money(refunded, order.currency) }) : undefined"
+        />
+        <BoxOfficeBookingDetails :booking="order" />
+        <BoxOfficeSendPasses
+          v-if="order.passes"
+          :passes="order.passes"
+          :headers="headers"
+          @sent="order = { ...order!, passes: $event }"
+        />
+        <BoxOfficeAccountCard
+          v-if="order.accountUnclaimed && !viewer.signedIn && ownerOrder === null"
+          :order-token="token"
+        />
 
-            <section
-              v-if="cancellable"
-              class="space-y-4"
-            >
-              <h2 class="text-lg font-semibold">
-                {{ t('box-office.manage.cancel.title') }}
-              </h2>
-              <p
-                v-if="terms"
-                class="text-sm text-muted"
-              >
-                {{ free ? t('box-office.manage.free.terms', { until: dateTime(terms.until) }) : terms.feeMinor > 0
-                  ? t('box-office.manage.refund.terms', { until: dateTime(terms.until), fee: money(terms.feeMinor, order.currency) })
-                  : t('box-office.manage.refund.terms-free', { until: dateTime(terms.until) }) }}
-              </p>
-              <RefusalNotice :refusal="refusal" />
-              <fieldset
-                v-if="order.lines.length > 1"
-                class="space-y-2"
-              >
-                <legend class="mb-2 text-sm">
-                  {{ t(`box-office.manage.${words}.some`) }}
-                </legend>
-                <UCheckbox
-                  v-for="(line, i) in order.lines"
-                  :key="line.id"
-                  :model-value="chosen.includes(line.id)"
-                  :label="t(kindOf(line) ? 'box-office.manage.cancel.line' : 'box-office.manage.cancel.line-plain', { n: i + 1, type: kindOf(line), price: line.amountMinor === 0 ? t('box-office.manage.free-price') : money(line.amountMinor, order.currency) })"
-                  @update:model-value="toggle(line.id, $event)"
-                />
-              </fieldset>
-              <div class="flex flex-wrap gap-2">
-                <UButton
-                  v-if="order.lines.length > 1"
-                  color="error"
-                  variant="outline"
-                  :loading="busy"
-                  :disabled="!chosen.length || chosen.length === order.lines.length"
-                  :label="chosen.length ? t('box-office.manage.cancel.button', { count: chosen.length }) : t('box-office.manage.cancel.none')"
-                  @click="cancel(false)"
-                />
-                <UButton
-                  color="error"
-                  variant="outline"
-                  :loading="busy"
-                  :label="t(`box-office.manage.${words}.all`)"
-                  @click="cancel(true)"
-                />
-              </div>
-            </section>
-            <p
-              v-else-if="order.state === 'confirmed'"
-              class="text-sm text-muted"
-            >
-              {{ t('box-office.manage.paid-help') }}
-            </p>
-          </template>
-        </div>
-      </UPageBody>
-    </UPage>
-  </UContainer>
+        <section
+          v-if="cancellable"
+          class="space-y-4"
+        >
+          <h2 class="text-lg font-semibold">
+            {{ t('box-office.manage.cancel.title') }}
+          </h2>
+          <p
+            v-if="terms"
+            class="text-sm text-muted"
+          >
+            {{ free ? t('box-office.manage.free.terms', { until: dateTime(terms.until) }) : terms.feeMinor > 0
+              ? t('box-office.manage.refund.terms', { until: dateTime(terms.until), fee: money(terms.feeMinor, order.currency) })
+              : t('box-office.manage.refund.terms-free', { until: dateTime(terms.until) }) }}
+          </p>
+          <RefusalNotice :refusal="refusal" />
+          <fieldset
+            v-if="order.lines.length > 1"
+            class="space-y-2"
+          >
+            <legend class="mb-2 text-sm">
+              {{ t(`box-office.manage.${words}.some`) }}
+            </legend>
+            <UCheckbox
+              v-for="(line, i) in order.lines"
+              :key="line.id"
+              :model-value="chosen.includes(line.id)"
+              :label="t(kindOf(line) ? 'box-office.manage.cancel.line' : 'box-office.manage.cancel.line-plain', { n: i + 1, type: kindOf(line), price: line.amountMinor === 0 ? t('box-office.manage.free-price') : money(line.amountMinor, order.currency) })"
+              @update:model-value="toggle(line.id, $event)"
+            />
+          </fieldset>
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              v-if="order.lines.length > 1"
+              color="error"
+              variant="outline"
+              :loading="busy"
+              :disabled="!chosen.length || chosen.length === order.lines.length"
+              :label="chosen.length ? t('box-office.manage.cancel.button', { count: chosen.length }) : t('box-office.manage.cancel.none')"
+              @click="cancel(false)"
+            />
+            <UButton
+              color="error"
+              variant="outline"
+              :loading="busy"
+              :label="t(`box-office.manage.${words}.all`)"
+              @click="cancel(true)"
+            />
+          </div>
+        </section>
+        <p
+          v-else-if="order.state === 'confirmed'"
+          class="text-sm text-muted"
+        >
+          {{ t('box-office.manage.paid-help') }}
+        </p>
+      </template>
+    </div>
+  </PageFrame>
 </template>

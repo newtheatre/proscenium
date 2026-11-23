@@ -37,20 +37,22 @@ const year = (date: string) => date.slice(0, 4) // not-policy: the year of a dat
           {{ group.summary }}
         </p>
       </template>
-      <ul class="mt-4 divide-y divide-default">
-        <li
+      <RecordList
+        :label="group.name"
+        class="mt-4"
+      >
+        <RecordListItem
           v-for="a in group.awards"
           :key="a.id"
-          class="py-3"
         >
-          <p>
+          <template #name>
             <span class="font-medium">{{ a.name }}</span>
             <span class="sr-only">, </span>
-            <span class="ms-2 text-sm text-muted">{{ year(a.awardedOn) }}</span>
-          </p>
-          <p
+            <span class="ms-2 text-sm font-normal text-muted">{{ year(a.awardedOn) }}</span>
+          </template>
+          <template
             v-if="a.awardedFor || a.production"
-            class="text-sm text-muted"
+            #description
           >
             <template v-if="a.awardedFor">
               {{ a.awardedFor }}
@@ -68,15 +70,17 @@ const year = (date: string) => date.slice(0, 4) // not-policy: the year of a dat
             <template v-else-if="a.production">
               {{ a.production.title }}
             </template>
-          </p>
-          <p
+          </template>
+          <template
             v-if="a.citation"
-            class="mt-1 whitespace-pre-line text-sm"
+            #below
           >
-            {{ a.citation }}
-          </p>
-        </li>
-      </ul>
+            <p class="whitespace-pre-line text-sm">
+              {{ a.citation }}
+            </p>
+          </template>
+        </RecordListItem>
+      </RecordList>
     </section>
     <p
       v-if="!types.length"

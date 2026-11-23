@@ -49,47 +49,43 @@ useHead(() => ({
 </script>
 
 <template>
-  <UContainer v-if="data">
-    <UPage>
-      <UPageHeader
-        :title="season.name"
-        :description="span(season.startsOn, season.endsOn)"
-      />
-      <UPageBody>
-        <MarkdownText
-          v-if="season.summary"
-          :text="season.summary"
-          class="mb-8 max-w-3xl"
+  <PageFrame
+    v-if="data"
+    :title="season.name"
+    :description="span(season.startsOn, season.endsOn)"
+  >
+    <MarkdownText
+      v-if="season.summary"
+      :text="season.summary"
+      class="mb-6 max-w-3xl"
+    />
+    <ul
+      v-if="season.productions.length"
+      class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    >
+      <li
+        v-for="p in season.productions"
+        :key="p.id"
+      >
+        <PublicSiteShowCard
+          :to="`/${p.past ? 'shows' : 'whats-on'}/${p.slug}`"
+          :title="p.title"
+          :description="markdownText(p.summary) || p.subtitle"
+          :poster="p.poster"
+          :when="p.firstStartsAt && p.lastStartsAt ? span(p.firstStartsAt, p.lastStartsAt) : t('public-site.season.dates-soon')"
+          :details="p.category?.label"
+          :cancelled="p.cancelled"
+          :age="p.age"
+          :effects="p.hasEffects"
+          :warnings="p.hasWarnings"
         />
-        <ul
-          v-if="season.productions.length"
-          class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          <li
-            v-for="p in season.productions"
-            :key="p.id"
-          >
-            <PublicSiteShowCard
-              :to="`/${p.past ? 'shows' : 'whats-on'}/${p.slug}`"
-              :title="p.title"
-              :description="markdownText(p.summary) || p.subtitle"
-              :poster="p.poster"
-              :when="p.firstStartsAt && p.lastStartsAt ? span(p.firstStartsAt, p.lastStartsAt) : t('public-site.season.dates-soon')"
-              :details="p.category?.label"
-              :cancelled="p.cancelled"
-              :age="p.age"
-              :effects="p.hasEffects"
-              :warnings="p.hasWarnings"
-            />
-          </li>
-        </ul>
-        <EmptyState
-          v-else
-          icon="i-lucide-calendar"
-          :title="t('public-site.season.empty')"
-          :description="t('public-site.season.empty-description')"
-        />
-      </UPageBody>
-    </UPage>
-  </UContainer>
+      </li>
+    </ul>
+    <EmptyState
+      v-else
+      icon="i-lucide-calendar"
+      :title="t('public-site.season.empty')"
+      :description="t('public-site.season.empty-description')"
+    />
+  </PageFrame>
 </template>

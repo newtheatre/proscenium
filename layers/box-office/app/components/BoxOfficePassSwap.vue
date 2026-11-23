@@ -87,18 +87,13 @@ const referenceId = useId()
         </p>
       </div>
     </div>
-    <ul class="space-y-2 sm:ps-8">
-      <li
+    <RecordList class="sm:ms-8">
+      <RecordListItem
         v-for="row in rows"
         :key="row.key"
-        class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-default px-3 py-2"
+        :name="t('box-office.book.swap.row', { ticket: row.ticket.name, pass: row.pass.name, price: row.price.name })"
+        :description="t('box-office.book.swap.terms', { amount: money(row.price.amountMinor, currency), count: row.entries, each: money(Math.round(row.price.amountMinor / row.entries), currency) })"
       >
-        <span class="flex min-w-0 flex-col">
-          <span>{{ t('box-office.book.swap.row', { ticket: row.ticket.name, pass: row.pass.name, price: row.price.name }) }}</span>
-          <span class="text-sm text-muted">
-            {{ t('box-office.book.swap.terms', { amount: money(row.price.amountMinor, currency), count: row.entries, each: money(Math.round(row.price.amountMinor / row.entries), currency) }) }}
-          </span>
-        </span>
         <FieldNumber
           :model-value="countOf(row)"
           :min="0"
@@ -107,27 +102,29 @@ const referenceId = useId()
           class="w-28"
           @update:model-value="setCount(row, $event)"
         />
-        <div
+        <template
           v-if="typing(row)"
-          class="w-full space-y-2"
+          #below
         >
-          <p class="text-sm text-muted">
-            {{ row.price.reference!.label }}
-          </p>
-          <UInput
-            v-for="n in countOf(row)"
-            :id="`${referenceId}-${row.key.replaceAll(' ', '-')}-${n}`"
-            :key="n"
-            :model-value="swapOf(row)?.references[n - 1] ?? ''"
-            :aria-label="t('box-office.book.reference', { label: row.price.reference!.field ?? row.price.reference!.label, n })"
-            :placeholder="t('box-office.book.reference-placeholder', { n })"
-            autocomplete="off"
-            maxlength="64"
-            class="block w-64"
-            @update:model-value="setReference(row, n - 1, String($event))"
-          />
-        </div>
-      </li>
-    </ul>
+          <div class="space-y-2">
+            <p class="text-sm text-muted">
+              {{ row.price.reference!.label }}
+            </p>
+            <UInput
+              v-for="n in countOf(row)"
+              :id="`${referenceId}-${row.key.replaceAll(' ', '-')}-${n}`"
+              :key="n"
+              :model-value="swapOf(row)?.references[n - 1] ?? ''"
+              :aria-label="t('box-office.book.reference', { label: row.price.reference!.field ?? row.price.reference!.label, n })"
+              :placeholder="t('box-office.book.reference-placeholder', { n })"
+              autocomplete="off"
+              maxlength="64"
+              class="block w-64"
+              @update:model-value="setReference(row, n - 1, String($event))"
+            />
+          </div>
+        </template>
+      </RecordListItem>
+    </RecordList>
   </UCard>
 </template>
