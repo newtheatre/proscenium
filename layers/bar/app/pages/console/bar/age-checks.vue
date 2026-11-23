@@ -43,6 +43,8 @@ const { data, status, error, refresh } = await useAPI<Register>('/api/bar/age-ch
 const outcomes: Outcome[] = ['refused', 'id_checked', 'not_needed', 'self_attested']
 const idTypeLabel = (id: string) => t(`bar.desk.id-types.${id}`)
 const outcomeLabel = (o: Outcome) => t(`bar.screens.age-checks.outcome.${o}`)
+const filtersOn = computed(() => Number(outlet.value !== ALL) + Number(outcome.value !== ALL))
+const clearFilters = () => void router.replace({ query: { ...route.query, outlet: undefined, outcome: undefined } })
 const outletItems = computed(() => [{ value: ALL, label: t('bar.screens.age-checks.every-outlet') }, ...(data.value?.outlets ?? []).map(o => ({ value: o.id, label: o.name }))])
 const outcomeItems = computed(() => [{ value: ALL, label: t('bar.screens.age-checks.every-outcome') }, ...outcomes.map(o => ({ value: o, label: outcomeLabel(o) }))])
 const describing = computed(() => !!data.value && (data.value.describing || data.value.rows.some(r => r.description)))
@@ -137,25 +139,28 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
     >
       {{ t('bar.screens.age-checks.ages', { minimum: data.ages.minimum, challenge: data.ages.challenge }) }}
     </p>
-    <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
-      <UFormField
-        :label="t('bar.screens.age-checks.days-filter')"
-        class="max-sm:col-span-2"
-      >
+    <div class="mb-6 flex flex-wrap items-end gap-2">
+      <UFormField :label="t('bar.screens.age-checks.days-filter')">
         <FieldDateRange v-model="range" />
       </UFormField>
-      <UFormField :label="t('bar.screens.age-checks.outlet')">
-        <USelect
-          v-model="outlet"
-          :items="outletItems"
-        />
-      </UFormField>
-      <UFormField :label="t('bar.screens.age-checks.outcome-heading')">
-        <USelect
-          v-model="outcome"
-          :items="outcomeItems"
-        />
-      </UFormField>
+      <FilterPanel
+        :count="filtersOn"
+        @clear="clearFilters"
+      >
+        <UFormField :label="t('bar.screens.age-checks.outlet')">
+          <USelectMenu
+            v-model="outlet"
+            :items="outletItems"
+            value-key="value"
+          />
+        </UFormField>
+        <UFormField :label="t('bar.screens.age-checks.outcome-heading')">
+          <USelect
+            v-model="outcome"
+            :items="outcomeItems"
+          />
+        </UFormField>
+      </FilterPanel>
     </div>
     <DataBoundary
       :data="data"
@@ -319,9 +324,10 @@ const days = (r: Review) => dayRange(r.fromDay, r.toDay)
             :label="t('bar.screens.age-checks.outlet')"
             name="outlet"
           >
-            <USelect
+            <USelectMenu
               v-model="signing.outlet"
               :items="outletItems"
+              value-key="value"
             />
           </UFormField>
           <p

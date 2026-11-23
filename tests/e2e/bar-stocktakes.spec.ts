@@ -56,7 +56,7 @@ test('a count is started, counted, submitted and approved, and the level is put 
   await visit(page, '/console/bar/stock/stocktakes')
   await page.getByRole('button', { name: 'Start a count' }).first().click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('combobox', { name: /^Location/ }).click()
+  await dialog.getByLabel(/^Location/).click()
   await page.getByRole('option', { name: `Back store ${stamp}` }).click()
   await dialog.getByLabel('What to count').click()
   await page.getByRole('option', { name: `Spirits ${stamp}` }).click()

@@ -40,8 +40,6 @@ watch(data, (d) => {
     ? { locationId: v.locationId, supplierTermId: v.supplierTermId ?? NONE, supplierRef: v.supplierRef ?? '', lines: v.lines.map(l => ({ stockItemId: l.stockItemId, packs: l.packs, looseUnits: l.looseUnits, packCostMinor: l.packCostMinor })) }
     : { locationId: d.locations.length === 1 ? d.locations[0]!.id : '', supplierTermId: NONE, supplierRef: '', lines: [] }
 }, { immediate: true })
-// Chosen by width after hydration, so a line's fields are never on the page twice.
-const phone = useScreenQuery('(max-width: 639px)')
 const received = computed(() => data.value?.delivery?.state === 'received')
 
 const itemOf = (itemId: string) => data.value?.items.find(i => i.id === itemId)
@@ -295,9 +293,10 @@ const title = computed(() => isNew.value
                 name="locationId"
                 required
               >
-                <USelect
+                <USelectMenu
                   v-model="form.locationId"
                   :items="locationItems"
+                  value-key="value"
                 />
               </UFormField>
               <UFormField
@@ -357,82 +356,77 @@ const title = computed(() => isNew.value
             >
               {{ t('bar.screens.deliveries.no-lines') }}
             </p>
-            <RecordList
-              v-else-if="phone"
+            <TableOrList
+              v-else
+              :rows="form.lines"
+              :columns="columns"
               :label="t('bar.screens.deliveries.lines')"
             >
-              <RecordListItem
-                v-for="l in form.lines"
-                :key="l.stockItemId"
-                :name="itemOf(l.stockItemId)?.name ?? ''"
-                :description="arriving(l)"
-              >
-                <IconButton
-                  icon="i-lucide-x"
-                  :label="t('bar.screens.deliveries.remove', { name: itemOf(l.stockItemId)?.name ?? '' })"
-                  @click="removeLine(l.stockItemId)"
-                />
-                <template #below>
-                  <div class="grid grid-cols-2 gap-3">
-                    <UFormField :label="t('bar.screens.deliveries.packs')">
-                      <UFieldGroup>
-                        <UInputNumber
-                          v-model="l.packs"
-                          :min="0"
-                          size="lg"
-                          :aria-label="t('bar.screens.deliveries.packs-of', { name: itemOf(l.stockItemId)?.name ?? '' })"
+              <template #item="{ row: l }">
+                <RecordListItem
+                  :name="itemOf(l.stockItemId)?.name ?? ''"
+                  :description="arriving(l)"
+                >
+                  <IconButton
+                    icon="i-lucide-x"
+                    :label="t('bar.screens.deliveries.remove', { name: itemOf(l.stockItemId)?.name ?? '' })"
+                    @click="removeLine(l.stockItemId)"
+                  />
+                  <template #below>
+                    <div class="grid grid-cols-2 gap-3">
+                      <UFormField :label="t('bar.screens.deliveries.packs')">
+                        <UFieldGroup>
+                          <FieldNumber
+                            v-model="l.packs"
+                            :min="0"
+                            size="lg"
+                            :aria-label="t('bar.screens.deliveries.packs-of', { name: itemOf(l.stockItemId)?.name ?? '' })"
+                          />
+                          <UBadge
+                            color="neutral"
+                            variant="outline"
+                            size="lg"
+                            :label="itemOf(l.stockItemId)?.packName ?? ''"
+                          />
+                        </UFieldGroup>
+                      </UFormField>
+                      <UFormField :label="t('bar.screens.deliveries.loose')">
+                        <UFieldGroup>
+                          <FieldNumber
+                            v-model="l.looseUnits"
+                            :min="0"
+                            size="lg"
+                            :aria-label="t('bar.screens.deliveries.loose-of', { name: itemOf(l.stockItemId)?.name ?? '' })"
+                          />
+                          <UBadge
+                            color="neutral"
+                            variant="outline"
+                            size="lg"
+                            :label="t(`bar.screens.stock.units.${itemOf(l.stockItemId)?.baseUnit ?? 'each'}`)"
+                          />
+                        </UFieldGroup>
+                      </UFormField>
+                      <UFormField
+                        :label="t('bar.screens.deliveries.pack-cost')"
+                        class="col-span-2"
+                      >
+                        <FieldMoney
+                          v-model="l.packCostMinor"
+                          :steppers="false"
+                          :placeholder="itemOf(l.stockItemId)?.costMinor != null ? money(itemOf(l.stockItemId)!.costMinor!) : undefined"
+                          :aria-label="t('bar.screens.deliveries.cost-of', { name: itemOf(l.stockItemId)?.name ?? '' })"
                         />
-                        <UBadge
-                          color="neutral"
-                          variant="outline"
-                          size="lg"
-                          :label="itemOf(l.stockItemId)?.packName ?? ''"
-                        />
-                      </UFieldGroup>
-                    </UFormField>
-                    <UFormField :label="t('bar.screens.deliveries.loose')">
-                      <UFieldGroup>
-                        <UInputNumber
-                          v-model="l.looseUnits"
-                          :min="0"
-                          size="lg"
-                          :aria-label="t('bar.screens.deliveries.loose-of', { name: itemOf(l.stockItemId)?.name ?? '' })"
-                        />
-                        <UBadge
-                          color="neutral"
-                          variant="outline"
-                          size="lg"
-                          :label="t(`bar.screens.stock.units.${itemOf(l.stockItemId)?.baseUnit ?? 'each'}`)"
-                        />
-                      </UFieldGroup>
-                    </UFormField>
-                    <UFormField
-                      :label="t('bar.screens.deliveries.pack-cost')"
-                      class="col-span-2"
-                    >
-                      <FieldMoney
-                        v-model="l.packCostMinor"
-                        :steppers="false"
-                        :placeholder="itemOf(l.stockItemId)?.costMinor != null ? money(itemOf(l.stockItemId)!.costMinor!) : undefined"
-                        :aria-label="t('bar.screens.deliveries.cost-of', { name: itemOf(l.stockItemId)?.name ?? '' })"
-                      />
-                    </UFormField>
-                  </div>
-                </template>
-              </RecordListItem>
-            </RecordList>
-            <UTable
-              v-else
-              :data="form.lines"
-              :columns="columns"
-              :caption="t('bar.screens.deliveries.lines')"
-            >
+                      </UFormField>
+                    </div>
+                  </template>
+                </RecordListItem>
+              </template>
               <template #item-cell="{ row }">
                 <span class="font-medium">{{ itemOf(row.original.stockItemId)?.name }}</span>
               </template>
               <template #packs-cell="{ row }">
                 <UFieldGroup>
-                  <UInputNumber
+                  <FieldNumber
                     v-model="row.original.packs"
                     :min="0"
                     :aria-label="t('bar.screens.deliveries.packs-of', { name: itemOf(row.original.stockItemId)?.name ?? '' })"
@@ -447,7 +441,7 @@ const title = computed(() => isNew.value
               </template>
               <template #loose-cell="{ row }">
                 <UFieldGroup>
-                  <UInputNumber
+                  <FieldNumber
                     v-model="row.original.looseUnits"
                     :min="0"
                     :aria-label="t('bar.screens.deliveries.loose-of', { name: itemOf(row.original.stockItemId)?.name ?? '' })"
@@ -478,7 +472,7 @@ const title = computed(() => isNew.value
                   @click="removeLine(row.original.stockItemId)"
                 />
               </template>
-            </UTable>
+            </TableOrList>
           </PageSection>
         </UForm>
       </template>

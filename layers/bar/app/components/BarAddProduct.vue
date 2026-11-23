@@ -32,6 +32,13 @@ const groups = ref<Group[]>([])
 const step = ref<1 | 2>(1)
 const preset = ref<Preset | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+// A modal's Save sits outside its form, where loading-auto cannot see the submit, so it spins on this.
+const submitting = ref(false)
+async function submit(run: () => Promise<unknown>) {
+  submitting.value = true
+  try { await run() }
+  finally { submitting.value = false }
+}
 const form = ref({ name: '', categoryId: '', age: 'category' as Age, sizes: [] as { name: string, amountMinor: number | null }[], groupIds: [] as string[], mixer: false })
 const formEl = useTemplateRef<FormRef>('formEl')
 // Whether somebody chose the age check here, so a change of category no longer moves it.
@@ -288,7 +295,7 @@ async function deletePreset(p: Preset) {
         :validate="validate"
         class="space-y-4"
         novalidate
-        @submit="add"
+        @submit="submit(add)"
       >
         <RefusalNotice :refusal="refusal" />
         <div class="flex items-center justify-between gap-2 text-sm">
@@ -313,10 +320,11 @@ async function deletePreset(p: Preset) {
             name="categoryId"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="form.categoryId"
               :items="categoryItems"
               :placeholder="t('bar.screens.add-product.pick-category')"
+              value-key="value"
             />
           </UFormField>
         </div>
@@ -431,7 +439,7 @@ async function deletePreset(p: Preset) {
           <UButton
             type="submit"
             form="bar-add-product"
-            loading-auto
+            :loading="submitting"
             :label="confirmUnpriced && unpriced.length ? t('bar.screens.add-product.add-unpriced') : t('bar.screens.add-product.add')"
             @click="another = false"
           />
@@ -455,7 +463,7 @@ async function deletePreset(p: Preset) {
         :validate="validatePreset"
         class="space-y-4"
         novalidate
-        @submit="savePreset"
+        @submit="submit(savePreset)"
       >
         <RefusalNotice :refusal="saveRefusal" />
         <UFormField
@@ -476,7 +484,7 @@ async function deletePreset(p: Preset) {
       <UButton
         type="submit"
         form="bar-save-preset"
-        loading-auto
+        :loading="submitting"
         :label="t('bar.screens.save')"
       />
     </template>

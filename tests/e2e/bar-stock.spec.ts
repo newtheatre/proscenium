@@ -112,7 +112,7 @@ test('Stock shows each location, and a row writes stock off and moves it', async
   await dialog.getByLabel('From').click()
   await page.getByRole('option', { name: `Cellar ${stamp}` }).click()
   await dialog.getByLabel('To', { exact: true }).click()
-  await page.getByRole('option', { name: `Foyer bar ${stamp}` }).click()
+  await page.getByRole('listbox', { name: /^To/ }).getByRole('option', { name: `Foyer bar ${stamp}` }).click()
   await dialog.getByLabel('How much').fill('24')
   await dialog.getByLabel('How much').press('Tab')
   await dialog.getByRole('button', { name: 'Move' }).click()

@@ -130,7 +130,10 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
           ]"
         />
         <PageSection :title="t('bar.screens.sale.lines')">
-          <RecordList :label="t('bar.screens.sale.lines')">
+          <RecordList
+            flush
+            :label="t('bar.screens.sale.lines')"
+          >
             <RecordListItem
               v-for="l in data.sale.lines"
               :key="l.id"
@@ -145,7 +148,10 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
           v-if="data.ageChecks.length"
           :title="t('bar.screens.sale.age-checks')"
         >
-          <RecordList :label="t('bar.screens.sale.age-checks')">
+          <RecordList
+            flush
+            :label="t('bar.screens.sale.age-checks')"
+          >
             <RecordListItem
               v-for="(c, i) in data.ageChecks"
               :key="i"
@@ -214,10 +220,11 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
             name="reasonTermId"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="form.reasonTermId"
               :items="reasonItems"
               :placeholder="t('bar.screens.sale.choose-reason')"
+              value-key="value"
             />
           </UFormField>
           <UFormField
