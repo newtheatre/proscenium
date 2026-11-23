@@ -106,8 +106,8 @@ What the door must get right:
 | --- | --- | --- | --- | --- |
 | My session | `/console/payments/session` | `payments.session.open` | Open with a float; cash up with a count; variance reason | First |
 | Sessions | `/console/payments/sessions` | `payments.session.view` | Every session, expected against counted | First |
-| Needs attention | `/console/payments/attention` | `payments.attempt.reconcile` | Attempts with no answer, unfulfilled payments, failed refunds, and (for someone who may approve them) refunds waiting for approval | First |
-| Refunds | `/console/payments/refunds` | `payments.refund.approve` | Requests waiting, with who asked and why | First |
+| Needs attention | `/console/payments/attention` | `payments.attempt.reconcile` | Attempts with no answer, with what they were for and a warning when the till had already given up on the payment (then answered "keep it", "send it back" or "did not go through"); payments being returned, which someone who may approve refunds can keep; failed refunds; and (for someone who may approve them) refunds waiting for approval | First |
+| Refunds | `/console/payments/refunds` | `payments.refund.approve` | Requests waiting, with who asked and why; a refund the system asked for can be withdrawn by keeping the payment, shown as Kept | First |
 | Providers and readers | `/console/payments/providers` | `payments.provider.manage` | Add a provider, pair a reader, test mode, health | First |
 | Ledger | `/console/finance/ledger` | `finance.ledger.view` | Postings with their entries; filter by account, production, performance, period; every row links to its source | First |
 | Accounts | `/console/finance/accounts` | `finance.account.manage` | Chart of accounts; rename and recode | First |

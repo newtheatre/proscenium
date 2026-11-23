@@ -1,7 +1,7 @@
 // Refunds (Box office specification, part 3, "A refund"). A refund names one part and the attempt
 // that took the money, so it goes back the way it came and never takes a part or an attempt past
-// what was paid: the counters on both, kept by trigger, add on approval and subtract only on failure,
-// and their CHECKs refuse the rest. The limit one person may approve alone is copied onto the refund
+// what was paid: the counters on both, kept by trigger, add on approval and subtract only on failure
+// or when the payment is kept, and their CHECKs refuse the rest. The limit one person may approve alone is copied onto the refund
 // when it is requested, so a later change to the setting cannot loosen it.
 import { sql } from 'drizzle-orm'
 import { all, createUnit, first, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
@@ -201,7 +201,7 @@ export async function confirmRefund(unit: UnitView, refundId: string, by: string
   await succeed(unit, refund)
 }
 
-export interface RefundSummary { id: string, partId: string, attemptId: string, /** The order (or other record) refunded, with its reference, buyer and address when its owner gives them. */ owner: DescribedOwner, amountMinor: number, currency: string, method: string, state: RefundState, requestedBy: string | null, requestedByName: string | null, approvedBy: string | null, approvedByName: string | null, selfApproveLimitMinor: number, createdAt: number, /** A person hands the money back and confirms it: cash, or a provider that cannot refund itself. */ handBack: boolean }
+export interface RefundSummary { id: string, partId: string, attemptId: string, /** The order (or other record) refunded, with its reference, buyer and address when its owner gives them. */ owner: DescribedOwner, amountMinor: number, currency: string, method: string, state: RefundState, requestedBy: string | null, requestedByName: string | null, approvedBy: string | null, approvedByName: string | null, selfApproveLimitMinor: number, createdAt: number, /** A person hands the money back and confirms it: cash, or a provider that cannot refund itself. */ handBack: boolean, /** The system's refund, withdrawn because the payment was kept. */ kept: boolean }
 
 /** The refunds with these ids, as Refunds shows them, in the order given. */
 export async function describeRefunds(ids: string[]): Promise<RefundSummary[]> {
@@ -216,7 +216,7 @@ export async function describeRefunds(ids: string[]): Promise<RefundSummary[]> {
   const name = (id: string | null) => (id ? names.get(id) ?? null : null)
   const known = await providers()
   const owners = await describeOwners(rows.map(r => ({ module: r.owner_module, record: r.owner_record })))
-  return rows.map(r => ({ id: r.id, partId: r.part_id, attemptId: r.attempt_id, owner: owners.get(`${r.owner_module}:${r.owner_record}`)!, amountMinor: r.amount_minor, currency: r.currency, method: r.method, state: r.state, requestedBy: r.requested_by, requestedByName: name(r.requested_by), approvedBy: r.approved_by, approvedByName: name(r.approved_by), selfApproveLimitMinor: r.self_approve_limit_minor, createdAt: r.created_at, handBack: !known.get(r.provider)?.refund }))
+  return rows.map(r => ({ id: r.id, partId: r.part_id, attemptId: r.attempt_id, owner: owners.get(`${r.owner_module}:${r.owner_record}`)!, amountMinor: r.amount_minor, currency: r.currency, method: r.method, state: r.state, requestedBy: r.requested_by, requestedByName: name(r.requested_by), approvedBy: r.approved_by, approvedByName: name(r.approved_by), selfApproveLimitMinor: r.self_approve_limit_minor, createdAt: r.created_at, handBack: !known.get(r.provider)?.refund, kept: r.state === 'declined' && r.requested_by === null }))
 }
 
 /**

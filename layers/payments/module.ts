@@ -230,6 +230,8 @@ export default defineModule({
         { slug: 'already-refunded', label: 'Already refunded another way' },
         { slug: 'duplicate', label: 'Asked for twice' },
         { slug: 'other', label: 'Other' },
+        // Given by the system when a payment being returned is kept; not offered when declining.
+        { slug: 'payment-kept', label: 'Payment kept: they had what they paid for' },
       ],
     }],
   },
