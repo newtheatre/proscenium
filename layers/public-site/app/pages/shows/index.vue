@@ -53,112 +53,108 @@ const find = () => navigateTo({ path: '/shows', query: search.q.trim() ? { q: se
 </script>
 
 <template>
-  <UContainer>
-    <UPage>
-      <UPageHeader
-        :title="t('public-site.archive.title')"
-        :description="t('public-site.archive.description')"
-      />
-      <UPageBody>
-        <!-- Nothing to search until a show has closed; the box and its button share a row on a phone. -->
-        <UForm
-          v-if="years.length || searching || data?.searchTooShort"
-          :state="search"
-          action="/shows"
-          method="get"
-          role="search"
-          class="flex flex-wrap items-end gap-2"
-          novalidate
-          @submit="find"
-        >
-          <UFormField
-            :label="t('public-site.archive.search')"
-            name="q"
-            :help="data?.searchTooShort ? t('public-site.archive.too-short') : undefined"
-            class="min-w-0 flex-1 sm:max-w-sm"
-          >
-            <UInput
-              v-model="search.q"
-              name="q"
-              type="search"
-              icon="i-lucide-search"
-            />
-          </UFormField>
-          <UButton
-            type="submit"
-            :label="t('public-site.archive.find')"
-          />
-          <UButton
-            v-if="searching"
-            to="/shows"
-            color="neutral"
-            variant="link"
-            :label="t('public-site.archive.clear')"
-          />
-        </UForm>
-
-        <nav
-          v-if="years.length"
-          :aria-label="t('public-site.archive.years')"
-          class="mt-6"
-        >
-          <ul class="flex flex-wrap gap-1">
-            <li
-              v-for="y in years"
-              :key="y.label"
-            >
-              <UButton
-                :to="y.to"
-                :label="y.label"
-                :aria-label="y.ariaLabel"
-                :aria-current="y.active ? 'page' : undefined"
-                color="neutral"
-                :variant="y.active ? 'solid' : 'ghost'"
-                size="sm"
-              />
-            </li>
-          </ul>
-        </nav>
-
-        <section
-          v-if="data?.productions.length"
-          aria-labelledby="archive-heading"
-          class="mt-8"
-        >
-          <h2
-            id="archive-heading"
-            class="mb-4 text-xl font-semibold"
-          >
-            {{ heading }}
-          </h2>
-          <ul class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <li
-              v-for="p in data.productions"
-              :key="p.id"
-            >
-              <PublicSiteShowCard
-                :to="`/shows/${p.slug}`"
-                :title="p.title"
-                :description="p.subtitle ?? (p.companyName ? t('public-site.production.presented-by', { company: p.companyName }) : undefined)"
-                :poster="p.poster"
-                :when="span(p.openedAt, p.lastStartsAt)"
-                :details="[p.venues.join(', '), p.category?.label].filter(Boolean).join(' · ')"
-                :cancelled="p.cancelled"
-                :age="p.age"
-                :effects="p.hasEffects"
-                :warnings="p.hasWarnings"
-              />
-            </li>
-          </ul>
-        </section>
-        <EmptyState
-          v-else
-          class="mt-8"
-          :icon="searching ? 'i-lucide-search-x' : 'i-lucide-archive'"
-          :title="searching ? t('public-site.archive.no-results') : t('public-site.archive.empty')"
-          :description="searching ? t('public-site.archive.no-results-description') : t('public-site.archive.empty-description')"
+  <PageFrame
+    :title="t('public-site.archive.title')"
+    :description="t('public-site.archive.description')"
+    width="full"
+  >
+    <!-- Nothing to search until a show has closed; the box and its button share a row on a phone. -->
+    <UForm
+      v-if="years.length || searching || data?.searchTooShort"
+      :state="search"
+      action="/shows"
+      method="get"
+      role="search"
+      class="flex flex-wrap items-end gap-2"
+      novalidate
+      @submit="find"
+    >
+      <UFormField
+        :label="t('public-site.archive.search')"
+        name="q"
+        :help="data?.searchTooShort ? t('public-site.archive.too-short') : undefined"
+        class="min-w-0 flex-1 sm:max-w-sm"
+      >
+        <UInput
+          v-model="search.q"
+          name="q"
+          type="search"
+          icon="i-lucide-search"
         />
-      </UPageBody>
-    </UPage>
-  </UContainer>
+      </UFormField>
+      <UButton
+        type="submit"
+        :label="t('public-site.archive.find')"
+      />
+      <UButton
+        v-if="searching"
+        to="/shows"
+        color="neutral"
+        variant="link"
+        :label="t('public-site.archive.clear')"
+      />
+    </UForm>
+
+    <nav
+      v-if="years.length"
+      :aria-label="t('public-site.archive.years')"
+      class="mt-6"
+    >
+      <ul class="flex flex-wrap gap-1">
+        <li
+          v-for="y in years"
+          :key="y.label"
+        >
+          <UButton
+            :to="y.to"
+            :label="y.label"
+            :aria-label="y.ariaLabel"
+            :aria-current="y.active ? 'page' : undefined"
+            color="neutral"
+            :variant="y.active ? 'solid' : 'ghost'"
+            size="sm"
+          />
+        </li>
+      </ul>
+    </nav>
+
+    <section
+      v-if="data?.productions.length"
+      aria-labelledby="archive-heading"
+      class="mt-8"
+    >
+      <h2
+        id="archive-heading"
+        class="mb-4 text-xl font-semibold"
+      >
+        {{ heading }}
+      </h2>
+      <ul class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <li
+          v-for="p in data.productions"
+          :key="p.id"
+        >
+          <PublicSiteShowCard
+            :to="`/shows/${p.slug}`"
+            :title="p.title"
+            :description="p.subtitle ?? (p.companyName ? t('public-site.production.presented-by', { company: p.companyName }) : undefined)"
+            :poster="p.poster"
+            :when="span(p.openedAt, p.lastStartsAt)"
+            :details="[p.venues.join(', '), p.category?.label].filter(Boolean).join(' · ')"
+            :cancelled="p.cancelled"
+            :age="p.age"
+            :effects="p.hasEffects"
+            :warnings="p.hasWarnings"
+          />
+        </li>
+      </ul>
+    </section>
+    <EmptyState
+      v-else
+      class="mt-8"
+      :icon="searching ? 'i-lucide-search-x' : 'i-lucide-archive'"
+      :title="searching ? t('public-site.archive.no-results') : t('public-site.archive.empty')"
+      :description="searching ? t('public-site.archive.no-results-description') : t('public-site.archive.empty-description')"
+    />
+  </PageFrame>
 </template>
