@@ -150,7 +150,10 @@ async function remove() {
   }
 }
 const actions = computed(() => [
-  [{ label: t('membership.screens.list.remove-entry'), icon: 'i-lucide-user-minus', onSelect: openRemove }],
+  [
+    { label: t('membership.screens.list.add-entry'), icon: 'i-lucide-plus', onSelect: openAdd },
+    { label: t('membership.screens.list.remove-entry'), icon: 'i-lucide-user-minus', onSelect: openRemove },
+  ],
   [{ label: t('membership.screens.list.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: remove }],
 ])
 // What the list holds, at a glance.
@@ -168,11 +171,6 @@ const facts = computed(() => {
     { label: t('membership.screens.list.fact-used-by'), value: data.value?.schemes.length ? data.value.schemes.map(s => s.name).join(', ') : t('membership.screens.list.fact-no-scheme'), to: data.value?.schemes.length === 1 ? `/admin/modules/membership/schemes/${data.value.schemes[0]!.id}` : undefined },
   ]
 })
-// Loading the file is what the page is for; adding one entry by hand is the exception.
-const pageActions = computed(() => [
-  { label: t('membership.screens.list.load'), icon: 'i-lucide-upload', disabled: !data.value?.keySet, onSelect: () => { loading.value = true } },
-  { label: t('membership.screens.list.add-entry'), icon: 'i-lucide-plus', onSelect: openAdd },
-])
 </script>
 
 <template>
@@ -185,7 +183,13 @@ const pageActions = computed(() => [
       v-if="list"
       #primary
     >
-      <PageActions :actions="pageActions" />
+      <!-- Loading the file is what the page is for; adding one entry by hand sits in the menu with removing one. -->
+      <UButton
+        icon="i-lucide-upload"
+        :label="t('membership.screens.list.load')"
+        :disabled="!data?.keySet"
+        @click="loading = true"
+      />
       <RowActions
         :items="actions"
         :label="t('membership.screens.list.actions', { list: list.name })"
