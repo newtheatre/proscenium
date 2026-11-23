@@ -32,6 +32,7 @@ async function create() {
 }
 // Draft and archived are the catalogue's shared words; open and closed are a scheme's own.
 const schemeStateLabel = (state: string) => state === 'draft' || state === 'archived' ? t(`core.states.${state}`) : t(`membership.screens.states.${state}`)
+const membershipNewSchemeForm = useFormRef('membershipNewSchemeForm')
 </script>
 
 <template>
@@ -96,6 +97,7 @@ const schemeStateLabel = (state: string) => state === 'draft' || state === 'arch
       <template #body>
         <UForm
           id="membership-new-scheme"
+          ref="membershipNewSchemeForm"
           :state="form"
           :validate="() => needs({ name: form.name })"
           class="space-y-4"
@@ -120,7 +122,7 @@ const schemeStateLabel = (state: string) => state === 'draft' || state === 'arch
         <UButton
           type="submit"
           form="membership-new-scheme"
-          loading-auto
+          :loading="membershipNewSchemeForm?.loading"
           :label="t('membership.screens.schemes.create')"
         />
       </template>

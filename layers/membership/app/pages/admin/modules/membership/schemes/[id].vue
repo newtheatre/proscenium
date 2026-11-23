@@ -212,6 +212,8 @@ const showWithdrawn = ref(false)
 const exampleFor = (optionId: string) => data.value?.example.find(e => e.lengthOptionId === optionId)?.endsOn
 // Draft and archived are the catalogue's shared words; open and closed are a scheme's own.
 const schemeStateLabel = (state: string) => state === 'draft' || state === 'archived' ? t(`core.states.${state}`) : t(`membership.screens.states.${state}`)
+const membershipSchemeDetailsForm = useFormRef('membershipSchemeDetailsForm')
+const membershipLengthForm = useFormRef('membershipLengthForm')
 </script>
 
 <template>
@@ -314,15 +316,8 @@ const schemeStateLabel = (state: string) => state === 'draft' || state === 'arch
             :title="t('membership.screens.lengths.empty')"
             :description="t('membership.screens.lengths.empty-help')"
             icon="i-lucide-calendar-range"
-          >
-            <template #actions>
-              <UButton
-                icon="i-lucide-plus"
-                :label="t('membership.screens.lengths.add')"
-                @click="openOption"
-              />
-            </template>
-          </EmptyState>
+            :action="{ icon: 'i-lucide-plus', label: t('membership.screens.lengths.add'), onClick: openOption }"
+          />
           <template v-else>
             <RecordList
               v-if="offeredOptions.length"
@@ -423,6 +418,7 @@ const schemeStateLabel = (state: string) => state === 'draft' || state === 'arch
         >
           <UForm
             id="membership-scheme-details"
+            ref="membershipSchemeDetailsForm"
             :state="details"
             class="space-y-4"
             novalidate
@@ -598,7 +594,7 @@ const schemeStateLabel = (state: string) => state === 'draft' || state === 'arch
             <UButton
               type="submit"
               form="membership-scheme-details"
-              loading-auto
+              :loading="membershipSchemeDetailsForm?.loading"
               :label="t('membership.screens.scheme.save')"
             />
           </template>
@@ -613,6 +609,7 @@ const schemeStateLabel = (state: string) => state === 'draft' || state === 'arch
       <template #body>
         <UForm
           id="membership-length-form"
+          ref="membershipLengthForm"
           :state="option"
           :schema="optionSchema"
           class="grid gap-4 sm:grid-cols-2"
@@ -651,7 +648,7 @@ const schemeStateLabel = (state: string) => state === 'draft' || state === 'arch
         <UButton
           type="submit"
           form="membership-length-form"
-          loading-auto
+          :loading="membershipLengthForm?.loading"
           :label="t('membership.screens.lengths.add')"
         />
       </template>

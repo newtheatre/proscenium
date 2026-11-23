@@ -115,6 +115,7 @@ watch(() => state.template, () => {
   state.title = offered
 })
 const tone = { draft: 'neutral', live: 'success', paused: 'neutral', closed: 'neutral', archived: 'neutral' } as const
+const formsNewForm = useFormRef('formsNewForm')
 </script>
 
 <template>
@@ -145,15 +146,8 @@ const tone = { draft: 'neutral', live: 'success', paused: 'neutral', closed: 'ne
         icon="i-lucide-file-text"
         :title="t('forms.screens.list.empty')"
         :description="t('forms.screens.list.empty-help')"
-      >
-        <template #actions>
-          <UButton
-            :label="t('forms.screens.list.new')"
-            icon="i-lucide-plus"
-            @click="start"
-          />
-        </template>
-      </EmptyState>
+        :action="{ label: t('forms.screens.list.new'), icon: 'i-lucide-plus', onClick: start }"
+      />
       <EmptyState
         v-else-if="!matching.length"
         icon="i-lucide-search"
@@ -203,6 +197,7 @@ const tone = { draft: 'neutral', live: 'success', paused: 'neutral', closed: 'ne
       <template #body>
         <UForm
           id="forms-new"
+          ref="formsNewForm"
           :state="state"
           :validate="() => needs({ title: state.title })"
           class="space-y-4"
@@ -288,7 +283,7 @@ const tone = { draft: 'neutral', live: 'success', paused: 'neutral', closed: 'ne
         <UButton
           type="submit"
           form="forms-new"
-          loading-auto
+          :loading="formsNewForm?.loading"
           :label="t('forms.screens.list.create')"
         />
       </template>
