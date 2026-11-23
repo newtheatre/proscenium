@@ -1,5 +1,5 @@
-<!-- One What's on filter: a native select, so it submits with its form when scripts are off (C-38).
-     Inline in the toolbar it carries its label inside the control; `stacked` puts it above, for the sheet. -->
+<!-- One What's on filter. A Nuxt UI select, its label inside the control in the toolbar and above it
+     when `stacked` (the phone sheet). `native` is the scripts-off fallback: a plain select that submits with its GET form (C-38). -->
 <script setup lang="ts">
 const props = defineProps<{
   name: string
@@ -8,46 +8,71 @@ const props = defineProps<{
   options: { value: string, label: string }[]
   value?: string
   stacked?: boolean
+  native?: boolean
 }>()
 const emit = defineEmits<{ pick: [value: string] }>()
 const id = useId()
-const chosen = computed(() => !!props.value)
+// A select cannot hold an empty value, so "any" stands for none.
+const ANY = '__any'
+const items = computed(() => [{ value: ANY, label: props.any }, ...props.options])
+const chosen = computed(() => props.value ?? ANY)
+const pick = (value: unknown) => emit('pick', value === ANY ? '' : String(value))
 </script>
 
 <template>
-  <div :class="stacked ? 'flex flex-col gap-1.5' : 'relative flex h-9 items-center rounded-md bg-default ring ring-inset focus-within:ring-2 focus-within:ring-primary ' + (chosen ? 'ring-2 ring-inverted' : 'ring-accented')">
+  <div
+    v-if="native"
+    class="flex items-center gap-1.5"
+  >
     <label
       :for="id"
-      :class="stacked ? 'text-sm font-medium text-highlighted' : 'ps-2.5 text-sm text-muted'"
+      class="text-sm text-muted"
     >{{ label }}</label>
-    <div class="relative flex items-center">
-      <select
-        :id="id"
-        :name="name"
-        :class="stacked
-          ? 'h-11 w-full appearance-none rounded-md bg-default ps-3 pe-9 text-base text-highlighted ring ring-inset focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ' + (chosen ? 'ring-2 ring-inverted font-medium' : 'ring-accented')
-          : 'h-9 appearance-none bg-transparent ps-1.5 pe-8 text-sm font-medium text-highlighted focus-visible:outline-none'"
-        @change="emit('pick', ($event.target as HTMLSelectElement).value)"
+    <select
+      :id="id"
+      :name="name"
+      class="h-8 rounded-md bg-default px-2 text-sm text-highlighted ring ring-inset ring-accented"
+    >
+      <option
+        value=""
+        :selected="!value"
       >
-        <option
-          value=""
-          :selected="!value"
-        >
-          {{ any }}
-        </option>
-        <option
-          v-for="o in options"
-          :key="o.value"
-          :value="o.value"
-          :selected="value === o.value"
-        >
-          {{ o.label }}
-        </option>
-      </select>
-      <UIcon
-        name="i-lucide-chevron-down"
-        class="pointer-events-none absolute end-2.5 size-4 text-muted"
-      />
-    </div>
+        {{ any }}
+      </option>
+      <option
+        v-for="o in options"
+        :key="o.value"
+        :value="o.value"
+        :selected="value === o.value"
+      >
+        {{ o.label }}
+      </option>
+    </select>
   </div>
+  <UFormField
+    v-else-if="stacked"
+    :label="label"
+    size="lg"
+  >
+    <USelect
+      :model-value="chosen"
+      :items="items"
+      color="neutral"
+      :highlight="!!value"
+      @update:model-value="pick"
+    />
+  </UFormField>
+  <USelect
+    v-else
+    :model-value="chosen"
+    :items="items"
+    :aria-label="label"
+    color="neutral"
+    :highlight="!!value"
+    :content="{ align: 'end' }"
+    class="w-auto"
+    @update:model-value="pick"
+  >
+    <span class="truncate"><span class="text-muted">{{ label }}</span> <span class="font-medium text-highlighted">{{ items.find(i => i.value === chosen)?.label }}</span></span>
+  </USelect>
 </template>

@@ -32,7 +32,10 @@ On saving, a fresh sign-in follows the setting and not the ability, so each sett
 | `box-office.reservations.remind-before` | duration | 24h | 1h to 14d | BO | staff | No | When the reminder with the amount due and the cancel link is sent; unset sends none |
 | `box-office.sales.close-before` | duration | 0m | 0m to 7d | BO | public | Yes | How long before curtain online sales close. Per performance: `off_sale_at` |
 | `box-office.sales.desk-until-after` | duration | 30m | 0m to 4h | BO | staff | No | How long after curtain the desk may still sell, for latecomers |
-| `box-office.availability.show-remaining-under` | integer (seats) | 20 | 0 to 1000 | BO | public | No | Show "N left" only at or under this many; 0 never shows it |
+| `box-office.availability.seats-left` | choice | count | count, progress, nearly-full, sold-out | BO | public | No | How much the public pages say about seats left, most open first: the number when nearly full; "Selling fast" then "Last few"; "Last few" only; nothing until sold out. Staff screens always show the count |
+| `box-office.availability.threshold-unit` | choice | share | share, seats | BO | public | No | Whether nearly full is a share of the house or a number of seats |
+| `box-office.availability.threshold-share` | integer (percent) | 10 | 1 to 100 | BO | public | No | Nearly full at or under this share of the house, rounded up |
+| `box-office.availability.show-remaining-under` | integer (seats) | 20 | 0 to 1000 | BO | public | No | Nearly full at or under this many seats, when counted in seats; 0 never |
 | `box-office.fees.booking-fee` | money | 0 | 0 to 2000 | BO | public | Yes | Booking fee per order online; 0 for none |
 | `box-office.fees.booking-fee-per` | choice | order | order, ticket | BO | public | No | Whether the fee is charged once or per ticket |
 | `box-office.fees.booking-fee-at-desk` | boolean | false |  | BO | staff | No | Whether the desk charges the fee too |
