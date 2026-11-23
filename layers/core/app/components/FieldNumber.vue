@@ -8,6 +8,6 @@ defineOptions({ inheritAttrs: false })
 <template>
   <UInputNumber
     v-bind="$attrs"
-    :ui="{ root: 'w-32' }"
+    :ui="{ root: 'w-32', ...($attrs.ui as object | undefined) }"
   />
 </template>

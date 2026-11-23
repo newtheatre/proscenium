@@ -180,7 +180,21 @@ the row arrow keys on the handle and Move up and Move down in its menu too (see 
 `bun run check:conformance` holds screens to this ("Screens are built from the kit"): no raw `<form>`
 (use `UForm` or `PageForm`), no `w-full` on a form control (controls already fill their field), no
 hand-built bordered list, no native date or time input, no date formatted by hand, no form without
-`novalidate`, and no native `required` on a control.
+`novalidate`, and no native `required` on a control. It also refuses:
+
+- `loading-auto` on a button outside its form (`form="…"`), which never spins: use `useFormRef`;
+- a `UInputNumber` outside the kit's fields: use `FieldNumber` (or `FieldMoney`, `DurationInput`);
+- `'en-GB'` named in an `Intl` call or `locale="en-GB"` in a page or component: use `useDates()` or
+  `useMoneyText()`, which follow `core.locale.language`;
+- `uqr` imported outside `QrCode`;
+- `useSeoMeta` with a title in English rather than through `t()`;
+- an `EmptyState` whose `actions` slot is one plain button (label, icon, `to`, a click): pass `action`;
+- a `USeparator` followed by a heading: use `FieldGroup`;
+- a hand-written `sticky` with a `top-` offset in a console or Admin page: use `sticky-panel` or `sticky-bar`.
+- a `UTable` or `TableOrList` on a page of `width="reading"`, too narrow for its columns.
+
+The Translations check also refuses a key written out in `t('…')` that no catalogue holds (or holds
+only as `.one` and `.other`), which a screen would show raw.
 
 ## Checking a form
 
@@ -204,6 +218,11 @@ app's words, and says what the server would say for the same value.
 - **Submit verbs.** A record with a page of its own is made with "Create <thing>" (Create production,
   Create venue, Create role); something added to a list is "Add <thing>" (Add season, Add space, Add
   closure). Its toast says "<Thing> added", with Undo where the act can be reversed.
+- **A Save outside its form.** A dialogue's footer button submits with `form="<id>"`, beyond the
+  form's reach, so `loading-auto` cannot see the submit. Give the form a ref with `useFormRef`
+  (`const venueForm = useFormRef('venueForm')`, `ref="venueForm"` on the `UForm`) and pass
+  `:loading="venueForm?.loading"`: it is true while the form validates and its `@submit` runs, so the
+  handler must return its promise. The same ref's `setErrors` puts the server's refusals on the fields.
 - **Do not disable the save button until the form is valid.** Let it be pressed and say what is
   missing. A form with no schema of its own names what it needs with `needs()`:
   `:validate="() => needs({ name: form.name, note: paid ? form.note : true })"`, each key the
@@ -358,6 +377,9 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
   `type="date"` or `type="datetime-local"`: a native picker ignores the locale and works in the
   viewer's zone.
 - `PageForm` has the kinds `date`, `daterange`, `datetime` and `money` for them.
+- **Money as text**: `useMoneyText()` gives `money(minor, currency, options?)` in the theatre's
+  language and `isCurrency(unit)` for a figure whose unit may be a currency. Finance's `useMoney`
+  adds the site's own currency on top.
 
 ### Small parts
 
@@ -386,12 +408,18 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
   takes `actions` (`label`, `icon`, `to` or `onSelect`, `loading`, `disabled`, `lesser`); every one is
   a worded button from 640 pixels, and on a phone the first stays a button while the rest fold into
   one "More actions" menu (`more-label` names it), so the bar never overflows. Use it in place of
-  hiding buttons by hand with `max-sm:hidden` and a second menu.
+  hiding buttons by hand with `max-sm:hidden` and a second menu. `menu` takes lesser items that
+  always sit behind an ellipsis; on a phone they share the one menu with the folded buttons, so a
+  page never shows two. An `onSelect` that returns a promise keeps its button spinning.
 - `TableOrList`: rows as a `UTable` from 640 pixels and a `RecordList` on a phone, chosen after
   hydration so only one is drawn. It takes `rows`, `columns`, a `label` (the caption and the list's
   name) and `to` (where a row leads, in both forms); the table's cells are UTable's slots
-  (`#when-cell`) and the phone's row is the `item` slot, a `RecordListItem`. A page does not call
-  `useScreenQuery` and draw both itself.
+  (`#when-cell`) and the phone's row is the `item` slot, a `RecordListItem`. `row-key` keys the
+  phone's rows, `flush` drops the list's frame inside a PageSection and `ui` goes to the table.
+  `row-actions` (with `row-label` for the menu's name) ends each table row with its `RowActions` and
+  offers the same items on a right click, as PageList does; the `item` slot receives them as
+  `actions`, for a `RowActions` in the phone's row. A page does not call `useScreenQuery` and draw
+  both itself.
 - `FieldNumber`: a count or whole number. It is `UInputNumber` at a width for a few digits (`w-32`),
   where the theme's own default fills the row; `class="w-24"` or `class="w-full"` gives another.
 - `DefaultedNumber` and `DefaultedMinutes`: a count, or a length in minutes, that takes the

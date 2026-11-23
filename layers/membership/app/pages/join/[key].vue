@@ -127,14 +127,8 @@ useSeoMeta({ title, description: () => scheme.value?.summary ?? undefined })
           icon="i-lucide-id-card"
           :title="t('membership.join.not-open')"
           :description="t('membership.join.not-open-help')"
-        >
-          <template #actions>
-            <UButton
-              :label="t('membership.join.see-all')"
-              to="/account/membership"
-            />
-          </template>
-        </EmptyState>
+          :action="{ label: t('membership.join.see-all'), to: '/account/membership' }"
+        />
       </div>
     </DataBoundary>
   </PageFrame>

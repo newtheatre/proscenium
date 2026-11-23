@@ -123,6 +123,7 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
   [{ label: t('front-of-house.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(list) }],
   [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void setArchived(list, true) } }],
 ]
+const fhChecklistForm = useFormRef('fhChecklistForm')
 </script>
 
 <template>
@@ -210,6 +211,7 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
       <template #body>
         <UForm
           id="fh-checklist"
+          ref="fhChecklistForm"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ name: form.name })"
@@ -346,6 +348,7 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
       <template #footer>
         <UButton
           type="submit"
+          :loading="fhChecklistForm?.loading"
           form="fh-checklist"
           :label="editing ? t('front-of-house.save') : t('front-of-house.checklists.add-button')"
         />

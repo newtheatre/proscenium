@@ -454,7 +454,7 @@ async function hold() {
                 size="lg"
                 :ui="{ root: 'items-center gap-4', wrapper: 'min-w-0', container: 'w-36 shrink-0' }"
               >
-                <UInputNumber
+                <FieldNumber
                   v-model="counts[keyOf(band.bandId, type.ticketTypeId)]"
                   :min="0"
                   :max="mostOf(band.bandId, type)"
@@ -462,7 +462,7 @@ async function hold() {
                   size="xl"
                   :increment="named(stepLabel(band, type, 'add'))"
                   :decrement="named(stepLabel(band, type, 'remove'))"
-                  :ui="{ increment: '[&_button:disabled]:opacity-40', decrement: '[&_button:disabled]:opacity-40' }"
+                  :ui="{ root: 'w-full', increment: '[&_button:disabled]:opacity-40', decrement: '[&_button:disabled]:opacity-40' }"
                 />
               </UFormField>
               <template v-if="typing(type) && counts[keyOf(band.bandId, type.ticketTypeId)]">

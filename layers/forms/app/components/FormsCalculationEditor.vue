@@ -182,7 +182,7 @@ async function remove() {
               :aria-label="t('forms.screens.calculations.term-value')"
               @update:model-value="setRow(i, { ...row, term: { value: $event ?? 0 } }, `row:${i}`)"
             />
-            <UInputNumber
+            <FieldNumber
               v-else
               size="sm"
               :model-value="row.term.value"

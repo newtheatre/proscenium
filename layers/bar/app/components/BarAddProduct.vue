@@ -13,7 +13,6 @@ interface Category { id: string, name: string, parentId: string | null, ageRestr
 interface List { id: string, name: string, standard: boolean, active: boolean }
 interface Group { id: string, name: string, active: boolean }
 type Age = 'category' | 'yes' | 'no'
-type FormRef = { setErrors: (errors: FieldError[]) => void }
 
 // categoryId: the category it was opened from, whose usual preset (or its parent's) it starts on.
 const props = defineProps<{ categories: Category[], lists: List[], categoryId?: string }>()
@@ -32,15 +31,8 @@ const groups = ref<Group[]>([])
 const step = ref<1 | 2>(1)
 const preset = ref<Preset | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-// A modal's Save sits outside its form, where loading-auto cannot see the submit, so it spins on this.
-const submitting = ref(false)
-async function submit(run: () => Promise<unknown>) {
-  submitting.value = true
-  try { await run() }
-  finally { submitting.value = false }
-}
 const form = ref({ name: '', categoryId: '', age: 'category' as Age, sizes: [] as { name: string, amountMinor: number | null }[], groupIds: [] as string[], mixer: false })
-const formEl = useTemplateRef<FormRef>('formEl')
+const formEl = useFormRef('formEl')
 // Whether somebody chose the age check here, so a change of category no longer moves it.
 const ageTouched = ref(false)
 
@@ -157,7 +149,7 @@ async function add() {
 // renames one of the theatre's own (id set).
 const saving = ref<{ id: string | null, name: string } | null>(null)
 const saveRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const saveEl = useTemplateRef<FormRef>('saveEl')
+const saveEl = useFormRef('saveEl')
 const measureOf = (name: string) => preset.value?.sizes.find(s => s.name === name)?.measure ?? null
 const presetBody = () => {
   const f = form.value
@@ -295,7 +287,7 @@ async function deletePreset(p: Preset) {
         :validate="validate"
         class="space-y-4"
         novalidate
-        @submit="submit(add)"
+        @submit="add"
       >
         <RefusalNotice :refusal="refusal" />
         <div class="flex items-center justify-between gap-2 text-sm">
@@ -439,7 +431,7 @@ async function deletePreset(p: Preset) {
           <UButton
             type="submit"
             form="bar-add-product"
-            :loading="submitting"
+            :loading="formEl?.loading"
             :label="confirmUnpriced && unpriced.length ? t('bar.screens.add-product.add-unpriced') : t('bar.screens.add-product.add')"
             @click="another = false"
           />
@@ -463,7 +455,7 @@ async function deletePreset(p: Preset) {
         :validate="validatePreset"
         class="space-y-4"
         novalidate
-        @submit="submit(savePreset)"
+        @submit="savePreset"
       >
         <RefusalNotice :refusal="saveRefusal" />
         <UFormField
@@ -484,7 +476,7 @@ async function deletePreset(p: Preset) {
       <UButton
         type="submit"
         form="bar-save-preset"
-        :loading="submitting"
+        :loading="saveEl?.loading"
         :label="t('bar.screens.save')"
       />
     </template>

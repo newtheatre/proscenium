@@ -189,6 +189,7 @@ async function setCategory(categoryId: string) {
 }
 const openActions = computed(() => (data.value?.actions ?? []).filter(a => a.state === 'open').length)
 const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dialog.${dialog.value}`) : '')
+const dialogForm = useFormRef('dialogForm')
 </script>
 
 <template>
@@ -395,6 +396,7 @@ const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dia
         <template #body>
           <UForm
             id="front-of-house-incident-dialog"
+            ref="dialogForm"
             class="space-y-4"
             :state="{ closeForm, reviewForm, reopenForm, personForm, actionForm }"
             :validate="() => needs({ comment: dialog === 'review' ? reviewForm.comment : true })"
@@ -507,6 +509,7 @@ const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dia
         <template #footer>
           <UButton
             type="submit"
+            :loading="dialogForm?.loading"
             form="front-of-house-incident-dialog"
             :disabled="dialog === 'close' && openActions > 0"
             :label="dialogTitle"

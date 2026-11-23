@@ -171,6 +171,9 @@ const facts = computed(() => {
     { label: t('membership.screens.list.fact-used-by'), value: data.value?.schemes.length ? data.value.schemes.map(s => s.name).join(', ') : t('membership.screens.list.fact-no-scheme'), to: data.value?.schemes.length === 1 ? `/admin/modules/membership/schemes/${data.value.schemes[0]!.id}` : undefined },
   ]
 })
+const membershipListDetailsForm = useFormRef('membershipListDetailsForm')
+const membershipListEntryForm = useFormRef('membershipListEntryForm')
+const membershipListRemoveForm = useFormRef('membershipListRemoveForm')
 </script>
 
 <template>
@@ -270,6 +273,7 @@ const facts = computed(() => {
         <PageSection :title="t('membership.screens.list.details')">
           <UForm
             id="membership-list-details"
+            ref="membershipListDetailsForm"
             :state="details"
             :validate="() => listErrors({ name: details.name, referenceLabel: list?.keyKind === 'reference' ? details.referenceLabel : undefined })"
             class="space-y-4"
@@ -309,7 +313,7 @@ const facts = computed(() => {
             <UButton
               type="submit"
               form="membership-list-details"
-              loading-auto
+              :loading="membershipListDetailsForm?.loading"
               :label="t('membership.screens.list.save')"
             />
           </template>
@@ -375,6 +379,7 @@ const facts = computed(() => {
       <template #body>
         <UForm
           id="membership-list-entry"
+          ref="membershipListEntryForm"
           :state="entry"
           :schema="entrySchema"
           class="space-y-4"
@@ -416,7 +421,7 @@ const facts = computed(() => {
         <UButton
           type="submit"
           form="membership-list-entry"
-          loading-auto
+          :loading="membershipListEntryForm?.loading"
           :label="t('membership.screens.list.add-entry')"
         />
       </template>
@@ -430,6 +435,7 @@ const facts = computed(() => {
       <template #body>
         <UForm
           id="membership-list-remove"
+          ref="membershipListRemoveForm"
           :state="{ removing }"
           :schema="removeSchema"
           novalidate
@@ -454,7 +460,7 @@ const facts = computed(() => {
           type="submit"
           form="membership-list-remove"
           color="error"
-          loading-auto
+          :loading="membershipListRemoveForm?.loading"
           :label="t('membership.screens.list.remove-entry')"
         />
       </template>

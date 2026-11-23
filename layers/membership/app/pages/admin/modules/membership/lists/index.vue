@@ -39,6 +39,7 @@ const describe = (l: List) => [
   t('membership.screens.lists.entries', { count: l.entryCount }),
   ...(l.validUntil ? [t('membership.screens.lists.valid-until', { date: day(l.validUntil) })] : []),
 ].join(' · ')
+const membershipNewListForm = useFormRef('membershipNewListForm')
 </script>
 
 <template>
@@ -122,6 +123,7 @@ const describe = (l: List) => [
       <template #body>
         <UForm
           id="membership-new-list"
+          ref="membershipNewListForm"
           :state="form"
           :validate="() => listErrors({ name: form.name, referenceLabel: form.keyKind === 'reference' ? form.referenceLabel : undefined })"
           class="space-y-4"
@@ -165,7 +167,7 @@ const describe = (l: List) => [
         <UButton
           type="submit"
           form="membership-new-list"
-          loading-auto
+          :loading="membershipNewListForm?.loading"
           :label="t('membership.screens.lists.create')"
         />
       </template>

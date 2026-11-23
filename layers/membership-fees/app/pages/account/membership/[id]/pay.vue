@@ -15,7 +15,8 @@ const { day } = useDates()
 const { data, status, error, refresh } = await useAPI<Pay>(() => `/api/membership-fees/mine/${id.value}`, { key: `membership-fees:pay:${id.value}` })
 useSeoMeta({ title: () => t('membership-fees.pay.title'), robots: 'noindex' })
 
-const amount = computed(() => data.value?.amountMinor && data.value.currency ? new Intl.NumberFormat('en-GB', { style: 'currency', currency: data.value.currency }).format(data.value.amountMinor / 100) : '') // not-policy: minor units to units
+const { money } = useMoneyText()
+const amount = computed(() => data.value?.amountMinor && data.value.currency ? money(data.value.amountMinor, data.value.currency) : '')
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const card = ref<CardStep | null>(null)
 const checking = ref(false)
