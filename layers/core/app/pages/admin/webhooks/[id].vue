@@ -143,6 +143,7 @@ const { data: log, refresh: refreshLog } = await useAPI<{ rows: WebhookDelivery[
   watch: [id, page],
 })
 const deliveryTone = { queued: 'info', sending: 'info', sent: 'success', retrying: 'warning', failed: 'danger' } as const
+const toneOf = (d: WebhookDelivery) => deliveryTone[d.state]
 const columns = computed(() => [
   { accessorKey: 'createdAt', header: t('core.webhooks.log-when') },
   { accessorKey: 'eventName', header: t('core.webhooks.log-event') },
@@ -395,7 +396,7 @@ async function retry(d: WebhookDelivery) {
                   :description="[brief(d.createdAt), t('core.webhooks.log-tries-count', { count: d.attempts }), answer(d)].join(' · ')"
                 >
                   <StatusBadge
-                    :tone="deliveryTone[d.state]"
+                    :tone="toneOf(d)"
                     :label="t(`core.webhooks.delivery.${d.state}`)"
                   />
                   <UButton
@@ -425,7 +426,7 @@ async function retry(d: WebhookDelivery) {
               </template>
               <template #state-cell="{ row }">
                 <StatusBadge
-                  :tone="deliveryTone[row.original.state]"
+                  :tone="toneOf(row.original)"
                   :label="t(`core.webhooks.delivery.${row.original.state}`)"
                 />
                 <p

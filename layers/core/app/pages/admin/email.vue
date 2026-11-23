@@ -191,7 +191,7 @@ async function setUp() {
               #footer
             >
               <UButton
-                :label="data.domain === data.automatic.proposed ? t('core.email.set-up-again', { domain: data.automatic.proposed }) : t('core.email.set-up', { domain: data.automatic.proposed })"
+                :label="data.domain === data.automatic.proposed ? t('core.email.set-up-again', { domain: data.automatic.proposed ?? '' }) : t('core.email.set-up', { domain: data.automatic.proposed ?? '' })"
                 icon="i-lucide-wand-sparkles"
                 :loading="busy === 'set-up'"
                 :disabled="busy !== null"
