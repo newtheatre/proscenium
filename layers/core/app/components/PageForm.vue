@@ -21,9 +21,9 @@ export interface FormField {
   placeholder?: string
   /**
    * Choices for select, radio and ticks. A radio's values may be numbers (0, 1 or 2 companions).
-   * A description sits under its label, for radio and ticks.
+   * A description sits under its label, for radio and ticks. Ticks with a group sit under its small heading.
    */
-  options?: { value: string | number, label: string, description?: string }[]
+  options?: { value: string | number, label: string, description?: string, group?: string | null }[]
   /** ticks only: each ticked option opens a short note of at most `max` characters; leave out for no notes. */
   notes?: { max: number, label: string }
   /** Shows the field only while this answers true for the form's values, as a follow-up question,
@@ -97,8 +97,20 @@ function setTick(g: FormField, value: string | number, on: boolean | 'indetermin
   const next = on === true ? [...kept, tickOf(g.name, value) ?? { value }] : kept
   state[g.name] = (g.options ?? []).flatMap(o => next.filter(x => x.value === o.value))
 }
+// Ticks whose options name groups are drawn as one small fieldset per group, in the options' order.
+const grouped = (g: FormField) => g.kind === 'ticks' && (g.options ?? []).some(o => o.group)
+function groupsOf(g: FormField) {
+  const out: { label: string | null, options: NonNullable<FormField['options']> }[] = []
+  for (const o of g.options ?? []) {
+    const label = o.group ?? null
+    const last = out.find(x => x.label === label)
+    if (last) last.options.push(o)
+    else out.push({ label, options: [o] })
+  }
+  return out
+}
 // A checkbox, a radio group and a checkbox group carry their own label (a group's is its legend).
-const ownsLabel = (g: FormField) => g.kind === 'checkbox' || g.kind === 'radio' || (g.kind === 'ticks' && (!g.notes || !!g.heading))
+const ownsLabel = (g: FormField) => g.kind === 'checkbox' || g.kind === 'radio' || (g.kind === 'ticks' && (!(g.notes || grouped(g)) || !!g.heading))
 // A question that heads its part of the form, and a part's own heading, are one size.
 const headingClass = 'text-lg font-semibold text-highlighted'
 function setTicks(g: FormField, values: string[]) {
@@ -364,6 +376,7 @@ useLeaveGuard(() => dirty.value && !saved.value)
                 <UTextarea
                   v-if="g.kind === 'textarea'"
                   v-model="state[g.name]"
+                  :placeholder="g.placeholder"
                 />
                 <URadioGroup
                   v-else-if="g.kind === 'radio'"
@@ -386,7 +399,7 @@ useLeaveGuard(() => dirty.value && !saved.value)
                 <!-- A choice of many is square ticks (UCheckboxGroup), never a radio-like control.
                    Only when each tick opens its own note is it a list of single checkboxes. -->
                 <UCheckboxGroup
-                  v-else-if="g.kind === 'ticks' && !g.notes"
+                  v-else-if="g.kind === 'ticks' && !g.notes && !grouped(g)"
                   :model-value="((state[g.name] ?? []) as { value: string | number }[]).map(x => String(x.value))"
                   :items="(g.options ?? []).map(o => ({ value: String(o.value), label: o.label, description: o.description }))"
                   value-key="value"
@@ -429,31 +442,45 @@ useLeaveGuard(() => dirty.value && !saved.value)
                   >
                     {{ g.label }}
                   </legend>
-                  <div
-                    v-for="o in g.options ?? []"
-                    :key="String(o.value)"
-                    class="space-y-2"
+                  <component
+                    :is="part.label ? 'fieldset' : 'div'"
+                    v-for="part in groupsOf(g)"
+                    :key="part.label ?? ''"
+                    class="space-y-3"
+                    :class="part.label && 'pt-2'"
                   >
-                    <UCheckbox
-                      :id="`${g.name}-${o.value}`"
-                      :model-value="!!tickOf(g.name, o.value)"
-                      :label="o.label"
-                      :description="o.description"
-                      @update:model-value="setTick(g, o.value, $event)"
-                    />
-                    <UFormField
-                      v-if="g.notes && tickOf(g.name, o.value)"
-                      :label="g.notes.label"
-                      :hint="`${(tickOf(g.name, o.value)?.note ?? '').length}/${g.notes.max}`"
-                      class="ms-7"
+                    <legend
+                      v-if="part.label"
+                      class="mb-3 text-xs font-semibold text-dimmed"
                     >
-                      <UInput
-                        :model-value="tickOf(g.name, o.value)?.note ?? ''"
-                        :maxlength="g.notes.max"
-                        @update:model-value="setNote(g, o.value, String($event))"
+                      {{ part.label }}
+                    </legend>
+                    <div
+                      v-for="o in part.options"
+                      :key="String(o.value)"
+                      class="space-y-2"
+                    >
+                      <UCheckbox
+                        :id="`${g.name}-${o.value}`"
+                        :model-value="!!tickOf(g.name, o.value)"
+                        :label="o.label"
+                        :description="o.description"
+                        @update:model-value="setTick(g, o.value, $event)"
                       />
-                    </UFormField>
-                  </div>
+                      <UFormField
+                        v-if="g.notes && tickOf(g.name, o.value)"
+                        :label="g.notes.label"
+                        :hint="`${(tickOf(g.name, o.value)?.note ?? '').length}/${g.notes.max}`"
+                        class="ms-7"
+                      >
+                        <UInput
+                          :model-value="tickOf(g.name, o.value)?.note ?? ''"
+                          :maxlength="g.notes.max"
+                          @update:model-value="setNote(g, o.value, String($event))"
+                        />
+                      </UFormField>
+                    </div>
+                  </component>
                 </fieldset>
                 <USelect
                   v-else-if="g.kind === 'select'"

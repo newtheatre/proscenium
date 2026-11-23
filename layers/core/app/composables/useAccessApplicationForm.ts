@@ -1,17 +1,17 @@
-// The access scheme's application form (ID-38, ID-42). The person ticks what makes a visit harder,
-// each with an optional short note when the scheme allows notes; then, under "More about your visit",
-// says whether they use a wheelchair and, if so, whether they stay in it or move to a seat; whether
-// they need a companion or carer and, if so, one or two; and anything else. The needs question heads
-// the form and a divider follows it (Matt, 2026-11-17). The person's own form and a reviewer
-// applying on somebody's behalf both build it from here, on PageForm's 'ticks', 'checkbox', 'radio'
-// and 'select' kinds.
+// The access scheme's application form (ID-38, ID-42). The person ticks what would help, under the
+// list's headings, each with an optional short note when the scheme allows notes (Matt, 2026-11-23);
+// then, under "More about your visit", says whether they use a wheelchair and, if so, whether they
+// stay in it or move to a seat; whether they come with an assistance dog; whether they need a
+// companion or carer and, if so, one or two; and anything else. The needs question heads the form
+// and a divider follows it (Matt, 2026-11-17). The person's own form and a reviewer applying on
+// somebody's behalf both build it from here, on PageForm's 'ticks', 'checkbox', 'radio' and 'select'.
 //
-// The API speaks in terms ({ term, note? }). The wheelchair answer is one of two terms, and the
-// companion and "anything else" terms are set by the server from those questions, so none of those
-// four is offered as a tick (shared/access-scheme).
+// The API speaks in terms ({ term, note? }). The wheelchair answer is one of two terms and the dog
+// one more; the companion and "anything else" terms are set by the server from those questions, so
+// none of those five is offered as a tick (shared/access-scheme).
 import { z } from 'zod'
 import type { FormField } from '../components/PageForm.vue'
-import { NOT_TICKED, WHEELCHAIR } from '../../shared/access-scheme'
+import { ASSISTANCE_DOG, NOT_TICKED, WHEELCHAIR } from '../../shared/access-scheme'
 
 /** What a person says, as the API sends and takes it. */
 export interface AccessApplicationValue {
@@ -22,8 +22,8 @@ export interface AccessApplicationValue {
   answer?: string
 }
 
-/** A need the form can offer: the term's id, its key (slug), label and description. */
-export interface AccessNeedOption { id: string, key: string, label: string, description?: string | null }
+/** A need the form can offer: the term's id, its key (slug), label, description and heading. */
+export interface AccessNeedOption { id: string, key: string, label: string, description?: string | null, group?: string | null }
 
 type Preference = 'stays' | 'transfers'
 
@@ -46,11 +46,13 @@ export function useAccessApplicationForm(
   /** Whether "I use a wheelchair" is asked at all, and whether the follow-up has two answers. */
   const askChair = computed(() => !!(chair.value.stays || chair.value.transfers))
   const askPreference = computed(() => !!(chair.value.stays && chair.value.transfers))
+  const dog = computed(() => toValue(needs).find(n => n.key === ASSISTANCE_DOG))
 
   const schema = z.object({
     needs: z.array(z.object({ value: z.string(), note: z.string().max(NOTE_LIMIT).optional() })),
     wheelchair: z.boolean().optional(),
     preference: z.enum(['stays', 'transfers']).optional(),
+    dog: z.boolean().optional(),
     companion: z.boolean().optional(),
     companions: z.union([z.literal(0), z.literal(1), z.literal(2)]),
     other: z.string().max(OTHER_LIMIT).optional(),
@@ -70,7 +72,7 @@ export function useAccessApplicationForm(
       kind: 'ticks',
       heading: true,
       help: t('core.access.form.needs-help'),
-      options: ticks.value.map(n => ({ value: n.id, label: n.label, ...(n.description ? { description: n.description } : {}) })),
+      options: ticks.value.map(n => ({ value: n.id, label: n.label, ...(n.description ? { description: n.description } : {}), ...(n.group ? { group: n.group } : {}) })),
       ...(toValue(allowNote) ? { notes: { max: NOTE_LIMIT, label: t('core.access.form.note') } } : {}),
     },
     ...(askChair.value
@@ -94,13 +96,22 @@ export function useAccessApplicationForm(
         showIf: (values: Record<string, any>) => !!values.wheelchair,
       } satisfies FormField]
       : []),
+    ...(dog.value
+      ? [{
+        name: 'dog',
+        label: t('core.access.form.dog'),
+        kind: 'checkbox',
+        help: t('core.access.form.dog-help'),
+        ...(askChair.value ? {} : { section: t('core.access.form.more') }),
+      } satisfies FormField]
+      : []),
     {
       name: 'companion',
       label: t('core.access.form.companion'),
       kind: 'checkbox',
       help: t('core.access.form.companions-help'),
-      // Without the wheelchair question, this one opens the second part.
-      ...(askChair.value ? {} : { section: t('core.access.form.more') }),
+      // Without the wheelchair and dog questions, this one opens the second part.
+      ...(askChair.value || dog.value ? {} : { section: t('core.access.form.more') }),
     },
     {
       name: 'companions',
@@ -115,6 +126,7 @@ export function useAccessApplicationForm(
       kind: 'textarea',
       optional: true,
       help: t('core.access.form.other-help'),
+      placeholder: t('core.access.form.other-placeholder'),
     },
   ])
 
@@ -129,6 +141,7 @@ export function useAccessApplicationForm(
       needs: sent.filter(n => offered.has(n.term)).map(n => n.note ? { value: n.term, note: n.note } : { value: n.term }),
       wheelchair: !!preference,
       preference,
+      dog: !!dog.value && sent.some(n => n.term === dog.value!.id),
       companion: !!from?.companions,
       companions: from?.companions || 1,
       other: from?.other ?? '',
@@ -149,6 +162,7 @@ export function useAccessApplicationForm(
       needs: [
         ...ticked.map(n => n.note?.trim() ? { term: n.value, note: n.note.trim() } : { term: n.value }),
         ...(chairTerm ? [{ term: chairTerm }] : []),
+        ...(values.dog && dog.value ? [{ term: dog.value.id }] : []),
       ],
       companions: values.companion ? values.companions : 0,
       ...(other ? { other } : {}),
