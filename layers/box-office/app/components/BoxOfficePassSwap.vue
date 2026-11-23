@@ -96,7 +96,7 @@ const referenceId = useId()
         <span class="flex min-w-0 flex-col">
           <span>{{ t('box-office.book.swap.row', { ticket: row.ticket.name, pass: row.pass.name, price: row.price.name }) }}</span>
           <span class="text-sm text-muted">
-            {{ t('box-office.book.swap.terms', { amount: money(row.price.amountMinor, currency), count: row.entries, each: money(Math.round(row.price.amountMinor / row.entries), currency), more: money(row.price.amountMinor - row.ticket.amountMinor, currency) }) }}
+            {{ t('box-office.book.swap.terms', { amount: money(row.price.amountMinor, currency), count: row.entries, each: money(Math.round(row.price.amountMinor / row.entries), currency) }) }}
           </span>
         </span>
         <UInputNumber

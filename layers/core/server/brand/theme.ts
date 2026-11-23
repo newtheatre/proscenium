@@ -3,6 +3,7 @@
 // and button colours reach 4.5 to 1. Status colours are fixed, so a brand never hides a warning.
 import { first, useSetting } from '#kit'
 import { fillUnder, nearestShade, solidFill } from '../../shared/colour'
+import { BRAND_FONTS, fontFaces, type BrandFontId } from '../../shared/brand-fonts'
 
 const NEUTRALS = {
   slate: ['#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', '#94a3b8', '#64748b', '#475569', '#334155', '#1e293b', '#0f172a', '#020617'],
@@ -18,17 +19,13 @@ const STATUS = {
   dark: { success: '#4ade80', warning: '#fbbf24', danger: '#f87171', info: '#60a5fa' },
 }
 const RADIUS = { none: '0', small: '0.25rem', medium: '0.5rem', large: '1rem' }
-const FONTS = {
-  system: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-  serif: '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif',
-  rounded: 'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", Quicksand, Comfortaa, sans-serif',
-}
 
 export type Neutral = keyof typeof NEUTRALS
 export interface BrandChoice {
   accent: string
   neutral: Neutral
-  displayFont: keyof typeof FONTS
+  displayFont: BrandFontId
+  bodyFont: BrandFontId
   radius: keyof typeof RADIUS
 }
 export interface ModeTokens {
@@ -47,7 +44,17 @@ export interface ModeTokens {
   danger: string
   info: string
 }
-export interface BrandTokens { light: ModeTokens, dark: ModeTokens, radius: string, displayFont: string, neutral: readonly string[] }
+export interface BrandTokens {
+  light: ModeTokens
+  dark: ModeTokens
+  radius: string
+  displayFont: string
+  /** Null for the device's own: the body keeps the site stylesheet's font. */
+  bodyFont: string | null
+  /** The @font-face rules for whichever chosen fonts the site serves itself. */
+  fontFaces: string
+  neutral: readonly string[]
+}
 
 /** Pure: the tokens for a choice. The preview and the saved brand both come from here. */
 export function tokensFor(choice: BrandChoice): BrandTokens {
@@ -60,7 +67,9 @@ export function tokensFor(choice: BrandChoice): BrandTokens {
     light: mode('#ffffff', grey[n50], grey[n200], grey[n900], grey[n600], STATUS.light),
     dark: mode(grey[n950], grey[n900], grey[n800], grey[n100], grey[n400], STATUS.dark),
     radius: RADIUS[choice.radius],
-    displayFont: FONTS[choice.displayFont],
+    displayFont: BRAND_FONTS[choice.displayFont].stack,
+    bodyFont: choice.bodyFont === 'system' ? null : BRAND_FONTS[choice.bodyFont].stack,
+    fontFaces: fontFaces([choice.displayFont, choice.bodyFont]),
     neutral: grey,
   }
 }
@@ -69,7 +78,8 @@ export async function brandChoice(): Promise<BrandChoice> {
   return {
     accent: await useSetting('core.brand.accent') as string,
     neutral: await useSetting('core.brand.neutral') as Neutral,
-    displayFont: await useSetting('core.brand.display-font') as BrandChoice['displayFont'],
+    displayFont: await useSetting('core.brand.display-font') as BrandFontId,
+    bodyFont: await useSetting('core.brand.body-font') as BrandFontId,
     radius: await useSetting('core.brand.radius') as BrandChoice['radius'],
   }
 }
@@ -130,6 +140,9 @@ const SCALE = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '90
  */
 export function themeCss(tokens: BrandTokens): string {
   const shared = `--brand-radius:${tokens.radius};--ui-radius:${tokens.radius};--brand-display-font:${tokens.displayFont}`
+  const faces = tokens.fontFaces ? `${tokens.fontFaces}\n` : ''
+  // The body font is the public shell's alone, as the heading font is (main.css); the device's own sets nothing.
+  const body = tokens.bodyFont ? `body.public-shell{font-family:${tokens.bodyFont}}\n` : ''
   // html:root and html.dark outrank the bundled stylesheet's :root and .dark, whatever the order.
-  return `html:root{${shared};${block(tokens.light, tokens.neutral, '#ffffff')}}\nhtml.dark{${block(tokens.dark, tokens.neutral, tokens.neutral[n900]!)}}\n`
+  return `${faces}html:root{${shared};${block(tokens.light, tokens.neutral, '#ffffff')}}\nhtml.dark{${block(tokens.dark, tokens.neutral, tokens.neutral[n900]!)}}\n${body}`
 }
