@@ -53,7 +53,7 @@ const ICONS = { error: 'i-lucide-octagon-alert', warning: 'i-lucide-triangle-ale
                 :ui="{ label: 'max-h-36 whitespace-normal text-start leading-tight [writing-mode:vertical-rl] rotate-180' }"
                 @click="toggle(k)"
               />
-              <span class="hidden max-h-36 rotate-180 px-1.5 py-2 text-start text-xs leading-tight font-medium [writing-mode:vertical-rl] print:inline-block">{{ t(`bar.allergen.${k}`) }}</span>
+              <span class="hidden max-h-36 rotate-180 px-1.5 py-2 text-start text-sm leading-tight font-medium [writing-mode:vertical-rl] print:inline-block">{{ t(`bar.allergen.${k}`) }}</span>
             </th>
           </tr>
         </thead>
@@ -77,7 +77,7 @@ const ICONS = { error: 'i-lucide-octagon-alert', warning: 'i-lucide-triangle-ale
           >
             <th
               scope="row"
-              class="sticky start-0 z-10 w-36 min-w-36 border-e border-b border-default bg-default p-2 text-start align-top sm:w-48 sm:min-w-48 print:w-40 print:min-w-40"
+              class="sticky start-0 z-10 w-36 min-w-36 border-e border-b border-default bg-default p-2 text-start align-top sm:w-48 sm:min-w-48 print:w-72 print:min-w-72"
               :class="row.sub ? 'ps-6 font-normal text-muted' : 'font-medium'"
             >
               <span class="block">{{ row.name }}</span>

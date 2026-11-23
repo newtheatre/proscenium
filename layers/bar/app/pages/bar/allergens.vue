@@ -1,7 +1,7 @@
 <!-- The public allergen chart (Bar specification, tab 10; allergens step 3): what each outlet sells and
      what the labels say, the same answers as the till's Allergens sheet. Picking what someone avoids
      marks each drink: contains, may contain, not checked (ask at the bar), or none of those listed. It
-     never says "free from". It prints for the bar, one outlet to a page. -->
+     never says "free from". It prints for the bar on A4 landscape, one outlet to a page. -->
 <script setup lang="ts">
 import { answerVerdict, itemVerdict, type Verdict } from '../../../shared/allergen-verdict'
 import type { MatrixRow, MatrixSection } from '../../../shared/allergen-matrix'
@@ -135,9 +135,9 @@ function print() {
 </template>
 
 <style>
-/* Printed for the bar: A4, the chart only, and nothing that depends on what one person ticked. */
+/* Printed for the bar: A4 landscape, the chart only, and nothing that depends on what one person ticked. */
 @page {
-  size: A4;
+  size: A4 landscape;
 }
 @media print {
   header,
