@@ -367,7 +367,9 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
   `PageList` does the same for its table rows from `row-actions` and `row-to`. A row with no actions
   has no menu of ours, so the browser's own shows; so do a table's headings, and a touch screen,
   where a long press stays the browser's. The ellipsis button stays: the right click is an extra
-  path, not the only one. `rowMenu()` (`app/utils/row-menu.ts`) builds the items for a screen that
+  path, not the only one. The menu is not modal (`:modal="false"`): a modal Reka menu marks the rest
+  of the page `aria-hidden` while its links and buttons can still take focus, which axe rightly
+  refuses, and a right-click menu should close on a press elsewhere anyway. `rowMenu()` (`app/utils/row-menu.ts`) builds the items for a screen that
   draws its own rows. Nothing is declared twice and no page writes a `UContextMenu` for a row.
 - A group of buttons of which one is pressed (the appearance choice, a date filter's presets) is a
   `UToggleGroup`, not buttons with `aria-pressed` set by hand. A fixed choice in a form is still a

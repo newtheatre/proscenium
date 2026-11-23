@@ -31,6 +31,7 @@ const touch = useScreenQuery('(hover: none)')
 <template>
   <li v-bind="$attrs">
     <UContextMenu
+      :modal="false"
       :items="menu"
       :disabled="!menu.length || touch"
     >

@@ -476,6 +476,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
           </div>
           <!-- A table above 1024 pixels. -->
           <UContextMenu
+            :modal="false"
             :items="rowMenuItems"
             :disabled="!rowActions || touch"
           >
