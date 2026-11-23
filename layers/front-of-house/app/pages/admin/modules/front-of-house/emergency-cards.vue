@@ -44,6 +44,7 @@ async function save() {
     refusal.value = toRefusal(e)
   }
 }
+const fhEmergencyForm = useFormRef('fhEmergencyForm')
 </script>
 
 <template>
@@ -98,6 +99,7 @@ async function save() {
       <template #body>
         <UForm
           id="fh-emergency"
+          ref="fhEmergencyForm"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ body: form.body })"
@@ -142,6 +144,7 @@ async function save() {
       <template #footer>
         <UButton
           type="submit"
+          :loading="fhEmergencyForm?.loading"
           form="fh-emergency"
           :label="t('front-of-house.save')"
         />

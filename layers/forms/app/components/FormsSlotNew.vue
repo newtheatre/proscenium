@@ -61,6 +61,7 @@ async function create() {
     refusal.value = toRefusal(e)
   }
 }
+const formsSlotNewForm = useFormRef('formsSlotNewForm')
 </script>
 
 <template>
@@ -72,6 +73,7 @@ async function create() {
     <template #body>
       <UForm
         id="forms-slot-new"
+        ref="formsSlotNewForm"
         :state="state"
         :validate="() => needs({ title: state.title })"
         class="space-y-4"
@@ -108,7 +110,7 @@ async function create() {
       <UButton
         type="submit"
         form="forms-slot-new"
-        loading-auto
+        :loading="formsSlotNewForm?.loading"
         :label="t(fields ? 'forms.screens.fields.create' : 'forms.screens.list.create')"
       />
     </template>

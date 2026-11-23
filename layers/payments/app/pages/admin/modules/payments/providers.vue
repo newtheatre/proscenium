@@ -153,15 +153,8 @@ const keyItems = (a: Account) => a.keys.map(k => ({ ...k, label: keyLabel(k.name
               :title="t('payments.screens.providers.empty')"
               :description="t('payments.screens.providers.empty-help')"
               icon="i-lucide-credit-card"
-            >
-              <template #actions>
-                <UButton
-                  :label="t('payments.screens.providers.add')"
-                  icon="i-lucide-plus"
-                  @click="openAdd"
-                />
-              </template>
-            </EmptyState>
+              :action="{ label: t('payments.screens.providers.add'), icon: 'i-lucide-plus', onClick: openAdd }"
+            />
             <ul
               v-else
               class="grid gap-4 md:grid-cols-2"

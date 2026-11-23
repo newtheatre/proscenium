@@ -86,14 +86,8 @@ const hours = (minutes: number) => t('front-of-house.hours.count', { count: Math
               :title="t('front-of-house.my-shifts.none-coming')"
               :description="t('front-of-house.my-shifts.none-coming-description')"
               icon="i-lucide-calendar-clock"
-            >
-              <template #actions>
-                <UButton
-                  :label="t('front-of-house.my-shifts.find')"
-                  @click="view = 'open'"
-                />
-              </template>
-            </EmptyState>
+              :action="{ label: t('front-of-house.my-shifts.find'), onClick: () => { view = 'open' } }"
+            />
             <RecordList
               v-else
               :label="t('front-of-house.my-shifts.coming')"

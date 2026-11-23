@@ -22,22 +22,17 @@ const props = defineProps<{ figure: ShownFigure }>()
 const { t } = useT()
 const { language, dayAxis, monthBrief, brief, dayBrief, time } = useDates()
 
-const CURRENCY = /^[A-Z]{3}$/ // not-policy: an ISO currency code's shape
+const { money, isCurrency } = useMoneyText()
 function format(value: number): string {
   const unit = props.figure.unit
-  if (unit && CURRENCY.test(unit)) {
-    const money = new Intl.NumberFormat(language.value, { style: 'currency', currency: unit })
-    return money.format(value / 10 ** (money.resolvedOptions().maximumFractionDigits ?? 2))
-  }
+  if (isCurrency(unit)) return money(value, unit)
   if (unit === 'percent') return new Intl.NumberFormat(language.value, { style: 'percent' }).format(value / 100) // not-policy: a whole percentage
   return new Intl.NumberFormat(language.value).format(value)
 }
 // Money on an axis drops its pence: the exact sum is the figure above it.
 function axis(value: number): string {
   const unit = props.figure.unit
-  if (!unit || !CURRENCY.test(unit)) return format(value)
-  const money = new Intl.NumberFormat(language.value, { style: 'currency', currency: unit, maximumFractionDigits: 0 })
-  return money.format(value / 10 ** (new Intl.NumberFormat(language.value, { style: 'currency', currency: unit }).resolvedOptions().maximumFractionDigits ?? 2))
+  return isCurrency(unit) ? money(value, unit, { maximumFractionDigits: 0 }) : format(value)
 }
 
 const label = computed(() => t(props.figure.label))

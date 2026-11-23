@@ -142,7 +142,7 @@ const context = computed(() => board.value ? [board.value.performance.title, tim
                     v-if="item.kind === 'reading'"
                     class="col-span-2 flex gap-2"
                   >
-                    <UInputNumber
+                    <FieldNumber
                       v-model="readings[item.id]"
                       size="xl"
                       class="min-w-0 flex-1 sm:w-40 sm:flex-none"

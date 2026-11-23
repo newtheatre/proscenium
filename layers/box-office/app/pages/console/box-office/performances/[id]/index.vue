@@ -134,7 +134,7 @@ const layout = useTemplateRef<{ dirty: boolean, own: boolean, commit: () => Prom
 const dirty = computed(() => seatsChanged.value || windowChanged.value || priceRows.value.length > 0 || !!layout.value?.dirty)
 
 // The one Save: each part that changed is saved in turn, and one Undo puts every one of them back.
-const saving = ref(false)
+const nightSetUpForm = useFormRef('nightSetUpForm')
 async function save(confirmOverVenue = false): Promise<void> {
   const d = data.value
   if (!d) return
@@ -143,7 +143,6 @@ async function save(confirmOverVenue = false): Promise<void> {
     return
   }
   refusal.value = null
-  saving.value = true
   const undo: (() => Promise<unknown>)[] = []
   let message = t('box-office.setup.saved')
   try {
@@ -180,9 +179,6 @@ async function save(confirmOverVenue = false): Promise<void> {
     if (r?.code === 'box-office.capacity.confirm-over-venue' && !undo.length && await confirm({ verb: t('box-office.setup.capacity.over-verb'), thing: t('box-office.setup.capacity.over-thing'), consequence: r.reason, button: t('box-office.setup.capacity.over-button') })) return save(true)
     refusal.value = r
     if (undo.length) message = t('box-office.setup.saved-part')
-  }
-  finally {
-    saving.value = false
   }
   if (!undo.length) return
   // After a part was refused, what was typed for it stays in its boxes rather than being lost.
@@ -308,13 +304,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <UButton
             type="submit"
             form="night-set-up"
-            :loading="saving"
+            :loading="nightSetUpForm?.loading"
             :label="t('box-office.setup.save')"
           />
         </template>
 
         <UForm
           id="night-set-up"
+          ref="nightSetUpForm"
           class="space-y-8"
           :state="windowForm"
           :validate="() => needs({ from: takes === 'later' && priceRows.length ? from : true })"

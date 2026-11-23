@@ -169,6 +169,34 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
   return problems
 }
 
+/** A key written out in a t() call that no catalogue holds, which a screen would show raw. */
+export function literalKeys(source: string, has: (key: string) => boolean): { line: number, key: string }[] {
+  const out: { line: number, key: string }[] = []
+  source.split('\n').forEach((text, i) => {
+    for (const [, key] of text.matchAll(/(?<![\w.$])t\(\s*'([a-z][\w-]*(?:\.[\w-]+)+)'/g)) if (!has(key!)) out.push({ line: i + 1, key: key! })
+  })
+  return out
+}
+
+export function checkLiteralKeys(modules: Loaded[]): string[] {
+  const all = new Set<string>()
+  for (const m of modules) {
+    const parts = join(ROOT, m.found.root, 'i18n/en-GB')
+    const files = [join(ROOT, m.found.root, 'i18n/en-GB.json'), ...(existsSync(parts) ? readdirSync(parts).filter(f => f.endsWith('.json')).map(f => join(parts, f)) : [])]
+    for (const f of files) if (existsSync(f)) for (const key of Object.keys(JSON.parse(readFileSync(f, 'utf8')))) all.add(key)
+  }
+  // A count's words may live only under .one and .other.
+  const has = (key: string) => all.has(key) || all.has(`${key}.one`) || all.has(`${key}.other`)
+  const problems: string[] = []
+  for (const m of modules) {
+    for (const file of moduleFiles(m)) {
+      if (rel(file).includes('/server/')) continue
+      for (const { line, key } of literalKeys(readFileSync(file, 'utf8'), has)) problems.push(`${rel(file)}:${line}: t('${key}') is in no catalogue, so the screen would show the key itself`)
+    }
+  }
+  return problems
+}
+
 /** Where a check may pass `fresh` to can() or requireAbility(): the settings saves, history and Revert. */
 const FRESH_OVERRIDE_HOMES = ['layers/core/server/settings/', 'layers/core/server/api/core/settings/', 'layers/core/kit/']
 

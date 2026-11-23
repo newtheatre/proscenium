@@ -17,7 +17,7 @@ const data = ref<Detail | null>(null)
 const failed = ref<ReturnType<typeof toRefusal> | null>(null)
 const type = computed(() => data.value?.type)
 const form = ref<TypeForm>({ name: '', key: '', summary: '', givesTicketBenefit: false, onePerPerson: false, defaultVisibility: 'public' })
-const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('formEl')
+const formEl = useFormRef('formEl')
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 async function load() {
@@ -139,7 +139,7 @@ const actions = computed(() => !data.value?.canManage
         type="submit"
         form="awards-type"
         class="ms-auto"
-        loading-auto
+        :loading="formEl?.loading"
         :label="t('awards.screens.type.save')"
       />
     </template>

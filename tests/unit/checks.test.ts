@@ -160,6 +160,57 @@ describe('the interface check', () => {
     expect(interfaceProblems('page.vue', source).map(p => p.line)).toEqual([1, 9])
     expect(interfaceProblems('SettingsSections.vue', '<form @submit.prevent="save">').map(p => p.line)).toEqual([1])
   })
+
+  it('refuses the parts the kit sweep found drawn by hand', async () => {
+    const { interfaceProblems } = await import('../../scripts/checks/interface')
+    const source = [
+      '<UButton',
+      '  type="submit"',
+      '  form="venue"',
+      '  loading-auto',
+      '/>',
+      '<UButton type="submit" form="venue" :loading="venueForm?.loading" />',
+      '<UInputNumber v-model="count" />',
+      'const money = new Intl.NumberFormat(\'en-GB\', { style: \'currency\' })',
+      "import { encode } from 'uqr'",
+      "useSeoMeta({ title: 'Your tickets' })",
+      '<div class="lg:sticky lg:top-4">',
+      '<EmptyState title="None">',
+      '  <template #actions>',
+      '    <UButton',
+      '      :label="t(\'add\')"',
+      '      @click="add"',
+      '    />',
+      '  </template>',
+      '</EmptyState>',
+      '<EmptyState title="None">',
+      '  <template #actions>',
+      '    <UButton label="Add" color="neutral" variant="outline" />',
+      '  </template>',
+      '</EmptyState>',
+      '<USeparator />',
+      '<h3 class="text-sm">On the night</h3>',
+    ].join('\n')
+    expect(interfaceProblems('x.vue', source, 'pages/console/x.vue').map(p => p.line)).toEqual([1, 7, 8, 9, 10, 11, 12, 25])
+    // The kit's own parts wrap what they replace; a component or a composable may name a default language.
+    expect(interfaceProblems('FieldNumber.vue', '<UInputNumber v-bind="$attrs" />', 'components/FieldNumber.vue')).toEqual([])
+    expect(interfaceProblems('QrCode.vue', "import { encode } from 'uqr'", 'components/QrCode.vue')).toEqual([])
+    expect(interfaceProblems('useMoney.ts', "new Intl.NumberFormat('en-GB')", 'composables/useMoney.ts')).toEqual([])
+    expect(interfaceProblems('FieldGroup.vue', '<USeparator />\n<h3 :id="id">', 'components/FieldGroup.vue')).toEqual([])
+    // Outside the console and Admin a sticky header may have its own offset.
+    expect(interfaceProblems('x.vue', '<div class="lg:sticky lg:top-24">', 'pages/whats-on/x.vue')).toEqual([])
+    expect(interfaceProblems('x.vue', '<PageFrame width="reading">\n  <TableOrList :rows="rows" />', 'pages/x.vue').map(p => p.line)).toEqual([2])
+  })
+})
+
+describe('keys written out in t()', () => {
+  it('finds a key no catalogue holds, and takes a count\'s .one and .other as the key', async () => {
+    const { literalKeys } = await import('../../scripts/checks/source')
+    const known = new Set(['core.save', 'core.counts.seats.one'])
+    const has = (key: string) => known.has(key) || known.has(`${key}.one`)
+    const source = "t('core.save')\nt('core.gone')\nt('core.counts.seats', { count })\nte('core.maybe')\nconst at = t(`core.${x}`)"
+    expect(literalKeys(source, has)).toEqual([{ line: 2, key: 'core.gone' }])
+  })
 })
 
 describe('changes() in SQL', () => {
