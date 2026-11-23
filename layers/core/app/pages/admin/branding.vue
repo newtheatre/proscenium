@@ -156,10 +156,10 @@ const logoHelp = {
         >
           <PageSection :title="t('core.settings-sections.brand')">
             <p
-              v-if="ability"
+              v-if="ability && !canChange"
               class="text-sm text-muted"
             >
-              {{ canChange ? t('core.settings-page.who', { ability: t(ability) }) : t('core.settings-page.read-only', { ability: t(ability) }) }}
+              {{ t('core.settings-page.read-only', { ability: t(ability) }) }}
             </p>
             <RefusalNotice :refusal="refusal" />
             <div class="divide-y divide-default">
