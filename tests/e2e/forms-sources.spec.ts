@@ -42,7 +42,7 @@ test('a question chooses from a source, and the preview searches it', async ({ p
   await saved(page)
   await axe(page)
 
-  await page.getByRole('radio', { name: 'Preview' }).click()
+  await page.getByRole('button', { name: 'Preview' }).click()
   const answer = page.getByRole('button', { name: 'Which venue?' })
   await expect(answer).toBeVisible()
   await answer.click()

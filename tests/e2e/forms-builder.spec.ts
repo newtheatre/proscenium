@@ -107,7 +107,7 @@ test('a form is built with questions, options as rows and logic, and saves itsel
   await expect(page.getByLabel('Option 3', { exact: true })).toHaveValue('Unsung hero')
 
   // The preview is the form as people will see it, and holds them to what is required.
-  await page.getByRole('radio', { name: 'Preview' }).click()
+  await page.getByRole('button', { name: 'Preview' }).click()
   await expect(page.getByText('This is the form as people will see it.')).toBeVisible()
   await page.getByRole('button', { name: 'Send' }).click()
   await expect(page.getByText('Answer this question.')).toBeVisible()

@@ -64,7 +64,7 @@ test('the proposal\'s total reads as money on its page, and a calculation is bui
   await expect(page.getByText('Saved', { exact: true })).toBeVisible()
 
   // ---- answered in the preview: each on its own page, worked out as the answers change ----
-  await page.getByRole('radio', { name: 'Preview' }).click()
+  await page.getByRole('button', { name: 'Preview' }).click()
   await page.getByRole('textbox', { name: /What is the show called/ }).fill('Posh')
   await page.getByRole('textbox', { name: /Tell us about it/ }).fill('A play about a dining club.')
   // The builder's own cards are still in the page, hidden; only what the preview shows counts.
