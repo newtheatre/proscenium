@@ -327,6 +327,7 @@ async function retry(d: WebhookDelivery) {
           <UButton
             type="submit"
             :label="isNew ? t('core.webhooks.new') : t('core.webhooks.save')"
+            loading-auto
           />
         </UForm>
 
