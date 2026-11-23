@@ -21,6 +21,7 @@ useSeoMeta({ title: () => t('public-site.venues.title'), description: () => t('p
   <PageFrame
     :title="t('public-site.venues.title')"
     :description="t('public-site.venues.description')"
+    width="full"
   >
     <ul
       v-if="venues.length"

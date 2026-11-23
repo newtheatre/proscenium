@@ -9,10 +9,10 @@ useSeoMeta({ title: () => t('core.policies.title'), description: () => t('core.p
   <PageFrame
     :title="t('core.policies.title')"
     :description="t('core.policies.description')"
+    width="reading"
   >
     <RecordList
       :label="t('core.policies.title')"
-      class="max-w-2xl"
     >
       <RecordListItem
         v-for="policy in data.policies"

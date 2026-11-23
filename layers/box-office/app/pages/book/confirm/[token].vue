@@ -36,8 +36,11 @@ async function go() {
 </script>
 
 <template>
-  <PageFrame :title="result ? t(`box-office.basket.done.${result.state}.title`) : t('box-office.confirm.title')">
-    <div class="max-w-2xl space-y-6">
+  <PageFrame
+    :title="result ? t(`box-office.basket.done.${result.state}.title`) : t('box-office.confirm.title')"
+    width="reading"
+  >
+    <div class="space-y-6">
       <BoxOfficeBookingDone
         v-if="result"
         :outcome="result"

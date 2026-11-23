@@ -16,6 +16,7 @@ useSeoMeta({ title: () => t('core.policies.versions.title', { policy: data.value
   <PageFrame
     :title="t('core.policies.versions.title', { policy: data?.policy.title ?? '' })"
     :description="t('core.policies.versions.description')"
+    width="reading"
   >
     <template #primary>
       <UButton
@@ -32,7 +33,6 @@ useSeoMeta({ title: () => t('core.policies.versions.title', { policy: data.value
     />
     <RecordList
       v-else
-      class="max-w-2xl"
       :label="t('core.policies.versions.title', { policy: data?.policy.title ?? '' })"
     >
       <RecordListItem

@@ -85,8 +85,11 @@ async function cancel(all: boolean) {
 </script>
 
 <template>
-  <PageFrame :title="t('box-office.manage.title')">
-    <div class="max-w-2xl space-y-6">
+  <PageFrame
+    :title="t('box-office.manage.title')"
+    width="reading"
+  >
+    <div class="space-y-6">
       <EmptyState
         v-if="error || !order"
         :title="t('box-office.manage.not-found.title')"

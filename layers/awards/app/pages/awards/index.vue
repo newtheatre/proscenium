@@ -9,21 +9,16 @@ useSeoMeta({ title: () => t('awards.roll.title'), description: () => t('awards.r
 </script>
 
 <template>
-  <UContainer>
-    <UPage>
-      <UPageHeader
-        :title="t('awards.roll.title')"
-        :description="t('awards.roll.description')"
-      />
-      <UPageBody>
-        <AwardsRoll />
-        <section
-          v-if="data?.nominations"
-          :aria-label="t('awards.roll.nominate')"
-        >
-          <FormsSlotOpen slot-id="awards.nomination" />
-        </section>
-      </UPageBody>
-    </UPage>
-  </UContainer>
+  <PageFrame
+    :title="t('awards.roll.title')"
+    :description="t('awards.roll.description')"
+  >
+    <AwardsRoll />
+    <section
+      v-if="data?.nominations"
+      :aria-label="t('awards.roll.nominate')"
+    >
+      <FormsSlotOpen slot-id="awards.nomination" />
+    </section>
+  </PageFrame>
 </template>

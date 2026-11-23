@@ -53,6 +53,7 @@ useHead(() => ({
     v-if="data"
     :title="season.name"
     :description="span(season.startsOn, season.endsOn)"
+    width="full"
   >
     <MarkdownText
       v-if="season.summary"

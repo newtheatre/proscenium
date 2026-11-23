@@ -9,9 +9,11 @@ useSeoMeta({ title: () => title.value, robots: 'noindex' })
 </script>
 
 <template>
-  <PageFrame :title="title">
+  <PageFrame
+    :title="title"
+    width="reading"
+  >
     <BoxOfficeCheckout
-      class="max-w-2xl"
       @title="title = $event"
     />
   </PageFrame>

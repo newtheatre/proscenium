@@ -17,7 +17,6 @@ const toast = useToast()
 const sending = ref<string | null>(null)
 const form = reactive({ email: '' })
 const schema = z.object({ email: z.string().trim().email(t('box-office.manage.passes.email-invalid')).max(254) }) // not-policy: the route's bound
-const busy = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 function open(id: string) {
@@ -27,7 +26,6 @@ function open(id: string) {
 }
 async function send(pass: BookingPass) {
   refusal.value = null
-  busy.value = true
   try {
     const done = await $api<{ passes: BookingPass[] }>('/api/box-office/orders/link/send-pass', { method: 'POST', body: { passId: pass.id, email: form.email.trim() }, headers: { ...props.headers, 'idempotency-key': crypto.randomUUID() } })
     emit('sent', done.passes)
@@ -36,9 +34,6 @@ async function send(pass: BookingPass) {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    busy.value = false
   }
 }
 </script>
@@ -101,7 +96,7 @@ async function send(pass: BookingPass) {
               <UButton
                 type="submit"
                 :label="t('box-office.manage.passes.send-button')"
-                :loading="busy"
+                loading-auto
               />
               <UButton
                 color="neutral"
