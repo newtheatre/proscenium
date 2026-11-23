@@ -141,7 +141,7 @@ const summary = computed(() => {
 const statusOf = computed(() => {
   const s = data.value
   if (!s) return undefined
-  if (s.state === 'cancelled') return { label: t('front-of-house.shift-states.cancelled'), tone: 'neutral' as const }
+  if (s.state === 'cancelled') return { label: t('core.states.cancelled'), tone: 'neutral' as const }
   if (s.mine) return { label: t(`front-of-house.assignment-states.${s.mine.state}`), tone: TONES[s.mine.state] ?? 'neutral' }
   return undefined
 })

@@ -236,7 +236,7 @@ const shiftName = (s: Shift) => s.title ? `${s.dutyName}: ${s.title}` : s.dutyNa
               <div class="flex items-center gap-2">
                 <StatusBadge
                   :tone="s.state === 'published' ? 'success' : 'neutral'"
-                  :label="t(`front-of-house.shift-states.${s.state}`)"
+                  :label="t(s.state === 'completed' ? 'front-of-house.shift-states.completed' : `core.states.${s.state}`)"
                 />
                 <UButton
                   v-if="s.state === 'draft'"
@@ -353,7 +353,7 @@ const shiftName = (s: Shift) => s.title ? `${s.dutyName}: ${s.title}` : s.dutyNa
                   />
                 </UFormField>
                 <UFormField :label="t('front-of-house.templates.places')">
-                  <UInputNumber
+                  <FieldNumber
                     v-model="newShift.places"
                     :min="1"
                     :max="50"
@@ -439,7 +439,7 @@ const shiftName = (s: Shift) => s.title ? `${s.dutyName}: ${s.title}` : s.dutyNa
                 :label="t('front-of-house.templates.places')"
                 :help="t('front-of-house.rota.edit.places-help', { count: editing.placesTaken })"
               >
-                <UInputNumber
+                <FieldNumber
                   v-model="shiftForm.places"
                   :min="Math.max(1, editing.placesTaken)"
                   :max="50"

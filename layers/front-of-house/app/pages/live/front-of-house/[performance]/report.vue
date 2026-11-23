@@ -33,13 +33,11 @@ watch(() => data.value?.unresolved?.people, (people) => {
   noShows.value = people.some(p => p.arrived) ? people.filter(p => !p.arrived).map(p => p.assignmentId) : []
 }, { immediate: true })
 const note = ref({ topic: 'other' as Topic, body: '' })
-const busy = ref<'note' | 'sign-off' | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const topics = computed(() => (['audience', 'building', 'show', 'staffing', 'other'] as const).map(value => ({ value, label: t(`front-of-house.report.topic.${value}`) })))
 
 async function addNote() {
   refusal.value = null
-  busy.value = 'note'
   try {
     await write(`${base.value}/notes`, { method: 'POST', body: { topic: note.value.topic, body: note.value.body.trim() } })
     toast.add({ title: t('front-of-house.report.note-added'), color: 'success' })
@@ -49,14 +47,10 @@ async function addNote() {
   catch (e) {
     refusal.value = toRefusal(e)
   }
-  finally {
-    busy.value = null
-  }
 }
 async function signOff() {
   refusal.value = null
   if (!(await confirm({ verb: t('front-of-house.report.confirm-verb'), thing: t('front-of-house.report.confirm-thing'), consequence: noShows.value.length ? t('front-of-house.report.confirm-consequence', { count: noShows.value.length }) : t('front-of-house.report.confirm-consequence-all'), button: t('front-of-house.report.sign-off') }))) return
-  busy.value = 'sign-off'
   try {
     await write(`${base.value}/sign-off`, { method: 'POST', body: { noShows: noShows.value } })
     toast.add({ title: t('front-of-house.report.signed'), color: 'success' })
@@ -64,9 +58,6 @@ async function signOff() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    busy.value = null
   }
 }
 const context = computed(() => data.value?.performance ? [data.value.performance.title, time(data.value.performance.startsAt)].join(' · ') : undefined)
@@ -97,17 +88,10 @@ const context = computed(() => data.value?.performance ? [data.value.performance
           />
 
           <template v-if="d.state === 'draft' && d.unresolved">
-            <section
+            <PageSection
               v-if="d.unresolved.missingTimings.length || d.unresolved.openChecklists.length"
-              aria-labelledby="fh-report-open"
-              class="space-y-2"
+              :title="t('front-of-house.live.still-open')"
             >
-              <h2
-                id="fh-report-open"
-                class="text-lg font-semibold text-highlighted"
-              >
-                {{ t('front-of-house.live.still-open') }}
-              </h2>
               <p
                 v-if="d.unresolved.missingTimings.length"
                 class="text-warning"
@@ -120,19 +104,12 @@ const context = computed(() => data.value?.performance ? [data.value.performance
               >
                 {{ t('front-of-house.report.open-checklists', { count: d.unresolved.openChecklists.length }) }}
               </p>
-            </section>
+            </PageSection>
 
-            <section
+            <PageSection
               v-if="d.can.signOff && d.unresolved.people.length"
-              aria-labelledby="fh-report-people"
-              class="space-y-2"
+              :title="t('front-of-house.live.who-did-not-come')"
             >
-              <h2
-                id="fh-report-people"
-                class="text-lg font-semibold text-highlighted"
-              >
-                {{ t('front-of-house.live.who-did-not-come') }}
-              </h2>
               <UCheckboxGroup
                 v-model="noShows"
                 size="xl"
@@ -140,36 +117,24 @@ const context = computed(() => data.value?.performance ? [data.value.performance
                 :legend="t('front-of-house.live.who-did-not-come-help')"
                 :items="d.unresolved.people.map(p => ({ value: p.assignmentId, label: `${d.names[p.accountId] ?? ''} (${p.duty})`, description: t(p.arrived ? 'front-of-house.report.arrived' : 'front-of-house.report.not-marked-arrived') }))"
               />
-            </section>
+            </PageSection>
           </template>
 
-          <section
-            aria-labelledby="fh-report-notes"
-            class="space-y-3"
-          >
-            <h2
-              id="fh-report-notes"
-              class="text-lg font-semibold text-highlighted"
-            >
-              {{ t('front-of-house.live.notes') }}
-            </h2>
-            <ul
+          <PageSection :title="t('front-of-house.live.notes')">
+            <RecordList
               v-if="d.notes.length"
-              class="space-y-2"
+              :label="t('front-of-house.live.notes')"
             >
-              <li
+              <RecordListItem
                 v-for="n in d.notes"
                 :key="n.id"
-                class="rounded-lg border border-default p-3"
+                :description="[t(`front-of-house.report.topic.${n.topic}`), d.names[n.authorId], time(n.at)].filter(Boolean).join(' · ')"
               >
-                <p class="text-sm text-muted">
-                  {{ t(`front-of-house.report.topic.${n.topic}`) }} · {{ d.names[n.authorId] ?? '' }} · {{ time(n.at) }}
-                </p>
-                <p class="whitespace-pre-line">
-                  {{ n.body }}
-                </p>
-              </li>
-            </ul>
+                <template #name>
+                  <span class="font-normal whitespace-pre-line">{{ n.body }}</span>
+                </template>
+              </RecordListItem>
+            </RecordList>
             <UForm
               v-if="d.state === 'draft' && d.can.write"
               :state="note"
@@ -205,11 +170,11 @@ const context = computed(() => data.value?.performance ? [data.value.performance
                 color="neutral"
                 variant="outline"
                 icon="i-lucide-message-square-plus"
-                :loading="busy === 'note'"
+                loading-auto
                 :label="t('front-of-house.report.add-note')"
               />
             </UForm>
-          </section>
+          </PageSection>
         </div>
       </template>
     </DataBoundary>
@@ -223,7 +188,7 @@ const context = computed(() => data.value?.performance ? [data.value.performance
           size="xl"
           block
           icon="i-lucide-signature"
-          :loading="busy === 'sign-off'"
+          loading-auto
           :label="t('front-of-house.report.sign-off')"
           @click="signOff"
         />
