@@ -34,14 +34,8 @@ const past = computed(() => byPerformance(data.value?.past ?? []))
           :title="t('box-office.mine.empty')"
           :description="t('box-office.mine.empty-description')"
           icon="i-lucide-ticket"
-        >
-          <template #actions>
-            <UButton
-              to="/whats-on"
-              :label="t('box-office.mine.see-whats-on')"
-            />
-          </template>
-        </EmptyState>
+          :action="{ label: t('box-office.mine.see-whats-on'), to: '/whats-on' }"
+        />
         <section
           v-else
           :aria-label="t('box-office.mine.upcoming')"

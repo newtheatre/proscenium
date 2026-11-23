@@ -22,7 +22,6 @@ const toast = useToast()
 // One dialogue for both ways in: 'invite' emails a link, 'apply' opens the form to fill in with them.
 const mode = ref<'invite' | 'apply' | null>(null)
 const open = computed({ get: () => mode.value !== null, set: (v: boolean) => { if (!v) mode.value = null } })
-const busy = ref(false)
 const person = reactive({ name: '', address: '' })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 function start(m: 'invite' | 'apply') {
@@ -31,7 +30,6 @@ function start(m: 'invite' | 'apply') {
 }
 
 async function go() {
-  busy.value = true
   refusal.value = null
   const body = { name: person.name, address: person.address }
   try {
@@ -54,9 +52,6 @@ async function go() {
   catch (error) {
     refusal.value = toRefusal(error)
     personForm.value?.setErrors(fieldErrors(refusal.value))
-  }
-  finally {
-    busy.value = false
   }
 }
 
@@ -158,7 +153,7 @@ const filters = [{
         <UButton
           type="submit"
           form="access-person"
-          :loading="busy"
+          :loading="personForm?.loading"
           :label="mode === 'apply' ? t('core.access.apply-for.continue') : t('core.access.invite.send')"
         />
       </template>

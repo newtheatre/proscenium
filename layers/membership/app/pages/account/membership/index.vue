@@ -47,7 +47,8 @@ const heldLine = (m: Mine['memberships'][number]) => [
   m.endsOn ? t('membership.screens.mine.until', { date: day(m.endsOn) }) : t('membership.screens.mine.no-end'),
   m.renewed ? t('membership.screens.mine.already-renewed') : m.renewal && !m.renewal.open && m.status !== 'lapsed' ? t('membership.screens.mine.renewal-opens', { date: day(m.renewal.opensOn) }) : '',
 ].filter(Boolean).join(' · ')
-const money = (fee: Fee) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: fee.currency }).format(fee.amountMinor / 100) // not-policy: minor units to units
+const { money: moneyText } = useMoneyText()
+const money = (fee: Fee) => moneyText(fee.amountMinor, fee.currency)
 /** How long a scheme lasts and what it costs, under its name: each length with its price. */
 function terms(s: Offered): string {
   // A scheme that checks a list is bought where the list is kept, so no fee here is not free.
@@ -116,6 +117,8 @@ async function withdraw(a: Mine['applications'][number]) {
     toast.add({ title: toRefusal(e).reason, color: 'error' })
   }
 }
+const membershipRenewForm = useFormRef('membershipRenewForm')
+const joinForm = useTemplateRef('joinForm')
 </script>
 
 <template>
@@ -283,6 +286,7 @@ async function withdraw(a: Mine['applications'][number]) {
       <template #body>
         <UForm
           id="membership-renew"
+          ref="membershipRenewForm"
           :state="renewChoice"
           :validate="() => needs({ ...(!renewScheme?.endsByList && (renewScheme?.options.length ?? 0) > 1 ? { lengthOptionId: renewChoice.lengthOptionId } : {}), ...(renewScheme?.asksFor ? { reference: renewChoice.reference } : {}) })"
           class="space-y-4"
@@ -342,7 +346,7 @@ async function withdraw(a: Mine['applications'][number]) {
         <UButton
           type="submit"
           form="membership-renew"
-          loading-auto
+          :loading="membershipRenewForm?.loading"
           :label="t('membership.screens.mine.renew')"
         />
       </template>
@@ -364,6 +368,7 @@ async function withdraw(a: Mine['applications'][number]) {
       <template #body>
         <MembershipJoinForm
           v-if="joining"
+          ref="joinForm"
           :scheme="joining"
           form-id="membership-join"
           @applied="joined"
@@ -373,7 +378,7 @@ async function withdraw(a: Mine['applications'][number]) {
         <UButton
           type="submit"
           form="membership-join"
-          loading-auto
+          :loading="joinForm?.loading"
           :label="joining ? t('membership.screens.mine.join-confirm', { scheme: joining.name }) : ''"
         />
       </template>

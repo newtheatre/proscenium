@@ -100,6 +100,7 @@ const describe = (template: Template) => [
   template.isDefault ? t('front-of-house.templates.default') : null,
   template.lines.map(l => t('front-of-house.templates.line', { duty: dutyName(l.dutyId), count: l.places })).join(', '),
 ].filter(Boolean).join(' · ')
+const fhTemplateForm = useFormRef('fhTemplateForm')
 </script>
 
 <template>
@@ -187,6 +188,7 @@ const describe = (template: Template) => [
       <template #body>
         <UForm
           id="fh-template"
+          ref="fhTemplateForm"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ name: form.name })"
@@ -264,6 +266,7 @@ const describe = (template: Template) => [
       <template #footer>
         <UButton
           type="submit"
+          :loading="fhTemplateForm?.loading"
           form="fh-template"
           :label="editing ? t('front-of-house.save') : t('front-of-house.templates.add-button')"
         />
