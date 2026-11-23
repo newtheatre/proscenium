@@ -270,6 +270,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               color="neutral"
               variant="outline"
               icon="i-lucide-archive-restore"
+              loading-auto
               @click="setArchived(false)"
             />
             <UButton
@@ -278,6 +279,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               color="neutral"
               variant="outline"
               icon="i-lucide-archive"
+              loading-auto
               @click="setArchived(true)"
             />
             <UButton

@@ -198,13 +198,10 @@ const logoHelp = {
                 </UFormField>
               </div>
             </div>
-            <div class="space-y-2 border-t border-default pt-4">
-              <h3 class="text-sm font-medium text-highlighted">
-                {{ t('core.branding-page.preview') }}
-              </h3>
-              <p class="text-sm text-muted">
-                {{ t('core.branding-page.preview-help') }}
-              </p>
+            <FieldGroup
+              :title="t('core.branding-page.preview')"
+              :description="t('core.branding-page.preview-help')"
+            >
               <BrandPreview
                 :accent="draft.accent"
                 :neutral="draft.neutral"
@@ -215,7 +212,7 @@ const logoHelp = {
                 :logo="brand?.logo ?? null"
                 :logo-dark="brand?.logoDark ?? null"
               />
-            </div>
+            </FieldGroup>
             <template
               v-if="canChange"
               #footer

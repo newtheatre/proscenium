@@ -151,6 +151,7 @@ const actions = (s: Season) => [[
                 variant="outline"
                 size="sm"
                 :aria-label="t('core.seasons.publish-named', { name: s.name })"
+                loading-auto
                 @click="move(s, 'published', t('core.seasons.published'))"
               />
               <RowActions
