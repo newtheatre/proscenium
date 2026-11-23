@@ -6,6 +6,7 @@ import { ability, call, code, defineAbilities, defineFacts, defineRecords, defin
 import type { SettingRule } from '#kit'
 import { parseDuration } from '#kit/duration'
 import { LATECOMER_RULES } from '../shared/latecomers'
+import { BRAND_FONT_IDS } from '../shared/brand-fonts'
 
 const organisation = 'core.organisation.edit'
 const branding = 'core.branding.edit'
@@ -47,7 +48,8 @@ export const settings = defineSettings('core', {
   // Light or dark is the interface's (core.appearance.*), not the brand's.
   'brand.accent': setting.colour({ default: '#2563eb', change: branding, audience: 'public' }),
   'brand.neutral': setting.choice({ default: 'slate', options: ['slate', 'stone', 'zinc', 'neutral'], change: branding, audience: 'public' }),
-  'brand.display-font': setting.choice({ default: 'system', options: ['system', 'serif', 'rounded'], change: branding, audience: 'public' }),
+  'brand.display-font': setting.choice({ default: 'system', options: BRAND_FONT_IDS, change: branding, audience: 'public' }),
+  'brand.body-font': setting.choice({ default: 'system', options: BRAND_FONT_IDS, change: branding, audience: 'public' }),
   'brand.radius': setting.choice({ default: 'medium', options: ['none', 'small', 'medium', 'large'], change: branding, audience: 'public' }),
   'brand.credit-line': setting.boolean({ default: true, change: branding, audience: 'public' }),
   // Programme (part 6). The other programme settings arrive with the screens they shape.

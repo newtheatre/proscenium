@@ -1140,7 +1140,7 @@
   "box-office.book.swap.covers-several": "These passes cover this show and more still to come.",
   "box-office.book.swap.first": "Swap a ticket for a pass and tonight is its first entry.",
   "box-office.book.swap.row": "{ticket} swapped for {pass}, {price}",
-  "box-office.book.swap.terms": "{amount} for {count} shows, {each} a show · {more} more each",
+  "box-office.book.swap.terms": "{amount} for {count} shows, {each} a show",
   "box-office.book.swap.how-many": "How many {ticket} tickets to swap for {pass}, {price}",
   "box-office.book.swap.references-missing": "Type a membership number for each member pass you are swapping for.",
   "box-office.book.pass.have-one": "Have a pass?",

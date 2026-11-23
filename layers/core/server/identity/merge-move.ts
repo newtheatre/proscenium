@@ -126,13 +126,12 @@ export async function runMergeMove(unit: UnitView, payload: MergeMovePayload, jo
     unit.enqueue('core.merge-move', { mergeId: merge.id, stage: 'finish' })
     return
   }
-  // A switched-off module's handlers are not run. While one of its handler columns names the
-  // merged-away account its chain waits until the module is back; where none does there is nothing
-  // for them to settle, so the chain goes straight on to its move columns. A module that was never
-  // switched on holds no rows, so it never holds a merge up.
+  // A switched-off module's handlers are not run. A handler may settle move columns as well as its
+  // handler columns, so the chain waits while any of either names the merged-away account; where
+  // none does there is nothing to settle and it goes straight on. A never-enabled module never waits.
   let step = payload.step ?? 0
   if (step < module.handlers.length && !(await isEnabled(module.module))) {
-    if (!module.handled.length || await stillNamed(module.handled, ref.mergedAccountId)) {
+    if (await stillNamed([...module.handled, ...module.moves], ref.mergedAccountId)) {
       job.defer('core.merge.module-off')
       return
     }
