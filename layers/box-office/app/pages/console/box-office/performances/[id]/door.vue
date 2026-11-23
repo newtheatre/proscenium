@@ -133,7 +133,8 @@ const trail = computed(() => [
           <UButton
             size="xs"
             variant="outline"
-            :loading="admitting === row.id"
+            loading-auto
+            :disabled="admitting === row.id"
             :label="t('box-office.door.admit-one')"
             :aria-label="t('box-office.door.admit-one-of', { reference: row.reference })"
             @click="admit(row, 1)"
@@ -142,7 +143,8 @@ const trail = computed(() => [
             v-if="row.tickets - row.admitted > 1"
             size="xs"
             variant="outline"
-            :loading="admitting === row.id"
+            loading-auto
+            :disabled="admitting === row.id"
             :label="t('box-office.door.admit-all', { count: row.tickets - row.admitted })"
             :aria-label="t('box-office.door.admit-all-of', { count: row.tickets - row.admitted, reference: row.reference })"
             @click="admit(row, row.tickets - row.admitted)"

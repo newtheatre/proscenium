@@ -134,7 +134,10 @@ const actions = (l: Layout) => [[
             :key="g.space.id"
             :title="g.space.name"
           >
-            <RecordList :label="t('box-office.layouts.of-space', { space: g.space.name })">
+            <RecordList
+              :label="t('box-office.layouts.of-space', { space: g.space.name })"
+              flush
+            >
               <RecordListItem
                 v-for="l in g.layouts"
                 :key="l.id"
@@ -186,8 +189,9 @@ const actions = (l: Layout) => [[
             name="spaceId"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="form.spaceId"
+              value-key="value"
               :items="spaceItems"
               :disabled="!!editId"
               :placeholder="t('box-office.layouts.space-placeholder')"

@@ -209,7 +209,10 @@ const refundDetail = (o: Order, r: Refund) => {
           <div class="space-y-6">
             <RefusalNotice :refusal="refusal" />
             <PageSection :title="t('box-office.order.tickets')">
-              <RecordList :label="t('box-office.order.tickets')">
+              <RecordList
+                :label="t('box-office.order.tickets')"
+                flush
+              >
                 <RecordListItem
                   v-for="{ line, count } in tickets"
                   :key="line.id"
@@ -232,7 +235,10 @@ const refundDetail = (o: Order, r: Refund) => {
               v-if="d.passes.length"
               :title="t('box-office.order.passes.title')"
             >
-              <RecordList :label="t('box-office.order.passes.title')">
+              <RecordList
+                :label="t('box-office.order.passes.title')"
+                flush
+              >
                 <RecordListItem
                   v-for="p in d.passes"
                   :key="p.id"
@@ -260,6 +266,7 @@ const refundDetail = (o: Order, r: Refund) => {
               <RecordList
                 v-else
                 :label="t('box-office.order.payments')"
+                flush
               >
                 <RecordListItem
                   v-for="p in d.payments"
@@ -286,7 +293,10 @@ const refundDetail = (o: Order, r: Refund) => {
               v-if="d.cancellations.length"
               :title="t('box-office.order.cancellations')"
             >
-              <RecordList>
+              <RecordList
+                :label="t('box-office.order.cancellations')"
+                flush
+              >
                 <RecordListItem
                   v-for="c in d.cancellations"
                   :key="c.id"

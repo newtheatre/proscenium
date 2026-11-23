@@ -71,18 +71,12 @@ const when = (row: Row) => row.label ? `${dateTime(row.startsAt)}, ${row.label}`
           v-else
           class="space-y-6"
         >
-          <section
+          <PageSection
             v-for="group in groups"
             :key="group.id"
-            :aria-labelledby="`production-${group.id}`"
+            :title="group.title"
           >
-            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h2
-                :id="`production-${group.id}`"
-                class="font-semibold text-highlighted"
-              >
-                {{ group.title }}
-              </h2>
+            <template #actions>
               <UButton
                 :to="`/console/box-office/performances/run/${encodeURIComponent(group.id)}`"
                 icon="i-lucide-ticket"
@@ -92,8 +86,11 @@ const when = (row: Row) => row.label ? `${dateTime(row.startsAt)}, ${row.label}`
                 :label="t('box-office.performances.run')"
                 :aria-label="t('box-office.performances.run-label', { title: group.title })"
               />
-            </div>
-            <RecordList :label="group.title">
+            </template>
+            <RecordList
+              :label="group.title"
+              flush
+            >
               <RecordListItem
                 v-for="row in group.rows"
                 :key="row.id"
@@ -107,7 +104,7 @@ const when = (row: Row) => row.label ? `${dateTime(row.startsAt)}, ${row.label}`
                 />
               </RecordListItem>
             </RecordList>
-          </section>
+          </PageSection>
         </div>
       </template>
     </DataBoundary>
