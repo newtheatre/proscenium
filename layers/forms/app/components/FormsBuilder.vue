@@ -171,7 +171,7 @@ const reload = () => window.location.reload()
             active-color="neutral"
             active-variant="solid"
             :aria-label="t('forms.screens.builder.view')"
-            @update:model-value="$event && (view = $event)"
+            @update:model-value="$event && (view = $event as 'build' | 'preview')"
           />
           <IconButton
             icon="i-lucide-undo-2"
@@ -318,7 +318,7 @@ const reload = () => window.location.reload()
           active-color="neutral"
           active-variant="solid"
           :aria-label="t('forms.screens.preview.width')"
-          @update:model-value="$event && (width = $event)"
+          @update:model-value="$event && (width = $event as 'phone' | 'desktop')"
         />
         <UButton
           :label="t('forms.screens.preview.restart')"

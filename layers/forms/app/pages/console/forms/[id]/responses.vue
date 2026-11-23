@@ -121,7 +121,7 @@ const columns = computed(() => [
   ...(data.value?.form.anonymous ? [] : [{ accessorKey: 'who', header: t('forms.screens.responses.from') }]),
   ...(data.value?.columns ?? []).filter(c => !hidden.value.includes(c.questionId)).map(c => ({ accessorKey: `q:${c.questionId}`, header: c.retired ? t('forms.screens.responses.removed', { name: c.label || c.key }) : c.label || c.key })),
   ...(data.value?.calculations ?? []).map(c => ({ accessorKey: `c:${c.id}`, header: c.label })),
-])
+].map(c => ({ ...c, meta: { class: { td: 'max-w-64 truncate', th: 'max-w-64 truncate' } } })))
 const rows = computed(() => (data.value?.rows ?? []).map(r => ({
   id: r.id,
   reference: r.reference,
@@ -497,34 +497,27 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
             @click="chosen = {}"
           />
         </div>
-        <RecordList
-          v-if="phone"
+        <TableOrList
+          :rows="rows"
+          :columns="columns"
           :label="t('forms.screens.responses.title')"
         >
-          <RecordListItem
-            v-for="row in rows"
-            :key="row.id"
-            :to="openTo(row.id)"
-            :name="row.who || row.reference"
-          >
-            <template #description>
-              <span class="block">{{ row.who ? `${row.reference} · ${row.sent}` : row.sent }}</span>
-              <StatusBadge
-                v-if="row.stage"
-                class="mt-1"
-                :tone="formsStageTone(row.stage.kind)"
-                :label="row.stage.name"
-              />
-            </template>
-          </RecordListItem>
-        </RecordList>
-        <UTable
-          v-else
-          :data="rows"
-          :columns="columns"
-          :caption="t('forms.screens.responses.title')"
-          :ui="{ td: 'max-w-64 truncate', th: 'max-w-64 truncate' }"
-        >
+          <template #item="{ row }">
+            <RecordListItem
+              :to="openTo(row.id)"
+              :name="row.who || row.reference"
+            >
+              <template #description>
+                <span class="block">{{ row.who ? `${row.reference} · ${row.sent}` : row.sent }}</span>
+                <StatusBadge
+                  v-if="row.stage"
+                  class="mt-1"
+                  :tone="formsStageTone(row.stage.kind)"
+                  :label="row.stage.name"
+                />
+              </template>
+            </RecordListItem>
+          </template>
           <template #select-header>
             <UCheckbox
               :model-value="allChosen"
@@ -555,7 +548,7 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
               :label="row.original.stage.name"
             />
           </template>
-        </UTable>
+        </TableOrList>
         <UPagination
           v-if="data.total > data.pageSize"
           v-model:page="page"
