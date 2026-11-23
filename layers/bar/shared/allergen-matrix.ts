@@ -14,6 +14,15 @@ export interface MatrixAnswer {
   checked: 'all' | 'some' | 'none'
 }
 
+/** A row of the matrix. A `sub` row is a choice offered on the row above; `note` says where it stands. */
+export interface MatrixRow extends MatrixAnswer {
+  key: string
+  name: string
+  sub?: boolean
+  note?: { tone: 'error' | 'warning' | 'success' | 'neutral', text: string } | null
+}
+export interface MatrixSection { key: string, heading: string | null, rows: MatrixRow[] }
+
 /** Every size's answer as one: what any checked size contains or may contain, in column order. */
 export function matrixAnswer(list: (AllergenFacts | undefined)[]): MatrixAnswer {
   const checked = list.filter((a): a is AllergenFacts => !!a?.checked)

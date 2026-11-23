@@ -1,18 +1,13 @@
 <!-- The allergen matrix: products down the side, the 14 allergens across the top, a filled dot where a
      product contains one and a ring where it may. Tapping an allergen's heading marks it as one the
      customer avoids (v-model:avoid) and shades its column; each row's `note` then says where the
-     product stands. On a phone the product names stay put while the allergens scroll sideways. -->
+     product stands. On a phone the product names stay put while the allergens scroll sideways. A `sub`
+     row (a choice offered on the row above) is indented. Printed, it drops whatever was tapped. -->
 <script setup lang="ts">
-import { ALLERGENS, markOf, type Allergen, type MatrixAnswer } from '../../shared/allergen-matrix'
+import { ALLERGENS, markOf, type Allergen, type MatrixSection } from '../../shared/allergen-matrix'
 
-export interface MatrixRow extends MatrixAnswer {
-  key: string
-  name: string
-  note?: { tone: 'error' | 'warning' | 'success' | 'neutral', text: string } | null
-}
-export interface MatrixSection { key: string, heading: string | null, rows: MatrixRow[] }
-
-defineProps<{ sections: MatrixSection[], caption: string }>()
+// `notChecked` is what a row with nothing checked says; `frame` sizes the scrolling box.
+const props = defineProps<{ sections: MatrixSection[], caption: string, notChecked?: string, frame?: string }>()
 const avoid = defineModel<string[]>('avoid', { default: () => [] })
 
 const { t } = useT()
@@ -25,7 +20,10 @@ const ICONS = { error: 'i-lucide-octagon-alert', warning: 'i-lucide-triangle-ale
 
 <template>
   <div class="flex min-h-0 flex-col gap-3">
-    <div class="min-h-0 overflow-auto overscroll-contain rounded-md border border-default">
+    <div
+      class="min-h-0 overflow-auto overscroll-contain rounded-md border border-default print:max-h-none print:overflow-visible"
+      :class="frame"
+    >
       <table class="w-max min-w-full border-separate border-spacing-0 text-sm">
         <caption class="sr-only">
           {{ caption }}
@@ -43,7 +41,7 @@ const ICONS = { error: 'i-lucide-octagon-alert', warning: 'i-lucide-triangle-ale
               :key="k"
               scope="col"
               class="sticky top-0 z-20 border-b border-default p-0.5 align-bottom"
-              :class="avoids(k) ? 'bg-elevated' : 'bg-default'"
+              :class="avoids(k) ? 'bg-elevated print:bg-default' : 'bg-default'"
             >
               <UButton
                 color="neutral"
@@ -51,10 +49,11 @@ const ICONS = { error: 'i-lucide-octagon-alert', warning: 'i-lucide-triangle-ale
                 size="sm"
                 :aria-pressed="avoids(k)"
                 :label="t(`bar.allergen.${k}`)"
-                class="w-8 justify-center px-0 py-2"
+                class="w-8 justify-center px-0 py-2 print:hidden"
                 :ui="{ label: 'max-h-36 whitespace-normal text-start leading-tight [writing-mode:vertical-rl] rotate-180' }"
                 @click="toggle(k)"
               />
+              <span class="hidden max-h-36 rotate-180 px-1.5 py-2 text-start text-xs leading-tight font-medium [writing-mode:vertical-rl] print:inline-block">{{ t(`bar.allergen.${k}`) }}</span>
             </th>
           </tr>
         </thead>
@@ -74,10 +73,12 @@ const ICONS = { error: 'i-lucide-octagon-alert', warning: 'i-lucide-triangle-ale
           <tr
             v-for="row in section.rows"
             :key="row.key"
+            class="break-inside-avoid"
           >
             <th
               scope="row"
-              class="sticky start-0 z-10 w-36 min-w-36 border-e border-b border-default bg-default p-2 text-start align-top font-medium sm:w-48 sm:min-w-48"
+              class="sticky start-0 z-10 w-36 min-w-36 border-e border-b border-default bg-default p-2 text-start align-top sm:w-48 sm:min-w-48 print:w-40 print:min-w-40"
+              :class="row.sub ? 'ps-6 font-normal text-muted' : 'font-medium'"
             >
               <span class="block">{{ row.name }}</span>
               <UBadge
@@ -87,7 +88,7 @@ const ICONS = { error: 'i-lucide-octagon-alert', warning: 'i-lucide-triangle-ale
                 size="sm"
                 :icon="ICONS[row.note.tone]"
                 :label="row.note.text"
-                class="mt-1 max-w-full text-start font-normal"
+                class="mt-1 max-w-full text-start font-normal print:hidden"
                 :ui="{ label: 'whitespace-normal! overflow-visible! break-words' }"
               />
             </th>
@@ -96,18 +97,18 @@ const ICONS = { error: 'i-lucide-octagon-alert', warning: 'i-lucide-triangle-ale
               :colspan="ALLERGENS.length"
               class="border-b border-default p-2 align-top text-muted"
             >
-              <span class="sticky start-36 sm:start-48">{{ t('bar.matrix.not-checked') }}</span>
+              <span class="sticky start-36 sm:start-48">{{ props.notChecked ?? t('bar.matrix.not-checked') }}</span>
             </td>
             <template v-else>
               <td
                 v-for="k in ALLERGENS"
                 :key="k"
                 class="border-b border-s border-default p-0 text-center align-middle first-of-type:border-s-0"
-                :class="avoids(k) && 'bg-elevated'"
+                :class="avoids(k) && 'bg-elevated print:bg-transparent'"
               >
                 <span
                   v-if="markOf(row, k) === 'contains'"
-                  class="inline-block size-3.5 rounded-full bg-error align-middle"
+                  class="inline-block size-3.5 rounded-full bg-error align-middle [print-color-adjust:exact]"
                   aria-hidden="true"
                 />
                 <span
@@ -128,7 +129,7 @@ const ICONS = { error: 'i-lucide-octagon-alert', warning: 'i-lucide-triangle-ale
     <p class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
       <span class="inline-flex items-center gap-1.5">
         <span
-          class="inline-block size-3 rounded-full bg-error"
+          class="inline-block size-3 rounded-full bg-error [print-color-adjust:exact]"
           aria-hidden="true"
         />{{ t('bar.matrix.contains') }}
       </span>
