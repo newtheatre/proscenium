@@ -150,7 +150,10 @@ async function remove() {
   }
 }
 const actions = computed(() => [
-  [{ label: t('membership.screens.list.remove-entry'), icon: 'i-lucide-user-minus', onSelect: openRemove }],
+  [
+    { label: t('membership.screens.list.add-entry'), icon: 'i-lucide-plus', onSelect: openAdd },
+    { label: t('membership.screens.list.remove-entry'), icon: 'i-lucide-user-minus', onSelect: openRemove },
+  ],
   [{ label: t('membership.screens.list.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: remove }],
 ])
 // What the list holds, at a glance.
@@ -180,13 +183,7 @@ const facts = computed(() => {
       v-if="list"
       #primary
     >
-      <UButton
-        icon="i-lucide-plus"
-        color="neutral"
-        variant="outline"
-        :label="t('membership.screens.list.add-entry')"
-        @click="openAdd"
-      />
+      <!-- Loading the file is what the page is for; adding one entry by hand sits in the menu with removing one. -->
       <UButton
         icon="i-lucide-upload"
         :label="t('membership.screens.list.load')"

@@ -18,6 +18,11 @@ const revoked = computed(() => (data.value?.awards ?? []).filter(a => a.state ==
 const describe = (a: Row) => [a.typeName, awardDate(a), a.awardedFor, a.linked ? null : t('awards.screens.awards.not-linked')].filter(Boolean).join(' · ')
 const issuing = ref(false)
 const importing = ref(false)
+// Issuing is the page's action; on a phone Import folds into the menu beside it.
+const actions = computed(() => [
+  { label: t('awards.screens.awards.issue'), icon: 'i-lucide-plus', onSelect: () => { issuing.value = true } },
+  { label: t('awards.screens.import.action'), icon: 'i-lucide-file-up', onSelect: () => { importing.value = true } },
+])
 const activeTypes = computed(() => (types.data.value?.types ?? []).filter(x => x.state === 'active'))
 </script>
 
@@ -29,26 +34,15 @@ const activeTypes = computed(() => (types.data.value?.types ?? []).filter(x => x
         v-model:open="searching"
         :label="t('awards.screens.awards.search')"
       />
-      <UButton
+      <PageActions
         v-if="data?.canIssue && activeTypes.length"
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-file-up"
-        :label="t('awards.screens.import.action')"
-        :ui="{ label: 'max-sm:sr-only' }"
-        @click="importing = true"
-      />
-      <UButton
-        v-if="data?.canIssue && activeTypes.length"
-        :label="t('awards.screens.awards.issue')"
-        icon="i-lucide-plus"
-        :ui="{ label: searching ? 'max-sm:sr-only' : '' }"
-        @click="issuing = true"
+        :actions="actions"
       />
     </template>
     <template #toolbar>
-      <USelect
+      <USelectMenu
         v-model="typeId"
+        value-key="value"
         :items="typeItems"
         :aria-label="t('awards.screens.awards.filter-type')"
         class="min-w-48"
