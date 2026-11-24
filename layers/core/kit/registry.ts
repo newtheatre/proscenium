@@ -1,5 +1,6 @@
 // The registry: every module's manifest and handler files, collected by the build into
 // .generated/registry.ts and checked here across modules (F-02).
+import { PRACTICE_PREFIXES } from './practice/tables'
 import { DeclarationError } from './refusal'
 import { DELIVERABLE, snake, type ModuleManifest, type SettingPlace, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl, type SigningDecl } from './manifest'
 import { tableMeta, type TableMeta } from './db'
@@ -84,7 +85,7 @@ const SETTINGS_ICON = 'i-lucide-settings-2'
 export function buildRegistry(entries: ModuleEntry[]): Registry {
   const r: Registry = {
     modules: new Map(), settings: new Map(), settingRules: new Map(), settingPages: new Map(), settingHomes: new Map(), settingAliases: new Map(), abilities: new Map(), records: new Map(), facts: new Map(),
-    tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(), lists: new Map(),
+    tables: new Map(), prefixes: new Map(PRACTICE_PREFIXES), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(), lists: new Map(),
   }
   const fail = (entry: ModuleEntry, field: string, message: string): never => {
     throw new DeclarationError(field, message, `${entry.root}/module.ts`)
@@ -227,6 +228,11 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
     }
     for (const [key, { decl }] of [...r.records].filter(([, a]) => a.module === m.id)) {
       if (decl.parent && !r.records.has(decl.parent)) fail(entry, `records.${key}.parent`, `"${decl.parent}" is not a record type`)
+      if (decl.point !== undefined) {
+        if (r.points.get(decl.point)?.decl.kind !== 'data') fail(entry, `records.${key}.point`, `"${decl.point}" is not a data point, whose contributions' ids would be this type's ids`)
+        if (decl.owner) fail(entry, `records.${key}.owner`, 'a record type without a table has no owner column')
+        continue
+      }
       if (decl.table === undefined) {
         if (!Array.isArray(decl.ids) || !decl.ids.length || !decl.ids.every(i => /^[a-z][a-z0-9-]*$/.test(i))) fail(entry, `records.${key}.ids`, 'a record type without a table lists its fixed ids, kebab-case')
         if (decl.owner) fail(entry, `records.${key}.owner`, 'a record type without a table has no owner column')
