@@ -12,6 +12,7 @@
 import { NOT_YET, all, first, isEnabled, moveAccountColumn, nowMs, useSetting, type MergeHandler, type MergeRef, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { runMergeUndo } from './merge-undo'
+import { allOf } from './all-of'
 
 /** The module stage one handles: its tables are the core's own, identity's among them. */
 export const SETTLED_IN_STAGE_ONE = 'core'
@@ -79,7 +80,7 @@ async function shares(moves: MoveModule['moves']): Promise<MoveModule['moves'][]
 
 /** SQL that is true while none of `moves` names the account bound to each `?`. */
 function noneLeft(moves: MoveModule['moves']): string {
-  return moves.map(m => `NOT EXISTS (SELECT 1 FROM "${m.table}" WHERE "${m.column}" = ?)`).join(' AND ') || '1'
+  return allOf(moves.map(m => `NOT EXISTS (SELECT 1 FROM "${m.table}" WHERE "${m.column}" = ?)`))
 }
 
 /** Whether any of `columns` still names the account. */
