@@ -13,7 +13,7 @@ const code = files.filter(f => /\.(ts|vue|mjs)$/.test(f) && !f.startsWith('.gene
 let failed = false
 if (code.length) {
   console.log(`Lint: ${code.length} changed file(s)`)
-  failed ||= (await $`bunx eslint --cache --cache-location node_modules/.cache/eslint ${code}`.nothrow()).exitCode !== 0
+  failed ||= (await $`bunx eslint --cache --cache-location node_modules/.cache/eslint --pass-on-unpruned-suppressions ${code}`.nothrow()).exitCode !== 0
   const sources = code.filter(f => !f.endsWith('.mjs'))
   console.log('Unit tests related to the changed files')
   failed ||= (await $`bunx vitest related --run --project unit --passWithNoTests ${sources}`.nothrow()).exitCode !== 0

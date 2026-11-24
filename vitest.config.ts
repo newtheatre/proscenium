@@ -19,6 +19,15 @@ const alias = { ...kitAliases(root, fixtureRoots), '#test-registry': join(root, 
 export default defineConfig({
   resolve: { alias },
   test: {
+    // A ratchet (CONTRIBUTING.md, "Rules as code"): raise these when coverage rises, never lower them.
+    // istanbul, because workerd has no V8 coverage; .ts only, as it cannot parse an unloaded .vue.
+    coverage: {
+      provider: 'istanbul',
+      include: ['layers/**/*.ts'],
+      exclude: ['**/tests/**', '**/*.d.ts'],
+      reporter: ['text-summary', 'json-summary'],
+      thresholds: { lines: 85, functions: 81, branches: 70 }, // not-policy: the coverage measured on 24 November 2026
+    },
     projects: [
       {
         resolve: { alias },
@@ -31,6 +40,8 @@ export default defineConfig({
           name: 'integration',
           include: ['tests/integration/**/*.test.ts', 'layers/*/tests/integration/**/*.test.ts'],
           setupFiles: ['./tests/integration/setup.ts'],
+          // Coverage instruments every module, which slows the longest flows past the 5 s default.
+          testTimeout: 20_000, // not-policy: a test runner limit
         },
       },
     ],
