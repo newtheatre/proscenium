@@ -77,4 +77,25 @@ export const runs = defineTable('reports_runs', {
   ],
 })
 
-export const tables = { definitions, runs }
+/** One person's figure in one copy of a people report (rules P5 to P7): an account id, never a name. */
+export const personRows = defineTable('reports_person_rows', {
+  id: col.id(),
+  runId: col.ref('reports_runs'),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'A copy counts each person once; the run is marked stale' }),
+  measure: col.internal(text('measure').notNull()),
+  breakdownValue: col.internal(text('breakdown_value')),
+  value: col.personal(integer('value').notNull()),
+}, {
+  id: 'rpe',
+  realm: 'operational',
+  subject: 'account_id',
+  retention: 'reports.people.keep-for',
+  onErasure: 'delete-row',
+  extra: t => [
+    index('reports_person_rows_run').on(t.runId, t.accountId),
+    index('reports_person_rows_account').on(t.accountId),
+    check('reports_person_rows_value', sql`${t.value} >= 0`),
+  ],
+})
+
+export const tables = { definitions, runs, personRows }

@@ -55,6 +55,15 @@ export async function accountLabel(id: string): Promise<string> {
   return row.name || 'Unnamed person'
 }
 
+/** accountLabel for many people in one read, keyed by the id asked about. */
+export async function accountLabels(ids: string[]): Promise<Record<string, string>> {
+  const rows = await all<{ asked: string, name: string | null, anonymised_at: number | null }>(
+    `SELECT j.value AS asked, a.name, a.anonymised_at FROM json_each(?) j
+       JOIN core_accounts m ON m.id = j.value
+       JOIN core_accounts a ON a.id = coalesce(m.merged_into_id, m.id)`, JSON.stringify([...new Set(ids)]))
+  return Object.fromEntries(rows.map(r => [r.asked, r.anonymised_at ? 'Former member' : r.name || 'Unnamed person']))
+}
+
 export interface AddressRow { id: string, account_id: string, address: string, verified_at: number | null }
 
 export async function addressRow(address: string): Promise<AddressRow | null> {

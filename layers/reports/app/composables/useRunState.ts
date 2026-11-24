@@ -1,6 +1,7 @@
 // A copy as the screens show it: its state as a badge, and the shape the server sends.
 import type { PeriodRule, ReportColumn, ReportView, ScopeKind, Words } from '../../shared/reports'
 import type { ReportTable } from '../../shared/table'
+import type { PeopleTable } from '../../shared/people'
 
 export type RunState = 'queued' | 'running' | 'done' | 'failed' | 'expired' | 'stale'
 
@@ -9,6 +10,7 @@ export interface RunListed {
   report: string
   name: Words
   question: {
+    kind?: 'people'
     columns: ReportColumn[]
     rowsBy?: string
     acrossBy?: string
@@ -26,7 +28,7 @@ export interface RunListed {
   mine: boolean
 }
 
-export interface RunOpened extends RunListed { table: ReportTable | null }
+export interface RunOpened extends RunListed { table: ReportTable | null, people?: PeopleTable | null }
 
 const COLOURS: Record<RunState, 'neutral' | 'success' | 'warning' | 'error'> = { queued: 'neutral', running: 'neutral', done: 'success', failed: 'error', expired: 'neutral', stale: 'warning' }
 

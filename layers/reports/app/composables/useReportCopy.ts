@@ -19,7 +19,7 @@ export function useReportCopy(view: Ref<ReportView | undefined | null>, by: Ref<
         ...(v.scope.id ? { scope: `${v.scope.kind}:${v.scope.id}` } : {}),
         ...(by.value ? { by: by.value } : {}),
       }
-      return (await $api<{ id: string }>('/api/reports/runs', { method: 'POST', body })).id
+      return (await $api<{ id: string }>(v.kind === 'people' ? '/api/reports/people/runs' : '/api/reports/runs', { method: 'POST', body })).id
     }
     catch (e) {
       const r = toRefusal(e)
@@ -30,12 +30,15 @@ export function useReportCopy(view: Ref<ReportView | undefined | null>, by: Ref<
 
   async function keep() {
     const id = await queue()
-    if (id) toast({ title: t('reports.copy.kept'), description: t('reports.copy.kept-description'), actions: [{ label: t('reports.copy.open'), to: `/console/reports/runs/${id}` }] })
+    if (id && view.value?.kind === 'people') toast({ title: t('reports.people.kept'), description: t('reports.people.kept-description'), actions: [{ label: t('reports.copy.open'), to: `/console/reports/runs/${id}` }] })
+    else if (id) toast({ title: t('reports.copy.kept'), description: t('reports.copy.kept-description'), actions: [{ label: t('reports.copy.open'), to: `/console/reports/runs/${id}` }] })
   }
 
+  // A people report's CSV is made on the fly from the copy just kept (P4); a figures copy is made in the background.
   async function download() {
     const id = await queue()
-    if (id) await navigateTo(`/console/reports/runs/${id}`)
+    if (id && view.value?.kind === 'people') await navigateTo(`/api/reports/people/runs/${id}/csv`, { external: true })
+    else if (id) await navigateTo(`/console/reports/runs/${id}`)
   }
 
   return { keep, download }

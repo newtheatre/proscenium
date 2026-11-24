@@ -6,6 +6,7 @@ import { PAGE_BREAKDOWNS, PERIOD_RULES, SCOPE_KINDS, isPageBreakdown, type Perio
 
 export interface BuilderColumn { measure?: string, formula?: string, label?: string }
 export interface BuilderForm {
+  kind: 'figures' | 'people'
   name: string
   description: string | null
   basedOn: string | null
@@ -28,14 +29,18 @@ const { $api } = useNuxtApp()
 const { toRefusal, fieldErrors } = useRefusal()
 const { keyName } = useReportWords()
 const toast = useToast()
-const { data: catalogue } = await useAPI<{ figures: Figure[], keys: Record<string, string> }>('/api/reports/catalogue', { key: 'reports:catalogue' })
+const { data: catalogue } = await useAPI<{ figures: Figure[], people: Omit<Figure, 'filters' | 'ratio'>[], keys: Record<string, string> }>('/api/reports/catalogue', { key: 'reports:catalogue' })
 const { data: roles } = await useAPI<{ roles: { id: string, name: string }[] }>('/api/reports/roles', { key: 'reports:roles' })
 
 const form = reactive<BuilderForm>(structuredClone(toRaw(props.start)))
 // Each column keeps a key of its own across moves, so a dragged row stays the same row.
 let made = 0
 const keys = ref<string[]>(form.columns.map(() => `c${made++}`))
-const figures = computed(() => new Map((catalogue.value?.figures ?? []).map(f => [f.id, f])))
+const PEOPLE_MAX = 6 // not-policy: rule P8, figures side by side
+const people = computed(() => form.kind === 'people')
+const mayPeople = computed(() => !!catalogue.value?.people.length)
+const pool = computed<Figure[]>(() => people.value ? (catalogue.value?.people ?? []).map(f => ({ ...f, filters: [], ratio: false })) : catalogue.value?.figures ?? [])
+const figures = computed(() => new Map(pool.value.map(f => [f.id, f])))
 const chosen = computed(() => form.columns.flatMap(c => c.measure && figures.value.has(c.measure) ? [figures.value.get(c.measure)!] : []))
 const keyLabels = computed(() => catalogue.value?.keys ?? {})
 const nameOf = (key: string) => keyName(key, keyLabels.value)
@@ -74,6 +79,12 @@ const chartItems = computed(() => [{ value: 'none', label: t('reports.builder.ch
 const chart = computed({ get: () => form.chart ?? 'none', set: v => form.chart = v === 'none' ? null : v as 'bar' | 'line' })
 const shareItems = computed(() => [{ value: 'none', label: t('reports.builder.share-none') }, ...(roles.value?.roles ?? []).map(r => ({ value: r.id, label: r.name }))])
 const share = computed({ get: () => form.shareRole ?? 'none', set: v => form.shareRole = v === 'none' ? null : v })
+const kindItems = computed(() => [{ value: 'figures', label: t('reports.builder.kind-figures') }, { value: 'people', label: t('reports.builder.kind-people') }])
+// A people report has none of the builder's extras (P3, P8), and its figures come from another list.
+watch(() => form.kind, () => {
+  Object.assign(form, { columns: [], rowsBy: null, acrossBy: null, filter: null, chart: null, shareRole: null })
+  keys.value = []
+})
 watch(() => form.scopeKind, (kind) => {
   form.scopeId = null
   if (kind === 'none' && form.periodRule === 'scope') form.periodRule = 'last-month'
@@ -110,7 +121,7 @@ function remove(i: number) {
 
 // Adding or changing a column happens in a small dialog: a figure from the catalogue, or a formula.
 const editing = ref<{ at: number | null, kind: 'figure' | 'formula', measure: string | null, formula: string, label: string } | null>(null)
-const figureItems = computed(() => (catalogue.value?.figures ?? []).map(f => ({ value: f.id, label: t(f.label), description: t(`${f.module}.module.name`) })))
+const figureItems = computed(() => pool.value.map(f => ({ value: f.id, label: t(f.label), description: t(`${f.module}.module.name`) })))
 const earlier = computed(() => form.columns.slice(0, editing.value?.at ?? form.columns.length).map((c, i) => `C${i + 1} ${columnName(c)}`).join(', '))
 const addFigure = () => editing.value = { at: null, kind: 'figure', measure: null, formula: '', label: '' }
 const addFormula = () => editing.value = { at: null, kind: 'formula', measure: null, formula: '', label: '' }
@@ -193,6 +204,17 @@ async function save() {
             />
           </UFormField>
           <UFormField
+            v-if="mayPeople || people"
+            :label="t('reports.builder.kind')"
+            :help="t('reports.builder.kind-help')"
+            name="kind"
+          >
+            <USelect
+              v-model="form.kind"
+              :items="kindItems"
+            />
+          </UFormField>
+          <UFormField
             :label="t('reports.builder.description')"
             name="description"
             class="sm:col-span-2"
@@ -217,9 +239,11 @@ async function save() {
             variant="outline"
             icon="i-lucide-plus"
             :label="t('reports.builder.add-figure')"
+            :disabled="people && form.columns.length >= PEOPLE_MAX"
             @click="addFigure"
           />
           <UButton
+            v-if="!people"
             color="neutral"
             variant="outline"
             icon="i-lucide-sigma"
@@ -292,6 +316,7 @@ async function save() {
             />
           </UFormField>
           <UFormField
+            v-if="!people"
             :label="t('reports.builder.across-by')"
             :help="t('reports.builder.across-by-help')"
             name="acrossBy"
@@ -302,6 +327,7 @@ async function save() {
             />
           </UFormField>
           <UFormField
+            v-if="!people"
             :label="t('reports.builder.filter')"
             name="filter"
           >
@@ -311,7 +337,7 @@ async function save() {
             />
           </UFormField>
           <UFormField
-            v-if="form.filter && filterIsRecord"
+            v-if="!people && form.filter && filterIsRecord"
             :label="nameOf(form.filter.key)"
             name="filter.values"
           >
@@ -321,7 +347,7 @@ async function save() {
             />
           </UFormField>
           <UFormField
-            v-else-if="form.filter"
+            v-else-if="!people && form.filter"
             :label="t('reports.builder.filter-values', { key: nameOf(form.filter.key).toLowerCase() })"
             name="filter.values"
           >
@@ -333,6 +359,7 @@ async function save() {
             />
           </UFormField>
           <UFormField
+            v-if="!people"
             :label="t('reports.builder.chart')"
             name="chart"
           >
@@ -376,6 +403,7 @@ async function save() {
             />
           </UFormField>
           <UFormField
+            v-if="!people"
             :label="t('reports.builder.share')"
             :help="t('reports.builder.share-help')"
             name="shareRole"

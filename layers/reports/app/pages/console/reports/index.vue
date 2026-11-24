@@ -7,7 +7,7 @@ import type { Area, ScopeKind } from '../../../../shared/reports'
 definePageMeta({ layout: 'console' })
 
 interface Listed { id: string, label: string, description: string, area: Area, scope: ScopeKind, module: string }
-interface Saved { id: string, name: string, description: string | null, basedOn: string | null, mine: boolean, shared: boolean, archived: boolean, editable: boolean }
+interface Saved { id: string, kind: 'figures' | 'people', name: string, description: string | null, basedOn: string | null, mine: boolean, shared: boolean, archived: boolean, editable: boolean }
 
 const { t } = useT()
 const { data, status, error, refresh } = await useAPI<{ reports: Listed[], saved: Saved[], mayCreate: boolean }>('/api/reports/definitions', { key: 'reports:definitions' })
@@ -104,7 +104,7 @@ const rowActions = (s: Saved) => [
                 v-for="s in current"
                 :key="s.id"
                 :to="`/console/reports/${s.id}`"
-                icon="i-lucide-table-properties"
+                :icon="s.kind === 'people' ? 'i-lucide-users' : 'i-lucide-table-properties'"
                 :name="s.name"
                 :description="describe(s) || undefined"
               >
@@ -125,7 +125,7 @@ const rowActions = (s: Saved) => [
                   v-for="s in archived"
                   :key="s.id"
                   :to="`/console/reports/${s.id}`"
-                  icon="i-lucide-table-properties"
+                  :icon="s.kind === 'people' ? 'i-lucide-users' : 'i-lucide-table-properties'"
                   :name="s.name"
                   :description="describe(s) || undefined"
                   muted

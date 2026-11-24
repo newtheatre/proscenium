@@ -4,7 +4,8 @@
 import { z } from 'zod'
 import { sql } from 'drizzle-orm'
 import { can, first, inAccountScope, newId, nowMs, refuse, siteWords, useDb, useSetting, type Actor, type UnitView } from '#kit'
-import { listMeasures, type MeasureListing } from '#modules/core'
+import { listMeasures, listPersonMeasures, type MeasureListing, type PersonMeasureListing } from '#modules/core'
+import { PEOPLE_MAX, personColumns } from './people'
 import { figureColumns, readyMadeFor, scopeTitle, viewBase, type ViewQuery } from './ready-made'
 import { keyLabels, keyValues } from './keys'
 import { keyParam } from './query'
@@ -21,6 +22,7 @@ const columnInput = z.union([
 ])
 
 export const definitionInput = z.object({
+  kind: z.enum(['figures', 'people']).default('figures'),
   name: z.string().trim().min(1).max(80), // not-policy: the data model's bound
   description: z.string().trim().max(300).nullable().optional(), // not-policy: the data model's bound
   basedOn: z.string().max(80).nullable().optional(), // not-policy: a report id's length
@@ -77,6 +79,7 @@ const FORMULA_FAULTS: Record<string, string> = {
 
 /** Checks a saved report against every rule at once (B1 to B6, D1) and gives the columns to store. */
 export async function checkDefinition(input: DefinitionInput, actor: Actor): Promise<StoredColumn[]> {
+  if (input.kind === 'people') return await checkPeople(input, actor)
   const fields: Record<string, string> = {}
   const max = await useSetting('reports.builder.max-columns') as number
   if (input.columns.length > max) fields.columns = `A report has at most ${max} columns.`
@@ -133,6 +136,36 @@ export async function checkDefinition(input: DefinitionInput, actor: Actor): Pro
   return stored
 }
 
+/** A people report (P3, P8): up to six figures per person, one shared breakdown, nothing shared or charted. */
+async function checkPeople(input: DefinitionInput, actor: Actor): Promise<StoredColumn[]> {
+  if (!(await can(actor, 'reports.people.view' as never)).allowed) refuse('core.access.denied', 'You do not have permission to make reports about people.', { status: 403 })
+  if (input.shareRole) refuse('reports.people.not-shareable', 'A report about named people is never shared with a role.', { status: 422, fields: { shareRole: 'A report about people is yours alone.' } })
+  const fields: Record<string, string> = {}
+  const readable = new Map((await listPersonMeasures(actor)).map(m => [m.id, m]))
+  if (input.columns.length > PEOPLE_MAX) fields.columns = `A report about people has at most ${PEOPLE_MAX} figures.`
+  const figures: PersonMeasureListing[] = []
+  input.columns.forEach((c, i) => {
+    if (!('measure' in c)) fields[`columns.${i}`] = 'A report about people has no formulas.'
+    else if (!readable.has(c.measure)) fields[`columns.${i}`] = 'Choose a figure you can see.'
+    else figures.push(readable.get(c.measure)!)
+  })
+  if (!figures.length && !fields.columns) fields.columns = 'A report needs at least one figure.'
+  const say = siteWords()
+  if (input.rowsBy) {
+    const odd = figures.find(m => !(m.by as string[]).includes(input.rowsBy!))
+    if (odd) fields.rowsBy = `${say(odd.label)} cannot be broken down this way.`
+  }
+  if (input.acrossBy) fields.acrossBy = 'A report about people has nothing across the top.'
+  if (input.filter) fields.filter = 'A report about people is not narrowed.'
+  if (input.chart) fields.chart = 'A report about people has no chart.'
+  if (input.scopeId) {
+    const prefix = input.scopeKind === 'none' ? null : RECORD_PREFIX[input.scopeKind]
+    if (!prefix || !input.scopeId.startsWith(prefix)) fields.scopeId = 'Choose one of the kind the report is about.'
+  }
+  if (Object.keys(fields).length) refuse('reports.definition.invalid', 'Some of this report needs changing.', { status: 422, fields })
+  return input.columns.map(c => ({ measure: (c as { measure: string }).measure }))
+}
+
 const params = (input: DefinitionInput, columns: StoredColumn[]) => [
   input.name, input.description || null, input.basedOn ?? null, JSON.stringify(columns), input.rowsBy ?? null, input.acrossBy ?? null,
   input.filter ? JSON.stringify(input.filter) : null, input.scopeKind, input.scopeId ?? null, input.periodRule, input.chart ?? null, input.shareRole ?? null,
@@ -146,9 +179,9 @@ export async function createDefinition(unit: UnitView, actor: Actor, input: Defi
   const at = nowMs()
   unit.add({
     sql: `INSERT INTO reports_definitions (id, name, description, based_on, columns, rows_by, across_by, filters, scope_kind, scope_id, period_rule, chart, share_role, kind, made_by, state, created_at, updated_at)
-          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'figures', ?, 'active', ?, ?
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?
            WHERE NOT EXISTS (SELECT 1 FROM reports_definitions WHERE state = 'active' AND lower(name) = lower(?))`,
-    params: [id, ...params(input, columns), actor.accountId!, at, at, input.name],
+    params: [id, ...params(input, columns), input.kind, actor.accountId!, at, at, input.name],
   }).expect(1, NAME_TAKEN)
   unit.audit({ action: 'create', record: ['reports.definition', id], detail: { columns: columns.length, shared: !!input.shareRole } })
   return { id }
@@ -172,6 +205,7 @@ const rolesOf = (actor: Actor) => (actor.grants ?? []).map(g => g.via).filter(v 
 /** Whether this person may open a saved report: its maker, a manager, or a holder of the role it is shared with. */
 async function mayOpen(actor: Actor, row: DefinitionRow): Promise<boolean> {
   if (!(await can(actor, 'reports.report.view' as never)).allowed) return false
+  if (row.kind === 'people' && !(await can(actor, 'reports.people.view' as never)).allowed) return false
   if (row.share_role && rolesOf(actor).includes(row.share_role)) return true
   return await mayEdit(actor, row) || await isMaker(actor, row.id)
 }
@@ -186,9 +220,9 @@ export async function updateDefinition(unit: UnitView, actor: Actor, id: string,
   const row = await editable(actor, id)
   const columns = await checkDefinition(input, actor)
   unit.add({
-    sql: `UPDATE reports_definitions SET name = ?, description = ?, based_on = ?, columns = ?, rows_by = ?, across_by = ?, filters = ?, scope_kind = ?, scope_id = ?, period_rule = ?, chart = ?, share_role = ?, updated_at = ?
+    sql: `UPDATE reports_definitions SET name = ?, description = ?, based_on = ?, columns = ?, rows_by = ?, across_by = ?, filters = ?, scope_kind = ?, scope_id = ?, period_rule = ?, chart = ?, share_role = ?, kind = ?, updated_at = ?
            WHERE id = ? AND updated_at = ? AND NOT EXISTS (SELECT 1 FROM reports_definitions WHERE state = 'active' AND id <> ? AND lower(name) = lower(?))`,
-    params: [...params(input, columns), nowMs(), id, row.updated_at, id, input.name],
+    params: [...params(input, columns), input.kind, nowMs(), id, row.updated_at, id, input.name],
   }).expect(1, NAME_TAKEN)
   unit.audit({ action: 'update', record: ['reports.definition', id], detail: { columns: columns.length, shared: !!input.shareRole } })
 }
@@ -204,7 +238,7 @@ export async function setArchived(unit: UnitView, actor: Actor, id: string, arch
   unit.audit({ action: 'state', record: ['reports.definition', id], detail: { to } })
 }
 
-export interface SavedListing { id: string, name: string, description: string | null, basedOn: string | null, mine: boolean, shared: boolean, archived: boolean, editable: boolean }
+export interface SavedListing { id: string, kind: DefinitionRow['kind'], name: string, description: string | null, basedOn: string | null, mine: boolean, shared: boolean, archived: boolean, editable: boolean }
 
 /** The saved reports this person may open: their own, those shared with a role they hold, all for a manager. */
 export async function savedFor(actor: Actor): Promise<SavedListing[]> {
@@ -214,8 +248,9 @@ export async function savedFor(actor: Actor): Promise<SavedListing[]> {
   const mine = actor.accountId ? inAccountScope('made_by', actor.accountId) : sql`0`
   const roles = rolesOf(actor)
   const shared = roles.length ? sql`share_role IN (SELECT value FROM json_each(${JSON.stringify(roles)}))` : sql`0`
-  const rows = await useDb().all<DefinitionRow & { is_mine: number }>(sql`SELECT *, (${mine}) AS is_mine FROM reports_definitions ${manager ? sql`` : sql`WHERE (${mine}) OR (${shared})`} ORDER BY lower(name)`)
-  return rows.map(r => ({ id: r.id, name: r.name, description: r.description, basedOn: r.based_on, mine: !!r.is_mine, shared: !!r.share_role, archived: r.state === 'archived', editable: manager || (!!r.is_mine && creator) }))
+  const people = (await can(actor, 'reports.people.view' as never)).allowed
+  const rows = (await useDb().all<DefinitionRow & { is_mine: number }>(sql`SELECT *, (${mine}) AS is_mine FROM reports_definitions ${manager ? sql`` : sql`WHERE (${mine}) OR (${shared})`} ORDER BY lower(name)`)).filter(r => people || r.kind !== 'people')
+  return rows.map(r => ({ id: r.id, kind: r.kind, name: r.name, description: r.description, basedOn: r.based_on, mine: !!r.is_mine, shared: !!r.share_role, archived: r.state === 'archived', editable: manager || (!!r.is_mine && creator) }))
 }
 
 /** A saved report as the page draws it, or as the builder edits it. */
@@ -223,7 +258,8 @@ export async function savedView(id: string, actor: Actor, query: ViewQuery): Pro
   const row = await definitionById(id)
   if (!row || !(await mayOpen(actor, row))) return refuse('reports.definition.unknown', 'There is no such report, or you cannot open it.', { status: 404 })
   const stored = JSON.parse(row.columns) as StoredColumn[]
-  const figures = await figureColumns(stored.flatMap(c => 'measure' in c ? [c.measure] : []), actor)
+  const ids = stored.flatMap(c => 'measure' in c ? [c.measure] : [])
+  const figures = row.kind === 'people' ? await personColumns(ids, actor) : await figureColumns(ids, actor)
   let next = 0
   const columns: ReportColumn[] = stored.map(c => 'measure' in c ? figures[next++]! : { kind: 'formula', formula: c.formula, label: c.label, unit: c.unit })
   const scopeQuery = query.scope ?? (row.scope_id && row.scope_kind !== 'none' ? { kind: row.scope_kind, id: row.scope_id } : null)
@@ -234,9 +270,10 @@ export async function savedView(id: string, actor: Actor, query: ViewQuery): Pro
   return {
     ...base,
     keyLabels: { ...base.keyLabels, ...await keyLabels(extraKeys) },
-    source: 'saved', id: row.id, name: { text: row.name }, description: row.description ? { text: row.description } : null,
+    source: 'saved', kind: row.kind, id: row.id, name: { text: row.name }, description: row.description ? { text: row.description } : null,
     usualBy: row.rows_by, chart: row.chart, acrossBy: row.across_by,
     filter: filter ? { ...filter, labels: filterLabels } : null,
+    ...(row.kind === 'people' ? { mayExport: (await can(actor, 'reports.people.export' as never)).allowed } : {}),
     saved: { editable: await mayEdit(actor, row), basedOn: row.based_on, shareRole: row.share_role, archived: row.state === 'archived' },
   }
 }
@@ -246,7 +283,7 @@ export async function formOf(id: string, actor: Actor): Promise<DefinitionInput 
   const row = await editable(actor, id)
   const columns = (JSON.parse(row.columns) as StoredColumn[]).map(c => 'measure' in c ? { measure: c.measure } : { formula: c.formula, label: c.label })
   return {
-    id: row.id, name: row.name, description: row.description, basedOn: row.based_on, columns, rowsBy: row.rows_by, acrossBy: row.across_by as DefinitionInput['acrossBy'],
+    id: row.id, kind: row.kind, name: row.name, description: row.description, basedOn: row.based_on, columns, rowsBy: row.rows_by, acrossBy: row.across_by as DefinitionInput['acrossBy'],
     filter: row.filters ? JSON.parse(row.filters) : null, scopeKind: row.scope_kind, scopeId: row.scope_id, periodRule: row.period_rule, chart: row.chart, shareRole: row.share_role,
   }
 }
@@ -255,5 +292,5 @@ export async function formOf(id: string, actor: Actor): Promise<DefinitionInput 
 export async function draftFrom(reportId: string, actor: Actor): Promise<DefinitionInput> {
   const found = (await readyMadeFor(actor)).find(r => r.report.id === reportId) ?? refuse('reports.report.unknown', 'There is no such report, or you cannot open it.', { status: 404 })
   const { report } = found
-  return { name: '', basedOn: report.id, columns: report.figures.map(measure => ({ measure })), rowsBy: report.breakdown ?? null, acrossBy: null, filter: null, scopeKind: report.scope, scopeId: null, periodRule: report.period, chart: report.chart ?? null, shareRole: null }
+  return { kind: 'figures', name: '', basedOn: report.id, columns: report.figures.map(measure => ({ measure })), rowsBy: report.breakdown ?? null, acrossBy: null, filter: null, scopeKind: report.scope, scopeId: null, periodRule: report.period, chart: report.chart ?? null, shareRole: null }
 }

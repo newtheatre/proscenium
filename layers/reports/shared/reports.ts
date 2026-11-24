@@ -59,6 +59,10 @@ export type Words = { key: string } | { text: string }
 
 export interface ReportView {
   source: 'ready-made' | 'saved'
+  /** A people report reads figures per person, one row each (rules P1 to P8). */
+  kind: 'figures' | 'people'
+  /** For a people report: whether the reader may download it (P4). */
+  mayExport?: boolean
   id: string
   name: Words
   description: Words | null

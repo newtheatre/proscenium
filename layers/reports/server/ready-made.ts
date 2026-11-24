@@ -41,7 +41,7 @@ export async function reportView(id: string, actor: Actor, query: ViewQuery): Pr
   const columns = await figureColumns(report.figures, actor)
   const base = await viewBase(columns, actor, query, { scopeKind: report.scope, periodRule: report.period })
   return {
-    ...base, source: 'ready-made', id: report.id, name: { key: report.label }, description: { key: report.description }, module,
+    ...base, source: 'ready-made', kind: 'figures', id: report.id, name: { key: report.label }, description: { key: report.description }, module,
     usualBy: report.breakdown ?? null, chart: report.chart ?? null, acrossBy: null, filter: null, saved: null,
   }
 }
@@ -66,7 +66,9 @@ export async function viewBase(columns: ReportColumn[], actor: Actor, query: Vie
   const rule = query.period ?? usual.periodRule
   // Until the record is chosen, "all of it" has no dates of its own: the page asks for the record first.
   const waiting = rule === 'scope' && kind !== 'none' && !scope.id
-  const period = waiting ? { from: await operatingDayOf(nowMs()), to: await operatingDayOf(nowMs()) } : await periodOf(rule, query)
+  // Chosen dates not yet chosen start as last month's, for the page to change.
+  const unchosen = rule === 'chosen' && !query.from && !query.to
+  const period = waiting ? { from: await operatingDayOf(nowMs()), to: await operatingDayOf(nowMs()) } : await periodOf(unchosen ? 'last-month' : rule, query)
   const mayCreate = (await can(actor, 'reports.report.create' as never)).allowed
   return { columns, breakdowns, mayCreate, keyLabels: await keyLabels(breakdowns), scopeKind: usual.scopeKind, periodRule: usual.periodRule, period: { rule, ...period }, scope }
 }
