@@ -7,7 +7,7 @@ import { startProvider } from '../../../identity/oidc'
 import { providerById } from '../../../identity/providers'
 import { safeNext } from '../../../identity/web'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   public: true,
   rateLimit: 'sign-in-network',
   input: z.object({ next: z.string().max(512).optional(), login_hint: z.email().max(254).optional() }), // not-policy: a return path and an address are short

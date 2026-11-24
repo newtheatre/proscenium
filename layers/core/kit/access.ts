@@ -147,7 +147,8 @@ export async function can(actor: Actor, ability: AbilityName | 'signed-in', reco
     for (const name of granting) if (name !== ability && (await isEnabled(registry.abilities.get(name)!.module))) implying.add(name)
   }
   if (!by) {
-    const grants = await provider.grants!(actor)
+    // Inside a practice store the person holds the scenario's abilities and nothing else (M6).
+    const grants = currentContext()?.practice ? actor.grants ?? [] : await provider.grants!(actor)
     const chain = record ? await lineage(record) : []
     for (const grant of grants) {
       if (grant.ability ? implying.has(grant.ability) : [...implying].some(name => registry.abilities.get(name)!.module === grant.module)) {

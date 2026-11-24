@@ -78,6 +78,8 @@ export type NextStep
 
 export interface PaymentProvider {
   capabilities: readonly Capability[]
+  /** Offered only inside a practice store, never to a real site: the practice card reader. */
+  practiceOnly?: true
   /** The methods this provider takes, each on the channels it suits. */
   methods: readonly { method: Method, channels: readonly ('online' | 'desk')[] }[]
   /**
