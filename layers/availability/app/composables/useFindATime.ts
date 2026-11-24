@@ -1,12 +1,13 @@
 // Find a time (S7): the organiser's choices, the find they bring back, the days in view, and the people
 // at a chosen slot by level. Nothing is stored until a poll is sent (part 2).
 import { addDays, clockOf, type Piece } from '../../shared/grid'
-import { tally, worstBetween, type Slot, type Span, type Week } from '../../shared/find'
+import { lateFor, tally, worstBetween, type Slot, type Span, type Under18, type Week } from '../../shared/find'
 import type { ShownLevel } from '../../shared/levels'
 
 export interface FindOptions {
   today: string
   grid: { step: number, dayStarts: string, dayEnds: string }
+  arrange: boolean
   groups: { id: string, label: string, hint?: string }[]
   venues: { id: string, name: string, spaces: { id: string, name: string }[] }[]
 }
@@ -18,6 +19,7 @@ export interface Found {
   weeks: Record<string, Week>
   taken: Record<string, (Span & { label: string | null })[]>
   best: Slot[]
+  under18: Under18
 }
 export interface Choices { groupIds: string[], period: { start: string, end: string }, hoursFrom: string, hoursTo: string, length: number, spaceIds: string[], roomOptional: boolean, must: string[] }
 
@@ -76,13 +78,13 @@ export async function useFindATime() {
   }
 
   /** Who is at each level over a stretch, with any reason the organiser may read (A7). */
-  function at(date: string, start: number, end: number): Record<ShownLevel, { name: string, reason?: string }[]> {
-    const out: Record<ShownLevel, { name: string, reason?: string }[]> = { free: [], maybe: [], busy: [], unknown: [] }
+  function at(date: string, start: number, end: number): Record<ShownLevel, { name: string, reason?: string, commitment?: string }[]> {
+    const out: Record<ShownLevel, { name: string, reason?: string, commitment?: string }[]> = { free: [], maybe: [], busy: [], unknown: [] }
     for (const p of found.value?.people ?? []) {
       const pieces: Piece[] = found.value!.weeks[p.id]?.[date] ?? []
       const level = worstBetween(pieces, start, end)
-      const reason = pieces.find(x => x.start < end && start < x.end && x.level === level && x.reason)?.reason
-      out[level].push({ name: p.name, reason })
+      const here = pieces.filter(x => x.start < end && start < x.end && x.level === level)
+      out[level].push({ name: p.name, reason: here.find(x => x.reason)?.reason, commitment: here.find(x => x.commitment)?.commitment })
     }
     return out
   }
@@ -90,7 +92,21 @@ export async function useFindATime() {
   const counts = (date: string, start: number, end: number) => tally(found.value?.people.map(p => p.id) ?? [], found.value?.weeks ?? {}, date, start, end)
   const mustFails = (date: string, start: number, end: number) => (found.value?.people ?? []).some(p => p.must && worstBetween(found.value!.weeks[p.id]?.[date] ?? [], start, end) !== 'free')
   const takenAt = (date: string, start: number, end: number) => (found.value?.taken[date] ?? []).filter(s => s.start < end && start < s.end)
+  /** F6: the names of the under-18s a slot keeps past the latest finish. */
+  const lateAt = (s: { date: string, end: number }) => {
+    const ids = found.value ? lateFor(found.value.under18, s) : []
+    return (found.value?.people ?? []).filter(p => ids.includes(p.id)).map(p => p.name)
+  }
   const when = (s: { start: number, end: number }) => `${clockOf(s.start)} to ${clockOf(s.end)}`
 
-  return { options, choices, found, refusal, searching, search, toggleMust, shown, first, move, at, counts, mustFails, takenAt, when }
+  /** The times picked for a poll (F7), in date and time order. */
+  const picked = ref<{ date: string, start: number, end: number }[]>([])
+  const isPicked = (s: { date: string, start: number }) => picked.value.some(p => p.date === s.date && p.start === s.start)
+  function pick(s: { date: string, start: number, end: number }) {
+    picked.value = isPicked(s)
+      ? picked.value.filter(p => !(p.date === s.date && p.start === s.start))
+      : [...picked.value, { date: s.date, start: s.start, end: s.end }].sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start)
+  }
+
+  return { options, choices, found, refusal, searching, search, toggleMust, shown, first, move, at, counts, mustFails, takenAt, lateAt, when, picked, isPicked, pick }
 }

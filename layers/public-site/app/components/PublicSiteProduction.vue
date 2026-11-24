@@ -11,6 +11,8 @@ interface Note { termId: string, label: string, detail: string | null }
 interface Booking { state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed', link?: string, seatsLeft?: number, sellingFast?: true, opensAt?: number, waitingList?: string, label?: string, external?: true }
 interface Performance {
   id: string
+  /** Absent from an answer cached before drop-in performances were added. */
+  shape?: 'timed' | 'drop-in'
   startsAt: number
   doorsAt: number | null
   endsAt: number
@@ -23,6 +25,10 @@ interface Performance {
   /** Absent from an answer cached before latecomers were added. */
   latecomers?: string
   booking: Booking | null
+  /** Absent from an answer cached before line-ups were added. */
+  lineUp?: { id: string, name: string, note: string | null, startsAt: number | null, production: { slug: string, title: string } | null }[]
+  /** Credits for this date only; an act's carry its lineUpId. */
+  credits?: { id: string, creditedName: string, role: string, lineUpId?: string | null }[]
 }
 interface VenueSummary {
   id: string
@@ -55,12 +61,18 @@ interface Production {
   state: 'published' | 'cancelled'
   past: boolean
   credits: { id: string, creditedName: string, role: string, section: string }[]
+  /** The published collections it belongs to. Absent from an older cached answer. */
+  collections?: { id: string, slug: string, name: string, colour: string }[]
+  /** Other shows' line-ups this one appears in. Absent from an older cached answer. */
+  appearances?: { slug: string, title: string, startsAt: number }[]
   poster: Image | null
   photos: Image[]
   performances: Performance[]
   /** Absent from an answer cached before venues were added. */
   venues?: VenueSummary[]
   price: PriceSummaryView | null
+  /** A season's own words (C-67); absent from an answer cached before they were added. */
+  wording?: Record<string, string> | null
   /** Other modules' parts of the page (C-69, C-75) and the base it lives at while one moves it (C-73). */
   sections?: { id: string, component: string }[]
   lines?: { text: string, placement: 'under-title' | 'credits' | 'footer' }[]
@@ -81,6 +93,7 @@ const here = 'moved' in data.value ? null : data.value
 const prefix = here ? (here.base || (here.past ? 'shows' : 'whats-on')) : props.prefix
 if (moved || prefix !== props.prefix) await navigateTo(`/${prefix}/${moved ?? props.slug}`, { replace: true, redirectCode: 302 })
 const production = computed(() => (data.value && !('moved' in data.value) ? data.value : null))
+const { word } = usePublicWords(() => production.value?.wording)
 const creditLines = computed(() => production.value?.lines?.some(l => l.placement === 'credits') ?? false)
 const priceLine = computed(() => production.value?.price ? priceSummary(production.value.price, t) : '')
 
@@ -131,6 +144,9 @@ const hasPanel = computed(() => !!production.value && (dates.value.length > 0 ||
 // A date says when latecomers are let in only where it differs from the show (one with no interval).
 const differs = (p: Performance) => !!p.latecomers && p.state === 'scheduled' && p.latecomers !== production.value?.latecomers
 const where = (p: Performance) => venues.value.length > 1 || p.space.name !== p.venue.name ? `${p.space.name}, ${p.venue.name}` : ''
+const people = (list: { creditedName: string, role: string }[]) => list.map(c => `${c.role}, ${c.creditedName}`).join('; ')
+const forAct = (p: Performance, id: string) => (p.credits ?? []).filter(c => c.lineUpId === id)
+const forDate = (p: Performance) => (p.credits ?? []).filter(c => !c.lineUpId)
 const credits = computed(() => {
   const sections = new Map<string, { section: string, people: { id: string, creditedName: string, role: string }[] }>()
   for (const c of production.value?.credits ?? []) {
@@ -239,6 +255,19 @@ useHead(() => {
           >
             {{ t('public-site.production.presented-by', { company: production.companyName }) }}
           </p>
+          <div
+            v-if="production.collections?.length"
+            class="flex flex-wrap items-center gap-2"
+          >
+            <span class="text-sm text-muted">{{ t('public-site.production.part-of') }}</span>
+            <CollectionChip
+              v-for="c in production.collections"
+              :key="c.id"
+              :name="c.name"
+              :colour="c.colour"
+              :to="`/collections/${c.slug}`"
+            />
+          </div>
           <dl
             v-if="facts.length"
             class="grid grid-cols-2 gap-x-6 gap-y-4 xl:grid-cols-4"
@@ -424,20 +453,20 @@ useHead(() => {
               v-if="!production.effects.length && production.effectsConfirmedNone && !production.advisories.length && production.advisoriesConfirmedNone"
               class="text-sm text-muted"
             >
-              {{ t('public-site.production.no-advisories') }}
+              {{ t('public-site.production.no-advisories', { production: word('production') }) }}
             </p>
             <template v-else>
               <p
                 v-if="!production.effects.length && production.effectsConfirmedNone"
                 class="text-sm text-muted"
               >
-                {{ t('public-site.production.no-effects') }}
+                {{ t('public-site.production.no-effects', { production: word('production') }) }}
               </p>
               <p
                 v-if="!production.advisories.length && production.advisoriesConfirmedNone"
                 class="text-sm text-muted"
               >
-                {{ t('public-site.production.no-warnings') }}
+                {{ t('public-site.production.no-warnings', { production: word('production') }) }}
               </p>
             </template>
           </div>
@@ -476,13 +505,13 @@ useHead(() => {
                         <span v-if="p.label"> · {{ p.label }}</span>
                       </p>
                       <p class="text-sm text-muted">
-                        <span :class="p.state === 'cancelled' ? undefined : 'font-medium text-default'">{{ time(p.startsAt) }}</span>{{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).map(x => ` · ${x}`).join('') }}
+                        <span :class="p.state === 'cancelled' ? undefined : 'font-medium text-default'">{{ p.shape === 'drop-in' ? t('public-site.production.open-hours', { from: time(p.startsAt), until: time(p.endsAt) }) : time(p.startsAt) }}</span>{{ [where(p), p.shape !== 'drop-in' && p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).map(x => ` · ${x}`).join('') }}
                       </p>
                       <p
                         v-if="p.effectsOff.length && p.state === 'scheduled'"
                         class="text-sm"
                       >
-                        {{ t('public-site.production.effects-off', { effects: p.effectsOff.join(', ') }) }}
+                        {{ t('public-site.production.effects-off', { effects: p.effectsOff.join(', '), performance: word('performance') }) }}
                       </p>
                       <LatecomersNote
                         v-if="differs(p)"
@@ -491,7 +520,7 @@ useHead(() => {
                       <ul
                         v-if="p.access.length"
                         class="flex flex-wrap gap-1"
-                        :aria-label="t('public-site.production.access')"
+                        :aria-label="t('public-site.production.access', { performance: word('performance') })"
                       >
                         <li
                           v-for="a in p.access"
@@ -504,6 +533,44 @@ useHead(() => {
                           />
                         </li>
                       </ul>
+                      <ol
+                        v-if="p.lineUp?.length && p.state !== 'cancelled'"
+                        class="space-y-0.5 text-sm"
+                        :aria-label="t('public-site.production.line-up')"
+                      >
+                        <li
+                          v-for="act in p.lineUp"
+                          :key="act.id"
+                        >
+                          <span
+                            v-if="act.startsAt !== null"
+                            class="me-2 text-muted tabular-nums"
+                          >{{ time(act.startsAt) }}</span>
+                          <ULink
+                            v-if="act.production"
+                            :to="`/${prefix}/${act.production.slug}`"
+                            class="font-medium"
+                          >{{ act.name }}</ULink>
+                          <span
+                            v-else
+                            class="font-medium"
+                          >{{ act.name }}</span>
+                          <span
+                            v-if="act.note"
+                            class="text-muted"
+                          > · {{ act.note }}</span>
+                          <span
+                            v-if="forAct(p, act.id).length"
+                            class="block text-muted"
+                          >{{ people(forAct(p, act.id)) }}</span>
+                        </li>
+                      </ol>
+                      <p
+                        v-if="forDate(p).length && p.state !== 'cancelled'"
+                        class="text-sm text-muted"
+                      >
+                        {{ t('public-site.production.on-this-date', { credits: people(forDate(p)), performance: word('performance') }) }}
+                      </p>
                     </div>
                     <span
                       v-if="p.state === 'cancelled'"
@@ -606,7 +673,7 @@ useHead(() => {
                 id="about-heading"
                 class="text-lg font-semibold text-highlighted"
               >
-                {{ t('public-site.production.about') }}
+                {{ t('public-site.production.about', { production: word('production') }) }}
               </h2>
               <MarkdownText :text="production.description" />
             </section>
@@ -651,6 +718,30 @@ useHead(() => {
               :sections="production.sections ?? []"
               :subject="{ productionId: production.id }"
             />
+
+            <section
+              v-if="production.appearances?.length"
+              aria-labelledby="appearances-heading"
+              class="space-y-2"
+            >
+              <h2
+                id="appearances-heading"
+                class="text-lg font-semibold text-highlighted"
+              >
+                {{ t('public-site.production.also-appearing') }}
+              </h2>
+              <ul class="space-y-1">
+                <li
+                  v-for="a in production.appearances"
+                  :key="`${a.slug}-${a.startsAt}`"
+                >
+                  <ULink
+                    :to="`/${prefix}/${a.slug}`"
+                    class="font-medium"
+                  >{{ a.title }}</ULink><span class="text-muted">, {{ dateTime(a.startsAt) }}</span>
+                </li>
+              </ul>
+            </section>
 
             <section
               v-if="production.photos.length"

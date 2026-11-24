@@ -3,13 +3,11 @@
 // once through the owner's settle handler, dated the day the money arrived. Several may be recorded
 // for one record, because a debt can be paid in parts; the owner refuses an amount above what is owed.
 import { instantOfLocal } from '#kit/clock'
-import { newId, nowMs, Refusal, theatreTimeZone, today, useSetting, type UnitView } from '#kit'
-import { postEntries, type EntryInput } from '#modules/finance'
+import { nowMs, Refusal, theatreTimeZone, today, useSetting, type UnitView } from '#kit'
 import { addAttempt } from './answers'
+import { attestSucceeded, postAttested } from './attested'
 import { createIntent, settlements } from './intents'
-import { clearingFor } from './providers'
 import { outsideAccounts } from './outside'
-import { ownerEntries } from './owner-entries'
 
 export interface ReceivedInput {
   owner: { module: string, record: string }
@@ -37,29 +35,13 @@ export async function recordReceived(unit: UnitView, input: ReceivedInput): Prom
   const currency = await useSetting('core.locale.currency') as string
   const { intentId, partIds } = await createIntent(unit, { parts: [{ owner: input.owner, amountMinor: input.amountMinor }], currency, channel: 'desk', expiresAt: at })
   const attempt = addAttempt(unit, { intentId, providerAccountId: input.providerAccountId, method: 'other_attested', amountMinor: input.amountMinor, note: reference })
-  unit.add({
-    sql: "UPDATE payments_attempts SET state = 'succeeded', answered_by = ?, answered_at = ?, updated_at = ? WHERE id = ? AND state = 'started'",
-    params: [input.by, at, at, attempt.id],
-  }).expect(1, { code: 'payments.attempt.already-answered', reason: 'This payment already has its answer.' })
-  unit.add({ sql: "INSERT INTO payments_attempt_events (id, attempt_id, kind, source, by, at) VALUES (?, ?, 'attested_succeeded', 'person', ?, ?)", params: [newId('ate'), attempt.id, input.by, at] })
+  attestSucceeded(unit, attempt.id, input.by, at)
   unit.add({ sql: "UPDATE payments_intents SET state = 'succeeded', settled_at = ?, updated_at = ? WHERE id = ? AND state = 'open'", params: [at, at, intentId] }).expect(1)
   unit.add({ sql: 'UPDATE payments_intent_parts SET settled_at = ? WHERE intent_id = ?', params: [at, intentId] }).expect(1)
 
   const part = { id: partIds[0]!, intentId, record: input.owner.record, amountMinor: input.amountMinor, currency, receivedOn: input.receivedOn }
   const own = await handler.settle(unit, part)
-  const total = own.reduce((sum, e) => sum + e.amountMinor, 0)
-  if (total !== -input.amountMinor) throw new Refusal('payments.settlement.part-mismatch', `${input.owner.module}'s entries for this payment total ${-total}, not ${input.amountMinor}.`, { status: 500 })
-  const entries: EntryInput[] = await ownerEntries(own, input.owner.module)
-  await postEntries(unit, {
-    key: `payments:intent:${intentId}:paid`,
-    source: { module: 'payments', type: 'payments.intent', id: intentId },
-    kind: 'sale',
-    currency,
-    postedBy: input.by,
-    occurredAt: input.receivedOn === await today() ? at : instantOfLocal(input.receivedOn, '12:00', await theatreTimeZone()), // not-policy: midday, safely inside the day
-    entries: [{ account: clearingFor('other_attested', input.providerAccountId), amountMinor: input.amountMinor }, ...entries],
-  })
-  unit.audit({ action: 'create', record: ['payments.intent', intentId], detail: { received: input.amountMinor } })
-  unit.announce('payments.intent.succeeded', { intentId, owners: [{ moduleId: input.owner.module, recordId: input.owner.record }] }, { record: ['payments.intent', intentId] })
+  const occurredAt = input.receivedOn === await today() ? at : instantOfLocal(input.receivedOn, '12:00', await theatreTimeZone()) // not-policy: midday, safely inside the day
+  await postAttested(unit, { intentId, owner: input.owner, amountMinor: input.amountMinor, currency, providerAccountId: input.providerAccountId, by: input.by, occurredAt, detail: { received: input.amountMinor } }, own)
   return { intentId }
 }

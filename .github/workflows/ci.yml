@@ -29,6 +29,8 @@ jobs:
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run check:conformance
+      # Import cycles, duplication, type coverage and ignore comments may not get worse than metrics.json.
+      - run: bun run metrics
       # No file, dependency or import that nothing uses (knip.json teaches it the registry's conventions).
       - run: bun run check:unused
 
@@ -41,7 +43,8 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
-      - run: bun run test
+      # Coverage may not fall below the thresholds in vitest.config.ts.
+      - run: bun run test:coverage
 
   browser:
     name: Build and browser tests
@@ -57,10 +60,8 @@ jobs:
       - run: bun run build
         env:
           PROSCENIUM_GALLERY: '1'
-      - name: Worker size
-        run: |
-          du -sh .output/server
-          gzip -c .output/server/chunks/nitro/nitro.mjs | wc -c | awk '{ printf "nitro.mjs gzipped: %.0f KB\n", $1 / 1024 }' >> "$GITHUB_STEP_SUMMARY"
+      # The Worker and browser bundles, compared with metrics.json (5% growth allowed per change).
+      - run: bun run metrics worker
       - run: bunx playwright test
       - uses: actions/upload-artifact@v4
         if: failure()

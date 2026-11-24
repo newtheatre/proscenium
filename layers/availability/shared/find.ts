@@ -4,11 +4,19 @@ import { pieceAt, type Piece } from './grid'
 import type { ShownLevel } from './levels'
 
 export const BEST_MAX = 10 // not-policy: rule F3 lists ten
+export const SLOTS_MIN = 2 // not-policy: rule F7's shortlist
+export const SLOTS_MAX = 6 // not-policy: rule F7's shortlist
 
 /** One person's levels: date to that day's pieces. */
 export type Week = Record<string, Piece[]>
 export interface Span { start: number, end: number }
 export interface Slot { date: string, start: number, end: number, free: number, maybe: number, unknown: number, busy: number }
+
+/** F6: the latest finish in minutes (null while unset), who is under 18 on each date, and one-to-one. */
+export interface Under18 { lateFinish: number | null, late: Record<string, string[]>, oneToOne: boolean }
+
+/** F6: the under-18s a slot keeps past the latest finish. */
+export const lateFor = (u: Under18, slot: { date: string, end: number }): string[] => u.lateFinish !== null && slot.end > u.lateFinish ? u.late[slot.date] ?? [] : []
 
 const WORST: ShownLevel[] = ['free', 'unknown', 'maybe', 'busy']
 
@@ -22,6 +30,22 @@ export function worstBetween(pieces: Piece[], start: number, end: number): Shown
     m = p.end
   }
   return WORST[worst]!
+}
+
+/** F4: a commitment laid over a person's day where it is worse than what they said; the rest is untouched. */
+export function overlay(pieces: Piece[], span: Span, level: 'busy' | 'maybe', commitment: string): Piece[] {
+  const out: Piece[] = []
+  for (const p of pieces) {
+    if (p.end <= span.start || span.end <= p.start) {
+      out.push(p)
+      continue
+    }
+    if (p.start < span.start) out.push({ ...p, end: span.start })
+    const mid = { start: Math.max(p.start, span.start), end: Math.min(p.end, span.end) }
+    out.push(WORST.indexOf(level) > WORST.indexOf(p.level) ? { ...mid, level, commitment } : { ...p, ...mid })
+    if (span.end < p.end) out.push({ ...p, start: span.end })
+  }
+  return out
 }
 
 /** Counts by level of a stretch, everyone at their worst over it. */

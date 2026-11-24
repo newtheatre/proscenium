@@ -10,6 +10,6 @@ export default defineRoute({
   rateLimit: 'write',
   input: creditOrderInput,
 }, async (_event, { input, unit, record }) => {
-  await reorderCredits(unit, record!.id, input.sectionTermId, input.ids)
+  await reorderCredits(unit, record!.id, input.sectionTermId, input.ids, input.performanceId ?? null)
   return { id: record!.id }
 })

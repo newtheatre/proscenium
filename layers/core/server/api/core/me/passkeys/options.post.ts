@@ -6,7 +6,7 @@ import { requireFresh, sessionOf } from '../../../../identity/guards'
 import { registrationOptions } from '../../../../identity/passkeys'
 import { accountById, verifiedAddressesOf } from '../../../../identity/accounts'
 
-export default defineRoute({ ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { unit, actor }) => {
+export default defineRoute({ practice: 'refuse', ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { unit, actor }) => {
   const session = await sessionOf(event)
   if (!session.limited) await requireFresh(actor)
   const account = await accountById(session.accountId)

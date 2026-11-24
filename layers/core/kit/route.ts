@@ -18,6 +18,9 @@ import { withoutTokens } from './tokens'
 import { useSetting } from './settings-store'
 import { ensureMigrated } from './migrations'
 import type { AbilityName } from './registry-types'
+import { PRACTICE_HEADER, usePracticeGate } from './practice/gate'
+import type { PracticeAnswer } from './practice/sample'
+import { log } from './log'
 
 export interface RouteDeclaration<I extends z.ZodType | undefined = undefined> {
   /** The ability the route requires, or 'signed-in' for any signed-in person. */
@@ -43,6 +46,14 @@ export interface RouteDeclaration<I extends z.ZodType | undefined = undefined> {
    * of the log, error reports, the idempotency record, audit rows, events and job payloads.
    */
   tokens?: readonly string[]
+  /** For a route outside /api/<module>/, such as /calendar: the module that serves it. */
+  module?: string
+  /**
+   * Practice mode (part 3). 'refuse': a marked request is refused, as signing in, passkeys,
+   * recovery, erasure, setup and the update card are (M4). 'outside': the route manages practice
+   * itself against the real database, so a mark neither swaps its bindings nor is required.
+   */
+  practice?: 'refuse' | 'outside'
 }
 
 export interface RouteContext<I> {
@@ -64,6 +75,11 @@ export function checkRouteDeclaration(decl: RouteDeclaration<any>): void {
   if (decl.protect !== undefined && decl.protect !== 'turnstile') throw new DeclarationError('protect', "is 'turnstile'")
   if (decl.body !== undefined && decl.body !== 'json' && decl.body !== 'binary') throw new DeclarationError('body', "is 'json' or 'binary'")
   if (decl.body === 'binary' && decl.idempotent) throw new DeclarationError('idempotent', 'a binary body is not kept, so it cannot be replayed')
+  checkRouteExtras(decl)
+}
+
+function checkRouteExtras(decl: RouteDeclaration<any>): void {
+  if (decl.practice !== undefined && decl.practice !== 'refuse' && decl.practice !== 'outside') throw new DeclarationError('practice', "is 'refuse' or 'outside'")
   if (decl.tokens !== undefined && (!Array.isArray(decl.tokens) || !decl.tokens.every(t => typeof t === 'string' && /^[a-z][a-zA-Z0-9]*$/.test(t)))) throw new DeclarationError('tokens', 'names the path parameters that carry a link token')
 }
 
@@ -160,14 +176,15 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     }
     await ensureMigrated()
     const registry = useRegistry()
-    const module = moduleOfPath(event.path)
+    const module = moduleOfPath(event.path) ?? decl.module
     if (!module || !registry.modules.has(module)) throw new Refusal('core.not-found', 'There is nothing here.', { status: 404 })
     context.module = module
     if (!(await isEnabled(module))) throw new Refusal('core.not-found', 'There is nothing here.', { status: 404 })
 
     const provider = useAccessProvider()
-    const actor = await provider.actor(event)
+    let actor = await provider.actor(event)
     context.actor = actor
+    actor = await practiceOrReal(event, actor)
 
     context.requestOrigin = requestUrl(event).origin
     context.reads = ['GET', 'HEAD'].includes(event.method.toUpperCase())
@@ -263,11 +280,45 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     else if (idempotency) {
       await context.env.DB.prepare('INSERT OR REPLACE INTO core_idempotency_keys (key, route, account_id, request_hash, status, response, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(idempotency.key, idempotency.route, actor.accountId ?? null, idempotency.hash, 200, JSON.stringify(body), nowMs()).run() // not-policy: HTTP OK
     }
+    if (context.practice && !reads) await afterPracticeChange({ path: event.path.split('?')[0]!, body })
     return body
+  }
+
+  /**
+   * Swaps the request into the person's practice store when it carries the mark (M1, M3), refuses a
+   * mark where practice may not go (M4), and an unmarked change from a practice page (M2).
+   */
+  async function practiceOrReal(event: H3Event, actor: Actor): Promise<Actor> {
+    const marked = getHeader(event, PRACTICE_HEADER) === '1'
+    if (decl.practice === 'outside') return actor
+    if (marked && decl.practice === 'refuse') throw new Refusal('core.practice.not-in-practice', 'This cannot be done in practice.', { status: 403, remedy: 'Leave practice first.' })
+    const gate = usePracticeGate()
+    if (!marked) {
+      await gate.unmarked(event)
+      return actor
+    }
+    const entry = await gate.enter(event, actor)
+    const context = useContext()
+    context.env = entry.env
+    context.practice = entry.practice
+    context.actor = entry.actor
+    // Settings, module states and the session were read from the real database: read them again from the store.
+    context.cache = {}
+    return entry.actor
   }
 
   ;(routeHandler as any)[ROUTE] = decl
   return routeHandler
+}
+
+/** Ticks the scenario's tasks after a practice change commits; a failure never undoes the change. */
+async function afterPracticeChange(answer: PracticeAnswer): Promise<void> {
+  try {
+    await usePracticeGate().changed?.(answer)
+  }
+  catch (error) {
+    log.error('core.practice.tasks-failed', { error: String((error as Error)?.message ?? error) })
+  }
 }
 
 export function routeDeclaration(handler: unknown): RouteDeclaration<any> | undefined {

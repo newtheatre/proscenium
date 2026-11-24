@@ -1,0 +1,15 @@
+{
+  "calendar-feed.module.name": "Calendar feed",
+  "calendar-feed.module.description": "One private calendar address for each person, with everything they are on: shifts, calls, sessions and meetings, kept up to date in their own calendar app. It has no switch: it comes on with any module that adds to it, such as Front of house.",
+  "calendar-feed.file.name": "My theatre calendar",
+  "calendar-feed.account.title": "Your calendar",
+  "calendar-feed.account.summary": "Everything you are on, in your own calendar app",
+  "calendar-feed.panel.description": "Subscribe in your calendar app and everything you are on appears there and stays up to date. Anyone with this address can see what you are on, so keep it to yourself.",
+  "calendar-feed.panel.show": "Get my calendar address",
+  "calendar-feed.panel.address": "Your calendar address",
+  "calendar-feed.panel.copy": "Copy",
+  "calendar-feed.panel.copied": "Address copied",
+  "calendar-feed.panel.reset": "Make a new address and stop the old one",
+  "calendar-feed.panel.reset-done": "You have a new address",
+  "calendar-feed.navigation.mine.label": "Your calendar"
+}

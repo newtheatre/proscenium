@@ -2,12 +2,11 @@
 // "A payment taken outside the site"), such as a card taken in the provider's own app when the till
 // could not reach the reader. It is recorded as an Other payment and kept: the owner books the income
 // through its `kept` handler, the record itself staying as it is, all in the caller's unit.
-import { all, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
-import { postEntries, type EntryInput } from '#modules/finance'
+import { all, nowMs, Refusal, useSetting, type UnitView } from '#kit'
 import { addAttempt } from './answers'
+import { attestSucceeded, postAttested } from './attested'
 import { createIntent, settlements } from './intents'
-import { clearingFor, methodsFor } from './providers'
-import { ownerEntries } from './owner-entries'
+import { methodsFor } from './providers'
 
 export interface OutsideInput {
   owner: { module: string, record: string }
@@ -40,11 +39,7 @@ export async function recordTakenOutside(unit: UnitView, input: OutsideInput): P
   const currency = await useSetting('core.locale.currency') as string
   const { intentId, partIds } = await createIntent(unit, { parts: [{ owner: input.owner, amountMinor: input.amountMinor }], currency, channel: 'desk', expiresAt: at })
   const attempt = addAttempt(unit, { intentId, providerAccountId: input.providerAccountId, method: 'other_attested', amountMinor: input.amountMinor, note })
-  unit.add({
-    sql: "UPDATE payments_attempts SET state = 'succeeded', answered_by = ?, answered_at = ?, updated_at = ? WHERE id = ? AND state = 'started'",
-    params: [input.by, at, at, attempt.id],
-  }).expect(1, { code: 'payments.attempt.already-answered', reason: 'This payment already has its answer.' })
-  unit.add({ sql: "INSERT INTO payments_attempt_events (id, attempt_id, kind, source, by, at) VALUES (?, ?, 'attested_succeeded', 'person', ?, ?)", params: [newId('ate'), attempt.id, input.by, at] })
+  attestSucceeded(unit, attempt.id, input.by, at)
   // Another payment for the same record settled since the read: this one is refused whole.
   unit.add({
     sql: `UPDATE payments_intents SET state = 'succeeded', settled_at = ?, updated_at = ? WHERE id = ? AND state = 'open'
@@ -55,18 +50,6 @@ export async function recordTakenOutside(unit: UnitView, input: OutsideInput): P
 
   const part = { id: partIds[0]!, intentId, record: input.owner.record, amountMinor: input.amountMinor, currency }
   const own = await handler.kept(unit, part)
-  const total = own.reduce((sum, e) => sum + e.amountMinor, 0)
-  if (total !== -input.amountMinor) throw new Refusal('payments.settlement.part-mismatch', `${input.owner.module}'s entries for this payment total ${-total}, not ${input.amountMinor}.`, { status: 500 })
-  const entries: EntryInput[] = await ownerEntries(own, input.owner.module)
-  await postEntries(unit, {
-    key: `payments:intent:${intentId}:paid`,
-    source: { module: 'payments', type: 'payments.intent', id: intentId },
-    kind: 'sale',
-    currency,
-    postedBy: input.by,
-    entries: [{ account: clearingFor('other_attested', input.providerAccountId), amountMinor: input.amountMinor }, ...entries],
-  })
-  unit.audit({ action: 'create', record: ['payments.intent', intentId], detail: { outside: input.amountMinor } })
-  unit.announce('payments.intent.succeeded', { intentId, owners: [{ moduleId: input.owner.module, recordId: input.owner.record }] }, { record: ['payments.intent', intentId] })
+  await postAttested(unit, { intentId, owner: input.owner, amountMinor: input.amountMinor, currency, providerAccountId: input.providerAccountId, by: input.by, detail: { outside: input.amountMinor } }, own)
   return { intentId, attemptId: attempt.id }
 }

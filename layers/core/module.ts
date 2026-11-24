@@ -10,6 +10,7 @@ import * as identity from './module/identity'
 import { tables } from './server/db/schema'
 import * as domain from './module/domain'
 import { tables as domainTables } from './server/db/domain'
+import { practiceAbilities, practicePoints, practiceRecords, practiceSettings } from './module/practice'
 
 export default defineModule({
   id: 'core',
@@ -18,19 +19,19 @@ export default defineModule({
   stability: 'experimental',
   switchable: false,
 
-  settings: { ...settings, ...identity.identitySettings, ...domain.settings },
+  settings: { ...settings, ...identity.identitySettings, ...domain.settings, ...practiceSettings },
   settingRules: defineSettingRules('core', [...settingRules.rules, ...identity.identitySettingRules, ...domain.settingRules]),
   settingGroups,
   settingPages,
-  abilities: { ...abilities, ...identity.identityAbilities, ...domain.abilities },
-  records: { ...records, ...identity.identityRecords, ...domain.records },
+  abilities: { ...abilities, ...identity.identityAbilities, ...domain.abilities, ...practiceAbilities },
+  records: { ...records, ...identity.identityRecords, ...domain.records, ...practiceRecords },
   facts: { ...identity.identityFacts, ...domain.facts },
   tables: { ...tables, ...domainTables },
-  points: { ...points, ...identity.identityPoints, ...domain.points },
+  points: { ...points, ...identity.identityPoints, ...domain.points, ...practicePoints },
   contributes: {
     ...domain.contributes,
     ...identity.identityContributions,
-    'core.health-check': [...identity.identityContributions['core.health-check'], ...domain.contributes['core.health-check'], { id: 'core.signing-keys', file: 'signing-keys' }, { id: 'core.site-origin', file: 'site-origin' }, { id: 'core.search-indexes', file: 'search-indexes' }],
+    'core.health-check': [...identity.identityContributions['core.health-check'], ...domain.contributes['core.health-check'], { id: 'core.signing-keys', file: 'signing-keys' }, { id: 'core.site-origin', file: 'site-origin' }, { id: 'core.search-indexes', file: 'search-indexes' }, { id: 'core.public-wording', file: 'public-wording' }],
     'core.vocabulary': [...domain.contributes['core.vocabulary'], ...identity.identityContributions['core.vocabulary']],
     'core.file-slot': [...domain.contributes['core.file-slot'], ...identity.identityContributions['core.file-slot']],
     'core.public-component': [...domain.contributes['core.public-component'], ...identity.identityContributions['core.public-component']],
@@ -50,6 +51,8 @@ export default defineModule({
     ],
     // The coming week's performances, on the console home's grid.
     'core.home-figure': [{ id: 'core.performances', file: 'performances' }],
+    // Practice mode's base sample sets (C-76): the people and tonight's show every scenario starts from.
+    'core.practice-sample': [{ id: 'core.people', file: 'people' }, { id: 'core.tonight', file: 'tonight' }],
     'core.account-notice': [...identity.identityContributions['core.account-notice']],
     'core.account-section': [...identity.identityContributions['core.account-section'], ...domain.contributes['core.account-section']],
     // My account's entries (identity spec part 6). The passkey offer after signing in is a getting-in
@@ -76,6 +79,7 @@ export default defineModule({
       { id: 'core.access-scheme-queue', menu: 'console', group: 'people', section: 'everyday', to: '/console/people/access-scheme', icon: 'i-lucide-accessibility', ability: 'core.access-scheme.read', order: 60, count: 'core.access-scheme-waiting' },
       { id: 'core.productions', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/productions', icon: 'i-lucide-drama', ability: 'core.production.view', order: 10 },
       { id: 'core.calendar', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/calendar', icon: 'i-lucide-calendar-days', ability: 'core.production.view', order: 15 },
+      { id: 'core.collections', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/collections', icon: 'i-lucide-library', ability: 'core.production.view', order: 12 },
       { id: 'core.seasons', menu: 'admin', group: 'modules', to: '/admin/modules/core/seasons', icon: 'i-lucide-calendar-range', ability: 'core.season.manage', order: 20, settingsIn: ['core.productions'] },
       { id: 'core.run-presets', menu: 'admin', group: 'modules', to: '/admin/modules/core/run-presets', icon: 'i-lucide-calendar-clock', ability: 'core.programme.configure', order: 25, settingsIn: ['core.productions'] },
       { id: 'core.modules', menu: 'admin', group: 'modules', to: '/admin/modules', icon: 'i-lucide-blocks', ability: ['core.modules.manage', 'core.health.view'], order: 10 },

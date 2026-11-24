@@ -2,6 +2,17 @@
 
 What the build settled that the parts above leave open, and where it differs from them. Each entry names its story.
 
+## C-70: the calendar feed
+
+- **Where it lives.** `layers/calendar-feed`, a support module (`support: true`) that Front of house requires, so it is on while Front of house is. Its table is `calendar_feed_tokens`; the feed is `server/routes/calendar/[file].get.ts`, served at `/calendar/<token>.ics` through `defineRoute` with the new `module` option. The address is made and reset by `POST /api/calendar-feed/me` and `/api/calendar-feed/me/reset`, shown on My account > Your calendar (`/account/calendar`) and on Front of house's My shifts, both through `CalendarFeedPanel`.
+- **Coming on.** A contributor lists `calendar-feed` in `requires`, which is what brings the module on; contributing alone does not, since core owns the point.
+- **CF3.** The marker is the core setting `core.calendar.site-marker` (managed, on the Advanced page's calendar group), set to the site's host in the same unit as the first address is made, or on the first serve if a carried-over address comes first. `siteMarker()` is in `#modules/core` for Availability's I4.
+- **CF4 as a kit check.** `core.calendar-feed` is declared `publicSafe: true`. Each contribution lists in `from` the `<table>.<column>` its titles and locations come from, and `buildRegistry` refuses one naming a personal, free-text, special or per-row column, or one naming no columns. It checks the declaration, not the code, so a reviewer still checks the query matches it.
+- **CF5.** The migration copies Front of house's rows across with their hash and generation and drops the old table. The token seed stays `front-of-house.feed`, so a carried-over address and a new one are worked out the same way, and `/api/front-of-house/calendar/<token>` still answers, now with the whole feed.
+- **CF6.** Each contributor is asked in turn; one that throws is logged (`calendar-feed.contributor-failed`) and the rest are served. Erasure deletes the row through the plan (`onErasure: 'delete-row'`).
+- **Front of house's events.** Places on published, completed or cancelled shifts in the window: requested is tentative; a cancelled shift or a place declined, withdrawn, released or removed is cancelled. Titles are the duty with the show or occasion; the briefing and the curtain time stay out of the feed and stay in the single-shift "Add to calendar" file, which now uses the feed's UID so adding both gives one event.
+- **Window.** 30 days back to a year ahead; the contract leaves cancelled events to each contributor within that window.
+
 ## FH-49: crew calls and sign-up questions
 
 - **Where it lives.** `layers/front-of-house/server/crew-calls.ts`; the console list is `/console/front-of-house/crew-calls` and each call's page has Details, Questions, Crew and Shifts tabs. A volunteer's page for a call is `/members/front-of-house/crew-calls/<id>`.
@@ -53,3 +64,22 @@ What the build settled that the parts above leave open, and where it differs fro
 - **Unit size.** A chain of five fits the unit's fifty statements with room to spare only because the person is told once, at the end of the chain. A form whose system moves open review rounds or queue several actions at each step may come close; if one is ever refused as too large, the remedy is a shorter chain.
 - **The loop warning** is an audit entry (`detail.loop`) on the response; the health check joins it to the form's live version, so publishing a fixed version clears it.
 - **Not done.** Records' own fields (FB-508) never take system moves, since they have no stages.
+
+## C-67: a season's own public words
+
+- **Where it lives.** The contract in `layers/core/server/points/public-wording.ts`; `publicWordingFor` and the clash check in `layers/core/server/programme/wording.ts`; the health check `core.public-wording`. On the public site, `usePublicWords` and the `public-site.words.*` defaults. `docs/kit/interface.md` ("A season's own public words") is the guide.
+- **What changes.** The production page (the about heading, the access and effects lines of a date, the "has no warnings" sentences) and the season page's empty state take the words. The public production and season answers carry `wording`.
+- **Emails and the feed.** No booking email names any of the eight words today (they say the show's title and date), so none changes. The calendar feed (C-70, lane A) should call `publicWordingFor` when it lands.
+- **Failing contributors** count as not applying.
+- **Tests.** `layers/public-site/tests/integration/public-wording.test.ts`, through the `worded` fixture module.
+
+## BO-73: door headcount
+
+- **Where it lives.** The counter is `/live/door/<performance>/count`, reached by the Scan and Count tabs at the top of the live door. A performance never put on sale and with no bookings opens on Count (HC1). The server is `layers/box-office/server/headcount.ts`; the arithmetic, shared with the device, is `layers/box-office/shared/headcount.ts`.
+- **Presses.** `POST /api/box-office/performances/<id>/headcount/taps` takes one press or an offline batch, oldest first, each with an id made on the device (`hct_`, as the kit makes ids). A stored id answers `sent` and changes nothing (HC2). Each answer says `counted`, `sent`, `out-not-offered`, `not-found`, `not-undoable`, `already-undone` or `too-late`, with the figures after.
+- **Undo (HC5).** An undo is a row of kind `undo` naming the press it reverses; a unique index keeps a press from being undone twice. The device undoes its own newest press while `box-office.door.undo-within` lasts, measured by the device's clocks, so an undo made offline is judged when it was pressed. After the window, `POST .../headcount/correct` takes a reason from the new vocabulary `box-office.headcount-correction` and needs `box-office.headcount.correct` (which implies `ticket.admit`; added to the Front of house manager role template). The reason is kept on the row as `reason_term_id`, a column the data model above does not list, and the correction is audited with the reason's slug and no free text.
+- **Figures.** `headcountFor(performanceIds)` answers as a set: `{ admitted, walkUps, in, out, inside, peak, capacity }`. `admitted` is tickets scanned and is never added to the counter's figures. `walkUps` is everyone counted in. `peak` is the most inside at once by the devices' clocks. `inside` never goes below nought.
+- **Full.** The counter warns from `box-office.door.full-warning` per cent of capacity and reads "Full: n of capacity" at capacity, never refusing (HC4). `box-office.headcount.full` is announced once, the first time inside reaches capacity.
+- **Out (HC3).** Out is offered while `box-office.door.count-out` is on. Drop-in performances (C-62) are not on `next` yet; when they land, `countsOut` in `headcount.ts` also answers true for them, and the counter's heading reads Inside for them.
+- **Night report.** Box office's attendance section adds "Walk-ups counted in", "Counted out" (when any) and "Most inside at once" when the counter was used.
+- **Left for BO-74.** The `festival.*` contributions wait for Festival's points, and `core.measure` for Reports'; the Tonight hub's "Inside now" figure waits for drop-in performances.
