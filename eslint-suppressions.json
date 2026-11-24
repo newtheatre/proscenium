@@ -225,6 +225,9 @@
   "layers/box-office/app/pages/admin/modules/box-office/ticket-types.vue": {
     "max-lines": {
       "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
     }
   },
   "layers/box-office/app/pages/console/box-office/comps.vue": {
