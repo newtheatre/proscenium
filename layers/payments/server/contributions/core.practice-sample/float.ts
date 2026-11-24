@@ -11,7 +11,7 @@ const FLOAT = 5000 // not-policy: a practice float, used only where the theatre 
 
 export default definePracticeSample({
   after: ['core.tonight'],
-  async seed(unit, { results }) {
+  async seed(unit, { results }): Promise<Record<string, string>> {
     const id = newId('ppa')
     const at = nowMs()
     const label = t('payments.practice.reader')

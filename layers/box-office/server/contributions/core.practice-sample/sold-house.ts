@@ -20,6 +20,7 @@ const MOST_SEATS = 40 // not-policy: a small house keeps the store quick to make
 const SOLD = 0.6 // not-policy: the spec's "60% sold"
 const RESERVED = 4 // not-policy: the spec's four unpaid reservations
 const PRICE = 1200 // not-policy: a practice price
+const PASS_PRICE = 3600 // not-policy: a practice pass, worth three shows
 
 type Person = { name: string, address: string }
 
@@ -41,7 +42,7 @@ async function setUp(production: string, nights: string[]): Promise<{ type: stri
   const typeId = wanted.made ? await createTicketType(first.view(), { name: wanted.name, kind: 'standard', channel: 'all' }) : wanted.id
   const bandId = createBand(first.view(), production, { name: t('box-office.practice.band'), kind: 'standard' })
   const currency = await useSetting('core.locale.currency') as string
-  await createPassType(first.view(), { name: t('box-office.practice.pass'), covers: 'productions', productionIds: [production], perShow: 'once', prices: [{ name: t('box-office.practice.pass-price'), amountMinor: PRICE * 3 }] }, currency, null)
+  await createPassType(first.view(), { name: t('box-office.practice.pass'), covers: 'productions', productionIds: [production], perShow: 'once', prices: [{ name: t('box-office.practice.pass-price'), amountMinor: PASS_PRICE }] }, currency, null)
   await first.commit()
 
   const second = createUnit()
@@ -65,7 +66,9 @@ async function setUp(production: string, nights: string[]): Promise<{ type: stri
   return { type: wanted.name }
 }
 
-function bookings(cast: Person[], holder: Person, type: string, startsAt: { tonight: number, tomorrow: number }, seats: number): ImportBooking[] {
+type Plan = { cast: Person[], holder: Person, type: string, startsAt: { tonight: number, tomorrow: number }, seats: number }
+
+function bookings({ cast, holder, type, startsAt, seats }: Plan): ImportBooking[] {
   const out: ImportBooking[] = []
   const book = (who: Person, at: number, tickets: ImportBooking['tickets'], code?: string) =>
     out.push({ reference: `PRAC-${String(out.length + 1).padStart(3, '0')}`, email: who.address, name: who.name, production: 'the-practice-play', startsAt: at, cancelled: false, tickets, ...code ? { code } : {} })
@@ -91,9 +94,9 @@ export default definePracticeSample({
     await importPasses(pass.view(), [{ code: PASS_CODE, passType: t('box-office.practice.pass'), price: t('box-office.practice.pass-price'), email: holder.address, name: holder.name, paid: true }], false)
     await pass.commit()
     const seats = Math.min(await houseOf(results.tonight!) ?? MOST_SEATS, MOST_SEATS)
-    const verdicts = await importShare({ importId: 'practice', bookings: bookings(cast.slice(0, -1), holder, type, { tonight: nights[0]!.starts_at, tomorrow: nights[1]!.starts_at }, seats) })
+    const verdicts = await importShare({ importId: 'practice', bookings: bookings({ cast: cast.slice(0, -1), holder, type, startsAt: { tonight: nights[0]!.starts_at, tomorrow: nights[1]!.starts_at }, seats }) })
     const refused = verdicts.find(v => v.result === 'refused')
-    if (refused) refuse('box-office.practice.not-seeded', `A practice booking could not be made: ${'reason' in refused ? refused.reason : refused.reference}`, { status: 500 })
+    if (refused) refuse('box-office.practice.not-seeded', `Practice booking ${refused.reference} could not be made: ${refused.reason}`, { status: 500 })
     return {}
   },
 })
