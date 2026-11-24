@@ -20,6 +20,10 @@ async function visit(page: Page, url: string) {
 }
 const noViolations = async (page: Page) => {
   await page.mouse.move(0, 0)
+  // A button still fading back from its loading state is not what the page settles to.
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter(a => a.effect?.getComputedTiming().iterations !== Infinity)
+    .map(a => a.finished.catch(() => null))))
   expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }
 const cell = (page: Page, day: string, from: string) => page.getByRole('gridcell', { name: new RegExp(`^${day}.*, ${from} to `) })
@@ -210,5 +214,63 @@ test.describe('finding a time', () => {
     await page.keyboard.press('Escape')
     await page.getByRole('checkbox', { name: /Ada Available/ }).check()
     await expect(page.getByText('No time works for everyone who must come')).toBeVisible()
+  })
+})
+
+test.describe('a poll', () => {
+  let pollUrl = ''
+
+  test.describe('its organiser', () => {
+    test.use(as(organiser))
+
+    test('picks two of the best times and sends them as a poll', async ({ page }) => {
+      await visit(page, '/members/find-a-time')
+      await page.getByRole('button', { name: /^Groups/ }).click()
+      await page.getByRole('option', { name: 'Gallery company' }).click()
+      await page.keyboard.press('Escape')
+      await page.getByRole('button', { name: 'Find times' }).click()
+      await page.getByRole('button', { name: 'Add to poll' }).first().click()
+      await expect(page.getByRole('button', { name: 'Send a poll' })).toBeDisabled()
+      await page.getByRole('button', { name: 'Add to poll' }).first().click()
+      await expect(page.getByRole('heading', { name: 'Times for a poll (2)' })).toBeVisible()
+      await noViolations(page)
+      await page.getByRole('button', { name: 'Send a poll' }).click()
+      const dialog = page.getByRole('dialog')
+      await dialog.getByRole('textbox', { name: /^Title/ }).fill('Cast reading')
+      await noViolations(page)
+      await dialog.getByRole('button', { name: 'Send a poll' }).click()
+      await expect(page.getByRole('heading', { level: 1, name: 'Cast reading' })).toBeVisible()
+      pollUrl = page.url()
+    })
+  })
+
+  test.describe('a member asked', () => {
+    test.use(as(member))
+
+    test('answers it from Asked of me, seeing only their own answers', async ({ page }) => {
+      await visit(page, '/members/availability/requests')
+      await page.getByRole('link', { name: /Cast reading/ }).click()
+      await expect(page.getByRole('heading', { level: 1, name: 'Cast reading' })).toBeVisible()
+      await expect(page.getByText('Only the person who sent the poll sees your answers')).toBeVisible()
+      await page.getByRole('radio', { name: 'Yes' }).first().check()
+      await page.getByRole('radio', { name: 'If need be' }).nth(1).check()
+      await noViolations(page)
+      await page.getByRole('button', { name: 'Save answers' }).click()
+      await expect(page.getByText('Answers saved')).toBeVisible()
+    })
+  })
+
+  test.describe('its organiser, later', () => {
+    test.use(as(organiser))
+
+    test('sees the answers and chooses a time', async ({ page }) => {
+      await visit(page, pollUrl)
+      await expect(page.getByText('1 yes · 0 if need be · 0 no')).toBeVisible()
+      await expect(page.getByRole('table')).toContainText('Ada Available')
+      await noViolations(page)
+      await page.getByRole('button', { name: 'Choose this time' }).first().click()
+      await page.getByRole('dialog').getByRole('button', { name: 'Choose this time' }).click()
+      await expect(page.getByText('Chosen', { exact: true })).toBeVisible()
+    })
   })
 })

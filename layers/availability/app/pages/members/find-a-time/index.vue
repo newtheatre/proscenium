@@ -4,11 +4,16 @@
 import { z } from 'zod'
 import { clockOf, DAY_MINUTES, rowStarts } from '../../../../shared/grid'
 import { minutesOf, type ShownLevel } from '../../../../shared/levels'
+import { SLOTS_MAX, SLOTS_MIN } from '../../../../shared/find'
+import type { PollRow } from '../../../composables/usePolls'
 
 const { t } = useT()
 const dates = useDates()
 const f = await useFindATime()
-const { options, choices, found, refusal, searching, shown } = f
+const { options, choices, found, refusal, searching, shown, picked } = f
+const words = usePollWords()
+const sent = await useAPI<{ polls: PollRow[] }>('/api/availability/polls/sent', { key: 'availability:polls-sent' })
+const sending = ref(false)
 const schema = z.object({
   groupIds: z.array(z.string()).min(1, t('availability.sent.groups-needed')),
   period: z.object({ start: z.string().min(1, t('availability.find.dates-needed')), end: z.string().min(1, t('availability.find.dates-needed')) }),
@@ -34,8 +39,15 @@ function choose(slot: { date: string, start: number, end: number }) {
 }
 async function find() {
   chosen.value = null
+  if (picked.value.some(p => p.end - p.start !== choices.length)) picked.value = []
   await f.search()
 }
+async function sentPoll(id: string) {
+  sending.value = false
+  picked.value = []
+  await navigateTo(`/members/find-a-time/${id}`)
+}
+const pollLine = (p: PollRow) => t('availability.poll.sent-line', { answered: p.answered, asked: p.asked, due: dates.dateTime(p.answersBy) })
 </script>
 
 <template>
@@ -155,13 +167,75 @@ async function find() {
           </UForm>
 
           <div class="min-w-0 space-y-6">
-            <EmptyState
-              v-if="!found"
-              icon="i-lucide-calendar-search"
-              :title="t('availability.find.start')"
-              :description="t('availability.find.start-help')"
-            />
+            <template v-if="!found">
+              <EmptyState
+                icon="i-lucide-calendar-search"
+                :title="t('availability.find.start')"
+                :description="t('availability.find.start-help')"
+              />
+              <PageSection
+                v-if="sent.data.value?.polls.length"
+                :title="t('availability.poll.mine')"
+              >
+                <RecordList flush>
+                  <RecordListItem
+                    v-for="p in sent.data.value.polls"
+                    :key="p.id"
+                    :to="`/members/find-a-time/${p.id}`"
+                    icon="i-lucide-vote"
+                    :name="p.title"
+                    :description="pollLine(p)"
+                    :muted="!p.open"
+                  >
+                    <StatusBadge
+                      :tone="words.stateTone(p.state)"
+                      :label="words.state(p)"
+                    />
+                  </RecordListItem>
+                </RecordList>
+              </PageSection>
+            </template>
             <template v-else>
+              <UCard
+                v-if="picked.length"
+                :ui="{ body: 'space-y-3' }"
+              >
+                <h2 class="font-semibold text-highlighted">
+                  {{ t('availability.poll.picked', { count: picked.length }) }}
+                </h2>
+                <ul class="flex flex-wrap gap-2">
+                  <li
+                    v-for="s in picked"
+                    :key="`${s.date}-${s.start}`"
+                  >
+                    <UBadge
+                      color="neutral"
+                      variant="subtle"
+                      size="lg"
+                    >
+                      {{ words.when(s) }}
+                      <IconButton
+                        icon="i-lucide-x"
+                        :label="t('availability.poll.unpick', { when: words.when(s) })"
+                        size="xs"
+                        @click="f.pick(s)"
+                      />
+                    </UBadge>
+                  </li>
+                </ul>
+                <div class="flex flex-wrap items-center gap-3">
+                  <UButton
+                    icon="i-lucide-send"
+                    :label="t('availability.poll.send')"
+                    :disabled="picked.length < SLOTS_MIN"
+                    @click="sending = true"
+                  />
+                  <span
+                    v-if="picked.length < SLOTS_MIN"
+                    class="text-sm text-muted"
+                  >{{ t('availability.poll.pick-more', { count: SLOTS_MIN }) }}</span>
+                </div>
+              </UCard>
               <p
                 v-if="found.hidden"
                 class="text-sm text-muted"
@@ -195,6 +269,15 @@ async function find() {
                         color="neutral"
                         variant="ghost"
                         @click="choose(s)"
+                      />
+                      <UButton
+                        :label="f.isPicked(s) ? t('availability.poll.picked-one') : t('availability.poll.pick')"
+                        :icon="f.isPicked(s) ? 'i-lucide-check' : 'i-lucide-plus'"
+                        :aria-pressed="f.isPicked(s)"
+                        :disabled="!f.isPicked(s) && picked.length >= SLOTS_MAX"
+                        color="neutral"
+                        variant="outline"
+                        @click="f.pick(s)"
                       />
                     </template>
                   </RecordListItem>
@@ -267,9 +350,18 @@ async function find() {
     >
       <template #body>
         <div
-          v-if="who"
+          v-if="who && chosen"
           class="space-y-5"
         >
+          <UButton
+            :label="f.isPicked(chosen) ? t('availability.poll.picked-one') : t('availability.poll.pick')"
+            :icon="f.isPicked(chosen) ? 'i-lucide-check' : 'i-lucide-plus'"
+            :aria-pressed="f.isPicked(chosen)"
+            :disabled="!f.isPicked(chosen) && picked.length >= SLOTS_MAX"
+            color="neutral"
+            variant="outline"
+            @click="f.pick(chosen)"
+          />
           <UAlert
             v-for="(s, i) in takenHere"
             :key="i"
@@ -313,5 +405,19 @@ async function find() {
         </div>
       </template>
     </USlideover>
+    <UModal
+      v-model:open="sending"
+      :title="t('availability.poll.send')"
+      :description="t('availability.poll.send-help')"
+    >
+      <template #body>
+        <AvailabilityPollForm
+          :choices="choices"
+          :slots="picked"
+          :today="options.data.value?.today ?? ''"
+          @sent="sentPoll"
+        />
+      </template>
+    </UModal>
   </PageFrame>
 </template>

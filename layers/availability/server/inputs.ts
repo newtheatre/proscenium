@@ -1,6 +1,6 @@
 // The shapes the routes accept (spec parts 2 and 3). Rules that need the database live in the services.
 import { z } from 'zod'
-import { LEVELS, UNMARKED } from '../shared/levels'
+import { LEVELS, UNMARKED, VOTES } from '../shared/levels'
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/) // not-policy: YYYY-MM-DD
 const clock = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/) // not-policy: HH:MM
@@ -66,3 +66,20 @@ export const findInput = z.object({
   spaceIds: z.array(z.string().max(40)).max(30), // not-policy: occupancy's ceiling on spaces (O3)
   roomOptional: z.boolean(),
 }).strict()
+
+export const pollInput = z.object({
+  title: z.string().trim().min(1).max(80), // not-policy: as the table's CHECK
+  groupIds: z.array(z.string().max(200)).min(1).max(20), // not-policy: shape bound
+  accountIds: z.array(z.string().max(40)).max(200), // not-policy: rule F1's ceiling
+  must: z.array(z.string().max(40)).max(30), // not-policy: rule F1's ceiling on must-have people
+  spaceIds: z.array(z.string().max(40)).max(30), // not-policy: occupancy's ceiling on spaces (O3)
+  length: z.number().int().min(15).max(720), // not-policy: as the table's CHECK
+  slots: z.array(z.object({ date, start: z.number().int().min(0).max(1439) }).strict()).min(2).max(6), // not-policy: rule F7's shortlist
+  answersBy: date,
+}).strict()
+
+export const voteInput = z.object({
+  answers: z.array(z.object({ slotId: z.string().min(1).max(40), answer: z.enum(VOTES) }).strict()).min(1).max(6), // not-policy: rule F7's shortlist
+}).strict()
+
+export const decideInput = z.object({ slotId: z.string().min(1).max(40) }).strict() // not-policy: an id's length
