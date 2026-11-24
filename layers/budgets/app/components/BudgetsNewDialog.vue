@@ -1,6 +1,8 @@
 <!-- A new budget: what it is for (a production, a department and year, a season, or a general
-     purpose) and, under "More details", the line of a larger budget it is funded from. -->
+     purpose) and, under "More details", the line of a larger budget it is funded from. Opened from a
+     production's Budget tab, it starts on that production. -->
 <script setup lang="ts">
+const props = defineProps<{ productionId?: string }>()
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ created: [budgetId: string] }>()
 
@@ -19,7 +21,7 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 let idempotency = ''
 watch(open, async (now) => {
   if (!now) return
-  Object.assign(form, blank())
+  Object.assign(form, blank(), { productionId: props.productionId })
   more.value = false
   refusal.value = null
   idempotency = crypto.randomUUID()
