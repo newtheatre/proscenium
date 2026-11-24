@@ -342,3 +342,10 @@ export async function accountsOf(module: string, kind?: AccountSummary['kind']):
     ...(kind ? [module, kind] : [module]))
   return rows.map(r => ({ id: r.id, code: r.code, name: r.name, kind: r.kind, module: r.module, systemKey: r.system_key, scope: r.scope }))
 }
+
+/** Every account, active or not, with whether any entry uses it: what an export maps to other books' codes. */
+export async function ledgerAccounts(): Promise<(AccountSummary & { active: boolean, used: boolean })[]> {
+  const rows = await all<{ id: string, code: string, name: string, kind: AccountSummary['kind'], module: string, system_key: string | null, scope: string | null, active: number, used: number }>(
+    'SELECT a.id, a.code, a.name, a.kind, a.module, a.system_key, a.scope, a.active, EXISTS (SELECT 1 FROM finance_entries e WHERE e.account_id = a.id) AS used FROM finance_accounts a ORDER BY a.module, a.code')
+  return rows.map(r => ({ id: r.id, code: r.code, name: r.name, kind: r.kind, module: r.module, systemKey: r.system_key, scope: r.scope, active: r.active === 1, used: r.used === 1 }))
+}
