@@ -75,3 +75,21 @@ carries four test figures (sold, capacity, fill as a ratio, takings as money); s
 `tests/integration/measures.test.ts`. REP-41 (`core.person-measure`) follows with the Reports gate,
 because its reader is Reports alone.
 
+REP-02 is built in Box office: twelve figures in `layers/box-office/server/contributions/core.measure/`,
+ability `box-office.report.view`. `tickets-issued` counts valid tickets; `tickets-sold` those not on a
+complimentary ticket type and `tickets-comp` those on one; `admitted` those scanned in; `orders` and
+`bookers` count confirmed orders and their accounts once each (combine distinct). These break down
+and filter by `box-office.ticket-type` and `box-office.channel` as well as the performance keys.
+`capacity` adds every band's pool, and `capacity-filled` is the ratio of issued over capacity.
+`gross`, `refunds`, `net` and `net-of-vat` read Box office's own accounts in the ledger through
+Finance's new service `performanceTotals` (sealed postings only): gross is sale postings, refunds
+refund postings, net every kind (so recognition and fee transfers between Box office's accounts net
+to nothing) and net of VAT that less the tax within it. Every figure keys to its performance's
+operating day (M8). Core's `measuredPerformances(query, keys)` gives the performances in the period
+and scope as a subquery with each shared key (performance, production, season, venue, space, day,
+month), so no module hands round a list of ids (M9); a collection scope answers unsupported until
+collections reach this branch. Deviations: `capacity` combines by sum, not level, because a run's
+seats add up across its performances; `orders` and `bookers` are in, as the interface tab lists them.
+`layers/box-office/tests/integration/figures.test.ts` proves the money matches `productionStatement`
+to the penny.
+

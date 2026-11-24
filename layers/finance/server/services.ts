@@ -4,3 +4,5 @@ export { postEntries, reversePosting, accountFor, balances, ensureSystemAccounts
 export type { PostingInput, EntryInput, PostingKind, AccountRef, Balance, BalanceFilter } from './ledger'
 export { isPeriodOpen } from './periods'
 export type { PeriodCloseCheck } from './points/period-close-check'
+export { performanceTotals } from './reports'
+export type { PerformanceTotal } from './reports'
