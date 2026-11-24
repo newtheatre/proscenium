@@ -124,7 +124,7 @@ Checked against every prefix declared in `layers/*` and every spec on `next` (23
 | `settle_within` | duration | default `companies.settlements.due-within` | internal | keep | After the last performance |
 | `clauses` | text | at most 20000, Markdown | internal | keep | Anything else, in words |
 | `file_id` | text | core file id; a signed paper contract | internal | keep |  |
-| `state` | text | `draft`, `sent`, `accepted`, `declined`, `superseded`, `withdrawn` | internal | keep | The only column a trigger lets change, and only along part 3's moves |
+| `state` | text | `draft`, `sent`, `accepted`, `declined`, `superseded`, `withdrawn` | internal | keep | With `sent_at`, the only columns the trigger lets change (`appendOnly: { except }`); the service keeps it to part 3's moves |
 | `sent_at` | timestamp |  | internal | keep |  |
 | `created_by` | account | actor | internal | keep | Merge: alias |
 
@@ -163,7 +163,7 @@ Checked against every prefix declared in `layers/*` and every spec on `next` (23
 | `account_id` | account | subject; nullable | internal | keep | Merge: alias |
 | `name` | text | not null, 1 to 120 | personal | anonymise |  |
 | `role` | text | at most 80 | internal | keep | "Lighting operator" |
-| `under_18` | boolean | not null, default false | personal | clear | For the venue's safeguarding rules |
+| `under_18` | boolean | default false; null once erased | personal | clear | For the venue's safeguarding rules |
 | `added_by` | account | actor | internal | keep | A contact or staff |
 
 ## Guests
@@ -176,6 +176,7 @@ Checked against every prefix declared in `layers/*` and every spec on `next` (23
 | `engagement_id` | ref `companies_engagements` | not null | internal | keep |  |
 | `performance_id` | text | core performance id; unique with `engagement_id` | internal | keep |  |
 | `places` | integer | 0 to 50 | internal | keep | From the agreement; staff may change one performance |
+| `named` | integer | 0 to `places` | internal | keep | Places named so far; naming is a guarded update on it (L3) |
 | `hold_ref` | text | Box office's staff hold id | internal | keep | Places held while unnamed |
 | `names_due_at` | timestamp | not null | internal | keep |  |
 | `state` | text | `open`, `closed`, `released` | internal | keep | Closed at the deadline; released returns unnamed places |
@@ -194,7 +195,7 @@ Checked against every prefix declared in `layers/*` and every spec on `next` (23
 
 ## Settlements
 
-**`companies_settlements`**: realm operational; subject none; not append-only, but every figure column is frozen by trigger once `state` leaves `draft`. A changed figure after that is a new version superseding the old.
+**`companies_settlements`**: realm operational; subject `queried_by` when set, else unlinked for staff; not append-only, but every figure column is frozen by trigger once `state` leaves `draft`. A changed figure after that is a new version superseding the old.
 
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -211,7 +212,9 @@ Checked against every prefix declared in `layers/*` and every spec on `next` (23
 | `balance_minor` | money | not null | internal | keep | Positive: the theatre owes; negative: the company owes |
 | `currency` | currency | not null | internal | keep |  |
 | `state` | text | `draft`, `proposed`, `agreed`, `queried`, `approved`, `paid`, `superseded`, `void` | internal | keep |  |
+| `proposed_at` | timestamp |  | internal | keep | When it was proposed; S7 counts from it |
 | `query_note` | text | at most 2000 | personal free text | redact | A contact's query |
+| `queried_by` | account | subject; nullable | internal | keep | Who wrote the query, so erasure reaches the note. Merge: alias |
 | `prepared_by` | account | actor | internal | keep |  |
 | `approved_by` | account | actor; never `prepared_by` (rule S7) | internal | keep |  |
 | `agreed_by` | account | a live contact, or staff recording agreement given elsewhere | internal | keep |  |
