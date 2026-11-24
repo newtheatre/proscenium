@@ -125,10 +125,11 @@ function when(e: Entry): string {
               :today="d.today"
               :horizon="d.horizon"
               :patterns="patternLabels"
+              :commitments="d.commitments"
               :readonly="saving"
               @paint="m.paint"
             />
-            <AvailabilityLegend />
+            <AvailabilityLegend :commitments="Object.keys(d.commitments).length > 0" />
           </div>
           <PageSection
             :title="t('availability.mine.entries')"
