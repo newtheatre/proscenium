@@ -72,8 +72,22 @@ REP-01 is built in core: the point `core.measure`, `defineMeasure` in the kit, `
 `listMeasures` in core's services and the advanced setting `core.measures.read-budget` (10 seconds,
 2 to 60). A figure's id is its contribution id, `<module>.<figure>`. The fixture module `seats`
 carries four test figures (sold, capacity, fill as a ratio, takings as money); see
-`tests/integration/measures.test.ts`. REP-41 (`core.person-measure`) follows with the Reports gate,
-because its reader is Reports alone.
+`tests/integration/measures.test.ts`.
+
+REP-41 is built in core: the point `core.person-measure`, `definePersonMeasure` in the kit and
+`readPersonMeasure` in core's services (`layers/core/server/measures/people.ts`). A figure per person
+counts or totals minutes, breaks down by at most one shared key (never a module's own), and says
+`side: 'members'`. The registry refuses one not named `<module>.<figure>`, whose ability is not
+privileged with `audit: 'read'`, or whose `purpose` is not a `core.privacy-record` entry. The read
+refuses with `core.person-measure.reports-only` unless it runs inside the `reports` module (a route
+under `/api/reports/`), the ability `reports.people.view` is declared, and the reader is a person; it
+then needs both `reports.people.view` and the figure's own ability, on the scope's record when there is
+one. Rows must be an `acc_` id, the asked key and a number of nought or more; a key value that is an
+account id or holds `@` makes the answer unavailable. Each read writes one audit row (action `read`,
+the figure's ability) whose detail is the figure, the period, the scope as kind and id, the breakdown,
+the outcome and the row count: no names, ids of people or figures. Until the Reports module exists, the
+test fixture `reports` stands in for it and `rota` contributes `rota.minutes`; see
+`tests/integration/person-measures.test.ts`. The real Reports module replaces the `reports` fixture.
 
 REP-02 is built in Box office: twelve figures in `layers/box-office/server/contributions/core.measure/`,
 ability `box-office.report.view`. `tickets-issued` counts valid tickets; `tickets-sold` those not on a
