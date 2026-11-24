@@ -116,6 +116,43 @@ export interface PublicSeason {
   productions: SeasonProduction[]
 }
 
+interface CardRow { id: string, slug: string, title: string, subtitle: string | null, summary: string | null, state: string, category_id: string | null, category_slug: string | null, category_label: string | null, last_ends_at: number | null, opened_at: number | null, closed_at: number | null, last_starts_at: number | null, age_min: number | null, age_restricted: number, has_effects: number, has_warnings: number }
+
+const CARD_SELECT = `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, p.state, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
+        p.last_ends_at, p.age_min, p.age_restricted, EXISTS (SELECT 1 FROM core_production_effects e WHERE e.production_id = p.id) AS has_effects,
+        EXISTS (SELECT 1 FROM core_production_advisories a WHERE a.production_id = p.id) AS has_warnings,
+        (SELECT min(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS opened_at,
+        (SELECT max(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS last_starts_at,
+        (SELECT max(ends_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS closed_at
+       FROM core_productions p LEFT JOIN core_terms c ON c.id = p.category_term_id`
+
+/** The fields every public card of a production begins with. */
+export const cardCore = (r: { id: string, slug: string, title: string, subtitle: string | null, summary: string | null, category_id: string | null, category_slug: string | null, category_label: string | null }) => ({
+  id: r.id,
+  slug: r.slug,
+  title: r.title,
+  subtitle: r.subtitle,
+  summary: r.summary,
+  category: r.category_id ? { id: r.category_id, slug: r.category_slug!, label: r.category_label! } : null,
+})
+
+/** A production's card, as a season's page and a collection's page show it. */
+async function cardsOf(rows: CardRow[], now: number): Promise<SeasonProduction[]> {
+  const images = await publicImages(rows.map(r => r.id))
+  return rows.map(r => ({
+    ...cardCore(r),
+    firstStartsAt: r.opened_at,
+    lastStartsAt: r.last_starts_at,
+    lastEndsAt: r.closed_at,
+    cancelled: r.state === 'cancelled',
+    past: r.state === 'cancelled' || (r.last_ends_at !== null && r.last_ends_at <= now),
+    poster: images.get(r.id)!.poster,
+    age: ageWording(r.age_min, !!r.age_restricted),
+    hasEffects: !!r.has_effects,
+    hasWarnings: !!r.has_warnings,
+  }))
+}
+
 /**
  * One published or archived season by its slug, with its listed productions in the order they open.
  * Null for a draft or unknown season, and for an archived one while past shows are not public; its
@@ -129,39 +166,13 @@ export async function publicSeason(slug: string, options: { pastVisible?: boolea
   )
   if (!s || (s.state === 'archived' && !pastVisible)) return null
   const now = options.now ?? nowMs()
-  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, state: string, category_id: string | null, category_slug: string | null, category_label: string | null, last_ends_at: number | null, opened_at: number | null, closed_at: number | null, last_starts_at: number | null, age_min: number | null, age_restricted: number, has_effects: number, has_warnings: number }>(
-    `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, p.state, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
-        p.last_ends_at, p.age_min, p.age_restricted, EXISTS (SELECT 1 FROM core_production_effects e WHERE e.production_id = p.id) AS has_effects,
-        EXISTS (SELECT 1 FROM core_production_advisories a WHERE a.production_id = p.id) AS has_warnings,
-        (SELECT min(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS opened_at,
-        (SELECT max(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS last_starts_at,
-        (SELECT max(ends_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS closed_at
-       FROM core_productions p LEFT JOIN core_terms c ON c.id = p.category_term_id
+  const rows = await all<CardRow>(
+    `${CARD_SELECT}
       WHERE p.season_id = ? AND p.state IN ('published', 'cancelled') AND p.listed = 1
       ORDER BY opened_at IS NULL, opened_at, lower(p.title), p.id`,
     s.id,
   )
-  const images = await publicImages(rows.map(r => r.id))
-  const productions = rows.map((r) => {
-    const past = r.state === 'cancelled' || (r.last_ends_at !== null && r.last_ends_at <= now)
-    return {
-      id: r.id,
-      slug: r.slug,
-      title: r.title,
-      subtitle: r.subtitle,
-      summary: r.summary,
-      category: r.category_id ? { id: r.category_id, slug: r.category_slug!, label: r.category_label! } : null,
-      firstStartsAt: r.opened_at,
-      lastStartsAt: r.last_starts_at,
-      lastEndsAt: r.closed_at,
-      cancelled: r.state === 'cancelled',
-      past,
-      poster: images.get(r.id)!.poster,
-      age: ageWording(r.age_min, !!r.age_restricted),
-      hasEffects: !!r.has_effects,
-      hasWarnings: !!r.has_warnings,
-    }
-  })
+  const productions = await cardsOf(rows, now)
   return {
     id: s.id,
     slug: s.slug,
@@ -219,38 +230,7 @@ export async function publicVenues(ids?: string[]): Promise<PublicVenueSummary[]
 /** Cards for the given productions, published ones only (CL3), in the order given: for a collection's page. */
 export async function productionCards(ids: readonly string[], now = nowMs()): Promise<SeasonProduction[]> {
   if (!ids.length) return []
-  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, category_id: string | null, category_slug: string | null, category_label: string | null, last_ends_at: number | null, opened_at: number | null, closed_at: number | null, last_starts_at: number | null, age_min: number | null, age_restricted: number, has_effects: number, has_warnings: number }>(
-    `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
-        p.last_ends_at, p.age_min, p.age_restricted, EXISTS (SELECT 1 FROM core_production_effects e WHERE e.production_id = p.id) AS has_effects,
-        EXISTS (SELECT 1 FROM core_production_advisories a WHERE a.production_id = p.id) AS has_warnings,
-        (SELECT min(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS opened_at,
-        (SELECT max(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS last_starts_at,
-        (SELECT max(ends_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS closed_at
-       FROM core_productions p LEFT JOIN core_terms c ON c.id = p.category_term_id
-      WHERE p.id IN (SELECT value FROM json_each(?)) AND p.state = 'published'`,
-    JSON.stringify([...new Set(ids)]),
-  )
-  const images = await publicImages(rows.map(r => r.id))
-  const byId = new Map(rows.map(r => [r.id, r]))
-  return ids.flatMap((id) => {
-    const r = byId.get(id)
-    if (!r) return []
-    return [{
-      id: r.id,
-      slug: r.slug,
-      title: r.title,
-      subtitle: r.subtitle,
-      summary: r.summary,
-      category: r.category_id ? { id: r.category_id, slug: r.category_slug!, label: r.category_label! } : null,
-      firstStartsAt: r.opened_at,
-      lastStartsAt: r.last_starts_at,
-      lastEndsAt: r.closed_at,
-      cancelled: false,
-      past: r.last_ends_at !== null && r.last_ends_at <= now,
-      poster: images.get(r.id)!.poster,
-      age: ageWording(r.age_min, !!r.age_restricted),
-      hasEffects: !!r.has_effects,
-      hasWarnings: !!r.has_warnings,
-    }]
-  })
+  const rows = await all<CardRow>(`${CARD_SELECT} WHERE p.id IN (SELECT value FROM json_each(?)) AND p.state = 'published'`, JSON.stringify([...new Set(ids)]))
+  const byId = new Map((await cardsOf(rows, now)).map(c => [c.id, c]))
+  return ids.flatMap(id => byId.get(id) ?? [])
 }

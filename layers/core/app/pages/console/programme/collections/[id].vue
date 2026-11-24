@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { watchDebounced } from '@vueuse/core'
 
 // One collection (C-60) as a record page: its details, and its productions in the order its public
 // page shows them, dragged or moved from the keyboard. Bound to a season, it takes only that season's
@@ -114,28 +113,11 @@ async function saveDetails() {
 }
 
 // Productions: added from a search, in this collection's season when it has one.
-const search = ref('')
-const found = ref<Choice[]>([])
-const searching = ref(false)
 const picked = ref<Choice | undefined>()
-watchDebounced(search, async (q) => {
-  if (q.trim().length < 2) {
-    found.value = []
-    return
-  }
-  searching.value = true
-  try {
-    const answer = await $api<{ rows: { id: string, title: string }[] }>('/api/core/productions', { query: { q, size: 10, ...(collection.value?.seasonId ? { seasonId: collection.value.seasonId } : {}) } }) // not-policy: a picker's length
-    const inside = new Set(members.value.map(m => m.id))
-    found.value = answer.rows.filter(r => !inside.has(r.id)).map(r => ({ id: r.id, label: r.title }))
-  }
-  catch {
-    found.value = []
-  }
-  finally {
-    searching.value = false
-  }
-}, { debounce: 250 }) // not-policy: typing pause before a search
+const { search, found, searching } = useProductionSearch({
+  query: () => collection.value?.seasonId ? { seasonId: collection.value.seasonId } : {},
+  keep: id => !members.value.some(m => m.id === id),
+})
 async function addMember() {
   const p = picked.value
   if (!p) return

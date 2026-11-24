@@ -13,7 +13,7 @@ import { collectionsFor, type CollectionChip } from './collections'
 import { bookingActions, priceSummaries, type ShownBooking } from './booking'
 import type { PriceSummary } from '../points/booking-action'
 import { publicImages, type PublicImage } from './media'
-import { publicVenues, type PublicVenueSummary } from './public-places'
+import { cardCore, publicVenues, type PublicVenueSummary } from './public-places'
 import { latecomersFor } from './latecomers'
 import { latecomerRule, type LatecomerRule } from '../../shared/latecomers'
 
@@ -297,12 +297,7 @@ export async function currentProductions(options: WhatsOnOptions = {}): Promise<
   )
   const [images, prices] = await Promise.all([publicImages(rows.map(r => r.id)), priceSummaries(rows.map(r => r.id))])
   return rows.map(r => ({
-    id: r.id,
-    slug: r.slug,
-    title: r.title,
-    subtitle: r.subtitle,
-    summary: r.summary,
-    category: r.category_id ? { id: r.category_id, slug: r.category_slug!, label: r.category_label! } : null,
+    ...cardCore(r),
     age: ageWording(r.age_min, !!r.age_restricted),
     hasEffects: !!r.has_effects,
     hasWarnings: !!r.has_warnings,
