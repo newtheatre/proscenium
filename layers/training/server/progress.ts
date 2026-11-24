@@ -167,7 +167,7 @@ export async function evaluateAward(unit: UnitView, course: Course, accountId: s
 }
 
 /** Whether two accounts are one person, merges followed. */
-async function samePerson(a: string | undefined, b: string): Promise<boolean> {
+export async function samePerson(a: string | undefined, b: string): Promise<boolean> {
   return !!a && await canonicalAccount(a) === await canonicalAccount(b)
 }
 
@@ -182,11 +182,11 @@ async function checkDay(occurredOn: string): Promise<void> {
   if (occurredOn > await theatreDay(nowMs())) refuse('training.sign-off.future', 'A sign-off is for something already done.', { status: 422, fields: { occurredOn: 'Choose today or an earlier day.' } })
 }
 
-function addSignOff(unit: UnitView, row: { accountId: string, courseId: string, stepId: string, kind: SignOffKind, signedBy: string | null, occurredOn: string, note?: string | null }): PendingSignOff {
+export function addSignOff(unit: UnitView, row: { accountId: string, courseId: string, stepId: string, kind: SignOffKind, signedBy: string | null, occurredOn: string, note?: string | null, placeId?: string }): PendingSignOff {
   const id = newId('tsof')
   unit.add({
-    sql: 'INSERT INTO training_sign_offs (id, account_id, course_id, step_id, kind, signed_by, occurred_on, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    params: [id, row.accountId, row.courseId, row.stepId, row.kind, row.signedBy, row.occurredOn, row.note ?? null, nowMs()],
+    sql: 'INSERT INTO training_sign_offs (id, account_id, course_id, step_id, kind, signed_by, occurred_on, place_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    params: [id, row.accountId, row.courseId, row.stepId, row.kind, row.signedBy, row.occurredOn, row.placeId ?? null, row.note ?? null, nowMs()],
   })
   unit.announce('training.sign-off.recorded', { signOffId: id, accountId: row.accountId, courseId: row.courseId, stepId: row.stepId, kind: row.kind }, { record: ['training.course', row.courseId] })
   unit.audit({ action: 'create', record: ['training.course', row.courseId], detail: { signOff: id, account: row.accountId, step: row.stepId, kind: row.kind } })

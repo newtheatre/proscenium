@@ -25,3 +25,15 @@ Where the build departs from, or is narrower than, this specification and the se
 - **References** of recognised items must look like `<source>:<id>`; a `training:` or `fact:training.` reference is refused `training.route.self-reference` (R7), as the table's check also does.
 - **The learner's page** (`GET /api/training/me/competencies/<slug>`) lists active routes with progress per item. The next session and the next action per item come with sessions.
 - **The fact `training.competent`** is declared `pin: true` with no default abilities, as part 4 says. It is judged by the same verdict as the source, now.
+
+## Sessions (TR-09 to TR-14), 24 November 2026
+
+- **The last place** is one conditional insert: booked only while `places_taken < capacity` on the statement, so of two people pressing at once one gets the place and the other is refused `training.session.full` with the waiting list offered (P2). The places triggers keep `places_taken`, and the table's check backs them.
+- **Promotion** reads the first people waiting, then promotes them in the same unit, each only if still waiting when the statement runs, and tells them (P3, P4). A place promoted from the waiting list keeps its `waiting_since`, which is how it may be cancelled up to the start.
+- **Rooms.** Publishing, or moving a published session, asks core's `isSpaceFree` (leaving out Training's own contribution) and Training's own published sessions, and refuses `training.session.space-taken` (P10). The refusal does not yet name what holds the space. Training contributes published sessions to `core.space-busy` as `training-session`, labelled "Training session", never giving way; so Training now requires the support module `occupancy`, as Spaces does.
+- **Trainers of a session** are those named on it, or else the course's trainers. They are told of changes and cancellation, and named when it is too late to cancel.
+- **Attendance** is marked from the start until `training.sessions.mark-within` after the end, never on one's own place (`training.own-attendance`). Marking attended writes one sign-off per session step of the version the session is held under, and evaluates the award, per person in the same unit; marking absent voids those sign-offs. These are statements per person rather than one set-wise statement, since each person's award is evaluated on its own; a session's capacity bounds them.
+- **Walk-ins** without an account are found or made through `findOrCreateAccount` with origin `staff`.
+- **Reminders** are sent by the task `training.send-reminders` every 30 minutes, once per place through the notification's dedupe key rather than a marker column. The reminder can be switched off under the topic `training.sessions`; every other session notice cannot.
+- **Not yet:** the overdue-attendance card for trainers (P8), telling a holder whether attending would renew (P6), refusing to delete a space with future sessions, and the screens.
+- **Abilities** added: `session.manage`, `session.run` (mapped by default to the course-trainer fact, beside `sign-off.record`), `place.book` and `place.manage`.

@@ -3,19 +3,41 @@
 // docs/specs/training). Whether a person is trained is worked out from rows and dates when asked.
 // This file grows with the build; it declares what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, point, setting } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 import { SIGN_OFF_KINDS } from './shared/states'
 
 const change = 'training.settings.manage'
 const record = { recordId: z.string(), accountId: z.string(), courseId: z.string() }
+const session = z.object({ sessionId: z.string(), courseId: z.string() })
+const place = { placeId: z.string(), sessionId: z.string(), accountId: z.string() }
+
+// Session notices (second-round part 4). Only the reminder can be switched off.
+const sessionNotice = (id: string, subject: string, body: string, { extra = {}, optional = false }: { extra?: Record<string, 'text'>, optional?: boolean } = {}) => ({
+  id,
+  category: optional ? 'optional' as const : 'transactional' as const,
+  ...(optional ? { topic: 'training.sessions' } : {}),
+  side: 'members' as const,
+  channels: ['email' as const, 'inbox' as const],
+  link: '/members/training',
+  variables: { session: 'text' as const, when: 'text' as const, ...extra },
+  wording: { 'en-GB': { subject, body, action: 'See my training' } },
+})
+const SESSION_NOTICES = [
+  sessionNotice('training.place-booked', 'Your place on {{ session }}', 'You have a place on **{{ session }}**, {{ when }}.'),
+  sessionNotice('training.place-promoted', 'A place has come up on {{ session }}', 'A place came up on **{{ session }}**, {{ when }}, and it is yours. If you cannot come after all, cancel it so the next person can have it.'),
+  sessionNotice('training.session-reminder', 'Reminder: {{ session }}', '**{{ session }}** is {{ when }}. Where: {{ where }}.', { extra: { where: 'text' }, optional: true }),
+  sessionNotice('training.session-changed', '{{ session }} has changed', '**{{ session }}** has moved. It is now {{ when }}.'),
+  sessionNotice('training.session-cancelled', '{{ session }} is cancelled', '**{{ session }}**, {{ when }}, is cancelled: {{ reason }}', { extra: { reason: 'text' } }),
+  sessionNotice('training.place-cancelled-by-staff', 'Your place on {{ session }} is cancelled', 'Your place on **{{ session }}**, {{ when }}, has been cancelled. If you think this is a mistake, talk to whoever runs training.'),
+]
 
 export default defineModule({
   id: 'training',
   manifest: 1,
   since: '0.5.0',
   stability: 'experimental',
-  requires: ['forms'],
+  requires: ['forms', 'occupancy'],
   uses: ['front-of-house', 'bar', 'spaces'],
 
   // Part 6. No rule holds a number; every period is one of these. A course's own validity is a
@@ -71,16 +93,25 @@ export default defineModule({
     'record.revoke': ability({ on: 'training.record', risk: 'privileged', implies: ['record.view'] }),
     // Changes who meets every requirement that names the competency (R9).
     'competency.manage': ability({ on: 'training.competency', risk: 'privileged', implies: ['course.view'] }),
+    'session.manage': ability({ on: 'training.course', implies: ['course.view'] }),
+    // Marking attendance, a walk-in and closing; mapped to the course-trainer fact by default.
+    'session.run': ability({ on: 'training.course', implies: ['course.view', 'core.account.find'] }),
+    'place.book': ability({ grantAt: ['site'], implies: ['course.view'] }),
+    'place.manage': ability({ on: 'training.course', implies: ['course.view', 'core.account.find'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
   // Part 6, "The facts". Both may be pinned to one record on Identity's permission screen.
   facts: defineFacts('training', {
-    'course-trainer': factDecl({ on: 'training.course', pin: true, defaults: ['training.sign-off.record'] }),
+    'course-trainer': factDecl({ on: 'training.course', pin: true, defaults: ['training.sign-off.record', 'training.session.run'] }),
     'competent': factDecl({ on: 'training.competency', pin: true }),
   }),
 
   tables,
+
+  tasks: {
+    'training.send-reminders': task({ every: '30m' }),
+  },
 
   points: {
     // Another module's activity that signs off an activity step, such as a shadowed shift (H1 to H4).
@@ -88,7 +119,11 @@ export default defineModule({
   },
 
   contributes: {
-    'core.notification-topic': [{ id: 'training.records', side: 'members' as const, order: 70 }],
+    'core.notification-topic': [
+      { id: 'training.records', side: 'members' as const, order: 70 },
+      { id: 'training.sessions', side: 'members' as const, order: 71 },
+    ],
+    'core.space-busy': [{ id: 'training' }],
     // Two places on one session after an account merge: the stronger is kept.
     'core.merge-handler': [{ id: 'training.places', file: 'places' }],
     'core.notification-type': [{
@@ -121,7 +156,7 @@ export default defineModule({
           action: 'See my training',
         },
       },
-    }],
+    }, ...SESSION_NOTICES],
     'core.requirement': [{ id: 'training', file: 'training' }],
     'core.record-resolver': [
       { id: 'training.course', file: 'course' },
@@ -142,6 +177,13 @@ export default defineModule({
       'training.record.awarded': event({ version: 1, payload: z.object({ ...record, expiresAt: z.number().int().nullable() }), internal: true }),
       'training.record.revoked': event({ version: 1, payload: z.object(record), internal: true }),
       // Who holds the competency may have changed; listeners ask core.requirement again.
+      'training.session.published': event({ version: 1, payload: session, internal: false }),
+      'training.session.changed': event({ version: 1, payload: session, internal: false }),
+      'training.session.cancelled': event({ version: 1, payload: session, internal: false }),
+      'training.session.completed': event({ version: 1, payload: session, internal: false }),
+      'training.place.booked': event({ version: 1, payload: z.object({ ...place, state: z.enum(['booked', 'waiting', 'attended']) }), internal: true }),
+      'training.place.promoted': event({ version: 1, payload: z.object(place), internal: true }),
+      'training.place.cancelled': event({ version: 1, payload: z.object(place), internal: true }),
       'training.competency.routes-changed': event({ version: 1, payload: z.object({ competencyId: z.string() }), internal: false }),
     },
   },
