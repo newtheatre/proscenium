@@ -26,6 +26,13 @@ const noViolations = async (page: Page) => {
     .map(a => a.finished.catch(() => null))))
   expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
 }
+const sunday = new Date(Date.parse(monday) + 6 * 86_400_000).toISOString().slice(0, 10)
+const typed = (date: string) => date.split('-').reverse().join('')
+// Best times today can start while the test runs, so the poll is made from a week three weeks ahead.
+const chooseDates = async (page: Page, from: string, to: string) => {
+  await page.getByRole('group', { name: /^Dates/ }).getByRole('spinbutton').first().click()
+  await page.keyboard.type(typed(from) + typed(to))
+}
 const cell = (page: Page, day: string, from: string) => page.getByRole('gridcell', { name: new RegExp(`^${day}.*, ${from} to `) })
 
 test.describe.configure({ mode: 'serial' })
@@ -228,6 +235,7 @@ test.describe('a poll', () => {
       await page.getByRole('button', { name: /^Groups/ }).click()
       await page.getByRole('option', { name: 'Gallery company' }).click()
       await page.keyboard.press('Escape')
+      await chooseDates(page, monday, sunday)
       await page.getByRole('button', { name: 'Find times' }).click()
       await page.getByRole('button', { name: 'Add to poll' }).first().click()
       await expect(page.getByRole('button', { name: 'Send a poll' })).toBeDisabled()
@@ -256,7 +264,7 @@ test.describe('a poll', () => {
       await page.getByRole('radio', { name: 'If need be' }).nth(1).check()
       await noViolations(page)
       await page.getByRole('button', { name: 'Save answers' }).click()
-      await expect(page.getByText('Answers saved')).toBeVisible()
+      await expect(page.getByText('Answers saved', { exact: true }).first()).toBeVisible()
     })
   })
 
@@ -297,6 +305,10 @@ test.describe('a poll', () => {
       await page.getByRole('button', { name: 'Going', exact: true }).click()
       await expect(page.getByText('Answer saved', { exact: true })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Going', exact: true })).toHaveAttribute('aria-pressed', 'true')
+      await page.getByRole('link', { name: 'See it on my week' }).click()
+      await expect(page.getByRole('gridcell', { name: /Meeting, a commitment/ }).first()).toBeVisible()
+      await expect(page.getByText('Held elsewhere')).toBeVisible()
+      await noViolations(page)
     })
   })
 })
