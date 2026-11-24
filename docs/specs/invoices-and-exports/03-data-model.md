@@ -159,12 +159,14 @@ Unique (`invoice_id`, `step`) where step is not manual, so the daily task sends 
 | `granularity` | text | `entry` or `daily` | internal | keep | Every ledger entry, or one line per account, tag set and day |
 | `columns` | JSON | not null for custom; validated against the column list in part 4 | internal | keep | Order, header text, and which fields |
 | `date_format` | text | `iso`, `dmy`, `mdy` | internal | keep | 2026-11-23, 23/11/2026, 11/23/2026 |
-| `signs` | text | `split` or `signed` | internal | keep | Debit and credit columns, or one signed amount |
+| `signs` | text | `split`, `signed` or `credit` | internal | keep | Debit and credit columns, one amount with debits positive, or one with credits positive (the union's return, where sales read positive) |
 | `split_by` | text | `none`, `production`, `source-module` | internal | keep | A tracking column some packages take |
 | `total_line` | text | `none`, `net`, or a money account's code | internal | keep | The old SU export's card-total line is a preset of this |
+| `total_label` | text | 0 to 80 characters | internal | keep | The total line's words; the union preset's is the old file's |
 | tax\_map | JSON | not null, default {}; keys are Finance tax codes, values 1 to 50 characters | internal | keep | The other books' name for each tax code, such as 20% (VAT on Income) or T1 (rule E-16). Each change audited with old and new value, as codes are |
+| `kind_labels` | JSON | not null, default {}; keys a posting kind, or a kind and the module or account the posting is for (`sale:bar`, `sale:box-office.pass-income`) | internal | keep | What the custom kind label column says; the closest key wins |
 | `unmapped_code` | text | 1 to 20 characters, default `UNMAPPED` | internal | keep |  |
-| `period_rule` | text | `custom`, `period`, `finance-year`, `season` | internal | keep | What the screen opens on |
+| `period_rule` | text | `custom`, `period`, `finance-year`, `season` | internal | keep | What the screen opens on. `season` is accepted by the table but not offered until Seasons' dates can be read by other modules |
 | `archived_at` | timestamp | nullable | internal | keep |  |
 | `created_at`, `updated_at` | timestamp | not null | internal | keep |  |
 

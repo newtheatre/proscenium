@@ -51,6 +51,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'payments.attempt.reconcile', 'payments.refund.approve', 'payments.session.view',
       'membership-fees.charge.view', 'membership-fees.charge.waive',
       'bar.sale.view',
+      'invoicing.export.manage', 'invoicing.settings.manage',
     ],
   },
 ]
