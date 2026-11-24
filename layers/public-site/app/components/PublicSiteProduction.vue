@@ -554,7 +554,7 @@ useHead(() => {
                         v-if="forDate(p).length && p.state !== 'cancelled'"
                         class="text-sm text-muted"
                       >
-                        {{ t('public-site.production.on-this-date', { credits: people(forDate(p)) }) }}
+                        {{ t('public-site.production.on-this-date', { credits: people(forDate(p)), performance: word('performance') }) }}
                       </p>
                     </div>
                     <span

@@ -95,7 +95,7 @@
   "public-site.production.doors": "Doors {time}",
   "public-site.production.open-hours": "Open {from} to {until}",
   "public-site.production.line-up": "Line-up",
-  "public-site.production.on-this-date": "At this performance: {credits}",
+  "public-site.production.on-this-date": "At this {performance}: {credits}",
   "public-site.production.also-appearing": "Also appearing in",
   "public-site.production.access": "Access at this {performance}",
   "public-site.production.effects-off": "Not used at this {performance}: {effects}",
