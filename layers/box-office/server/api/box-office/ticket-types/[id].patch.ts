@@ -19,6 +19,7 @@ export default defineRoute({
     maxPerHolder: z.number().int().min(1).max(50).optional(), // not-policy: as on adding
     recheckAtEntry: z.boolean().optional(),
     channel: z.enum(['all', 'desk', 'online']).optional(),
+    taxCode: z.string().regex(/^[a-z][a-z0-9-]{0,31}$/).nullable().optional(), // not-policy: a Finance tax code's shape
   }).strict(),
 }, async (event, { input, unit }) => {
   const id = ticketTypeId(getRouterParam(event, 'id'))

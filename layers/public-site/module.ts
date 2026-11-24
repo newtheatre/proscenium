@@ -2,7 +2,7 @@
 // components. It owns no tables: it reads the programme through the core's public services. With it
 // switched off, its routes answer "not found" and the core-owned prefixes /whats-on and /shows stay
 // reserved (R-07). This file grows with the build; it declares only what the code so far uses.
-import { ability, defineAbilities, defineModule, defineSettings, setting } from '#kit'
+import { ability, defineAbilities, defineModule, defineSettings, point, setting } from '#kit'
 
 const change = 'public-site.site.configure'
 
@@ -29,6 +29,16 @@ export default defineModule({
     search: { screen: '/admin/site-readiness' },
   },
 
+  points: {
+    // A module's own block on a production's or a venue's public page (C-69).
+    'public-site.production-section': point({ kind: 'code', contract: 'page-section' }),
+    'public-site.venue-section': point({ kind: 'code', contract: 'page-section' }),
+    // The site's shape while a condition holds, as a festival's site (C-71 to C-73). The first to apply wins.
+    'public-site.front-page': point({ kind: 'code', contract: 'site-shape' }),
+    'public-site.menu': point({ kind: 'code', contract: 'site-shape' }),
+    'public-site.production-address': point({ kind: 'code', contract: 'site-shape' }),
+  },
+
   contributes: {
     // What the public pages keep in a browser, for the privacy notice's cookies section.
     'core.browser-storage': [
@@ -44,6 +54,8 @@ export default defineModule({
       { id: 'public-site.readiness', menu: 'admin', group: 'theatre', to: '/admin/site-readiness', icon: 'i-lucide-list-checks', ability: 'public-site.readiness.view', order: 60 },
     ],
     'core.count': [{ id: 'public-site.readiness-outstanding', file: 'readiness-outstanding' }],
+    // Two contributors applying at once to the front page or the production address (C-71, C-73).
+    'core.health-check': [{ id: 'public-site.site-shape', file: 'site-shape' }],
     // Site readiness has items outstanding (core part 6, Admin overview).
     'core.home-card': [{ id: 'public-site.readiness', home: 'admin', ability: 'public-site.readiness.view', component: 'PublicSiteReadinessCard', urgency: 'info', count: 'public-site.readiness-outstanding' }],
   },

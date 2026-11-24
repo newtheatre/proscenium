@@ -455,7 +455,23 @@ export const accessShares = defineTable('core_access_shares', {
   createdAt: col.createdAt(),
 }, { realm: 'audience', onErasure: 'delete-row', extra: t => [primaryKey({ columns: [t.accountId, t.purpose] })] })
 
+/**
+ * The day a person under 18 turns 18 (C-74, ruling R3-25), never a full date of birth, and only
+ * until it passes: the daily sweep deletes the row then. Modules read ageStatus, never this table.
+ */
+export const ageMarkers = defineTable('core_age_markers', {
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'alias' }),
+  turns18On: col.personal(text('turns_18_on').notNull()),
+  source: col.internal(text('source', { enum: ['self', 'staff'] }).notNull()),
+  recordedBy: col.account('recorded_by', { role: 'actor', onMerge: 'alias' }),
+  recordedAt: col.timestamp('recorded_at').notNull(),
+}, {
+  realm: 'audience',
+  onErasure: 'delete-row',
+  extra: t => [primaryKey({ columns: [t.accountId] }), index('core_age_markers_turns').on(t.turns18On), check('core_age_markers_date', sql`${t.turns18On} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`)],
+})
+
 export const identityTables = {
   accounts, accountEmails, passkeys, authenticators, federatedIdentities, recoveryCodes, accountTokens, passkeyChallenges, sessions,
-  roles, roleAbilities, factAbilities, moduleDefaults, grants, grantEnds, grantWarnings, accountMerges, accountMergeItems, emergencyContacts, dataRequests, dataRequestChecks, accessProfiles, accessShares,
+  roles, roleAbilities, factAbilities, moduleDefaults, grants, grantEnds, grantWarnings, accountMerges, accountMergeItems, emergencyContacts, dataRequests, dataRequestChecks, accessProfiles, accessShares, ageMarkers,
 }

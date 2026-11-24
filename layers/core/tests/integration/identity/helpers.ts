@@ -6,6 +6,7 @@ import type { EventHandler } from 'h3'
 import { setAccessProvider } from '#kit/access'
 import { resetRateLimits } from '#kit/ratelimit'
 import { newId } from '#kit/ids'
+import { nowMs } from '#kit/clock'
 import { server, deliver, env, testAccess } from '../../../../../tests/integration/helpers'
 import { identityAccess } from '../../../server/identity/access'
 import { setMailer } from '../../../server/notifications/mailer'
@@ -167,7 +168,8 @@ export async function staff(): Promise<{ browser: Browser, device: Authenticator
 /** Gives an account a role holding these abilities, directly in the database. */
 export async function grantDirectly(accountId: string, abilities: string[], options: { roleKey?: string, roleId?: string } = {}): Promise<{ roleId: string, grantId: string }> {
   const roleId = options.roleId ?? newId('rol')
-  const at = Date.now()
+  // The test clock, so a grant made under setClock has already started.
+  const at = nowMs()
   if (!options.roleId) {
     await env.DB.prepare('INSERT INTO core_roles (id, key, name, fixed, opens_members_area, needs_managed_identity, expiry_rule, created_at) VALUES (?, ?, ?, ?, 1, 0, \'none\', ?)')
       .bind(roleId, options.roleKey ?? `role-${roleId.slice(-10)}`, options.roleKey ?? 'Test role', options.roleKey === 'owner' ? 1 : 0, at).run()
