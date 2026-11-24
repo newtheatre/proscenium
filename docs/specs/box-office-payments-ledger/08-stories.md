@@ -130,7 +130,7 @@ This is how the first theatre sells, so all seven are Gate stories. The rules ar
 | FIN-04 | As a producer I see my production's box office statement | Income, booking fees charged to buyers and refunds for one production, visible to someone granted the ability on that production only. What a payment provider charged the theatre is not on the statement in the first release, since those charges are entered by hand per payout and belong to no production, and the screen says so. When providers' charges are reported per payment (the later part of PAY-06), each is shared across the productions in that payment in proportion to their income entries and tagged, so the statement can show them | First |
 | FIN-05 | As a treasurer I export the ledger | A CSV of postings and entries for a date range, with account codes | First |
 | FIN-06 | As a treasurer I reconcile card money against payouts | The clearing account's balance equals payouts not yet received. Line-by-line matching of payouts to payments | First: balance. Later: matching |
-| FIN-07 | As a VAT-registered theatre I record tax on sales | Tax codes on entries, a tax report per period | Later |
+| FIN-07 | As a VAT-registered theatre I record tax on sales | Tax codes on entries, a tax report per period | First release (brought forward by Integration Q12, 24 November 2026; BO-78, BAR-60) |
 
 ## Not stories of these modules
 
