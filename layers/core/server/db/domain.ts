@@ -360,6 +360,58 @@ export const productions = defineTable('core_productions', {
   ],
 })
 
+/**
+ * A collection (C-60): a strand of productions with its own page, such as a festival's or "Studio
+ * shorts". Bound to a season, only that season's productions may join (CL1).
+ */
+export const collections = defineTable('core_collections', {
+  id: col.id(),
+  slug: col.public(text('slug').notNull()),
+  name: col.public(text('name').notNull()),
+  summary: col.public(text('summary')),
+  description: col.public(text('description')),
+  colour: col.public(text('colour').notNull()),
+  seasonId: col.internal(text('season_id').references(() => seasons.id, { onDelete: 'set null' })),
+  state: col.internal(text('state').notNull().default('draft')),
+  sort: col.internal(integer('sort').notNull().default(0)),
+  createdBy: col.account('created_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'cln',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('core_collections_slug').on(t.slug),
+    uniqueIndex('core_collections_name').on(sql`lower(${t.name})`),
+    check('core_collections_state', sql`${t.state} IN ('draft', 'published', 'archived')`),
+    check('core_collections_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
+    check('core_collections_summary_length', sql`${t.summary} IS NULL OR length(${t.summary}) <= 300`),
+    check('core_collections_description_length', sql`${t.description} IS NULL OR length(${t.description}) <= 5000`),
+    check('core_collections_colour', sql`${t.colour} GLOB '#[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'`),
+  ],
+})
+
+/** The productions in a collection, in the collection page's order. */
+export const collectionProductions = defineTable('core_collection_productions', {
+  collectionId: col.internal(text('collection_id').notNull().references(() => collections.id, { onDelete: 'cascade' })),
+  productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'cascade' })),
+  sort: col.internal(integer('sort').notNull().default(0)),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    primaryKey({ columns: [t.collectionId, t.productionId] }),
+    index('core_collection_productions_production').on(t.productionId),
+  ],
+})
+
+/** Every slug a published collection has had, as for productions. */
+export const collectionSlugs = defineTable('core_collection_slugs', {
+  slug: col.public(text('slug').primaryKey()),
+  collectionId: col.internal(text('collection_id').notNull().references(() => collections.id, { onDelete: 'cascade' })),
+  retiredAt: col.internal(integer('retired_at').notNull()),
+}, { realm: 'operational', subject: 'none', appendOnly: true })
+
 /** Every slug a published production has had, so an old link redirects for ever. */
 export const productionSlugs = defineTable('core_production_slugs', {
   slug: col.public(text('slug').primaryKey()),
@@ -851,4 +903,4 @@ export const policyVersions = defineTable('core_policy_versions', {
   ],
 })
 
-export const tables = { policyVersions, webhooks, webhookDeliveries, performanceLineUps, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionEffects, termGroups, productionCredits, runPresets, performanceRuns, performances, performanceAccess, performanceEffectExceptions, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }
+export const tables = { policyVersions, webhooks, webhookDeliveries, performanceLineUps, collections, collectionProductions, collectionSlugs, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionEffects, termGroups, productionCredits, runPresets, performanceRuns, performances, performanceAccess, performanceEffectExceptions, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }

@@ -215,3 +215,42 @@ export async function publicVenues(ids?: string[]): Promise<PublicVenueSummary[]
     access: features.filter(f => f.venue_id === v.id).map(f => ({ termId: f.term_id, label: f.label, icon: f.icon, note: f.note })),
   }))
 }
+
+/** Cards for the given productions, published ones only (CL3), in the order given: for a collection's page. */
+export async function productionCards(ids: readonly string[], now = nowMs()): Promise<SeasonProduction[]> {
+  if (!ids.length) return []
+  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, category_id: string | null, category_slug: string | null, category_label: string | null, last_ends_at: number | null, opened_at: number | null, closed_at: number | null, last_starts_at: number | null, age_min: number | null, age_restricted: number, has_effects: number, has_warnings: number }>(
+    `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
+        p.last_ends_at, p.age_min, p.age_restricted, EXISTS (SELECT 1 FROM core_production_effects e WHERE e.production_id = p.id) AS has_effects,
+        EXISTS (SELECT 1 FROM core_production_advisories a WHERE a.production_id = p.id) AS has_warnings,
+        (SELECT min(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS opened_at,
+        (SELECT max(starts_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS last_starts_at,
+        (SELECT max(ends_at) FROM core_performances WHERE production_id = p.id AND state <> 'draft') AS closed_at
+       FROM core_productions p LEFT JOIN core_terms c ON c.id = p.category_term_id
+      WHERE p.id IN (SELECT value FROM json_each(?)) AND p.state = 'published'`,
+    JSON.stringify([...new Set(ids)]),
+  )
+  const images = await publicImages(rows.map(r => r.id))
+  const byId = new Map(rows.map(r => [r.id, r]))
+  return ids.flatMap((id) => {
+    const r = byId.get(id)
+    if (!r) return []
+    return [{
+      id: r.id,
+      slug: r.slug,
+      title: r.title,
+      subtitle: r.subtitle,
+      summary: r.summary,
+      category: r.category_id ? { id: r.category_id, slug: r.category_slug!, label: r.category_label! } : null,
+      firstStartsAt: r.opened_at,
+      lastStartsAt: r.last_starts_at,
+      lastEndsAt: r.closed_at,
+      cancelled: false,
+      past: r.last_ends_at !== null && r.last_ends_at <= now,
+      poster: images.get(r.id)!.poster,
+      age: ageWording(r.age_min, !!r.age_restricted),
+      hasEffects: !!r.has_effects,
+      hasWarnings: !!r.has_warnings,
+    }]
+  })
+}

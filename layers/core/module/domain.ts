@@ -125,6 +125,7 @@ export const records = defineRecords('core', {
   'sender': record({ table: 'core_sender_identities' }),
   'vocabulary': record({ table: 'core_vocabularies' }),
   'season': record({ table: 'core_seasons' }),
+  'collection': record({ table: 'core_collections' }),
   'production': record({ table: 'core_productions' }),
   // A grant on a production covers its performances.
   'performance': record({ table: 'core_performances', parent: 'core.production' }),
@@ -154,6 +155,8 @@ export const abilities = defineAbilities('core', {
   'performance.schedule': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
   'performance.cancel': ability({ risk: 'privileged', on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
   'season.manage': ability(),
+  // Collections (C-60): a grant on one collection covers its page and its members only.
+  'collection.manage': ability({ on: 'core.collection', grantAt: ['site', 'record'], implies: ['production.view'] }),
   'programme.configure': ability(),
   // A venue and its spaces. Creating a venue needs it site-wide; a grant on one venue covers its spaces.
   'venue.manage': ability({ on: 'core.venue', grantAt: ['site', 'record'] }),
@@ -310,6 +313,7 @@ export const contributes = {
     { id: 'core.brand-logo', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
     { id: 'core.brand-logo-dark', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
     // A production's poster and its photos (C-23, C-24), managed on its own page.
+    { id: 'core.collection-image', owner: 'core.collection', ability: 'core.collection.manage', accepts: ['png', 'jpeg', 'webp'], limit: 'core.files.image-limit', access: 'public', textClass: 'public', clean: true },
     { id: 'core.production-poster', owner: 'core.production', ability: 'core.production.edit', accepts: ['png', 'jpeg', 'webp'], limit: 'core.files.image-limit', access: 'public', textClass: 'public', clean: true },
     { id: 'core.production-photos', owner: 'core.production', ability: 'core.production.edit', many: true, accepts: ['png', 'jpeg', 'webp'], limit: 'core.files.image-limit', access: 'public', textClass: 'public', clean: true },
   ],
@@ -391,7 +395,7 @@ export const contributes = {
     { id: 'core.emails', holds: 'Whether emails we sent you were delivered', why: 'To know that tickets and notices reach you', basis: 'Our legitimate interests in running a reliable service', keptFor: 'While you have an account', order: 50 },
     { id: 'core.audit', holds: 'A record of what staff changed', why: 'To protect you and them, and to put mistakes right', basis: 'Our legitimate interests in running a safe, honest theatre', keptFor: 'For as long as the record it describes', order: 60 },
   ],
-  'core.record-resolver': ['performance', 'production', 'season', 'venue', 'account'].map(n => ({ id: `core.${n}`, file: n })),
+  'core.record-resolver': ['performance', 'production', 'season', 'collection', 'venue', 'account'].map(n => ({ id: `core.${n}`, file: n })),
   // What the command palette finds by name (H9): each type through its own list's search.
   'core.search-source': [
     { id: 'core.productions', record: 'core.production', ability: 'core.production.view', route: '/api/core/search/productions', shells: ['console' as const] },
@@ -505,6 +509,9 @@ export const announces = {
   'core.branding.changed': event({ version: 1, payload: z.object({ revision: z.number().int() }), internal: true }),
   'core.season.published': event({ version: 1, payload: z.object({ seasonId: z.string() }), internal: false }),
   'core.season.archived': event({ version: 1, payload: z.object({ seasonId: z.string() }), internal: false }),
+  'core.collection.published': event({ version: 1, payload: z.object({ collectionId: z.string() }), internal: false }),
+  // Productions joined or left a collection (C-60), for Festival's timetable filter.
+  'core.collection.changed': event({ version: 1, payload: z.object({ collectionId: z.string(), addedIds: z.array(z.string()), removedIds: z.array(z.string()) }), internal: false }),
   'core.production.published': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
   'core.production.updated': event({ version: 1, payload: z.object({
     productionId: z.string(),

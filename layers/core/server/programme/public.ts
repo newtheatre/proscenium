@@ -9,6 +9,7 @@ import { productionBySlug } from './service'
 import { ageWording, guidanceFor, type GuidanceEffect, type GuidanceWarning } from './guidance'
 import { shownCredits, shownPerformanceCredits, type ShownCredit } from './credits'
 import { appearancesOf, lineUpsFor } from './line-ups'
+import { collectionsFor, type CollectionChip } from './collections'
 import { bookingActions, priceSummaries, type ShownBooking } from './booking'
 import type { PriceSummary } from '../points/booking-action'
 import { publicImages, type PublicImage } from './media'
@@ -85,6 +86,8 @@ export interface PublicProduction {
   /** Worked out, not stored (part 3): cancelled, or its last performance not cancelled has ended. */
   past: boolean
   credits: ShownCredit[]
+  /** The published collections it is part of, as chips linking to their pages (C-60). */
+  collections: CollectionChip[]
   /** Other productions' line-ups it appears in (LU3): "Also appearing in". */
   appearances: { slug: string, title: string, startsAt: number }[]
   poster: PublicImage | null
@@ -198,6 +201,7 @@ export async function publicProduction(slug: string, options: PublicProductionOp
     past: isPast(row.state, performances, now),
     credits: await shownCredits(row.id, options.members ?? false),
     appearances: await appearances(row.id),
+    collections: (await collectionsFor([row.id], { publishedOnly: true })).get(row.id) ?? [],
     ...(await publicImages([row.id])).get(row.id)!,
     performances,
     venues: await publicVenues([...new Set(performances.map(p => p.venue.id))]),

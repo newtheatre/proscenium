@@ -61,6 +61,8 @@ interface Production {
   state: 'published' | 'cancelled'
   past: boolean
   credits: { id: string, creditedName: string, role: string, section: string }[]
+  /** The published collections it belongs to. Absent from an older cached answer. */
+  collections?: { id: string, slug: string, name: string, colour: string }[]
   /** Other shows' line-ups this one appears in. Absent from an older cached answer. */
   appearances?: { slug: string, title: string, startsAt: number }[]
   poster: Image | null
@@ -240,6 +242,19 @@ useHead(() => {
           >
             {{ t('public-site.production.presented-by', { company: production.companyName }) }}
           </p>
+          <div
+            v-if="production.collections?.length"
+            class="flex flex-wrap items-center gap-2"
+          >
+            <span class="text-sm text-muted">{{ t('public-site.production.part-of') }}</span>
+            <CollectionChip
+              v-for="c in production.collections"
+              :key="c.id"
+              :name="c.name"
+              :colour="c.colour"
+              :to="`/collections/${c.slug}`"
+            />
+          </div>
           <dl
             v-if="facts.length"
             class="grid grid-cols-2 gap-x-6 gap-y-4 xl:grid-cols-4"
