@@ -177,3 +177,15 @@ describe('marking-pinned-version', () => {
     expect(await refusalOf(inContext(() => slotFormVersion(placement, otherForm), actorOf(member)))).toBe('forms.version-not-of-form')
   })
 })
+
+describe('the quiz template (FB-515)', () => {
+  it('starts a quiz that publishes and is marked as it stands', async () => {
+    const formId = (await req('POST', '/api/forms/forms', { title: `Safety quiz ${newId('tst').slice(-6)}`, template: 'forms.quiz' }, marker)).body.formId as string
+    const { body } = await req('GET', `/api/forms/forms/${formId}`, undefined, marker)
+    expect(body.draft.definition.marking).toEqual({ passMark: 5, show: 'score-and-feedback' })
+    expect((await req('POST', `/api/forms/forms/${formId}/publish`, { editRevision: body.draft.editRevision }, marker)).status).toBe(200)
+    expect((await req('PUT', `/api/forms/forms/${formId}/link`, OPEN, marker)).status).toBe(200)
+    const sent = await send(body.form.slug, { exits: 'two', alarm: ['stop', 'guide', 'count'], lifts: false, capacity: 200, point: 'The Car Park' }, member)
+    expect(sent.body.marking).toMatchObject({ score: 6, outOf: 6, passed: true })
+  })
+})
