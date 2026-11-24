@@ -250,7 +250,11 @@ theatre's time zone (UTC until setup sets it); the cron trigger runs only the la
 (`RESERVED_MODULE_IDS` in the registry); listening to it or contributing to its points then does
 nothing. A record type may have no table and a fixed list of ids (`record({ ids: ['site'] })`). A
 fact resolver may give the accounts that hold it, `defineFact(resolve, { holders })`, read with
-`factHolders(name, record?)`; without it the fact cannot be enumerated. A `core.navigation` entry
+`factHolders(name, record?)`; without it the fact cannot be enumerated. A fact on a record type may
+say `pin: true`: the theatre can then map it to abilities for one named record of that type (Admin >
+Roles > Automatic access, "For one post only"), and the fact is judged against that record whatever
+record the ability is used on. The type's `core.record-resolver` offers the records to pick from
+with `choices(limit)`. A pinned mapping whose record has gone grants nothing and shows as broken. A `core.navigation` entry
 names a `menu` (account, members, console or live) and may set `hideEmpty` beside `count`; only an
 account entry may use the ability `'signed-in'`. A theatre's page may not sit under a reserved
 address prefix (`RESERVED_PREFIXES` in `scripts/checks/routes.ts`) or start with an underscore.
