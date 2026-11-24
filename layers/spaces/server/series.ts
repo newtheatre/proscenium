@@ -8,6 +8,7 @@ import { bookableFree, CLASH, requireBookable } from './bookings'
 import { bookingEvents } from './db/schema'
 import type { SeriesInput } from './inputs'
 import { checkRequest, type Rule } from './rules'
+import { usesOf } from './uses'
 
 const MINUTE = 60_000 // not-policy: unit of time
 const HHMM = 5 // not-policy: the length of "19:00"
@@ -146,11 +147,16 @@ export async function confirmSeries(unit: UnitView, actor: Actor, id: string, no
   const bookable = await requireBookable(series.bookable_id)
   const at = nowMs()
   const list = JSON.stringify(ids)
+  const times = await all<{ id: string, starts_at: number, ends_at: number }>('SELECT id, starts_at, ends_at FROM spaces_bookings WHERE id IN (SELECT value FROM json_each(?)) ORDER BY starts_at', list)
+  // C1a: another module's use of the room is read just before the write.
+  if (bookable.spaceId && times.length) {
+    const uses = await usesOf([bookable.spaceId], times[0]!.starts_at, Math.max(...times.map(r => r.ends_at)), null)
+    if (uses.some(u => times.some(r => u.from < r.ends_at && r.starts_at < u.to))) refuse(CLASH.code, 'A date of the series clashes with another use of the room.', { status: 409, remedy: 'Decide the dates one by one.' })
+  }
   unit.add(sql`UPDATE spaces_bookings SET state = 'confirmed', decided_by = ${actor.accountId!}, decided_at = ${at}, decision_note = ${note}, updated_at = ${at}
       WHERE id IN (SELECT value FROM json_each(${list})) AND state = 'requested'
         AND ${bookableFree(bookable, sql`spaces_bookings.starts_at`, sql`spaces_bookings.ends_at`, sql`spaces_bookings.id`)}`)
     .expect(ids.length, { ...CLASH, remedy: 'Decide the dates one by one.' })
-  const times = await all<{ id: string, starts_at: number, ends_at: number }>('SELECT id, starts_at, ends_at FROM spaces_bookings WHERE id IN (SELECT value FROM json_each(?))', list)
   unit.insertSet(bookingEvents, ids.map(b => ({ bookingId: b, kind: 'confirmed', actor: actor.accountId ?? null, at, note })))
   unit.announce('spaces.booking.confirmed', times.map(r => ({
     payload: { bookingId: r.id, bookableId: bookable.id, startsAt: r.starts_at, endsAt: r.ends_at, seriesId: id, decided: true },

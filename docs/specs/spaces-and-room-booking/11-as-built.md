@@ -12,7 +12,7 @@ Where the build departs from, or is narrower than, parts 1 to 9. The build is th
 - **Audience** `members` in part 6 is the kit's `signed-in`.
 - **Cascades.** The kit's references take no `ON DELETE`, so removing a bookable's hours or purpose rows is done by the code that archives it, not by the database.
 - **Abilities** are declared with the first route that needs them, as the conformance check requires; the gate declares only `spaces.settings.manage`.
-- **Occupancy.** Spaces will list the support module `occupancy` under `requires` (R3-03, Matt 2026-11-23) once lane A's module is on `next`, and contributes its bookings to core's `core.space-busy` then.
+- **Occupancy.** Spaces lists the support module `occupancy` under `requires` (R3-03, Matt 2026-11-23); see the Occupancy section below.
 
 Proof runs P-1 to P-5 and P-7 are integration tests in `layers/spaces/tests/integration/gate.test.ts`, run in workerd against local D1 with every attempt fired at once. P-6 (a series saved whole or not at all) follows with series. The deployed run against a real D1 is still owed.
 
@@ -62,3 +62,12 @@ Integration tests: `layers/spaces/tests/integration/approval.test.ts`.
 - **Cancelling (R6, R7).** A booking in a series offers Cancel this date, Cancel this and later dates, and Cancel every date to come (`POST /api/spaces/series/<id>/cancel` with `from`, or without it). Past dates never change, requests still waiting are withdrawn rather than cancelled, and cancelling every date ends the series. Changing the time of a series is part of the change and priority slice.
 
 Integration tests: `layers/spaces/tests/integration/series.test.ts`; unit tests: `layers/spaces/tests/unit/series.test.ts`.
+
+## Occupancy (R3-03, rule C1a), 24 November 2026
+
+- **Needs occupancy.** `requires: ['occupancy']`, so the occupancy view is on whenever room bookings are, and Admin > Modules lists Room bookings under occupancy's "Needed by".
+- **What Spaces reports.** A contribution to `core.space-busy` (`room-bookings`) gives each Confirmed booking of a space's bookable, kind `room-booking`, always yielding. Its label follows K2: the title to the booker, to holders of `spaces.booking.view` on the room and when `spaces.calendar.show-details` is `full`; the purpose's name when it is `purpose`; nothing for `busy` and for a reader of null. Resources take no space and are not reported.
+- **Other modules' uses (C1a).** `server/uses.ts` reads `core.space-busy` leaving out Spaces' own contribution. A use is a fourth blocker for a space (`kind: 'use'`, never named on the form: "In use for something else"); the check refuses with C1 and offers the nearest free time around it. Confirming a request, one or a whole series, reads the uses again just before the write and refuses `spaces.clash` if one now overlaps. A use cannot sit on the write's statement, so a use reported between that read and the write is not caught; the module taking the space asks `isSpaceFree` itself, which sees the bookings.
+- **The calendar** draws uses in the room's column with a double edge, labelled as the reporting module allows, or "In use".
+
+Integration tests: `layers/spaces/tests/integration/occupancy.test.ts`; the occupancy module's own test now expects Room bookings among the modules that need it.

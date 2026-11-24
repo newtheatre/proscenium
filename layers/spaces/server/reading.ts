@@ -5,6 +5,7 @@ import { all, can, first, inAccountScope, refuse, useDb, useSetting, type Actor 
 import { accountLabel, closuresBetween, listPerformances } from '#modules/core'
 import type { BookingState } from '../shared/states'
 import { listBookables, type BookableRow } from './setup'
+import { usesOf } from './uses'
 
 const DAY = 86_400_000 // not-policy: unit of time
 export const CALENDAR_DAYS = 31 // not-policy: the widest window the calendar asks for (part 4, routes)
@@ -38,7 +39,7 @@ export async function bookablesFor(actor: Actor): Promise<(BookableRow & { may: 
 }
 
 export interface CalendarItem {
-  kind: 'booking' | 'request' | 'performance' | 'closure' | 'holiday'
+  kind: 'booking' | 'request' | 'performance' | 'closure' | 'holiday' | 'use'
   id: string
   bookableId: string | null
   startsAt: number
@@ -93,6 +94,13 @@ export async function calendarFor(actor: Actor, input: { bookableIds: string[], 
         if (!titles.has(p.productionId)) titles.set(p.productionId, (await first<{ title: string }>('SELECT title FROM core_productions WHERE id = ?', p.productionId))?.title ?? '')
         items.push({ kind: 'performance', id: p.id, bookableId: b.id, startsAt: p.startsAt, endsAt: p.endsAt, title: titles.get(p.productionId), mine: false })
       }
+    }
+  }
+  // C1a: other modules' uses of the spaces chosen, named only where the reporting module allows.
+  const spaceIds = [...new Set(chosen.flatMap(b => b.kind === 'space' && b.spaceId ? [b.spaceId] : []))]
+  for (const u of await usesOf(spaceIds, input.from, input.to, actor)) {
+    for (const b of chosen) {
+      if (b.kind === 'space' && b.spaceId === u.spaceId) items.push({ kind: 'use', id: u.record.id, bookableId: b.id, startsAt: u.from, endsAt: u.to, ...(u.label ? { title: u.label } : {}), mine: false })
     }
   }
   const closures = await closuresBetween(input.from, input.to)

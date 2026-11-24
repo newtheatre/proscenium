@@ -16,6 +16,7 @@ export default defineModule({
   since: '0.5.0',
   stability: 'experimental',
   uses: ['forms'],
+  requires: ['occupancy'],
 
   // Part 6. Every setting holds one value for the whole theatre; a value that varies by purpose or
   // by bookable is a column on that record that falls back to the setting.
@@ -191,6 +192,7 @@ export default defineModule({
     }],
     'core.count': [{ id: 'spaces.requests-waiting', file: 'requests-waiting' }],
     'core.health-check': [{ id: 'spaces.no-approver', file: 'no-approver' }],
+    'core.space-busy': [{ id: 'spaces.room-bookings', file: 'room-bookings' }],
     // The room manager and read-only oversight of part 6's presets; a theatre's own role of the same key is kept.
     'core.role-preset': [
       { id: 'spaces.technical-manager', key: 'technical-manager', name: 'Technical manager', description: 'Looks after the rooms: sets them up, decides booking requests and manages anyone\'s booking.', abilities: ['spaces.booking.view', 'spaces.booking.decide', 'spaces.booking.manage', 'spaces.bookable.manage'], opensMembersArea: true },

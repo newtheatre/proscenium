@@ -4,6 +4,7 @@
 import { sql, type SQL } from 'drizzle-orm'
 import { all, first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { assertNoVenueClosure, assertSpaceFree, closuresBetween, listPerformances } from '#modules/core'
+import { usesOf } from './uses'
 import { canMove, movesInto, type BookingEventKind, type BookingState, type ClosedReason } from '../shared/states'
 
 export interface Bookable {
@@ -35,8 +36,10 @@ export interface Booking {
 
 /** Something in the way of a window (rule C1). A title is given only where the reader may see it (K2). */
 export interface Blocker {
-  kind: 'booking' | 'performance' | 'closure'
+  kind: 'booking' | 'performance' | 'closure' | 'use'
   id: string
+  /** For a use: the module that reported it to core.space-busy (rule C1a). */
+  module?: string
   startsAt: number
   endsAt: number
   tier?: number
@@ -101,6 +104,7 @@ export async function blockersOf(bookable: Bookable, from: number, to: number, e
     ? await closuresBetween(from, to, { spaceId: bookable.spaceId! })
     : (await closuresBetween(from, to)).filter(c => c.venueId === null || (c.spaceId === null && c.venueId === bookable.homeVenueId))
   for (const c of closures) if (c.kind === 'closure' && c.blocksPerformances) found.push({ kind: 'closure', id: c.id, startsAt: c.startsAt, endsAt: c.endsAt })
+  if (bookable.kind === 'space') for (const u of await usesOf([bookable.spaceId!], from, to, null)) found.push({ kind: 'use', id: u.record.id, startsAt: u.from, endsAt: u.to, module: u.module })
   return found.sort((a, b) => a.startsAt - b.startsAt)
 }
 

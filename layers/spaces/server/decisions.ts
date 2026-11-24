@@ -5,6 +5,7 @@ import { all, can, first, inAccountScope, nowMs, refuse, useDb, useSetting, word
 import { accountLabel, holdersOf, notify } from '#modules/core'
 import { confirmRequest, history, moveBooking, requireBookable, requireBooking, type Booking } from './bookings'
 import { listBookables } from './setup'
+import { assertNoUse } from './uses'
 import { bookingWords } from './words'
 import catalogue from '../i18n/en-GB.json'
 
@@ -129,6 +130,7 @@ export async function decideConfirm(unit: UnitView, id: string, decider: string,
   const bookable = await requireBookable(booking.bookableId)
   const reference = input.reference?.trim() || null
   if (bookable.control === 'external' && !reference) refuse('spaces.booking.reference-needed', 'Give the owner\'s reference for this booking.', { status: 422 })
+  await assertNoUse(bookable.spaceId, booking.startsAt, booking.endsAt)
   confirmRequest(unit, booking, bookable, decider, input.note?.trim() || null)
   if (reference) unit.add(sql`UPDATE spaces_bookings SET external_ref = ${reference} WHERE id = ${booking.id}`)
   await tellBooker(unit, booking, 'confirmed', input.note)

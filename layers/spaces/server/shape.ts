@@ -4,7 +4,7 @@ import { all, can, fact, nowMs, useSetting, type Actor } from '#kit'
 import { bookablesFor } from './reading'
 import type { Verdict } from './rules'
 
-export interface ShownBlocker { kind: 'booking' | 'performance' | 'closure', startsAt: number, endsAt: number, label?: string }
+export interface ShownBlocker { kind: 'booking' | 'performance' | 'closure' | 'use', startsAt: number, endsAt: number, label?: string }
 
 /** A verdict for the screen: a booking in the way is named only to people who may read it (C3, K2). */
 export async function shapeVerdict(actor: Actor, bookableId: string, verdict: Verdict) {
