@@ -18,6 +18,7 @@ import { addPassSales, carryOwed, owedHere, passSalesOn, planPassBuys, type Owed
 import { holdCovers, planCovers, type PlannedCover } from './pass-covers'
 import { judgePasses, letGoBaskets, passEntryTypeId, redeemPasses, type JudgedPass, type PassAsk } from './pass-entries'
 import { WHEELCHAIR_TYPE } from './prices'
+import { offSaleAt } from './sales-close'
 
 /**
  * `references`, one for each ticket in turn, are typed in place of signing in, such as student IDs
@@ -43,11 +44,6 @@ const NOT_ON_SALE: Record<string, { code: string, reason: string }> = {
   draft: { code: 'box-office.sales.not-yet', reason: 'This performance is not on sale yet.' },
   paused: { code: 'box-office.sales.paused', reason: 'Sales are paused for this performance.' },
   closed: { code: 'box-office.sales.closed', reason: 'Sales have closed for this performance.' },
-}
-
-/** When online sales close: the time set on the sales record, or the setting's time before curtain. */
-export async function offSaleAt(sales: { offSaleAt: number | null }, startsAt: number): Promise<number> {
-  return sales.offSaleAt ?? startsAt - (await useSetting('box-office.sales.close-before') as number) * 1000 // not-policy: seconds to milliseconds
 }
 
 export interface PricedLine { bandId: string, ticketTypeId: string, priceId: string, amountMinor: number, requirement: Requirement | null }

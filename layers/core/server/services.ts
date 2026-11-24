@@ -26,7 +26,6 @@ export type { PublicProduction, PublicPerformance, PublicListing, PublicProducti
 export type { PublicImage } from './programme/media'
 export type { ChangeImpact, ProposedChange } from './points/change-impact'
 export type { SpaceBusy, SpaceBusyItem, SpaceBusyQuery } from './points/space-busy'
-export { assertSpaceFree, isSpaceFree } from './programme/performances'
 export type { AccountNotice, AccountNoticeSource } from './points/account-notice'
 export { findOrCreateAccount } from './identity/guests'
 export { canSendClaimLink, claimLink, isUnclaimed, sendClaimLink } from './identity/claim'
