@@ -138,6 +138,8 @@ export default defineModule({
     // One file per piece of evidence, uploaded through Training's own route (E2, E4).
     'core.file-slot': [{ id: 'training.evidence-file', owner: 'training.evidence', ability: 'training.settings.manage', accepts: ['png' as const, 'jpeg' as const, 'webp' as const, 'pdf' as const], limit: 'core.files.document-limit', access: 'record' as const, textClass: 'personal' as const, clean: true }],
     'core.file-access': [{ id: 'training.evidence', file: 'evidence' }],
+    // Two places on one session after an account merge: the stronger is kept.
+    'core.merge-handler': [{ id: 'training.places', file: 'places' }],
     'core.notification-type': [{
       id: 'training.record-awarded',
       category: 'optional' as const,
