@@ -2,6 +2,7 @@
 // variants, price lists and prices, and outlets. Every write is one unit; a name already in use and a
 // record that has gone are refused by the statement itself, never by a read first.
 import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
+import { listTaxCodes } from '#modules/finance'
 import { priceOn, nextChange, type ListRule, type PriceRow } from './pricing'
 import type { OUTLET_KINDS, TILL_LAYOUTS } from './db/schema'
 import { choiceGroups, groupsByProduct, priceGroups, type ChoiceGroup } from './choices'
@@ -34,7 +35,7 @@ const currency = async () => await useSetting('core.locale.currency') as string
 export interface PriceList { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, active: boolean }
 export interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | null, next: { amountMinor: number | null, from: number } | null }
 export interface Variant { id: string, name: string, barcode: string | null, mixerMeasure: boolean, position: number, active: boolean, prices: VariantPrice[] }
-export interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, ageFromCategory: boolean, position: number, active: boolean, groupIds: string[], variants: Variant[] }
+export interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, ageFromCategory: boolean, taxCode: string | null, position: number, active: boolean, groupIds: string[], variants: Variant[] }
 export interface Category { id: string, name: string, position: number, colour: string | null, parentId: string | null, ageRestricted: boolean, usualPreset: string | null, active: boolean, products: Product[] }
 
 interface ListRow { id: string, name: string, system_key: string | null, restricted: number, falls_back: number, active: number }
@@ -58,7 +59,7 @@ const rule = (l: PriceList): ListRule => ({ id: l.id, fallsBack: l.fallsBack })
 export async function catalogue(options: { activeOnly?: boolean } = {}): Promise<{ categories: Category[], lists: PriceList[], currency: string }> {
   const active = options.activeOnly ? 'WHERE active = 1' : ''
   const cats = await all<{ id: string, name: string, position: number, colour: string | null, parent_id: string | null, age_restricted: number, usual_preset: string | null, active: number }>(`SELECT id, name, position, colour, parent_id, age_restricted, usual_preset, active FROM bar_categories ${active} ORDER BY position, lower(name), id`)
-  const prods = await all<{ id: string, category_id: string, name: string, age_restricted: number, age_from_category: number, position: number, active: number }>(`SELECT p.id, p.category_id, p.name, (CASE WHEN p.age_from_category = 1 THEN c.age_restricted ELSE p.age_restricted END) AS age_restricted, p.age_from_category, p.position, p.active FROM bar_products p JOIN bar_categories c ON c.id = p.category_id ${options.activeOnly ? 'WHERE p.active = 1' : ''} ORDER BY p.position, lower(p.name), p.id`)
+  const prods = await all<{ id: string, category_id: string, name: string, age_restricted: number, age_from_category: number, tax_code: string | null, position: number, active: number }>(`SELECT p.id, p.category_id, p.name, (CASE WHEN p.age_from_category = 1 THEN c.age_restricted ELSE p.age_restricted END) AS age_restricted, p.age_from_category, p.tax_code, p.position, p.active FROM bar_products p JOIN bar_categories c ON c.id = p.category_id ${options.activeOnly ? 'WHERE p.active = 1' : ''} ORDER BY p.position, lower(p.name), p.id`)
   const vars = await all<{ id: string, product_id: string, name: string, barcode: string | null, mixer_measure: number, position: number, active: number }>(`SELECT id, product_id, name, barcode, mixer_measure, position, active FROM bar_variants ${active} ORDER BY position, id`)
   const attached = await groupsByProduct()
   const lists = await priceLists()
@@ -79,7 +80,7 @@ export async function catalogue(options: { activeOnly?: boolean } = {}): Promise
   const productsOf = new Map<string, Product[]>()
   for (const p of prods) {
     const list = productsOf.get(p.category_id) ?? []
-    list.push({ id: p.id, categoryId: p.category_id, name: p.name, ageRestricted: !!p.age_restricted, ageFromCategory: !!p.age_from_category, position: p.position, active: !!p.active, groupIds: attached.get(p.id) ?? [], variants: variantsOf.get(p.id) ?? [] })
+    list.push({ id: p.id, categoryId: p.category_id, name: p.name, ageRestricted: !!p.age_restricted, ageFromCategory: !!p.age_from_category, taxCode: p.tax_code, position: p.position, active: !!p.active, groupIds: attached.get(p.id) ?? [], variants: variantsOf.get(p.id) ?? [] })
     productsOf.set(p.category_id, list)
   }
   return {
@@ -230,19 +231,20 @@ export async function updateCategory(unit: UnitView, id: string, input: Partial<
 }
 
 // ageRestricted null: as the category, which a change to the category then follows.
-export interface ProductInput { categoryId: string, name: string, ageRestricted?: boolean | null, active?: boolean }
+export interface ProductInput { categoryId: string, name: string, ageRestricted?: boolean | null, taxCode?: string | null, active?: boolean }
 export interface FirstVariant { name?: string, amountMinor?: number | null }
 
 /** A product with its first variant ("Each" unless named), and that variant's Standard price if given. */
 export async function addProduct(unit: UnitView, input: ProductInput, first: FirstVariant, by: string): Promise<{ productId: string, variantId: string }> {
   ensureStandard(unit)
+  if (input.taxCode) await knownTaxCode(input.taxCode)
   const productId = newId('bprd')
   const variantId = newId('bvar')
   const at = nowMs()
   unit.add({
-    sql: `INSERT INTO bar_products (id, category_id, name, age_restricted, age_from_category, position, active, created_at, updated_at)
-          SELECT ?, id, ?, ?, ?, coalesce((SELECT max(position) + 1 FROM bar_products WHERE category_id = ?), 0), 1, ?, ? FROM bar_categories WHERE id = ? AND active = 1`,
-    params: [productId, input.name, input.ageRestricted ? 1 : 0, input.ageRestricted === null ? 1 : 0, input.categoryId, at, at, input.categoryId],
+    sql: `INSERT INTO bar_products (id, category_id, name, age_restricted, age_from_category, tax_code, position, active, created_at, updated_at)
+          SELECT ?, id, ?, ?, ?, ?, coalesce((SELECT max(position) + 1 FROM bar_products WHERE category_id = ?), 0), 1, ?, ? FROM bar_categories WHERE id = ? AND active = 1`,
+    params: [productId, input.name, input.ageRestricted ? 1 : 0, input.ageRestricted === null ? 1 : 0, input.taxCode ?? null, input.categoryId, at, at, input.categoryId],
   }).expect(1, { code: 'bar.category.unknown', reason: 'That category is not in use.' })
   unit.add({
     sql: 'INSERT INTO bar_variants (id, product_id, name, position, active, created_at, updated_at) VALUES (?, ?, ?, 0, 1, ?, ?)',
@@ -253,17 +255,25 @@ export async function addProduct(unit: UnitView, input: ProductInput, first: Fir
   return { productId, variantId }
 }
 
+/** A code a product may be given: one Finance offers now. */
+async function knownTaxCode(code: string): Promise<void> {
+  if (!(await listTaxCodes({ activeOnly: true })).some(c => c.code === code && c.code !== 'none'))
+    refuse('bar.product.tax-code', 'That tax code is not offered.', { status: 422, remedy: 'Choose a code from the list.', fields: { taxCode: 'bar.product.tax-code' } })
+}
+
 export async function updateProduct(unit: UnitView, id: string, input: Partial<ProductInput>): Promise<void> {
-  const row = await first<{ category_id: string, name: string, age_restricted: number, age_from_category: number, active: number }>('SELECT category_id, name, age_restricted, age_from_category, active FROM bar_products WHERE id = ?', id)
+  const row = await first<{ category_id: string, name: string, age_restricted: number, age_from_category: number, tax_code: string | null, active: number }>('SELECT category_id, name, age_restricted, age_from_category, tax_code, active FROM bar_products WHERE id = ?', id)
   if (!row) refuse(GONE('product').code, GONE('product').reason, { status: 404 })
+  if (input.taxCode && input.taxCode !== row!.tax_code) await knownTaxCode(input.taxCode)
   const categoryId = input.categoryId ?? row!.category_id
   unit.add({
-    sql: `UPDATE bar_products SET category_id = ?, name = ?, age_restricted = ?, age_from_category = ?, active = ?, updated_at = ?
+    sql: `UPDATE bar_products SET category_id = ?, name = ?, age_restricted = ?, age_from_category = ?, tax_code = ?, active = ?, updated_at = ?
           WHERE id = ? AND EXISTS (SELECT 1 FROM bar_categories WHERE id = ? AND (active = 1 OR id = ?))`,
     params: [
       categoryId, input.name ?? row!.name,
       input.ageRestricted === undefined ? row!.age_restricted : input.ageRestricted ? 1 : 0,
       input.ageRestricted === undefined ? row!.age_from_category : input.ageRestricted === null ? 1 : 0,
+      input.taxCode === undefined ? row!.tax_code : input.taxCode,
       input.active === undefined ? row!.active : input.active ? 1 : 0, nowMs(), id, categoryId, row!.category_id,
     ],
   }).expect(1, { code: 'bar.category.unknown', reason: 'That category is not in use.' })

@@ -33,7 +33,7 @@ export interface EntryInput {
   performanceId?: string | null
   /** The budget line this entry is spent against (Budgets). */
   budgetLineId?: string | null
-  /** An active code from finance_tax_codes; `none` when left out. */
+  /** A code from finance_tax_codes; `none` when left out. */
   taxCode?: string
   /** The VAT on this entry's net amount, signed like the entry, posted on its own entry to a VAT account. 0 for `none`. */
   taxMinor?: number
@@ -195,14 +195,12 @@ export async function postEntries(unit: UnitView, posting: PostingInput): Promis
       throw new Refusal('finance.entry.wrong-module', `${owner} cannot post to an account that belongs to ${resolved[i]!.module}.`, { status: 500 })
   })
 
-  // Every code named is known, and active unless the posting reverses one written while it was.
+  // Every code named is known. A stopped code is no longer offered, but stays on the prices that use it.
   const codes = [...new Set(posting.entries.map(e => e.taxCode ?? 'none').filter(c => c !== 'none'))]
   if (codes.length) {
-    const found = await all<{ code: string, active: number }>('SELECT code, active FROM finance_tax_codes WHERE code IN (SELECT value FROM json_each(?))', JSON.stringify(codes))
+    const found = await all<{ code: string }>('SELECT code FROM finance_tax_codes WHERE code IN (SELECT value FROM json_each(?))', JSON.stringify(codes))
     for (const code of codes) {
-      const row = found.find(r => r.code === code)
-      if (!row) throw new Refusal('finance.tax-code.missing', `There is no tax code ${code}.`, { status: 409 })
-      if (!row.active && !posting.reversesId) throw new Refusal('finance.tax-code.inactive', `The tax code ${code} is no longer in use.`, { status: 409, remedy: 'Choose a code that is in use on the Tax codes screen.' })
+      if (!found.some(r => r.code === code)) throw new Refusal('finance.tax-code.missing', `There is no tax code ${code}.`, { status: 409 })
     }
   }
 

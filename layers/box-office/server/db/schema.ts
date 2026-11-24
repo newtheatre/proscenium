@@ -104,6 +104,8 @@ export const ticketTypes = defineTable('box_office_ticket_types', {
   // online (an online discount). A selling choice, so people set it on a module's type too. The
   // routes hold it to those three; no CHECK, since adding one to an existing table rebuilds it.
   channel: col.internal(text('channel', { enum: ['all', 'desk', 'online'] }).notNull().default('all')),
+  // The Finance tax code its prices include (BO-78); null sells at finance.tax.default-code.
+  taxCode: col.internal(text('tax_code')),
   // Set on a type a module declares through box-office.ticket-type: `<module>.<id>`. The module owns
   // its rules (kind, requirements, needing a paid ticket); people may only rename, order and price it.
   managedBy: col.internal(text('managed_by')),
