@@ -121,3 +121,8 @@ export async function isPeriodOpen(date: string | number): Promise<boolean> {
   const r = await first<{ closed: number }>(`SELECT ${closedSql('p')} AS closed FROM finance_periods p WHERE p.starts_on <= ? AND p.ends_on >= ?`, day, day)
   return !r || r.closed !== 1
 }
+
+/** The finance year, from finance.year.starts, that holds a London date: a department budget's year (Budgets, BC-06). */
+export async function financeYearOf(date: string): Promise<{ startsOn: string, endsOn: string }> {
+  return periodContaining(date, YEAR, await useSetting('finance.year.starts') as string)
+}

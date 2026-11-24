@@ -342,3 +342,13 @@ export async function accountsOf(module: string, kind?: AccountSummary['kind']):
     ...(kind ? [module, kind] : [module]))
   return rows.map(r => ({ id: r.id, code: r.code, name: r.name, kind: r.kind, module: r.module, systemKey: r.system_key, scope: r.scope }))
 }
+
+/** What sealed entries spent against each budget line come to, debits positive: a budget's Spent (Budgets, BC-10). */
+export async function budgetLineTotals(lineIds: readonly string[]): Promise<Map<string, number>> {
+  if (!lineIds.length) return new Map()
+  const rows = await all<{ line: string, amount: number }>(
+    `SELECT e.budget_line_id AS line, sum(e.amount_minor) AS amount FROM finance_entries e
+      WHERE e.budget_line_id IN (SELECT value FROM json_each(?)) AND EXISTS (SELECT 1 FROM finance_seals s WHERE s.posting_id = e.posting_id)
+      GROUP BY e.budget_line_id`, JSON.stringify(lineIds))
+  return new Map(rows.map(r => [r.line, r.amount]))
+}

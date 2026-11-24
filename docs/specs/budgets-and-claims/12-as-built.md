@@ -1,0 +1,18 @@
+# 12. As built
+
+Where the build departs from, or is narrower than, parts 1 to 11. The build is the reference from here on.
+
+## The plan: BC-03, BC-04, BC-06 to BC-10, BC-12, BC-13 (24 November 2026)
+
+- **Module.** `layers/budgets`, requiring `finance`. It declares only what is built: abilities `budgets.budget.view`, `budget.manage`, `budget.approve` and `category.manage`. `budget.hold`, the claim and request abilities and the settings come with the slices that use them, as the conformance check requires. The treasurer's role template gains the four.
+- **Accounts (BC-04).** `budgets.claims-payable` (liability) and `budgets.expenses` (expense), made by Finance's own listener when the module is switched on.
+- **Categories (BC-03).** Seeded by the listener `categories` on `core.module.enabled`: Set, Costume, Lighting, Sound, Publicity, Rights and licences, Travel, Hospitality, Equipment, General. A category's account is an active expense account given to Budgets (`module = 'budgets'`), or none, which posts to `budgets.expenses`. Admin > Modules > Spending categories edits and archives them.
+- **Departments.** Core's shared vocabulary `core.department` (Technical, Publicity, Front of house, Bar, Social, General) is added to core domain, per Integration's ruling of 23 November.
+- **The finance year.** Finance gains `financeYearOf(date)`, the year from `finance.year.starts` that holds a London date. A production's budget takes the year of its first performance (today when it has none), a season's the year it starts, and a department or general budget the year chosen on the form.
+- **`budgets_budgets` adds two columns** to part 2: `proposed_by`, so the proposer cannot approve (checked on the statement through the account scope, so a merged account is the same person), and `note`, the latest note from sending back or reopening, shown at the top of the budget. The audit keeps that each happened.
+- **Owner rule.** The kit's `owner: 'refuses'` needs a record with an owner column, which a budget does not have. The four-eyes rule on approval is the service's own check, so the Owner is refused like anyone else (PR 643).
+- **Lines.** Changed only while the budget is a draft, with `budgets.budget.manage`. On an approved budget the approver may add a line (approved at once, with a reason), rename it, change its category or sources, revise its amount (BC-09) or archive it; a line with spending, commitments or pending money on it is not archived. A proposed or closed budget's lines do not change.
+- **Figures (BC-10).** Read, never stored. Spent is Finance's new `budgetLineTotals(lineIds)`: sealed entries tagged with the line, debits positive. Committed is, for now, only budgets funded from the line (BC-12): their approved expense total once approved or closed. Pending is 0 until claims and bills exist. An income line's actual is what its source accounts took for the budget's production (by `production_id`), or, for other budgets, over the season's dates or the finance year, plus any income entry tagged with the line.
+- **Revising below spent plus committed** is refused `budgets.line.below-spent` with the floor in `detail.floorMinor`; sending `confirm` sets it anyway.
+- **Closing (BC-13).** Close has nothing to wait for yet; requests, claims and awards will each add their guard. The `budgets.close.after` offer comes with the production tab. Reopening is refused `budgets.budget.taken` when another open budget has taken the same production, season or department and year.
+- **Not yet built from this release:** BC-11 (the production tab), BC-14 (holders), and everything from BC-15 on. The production's lead making their own production's budget waits for holders.
