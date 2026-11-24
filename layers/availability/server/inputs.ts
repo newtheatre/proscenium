@@ -47,3 +47,5 @@ export const requestInput = z.object({
   to: date,
   dueOn: date,
 }).strict()
+
+export const withdrawInput = z.object({ accountId: z.string().min(1).max(40) }).strict() // not-policy: an id's length

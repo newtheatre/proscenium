@@ -25,7 +25,8 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/ // not-policy: a date's shape
 const PHONE_DAYS = 3 // not-policy: spec part 5, a phone shows three days
 const WEEK_DAYS = 7 // not-policy: a week
 
-export async function useMyAvailability() {
+/** `home` is the first day shown when the address names none: today on S1, a request's first day on S5. */
+export async function useMyAvailability(options: { home?: Ref<string | null> } = {}) {
   const route = useRoute()
   const router = useRouter()
   const dates = useDates()
@@ -38,7 +39,7 @@ export async function useMyAvailability() {
   const length = computed(() => phone.value ? PHONE_DAYS : WEEK_DAYS)
   const asked = computed(() => {
     const q = route.query.from
-    return typeof q === 'string' && DATE.test(q) ? q : todayIn(dates.zone.value).toString()
+    return typeof q === 'string' && DATE.test(q) ? q : options.home?.value ?? todayIn(dates.zone.value).toString()
   })
   const from = computed(() => phone.value ? asked.value : mondayOf(asked.value))
   const query = computed(() => ({ from: from.value, to: addDays(from.value, length.value - 1) }))
