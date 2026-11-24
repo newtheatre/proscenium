@@ -6,6 +6,7 @@ import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { accountLabel, assertTerm } from '#modules/core'
+import { defaultTaxCode } from '#modules/finance'
 import { requestRefund } from '#modules/payments'
 import type { OwnerEntry } from '#modules/payments'
 import { STOCK_OUTCOMES } from './db/schema'
@@ -169,20 +170,28 @@ export async function refundSale(unit: UnitView, reference: string, input: Refun
  * went to. A refund made from Payments' own screens, with no reversals, comes off bar.income.
  */
 export async function refunded(unit: UnitView, saleId: string, refund: { id: string, amountMinor: number }, where: { productionId: string | null, performanceId: string | null }): Promise<OwnerEntry[]> {
-  const rows = await all<{ account: string | null, amount: number }>(
-    `SELECT c.income_account_id AS account, sum(r.amount_minor) AS amount FROM bar_sale_reversals r
+  const usual = await defaultTaxCode()
+  const rows = await all<{ account: string | null, code: string, amount: number }>(
+    `SELECT c.income_account_id AS account, coalesce(p.tax_code, ?) AS code, sum(r.amount_minor) AS amount FROM bar_sale_reversals r
        JOIN bar_sale_lines l ON l.id = r.sale_line_id JOIN bar_variants v ON v.id = l.variant_id
        JOIN bar_products p ON p.id = v.product_id JOIN bar_categories c ON c.id = p.category_id
-      WHERE r.refund_id = ? AND r.state = 'requested' AND l.sale_id = ? GROUP BY c.income_account_id ORDER BY c.income_account_id`,
-    refund.id, saleId,
+      WHERE r.refund_id = ? AND r.state = 'requested' AND l.sale_id = ? GROUP BY c.income_account_id, code ORDER BY c.income_account_id, code`,
+    usual, refund.id, saleId,
   )
-  if (!rows.length) return [{ account: INCOME, amountMinor: refund.amountMinor, ...where }]
+  if (!rows.length) {
+    // From Payments' own screens, with no lines named: the VAT comes back at the sale's code, or the usual one if it had several.
+    const codes = await all<{ code: string }>(
+      'SELECT DISTINCT coalesce(p.tax_code, ?) AS code FROM bar_sale_lines l JOIN bar_variants v ON v.id = l.variant_id JOIN bar_products p ON p.id = v.product_id WHERE l.sale_id = ?',
+      usual, saleId,
+    )
+    return [{ account: INCOME, amountMinor: refund.amountMinor, taxCode: codes.length === 1 ? codes[0]!.code : usual, ...where }]
+  }
   // Goods handed back go back to stock, before the reversals stop being requested.
   await returnForRefund(unit, refund.id)
   const at = nowMs()
   unit.add({ sql: "UPDATE bar_sale_reversals SET state = 'succeeded', updated_at = ? WHERE refund_id = ? AND state = 'requested'", params: [at, refund.id] })
   unit.announce('bar.sale.refunded', { saleId, refundId: refund.id }, { record: ['bar.sale', saleId] })
-  return rows.map(r => ({ account: r.account ?? INCOME, amountMinor: r.amount, ...where }))
+  return rows.map(r => ({ account: r.account ?? INCOME, amountMinor: r.amount, taxCode: r.code, ...where }))
 }
 
 /** The refund failed or was declined: its reversals let go of what they held. Safe to repeat. */
