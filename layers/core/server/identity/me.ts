@@ -1,11 +1,12 @@
 // What a signed-in person's own screens read: their account, how they sign in, and what to offer.
 import { all, credential, first, nowMs, useContext, useSetting } from '#kit'
-import { useRegistry } from '#kit/registry'
 import { accountById, verifiedAddressesOf } from './accounts'
-import { kitGrantsOf } from './grants'
 import type { CurrentSession } from './sessions'
 import { authenticatorOf } from './authenticator'
 import { managedDomainProvider, offeredProviders } from './providers'
+import { holdsPrivileged } from './privileged'
+
+export { holdsPrivileged } from './privileged'
 
 // Does the account still have a way in other than its passkeys (ID-14, "the only way in")?
 export async function hasOtherWayIn(accountId: string): Promise<boolean> {
@@ -13,12 +14,6 @@ export async function hasOtherWayIn(accountId: string): Promise<boolean> {
   if (!(await useSetting('core.sign-in.email-link'))) return false
   const managed = await useSetting('core.sign-in.managed-domains') as string[]
   return (await verifiedAddressesOf(accountId)).some(address => !managed.includes(address.split('@').pop()!))
-}
-
-// Whether this person holds any privileged ability, so the console will want a passkey (ID-03).
-export async function holdsPrivileged(accountId: string): Promise<boolean> {
-  const registry = useRegistry()
-  return (await kitGrantsOf(accountId)).some(g => g.ability && registry.abilities.get(g.ability)?.decl.risk === 'privileged')
 }
 
 /** Whether the account can sign in strongly at all: a passkey, or an authenticator app where the theatre accepts one as strong. */
