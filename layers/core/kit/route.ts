@@ -18,7 +18,7 @@ import { withoutTokens } from './tokens'
 import { useSetting } from './settings-store'
 import { ensureMigrated } from './migrations'
 import type { AbilityName } from './registry-types'
-import { PRACTICE_HEADER, usePracticeGate } from './practice/gate'
+import { PRACTICE_HEADER, PRACTICE_TICKED_HEADER, usePracticeGate } from './practice/gate'
 import type { PracticeAnswer } from './practice/sample'
 import { log } from './log'
 
@@ -50,8 +50,10 @@ export interface RouteDeclaration<I extends z.ZodType | undefined = undefined> {
    * Practice mode (part 3). 'refuse': a marked request is refused, as signing in, passkeys,
    * recovery, erasure, setup and the update card are (M4). 'outside': the route manages practice
    * itself against the real database, so a mark neither swaps its bindings nor is required.
+   * 'ticks': a read that may tick a scenario's task, such as opening an emergency card, so inside a
+   * store the checks run after it as they do after a change (T1).
    */
-  practice?: 'refuse' | 'outside'
+  practice?: 'refuse' | 'outside' | 'ticks'
 }
 
 export interface RouteContext<I> {
@@ -77,7 +79,7 @@ export function checkRouteDeclaration(decl: RouteDeclaration<any>): void {
 }
 
 function checkRouteExtras(decl: RouteDeclaration<any>): void {
-  if (decl.practice !== undefined && decl.practice !== 'refuse' && decl.practice !== 'outside') throw new DeclarationError('practice', "is 'refuse' or 'outside'")
+  if (decl.practice !== undefined && !['refuse', 'outside', 'ticks'].includes(decl.practice)) throw new DeclarationError('practice', "is 'refuse', 'outside' or 'ticks'")
   if (decl.tokens !== undefined && (!Array.isArray(decl.tokens) || !decl.tokens.every(t => typeof t === 'string' && /^[a-z][a-zA-Z0-9]*$/.test(t)))) throw new DeclarationError('tokens', 'names the path parameters that carry a link token')
 }
 
@@ -278,7 +280,8 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     else if (idempotency) {
       await context.env.DB.prepare('INSERT OR REPLACE INTO core_idempotency_keys (key, route, account_id, request_hash, status, response, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(idempotency.key, idempotency.route, actor.accountId ?? null, idempotency.hash, 200, JSON.stringify(body), nowMs()).run() // not-policy: HTTP OK
     }
-    if (context.practice && !reads) await afterPracticeChange({ path: event.path.split('?')[0]!, body })
+    if (context.practice && (!reads || decl.practice === 'ticks') && (await afterPracticeChange({ path: event.path.split('?')[0]!, body })).length)
+      setResponseHeader(event, PRACTICE_TICKED_HEADER, '1')
     return body
   }
 
@@ -309,13 +312,14 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
   return routeHandler
 }
 
-/** Ticks the scenario's tasks after a practice change commits; a failure never undoes the change. */
-async function afterPracticeChange(answer: PracticeAnswer): Promise<void> {
+/** Ticks the scenario's tasks after a practice change commits, answering those ticked now; a failure never undoes the change. */
+async function afterPracticeChange(answer: PracticeAnswer): Promise<readonly string[]> {
   try {
-    await usePracticeGate().changed?.(answer)
+    return await usePracticeGate().changed?.(answer) ?? []
   }
   catch (error) {
     log.error('core.practice.tasks-failed', { error: String((error as Error)?.message ?? error) })
+    return []
   }
 }
 

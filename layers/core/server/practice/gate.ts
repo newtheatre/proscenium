@@ -72,8 +72,7 @@ export const practiceGate: PracticeGate = {
 
   async changed(answer) {
     const practice = useContext().practice
-    if (!practice) return
-    await tickTasks(practice.scenarioId, answer)
+    return practice ? tickTasks(practice.scenarioId, answer) : []
   },
 }
 

@@ -4,6 +4,9 @@
 /** The mark a practice tab sends with every request (M1, M5). */
 export const PRACTICE_HEADER = 'proscenium-practice'
 
+/** Sent back when a request ticked one of the scenario's tasks, so the panel reads them again (T1). */
+export const PRACTICE_TICKED_HEADER = 'proscenium-practice-ticked'
+
 const PREFIX = '/practice'
 const LIVE = '/live'
 
