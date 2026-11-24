@@ -1,10 +1,10 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "0df99870-7c00-4e02-85aa-7f7fedc590b6",
+  "id": "546dfd18-fe87-4787-8398-916f72ff6e53",
   "prevIds": [
     "27eee593-bbbf-4646-8a7c-179f088b6b30",
-    "a1307633-54c5-4fa4-9823-7c8c88d57e47"
+    "cef7c2ae-2778-4e52-aaf6-55ab4cf032b6"
   ],
   "ddl": [
     {
@@ -13660,6 +13660,16 @@
       "entityType": "columns"
     },
     {
+      "table": "finance_tax_codes",
+      "name": "in_scope",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "forms_action_runs",
       "name": "id",
       "type": "text",
@@ -24116,6 +24126,20 @@
       ],
       "isUnique": false,
       "where": "budget_line_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "finance_entries",
+      "name": "finance_entries_tax_code",
+      "columns": [
+        {
+          "value": "tax_code",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "tax_code <> 'none'",
       "origin": "manual",
       "entityType": "indexes"
     },
