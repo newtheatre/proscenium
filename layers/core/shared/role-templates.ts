@@ -10,7 +10,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     id: 'producer',
     abilities: [
       'core.production.view', 'core.production.create', 'core.production.edit', 'core.production.publish',
-      'core.performance.schedule', 'core.season.manage',
+      'core.performance.schedule', 'core.season.manage', 'core.collection.manage',
       'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.order.view', 'box-office.report.view', 'box-office.comp.approve',
       'front-of-house.shift.view', 'front-of-house.night-report.view',
       'reports.report.view', 'reports.run.export',
@@ -34,7 +34,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'front-of-house.checklist.complete', 'front-of-house.checklist.manage', 'front-of-house.emergency-card.view',
       'front-of-house.night-report.write', 'front-of-house.night-report.sign-off', 'front-of-house.night-report.view',
       'front-of-house.incident.report', 'front-of-house.incident.view', 'front-of-house.incident.manage', 'front-of-house.hours.view',
-      'box-office.order.view', 'box-office.ticket.admit',
+      'box-office.order.view', 'box-office.ticket.admit', 'box-office.headcount.correct',
     ],
   },
   {

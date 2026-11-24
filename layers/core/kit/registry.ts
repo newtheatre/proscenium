@@ -1,5 +1,6 @@
 // The registry: every module's manifest and handler files, collected by the build into
 // .generated/registry.ts and checked here across modules (F-02).
+import { PRACTICE_PREFIXES } from './practice/tables'
 import { DeclarationError } from './refusal'
 import { DELIVERABLE, snake, type ModuleManifest, type SettingPlace, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl, type SigningDecl } from './manifest'
 import { tableMeta, type TableMeta } from './db'
@@ -86,7 +87,7 @@ const SETTINGS_ICON = 'i-lucide-settings-2'
 export function buildRegistry(entries: ModuleEntry[]): Registry {
   const r: Registry = {
     modules: new Map(), settings: new Map(), settingRules: new Map(), settingPages: new Map(), settingHomes: new Map(), settingAliases: new Map(), abilities: new Map(), records: new Map(), facts: new Map(),
-    tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(), lists: new Map(),
+    tables: new Map(), prefixes: new Map(PRACTICE_PREFIXES), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(), lists: new Map(),
   }
   const fail = (entry: ModuleEntry, field: string, message: string): never => {
     throw new DeclarationError(field, message, `${entry.root}/module.ts`)
@@ -196,6 +197,8 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
         else if (!entry.handlers.contributions?.[name]?.[c.file ?? c.id]) {
           fail(entry, `contributes.${name}.${c.id}`, `the file ${entry.root}/server/contributions/${name}/${c.file ?? c.id}.ts does not exist`)
         }
+        const problem = declared!.decl.kind === 'code' && declared!.decl.publicSafe ? publicSafeProblem(r, c.from) : null
+        if (problem) fail(entry, `contributes.${name}.${c.id}.from`, problem)
       }
     }
     placeSettings(r, entry, fail)
@@ -229,6 +232,11 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
     }
     for (const [key, { decl }] of [...r.records].filter(([, a]) => a.module === m.id)) {
       if (decl.parent && !r.records.has(decl.parent)) fail(entry, `records.${key}.parent`, `"${decl.parent}" is not a record type`)
+      if (decl.point !== undefined) {
+        if (r.points.get(decl.point)?.decl.kind !== 'data') fail(entry, `records.${key}.point`, `"${decl.point}" is not a data point, whose contributions' ids would be this type's ids`)
+        if (decl.owner) fail(entry, `records.${key}.owner`, 'a record type without a table has no owner column')
+        continue
+      }
       if (decl.table === undefined) {
         if (!Array.isArray(decl.ids) || !decl.ids.length || !decl.ids.every(i => /^[a-z][a-z0-9-]*$/.test(i))) fail(entry, `records.${key}.ids`, 'a record type without a table lists its fixed ids, kebab-case')
         if (decl.owner) fail(entry, `records.${key}.owner`, 'a record type without a table has no owner column')
@@ -286,6 +294,20 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
   }
   for (const id of r.modules.keys()) visit(id, [])
   return r
+}
+
+const ABOUT_A_PERSON = new Set(['personal', 'freeText', 'special', 'perRow'])
+
+/** Why a public-safe contribution's `from` (its <table>.<column> sources) is not safe, or null. */
+function publicSafeProblem(r: Registry, from: unknown): string | null {
+  if (!Array.isArray(from) || !from.length || !from.every(f => typeof f === 'string')) return 'lists the columns its titles and locations are read from, as <table>.<column>'
+  for (const source of from as string[]) {
+    const [table, column] = source.split('.')
+    const found = Object.values(r.tables.get(table ?? '')?.meta.columns ?? {}).find(c => c.sql === column)
+    if (!found) return `"${source}" is not a column any module declares`
+    if (ABOUT_A_PERSON.has(found.meta.class)) return `"${source}" is ${found.meta.class} data, and these words are shown to anyone holding the address: use a name, a title or a place`
+  }
+  return null
 }
 
 /** The part of a job, task or call name after the module: `box-office.sweep-holds` → `sweep-holds`. */

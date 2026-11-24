@@ -3,7 +3,7 @@
 // own small unit too, so one delivery's failure never undoes another's success. The provider's
 // message id is kept exactly as send() returns it, angle brackets included, because Cloudflare's
 // bounce and complaint events carry that same string (proof P-COM-3).
-import { all, createUnit, isRefusal, nowMs, openSpecial, siteUrl, useSetting } from '#kit'
+import { all, createUnit, isPractice, isRefusal, nowMs, openSpecial, siteUrl, useSetting } from '#kit'
 import type { UnitView } from '#kit'
 import { addressesFor } from '../identity/addresses'
 import { brandTokens } from '../brand/theme'
@@ -26,6 +26,9 @@ interface DueRow {
   payload: string | null
   sealed_variables: string | null
 }
+
+/** What a sealed value reads as in a practice outbox. */
+export const PRACTICE_SEALED = '(link not shown in practice)'
 
 /** The button's words when a type's wording does not name them. */
 const DEFAULT_ACTION: Record<string, string> = { 'en-GB': 'Open it' }
@@ -134,7 +137,8 @@ export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitV
     }
     const { type } = found
     const wording = type.wording[row.locale] ?? type.wording['en-GB']!
-    const values = { ...JSON.parse(row.payload!), ...opened }
+    // A sealed value, such as a sign-in link, never shows in a practice outbox (O3).
+    const values = { ...JSON.parse(row.payload!), ...(isPractice() ? Object.fromEntries(Object.keys(opened).map(k => [k, PRACTICE_SEALED])) : opened) }
     const locale = type.wording[row.locale] ? row.locale : 'en-GB'
     const action = await actionFor(type, wording, locale, values)
     const message = render(wording, { values, kinds: type.variables, accent: brand.light.link, dark: brand.dark, lang: locale, theatre, footer, action })

@@ -6,7 +6,7 @@ import { newRecoveryCodes, passkeyCount } from '../../../identity/passkeys'
 import { credentialNotice } from '../../../identity/notices'
 import { deviceLabel } from '../../../identity/web'
 
-export default defineRoute({ ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { unit, actor }) => {
+export default defineRoute({ practice: 'refuse', ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { unit, actor }) => {
   const session = await sessionOf(event)
   await requireFresh(actor)
   if (!(await passkeyCount(session.accountId))) refuse('core.passkey.none', 'Recovery codes come with a passkey.', { status: 409, remedy: 'Add a passkey first.' })
