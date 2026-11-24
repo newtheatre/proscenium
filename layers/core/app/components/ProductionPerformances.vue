@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { noOverrides, overrideErrors, slotsInWords, type RunSlot, type ShowDefaultValues, type ShowOverrides } from '../utils/show-defaults'
+import { formOf, overridesOf, performanceBody, changeKinds } from '../utils/performance-form'
 import { parseTime } from '@internationalized/date'
 import type { HeldRefusal } from './ChangeHeld.vue'
 // A production's performances (C-03 to C-07, C-10): added one at a time or as a run (C-04), scheduled
@@ -10,6 +11,7 @@ import type { HeldRefusal } from './ChangeHeld.vue'
 type State = 'draft' | 'scheduled' | 'cancelled' | 'completed'
 interface Performance {
   id: string
+  shape: 'timed' | 'drop-in'
   venueId: string
   spaceId: string
   startsAt: number
@@ -49,7 +51,7 @@ type Kind = 'cancel' | 'reschedule' | 'move' | 'capacity'
 interface Reach { lines: string[], refusal: HeldRefusal | null }
 
 const { t } = useT()
-const props = defineProps<{ productionId: string, title: string }>()
+const props = defineProps<{ productionId: string, title: string, creditsPublic?: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
 
 const { $api } = useNuxtApp()
@@ -87,7 +89,7 @@ const place = (p: Performance) => spaces.value.find(s => s.value === p.spaceId)?
 /** Whether every performance is in the one space, which is then said once above the list. */
 const oneSpace = computed(() => new Set(performances.value.map(p => p.spaceId)).size === 1)
 /** Where (unless there is only one space), doors, end and seats, on one line. */
-const summaryOf = (p: Performance) => [...(oneSpace.value ? [] : [place(p)]), ...(p.doorsAt ? [`doors ${dates.time(p.doorsAt)}`] : []), `ends ${dates.time(p.endsAt)}`, ...(p.capacity !== null ? [`${p.capacity} seats`] : [])].join(' · ')
+const summaryOf = (p: Performance) => [...(oneSpace.value ? [] : [place(p)]), ...(p.shape === 'drop-in' ? ['drop-in'] : []), ...(p.doorsAt ? [`doors ${dates.time(p.doorsAt)}`] : []), p.shape === 'drop-in' ? `open until ${dates.time(p.endsAt)}` : `ends ${dates.time(p.endsAt)}`, ...(p.capacity !== null ? [`${p.capacity} seats`] : [])].join(' · ')
 const accessLabel = (id: string) => data.value?.options.access.find(a => a.id === id)?.label ?? 'Access'
 const thing = (p: Performance) => `the ${dates.time(p.startsAt)} performance of ${props.title} on ${dates.dayNamed(p.startsAt)}`
 const upperFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
@@ -141,7 +143,14 @@ function reach(id: string, kind: Kind): Promise<Reach> {
 const editing = ref<Performance | null>(null)
 const MINUTE = 60_000 // not-policy: milliseconds in a minute
 const open = ref(false)
-const form = ref({ spaceId: '', startsAt: null as number | null })
+const form = ref({ shape: 'timed' as Performance['shape'], spaceId: '', startsAt: null as number | null, endsAt: null as number | null })
+const dropIn = computed(() => form.value.shape === 'drop-in')
+// Timed or drop-in is chosen when a performance is made, and changed only while it is a draft (DI1).
+const shapeChangeable = computed(() => !editing.value || editing.value.state === 'draft')
+const SHAPES = [
+  { value: 'timed', label: 'Timed', description: 'Starts at a set time, with doors and any intervals.' },
+  { value: 'drop-in', label: 'Drop-in', description: 'Open for a stretch of one day, such as an exhibition: people come any time.' },
+]
 const overrides = ref<ShowOverrides>(noOverrides())
 const shown = computed(() => form.value.spaceId && data.value ? defaultsIn(form.value.spaceId) : null)
 /** Whether a whole-day closure that blocks performances covers this day for the chosen space. The
@@ -158,6 +167,8 @@ function checkPerformance() {
   return [
     ...(form.value.spaceId ? [] : [needed('spaceId')]),
     ...(form.value.startsAt ? [] : [needed('startsAt')]),
+    ...(dropIn.value && !form.value.endsAt ? [needed('endsAt')] : []),
+    ...(dropIn.value && form.value.endsAt && form.value.startsAt && form.value.endsAt <= form.value.startsAt ? [{ name: 'endsAt', message: 'Close it after it opens.' }] : []),
     ...overrideErrors(overrides.value, shown.value, !!data.value?.defaults.sellsHere),
     ...(editHeld.value?.question && !editAnswer.value ? [needed('changeAnswer')] : []),
   ]
@@ -167,66 +178,34 @@ function start(p: Performance | null) {
   editHeld.value = null
   editAnswer.value = undefined
   editing.value = p
-  form.value = { spaceId: p?.spaceId ?? usualSpace() ?? spaces.value[0]?.value ?? '', startsAt: p?.startsAt ?? null }
-  overrides.value = noOverrides()
-  if (p) {
-    // A performance shows as changed only where it differs from the show's defaults.
-    const d = defaultsIn(p.spaceId)
-    const running = Math.round((p.endsAt - p.startsAt) / MINUTE)
-    const doors = p.doorsAt === null ? null : Math.round((p.startsAt - p.doorsAt) / MINUTE)
-    overrides.value = {
-      runningMinutes: running === d.runningMinutes ? null : running,
-      doorsBeforeMinutes: doors === null || doors === d.doorsBeforeMinutes ? null : doors,
-      intervalCount: p.intervalCount,
-      intervalMinutes: p.intervalMinutes,
-      capacity: p.capacity,
-      label: p.label ?? '',
-      bookedElsewhere: !!p.externalBookingUrl,
-      externalBookingUrl: p.externalBookingUrl ?? '',
-    }
-  }
+  form.value = formOf(p, usualSpace() ?? spaces.value[0]?.value ?? '')
+  overrides.value = overridesOf(p, p ? defaultsIn(p.spaceId) : null)
   open.value = true
 }
 async function save() {
   const space = spaces.value.find(s => s.value === form.value.spaceId)
   if (!space) return
-  const o = overrides.value
-  const d = defaultsIn(space.value)
-  const body: Record<string, unknown> = {
-    venueId: space.venueId,
-    spaceId: space.value,
-    startsAt: form.value.startsAt,
-    capacity: o.capacity,
-    intervalCount: o.intervalCount,
-    intervalMinutes: o.intervalMinutes,
-    label: o.label,
-    externalBookingUrl: o.bookedElsewhere ? o.externalBookingUrl.trim() || null : null,
-    // Left empty, the end and doors come from the show's defaults; an edit always sends them, so the end moves with the start.
-    runningMinutes: o.runningMinutes ?? (editing.value ? d.runningMinutes : null),
-    doorsBeforeMinutes: o.doorsBeforeMinutes ?? (editing.value ? d.doorsBeforeMinutes : null),
-  }
+  const body = performanceBody({ space, form: form.value, overrides: overrides.value, defaults: defaultsIn(space.value), editing: !!editing.value, shapeChangeable: shapeChangeable.value })
   const p = editing.value
   if (!p) {
     if (await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/performances` as string, { method: 'POST', body }), 'Performance added', performanceForm.value)) open.value = false
     return
   }
-  if (p.state === 'scheduled') {
-    const kinds: Kind[] = []
-    const endsAt = form.value.startsAt! + (body.runningMinutes as number) * MINUTE
-    if (form.value.startsAt !== p.startsAt || endsAt !== p.endsAt) kinds.push('reschedule')
-    if (form.value.spaceId !== p.spaceId) kinds.push('move')
-    if (o.capacity !== p.capacity) kinds.push('capacity')
-    const reached = await Promise.all(kinds.map(k => reach(p.id, k)))
-    const refused = reached.find(r => r.refusal)?.refusal ?? null
-    const recheck = async () => (await Promise.all(kinds.map(k => reach(p.id, k)))).find(r => r.refusal)?.refusal ?? null
-    if (!await settled(refused, editHeld.value ? editAnswer.value : undefined, recheck, (still) => { editHeld.value = still })) {
-      if (refused && !refused.question) refusal.value = { code: refused.code, reason: refused.reason, remedy: refused.link ?? undefined } as ReturnType<typeof toRefusal>
-      return
-    }
-    const lines = reached.flatMap(r => r.lines)
-    if (lines.length && !await confirm({ verb: 'Change', thing: thing(p), consequence: lines.join(' '), button: 'Change performance' })) return
-  }
+  if (p.state === 'scheduled' && !await confirmChange(p, body)) return
   if (await run(() => call(p.id, '', 'PATCH', body), 'Performance saved', performanceForm.value)) open.value = false
+}
+/** What saving would touch on a scheduled performance and whether a module refuses it: true to go ahead. */
+async function confirmChange(p: Performance, body: Record<string, unknown>): Promise<boolean> {
+  const kinds = changeKinds(p, form.value, overrides.value, body)
+  const reached = await Promise.all(kinds.map(k => reach(p.id, k)))
+  const refused = reached.find(r => r.refusal)?.refusal ?? null
+  const recheck = async () => (await Promise.all(kinds.map(k => reach(p.id, k)))).find(r => r.refusal)?.refusal ?? null
+  if (!await settled(refused, editHeld.value ? editAnswer.value : undefined, recheck, (still) => { editHeld.value = still })) {
+    if (refused && !refused.question) refusal.value = { code: refused.code, reason: refused.reason, remedy: refused.link ?? undefined } as ReturnType<typeof toRefusal>
+    return false
+  }
+  const lines = reached.flatMap(r => r.lines)
+  return !lines.length || await confirm({ verb: 'Change', thing: thing(p), consequence: lines.join(' '), button: 'Change performance' })
 }
 
 // Moves
@@ -279,6 +258,10 @@ async function cancel() {
   if (!await settled(cancelReach.value?.refusal ?? null, cancelAnswer.value, async () => (await reach(p.id, 'cancel')).refusal, (still) => { if (cancelReach.value) cancelReach.value.refusal = still })) return
   if (await run(() => call(p.id, '/cancel', 'POST', { reasonTermId: cancelForm.value.reasonTermId, note: cancelForm.value.note }), 'Performance cancelled')) cancelling.value = null
 }
+
+// The line-up and credits for one date (C-61)
+const lineUpFor = ref<Performance | null>(null)
+const lineUpOpen = computed({ get: () => !!lineUpFor.value, set: (v) => { if (!v) lineUpFor.value = null } })
 
 // Access features
 const accessFor = ref<Performance | null>(null)
@@ -570,6 +553,7 @@ function actions(p: Performance) {
     if (productionEffects.value.length) items.push({ label: 'Staging effects', icon: 'i-lucide-zap-off', onSelect: () => startEffects(p) })
     if (inRun) items.push({ label: 'Edit the run', icon: 'i-lucide-calendar-range', onSelect: () => startEditRun(inRun) })
   }
+  items.push({ label: 'Line-up and credits', icon: 'i-lucide-list-ordered', onSelect: () => { lineUpFor.value = p } })
   if (p.state === 'scheduled') items.push({ label: 'Cancel', icon: 'i-lucide-calendar-x', color: 'error' as const, onSelect: () => startCancel(p) })
   if (p.state === 'cancelled' && p.startsAt > Date.now()) items.push({ label: 'Reinstate', icon: 'i-lucide-undo-2', onSelect: () => reinstate(p) })
   if (p.state === 'draft') items.push({ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove(p) })
@@ -792,7 +776,18 @@ function actions(p: Performance) {
             />
           </UFormField>
           <UFormField
-            label="Starts"
+            v-if="shapeChangeable"
+            label="Kind"
+            name="shape"
+          >
+            <URadioGroup
+              v-model="form.shape"
+              :items="SHAPES"
+              orientation="horizontal"
+            />
+          </UFormField>
+          <UFormField
+            :label="dropIn ? 'Open from' : 'Starts'"
             name="startsAt"
             required
           >
@@ -801,11 +796,24 @@ function actions(p: Performance) {
               :unavailable="closed"
             />
           </UFormField>
+          <UFormField
+            v-if="dropIn"
+            label="Open until"
+            name="endsAt"
+            help="The same day. For an exhibition over several days, add one drop-in for each day."
+            required
+          >
+            <FieldDateTime
+              v-model="form.endsAt"
+              :unavailable="closed"
+            />
+          </UFormField>
           <ShowDefaults
             v-if="shown && open"
             v-model="overrides"
             :defaults="shown"
             :sells-here="data!.defaults.sellsHere"
+            :drop-in="dropIn"
           />
         </UForm>
       </template>
@@ -1144,5 +1152,22 @@ function actions(p: Performance) {
       :spaces="spaces"
       @changed="runEdited"
     />
+
+    <USlideover
+      v-model:open="lineUpOpen"
+      :title="lineUpFor ? `Line-up and credits, ${dates.dayNamed(lineUpFor.startsAt)} ${dates.time(lineUpFor.startsAt)}` : 'Line-up and credits'"
+      description="Who appears and who is credited at this performance only."
+      :ui="{ content: 'sm:max-w-2xl' }"
+    >
+      <template #body>
+        <PerformanceLineUp
+          v-if="lineUpFor"
+          :production-id="productionId"
+          :credits-public="creditsPublic ?? true"
+          :performance="lineUpFor"
+          @changed="emit('changed')"
+        />
+      </template>
+    </USlideover>
   </PageSection>
 </template>

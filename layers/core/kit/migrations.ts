@@ -18,6 +18,11 @@ export function installMigrations(migrations: Migration[], version = release): v
   release = version
 }
 
+/** One value for the whole migration bundle: a practice store made from another ends (rule S7). */
+export async function bundleHash(): Promise<string> {
+  return checksum(bundle.map(m => `${m.owner}/${m.name}:${m.checksum}`).join('\n'))
+}
+
 export function splitStatements(sql: string): string[] {
   return sql.split('--> statement-breakpoint').map(s => s.trim()).filter(Boolean)
 }

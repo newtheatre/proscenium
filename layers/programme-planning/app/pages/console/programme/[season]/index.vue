@@ -44,12 +44,16 @@ const facts = computed(() => {
     { label: t('programme-planning.plan.facts.placed'), value: t('programme-planning.plans.placed', { placed: o.placed, wanted: o.wanted }) },
   ]
 })
-const actions = computed(() => data.value?.may.manageEntries && plan.value && plan.value.state !== 'closed'
-  ? [
-      { label: t('programme-planning.entry.add'), icon: 'i-lucide-plus', onSelect: () => { adding.value = true } },
-      { label: t('programme-planning.entry.bring'), icon: 'i-lucide-drama', lesser: true, onSelect: () => { bringing.value = true } },
-    ]
-  : [])
+const actions = computed(() => {
+  if (!plan.value) return []
+  const board = { label: t('programme-planning.board.open'), icon: 'i-lucide-layout-dashboard', to: `/console/programme/${data.value!.season.slug}/board`, lesser: true }
+  if (!data.value?.may.manageEntries || plan.value.state === 'closed') return [board]
+  return [
+    { label: t('programme-planning.entry.add'), icon: 'i-lucide-plus', onSelect: () => { adding.value = true } },
+    { label: t('programme-planning.entry.bring'), icon: 'i-lucide-drama', lesser: true, onSelect: () => { bringing.value = true } },
+    board,
+  ]
+})
 
 function describe(e: Entry): string {
   return [

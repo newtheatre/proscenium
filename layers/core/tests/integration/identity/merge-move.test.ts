@@ -199,7 +199,12 @@ describe('a merge on a theatre that never switched front of house on', () => {
 
   it('waits for front of house while one of its move columns still names the account', async () => {
     const { admin, survivorId, mergedAccountId } = await twoAccounts()
-    await env.DB.prepare('INSERT INTO front_of_house_calendar_feeds (account_id, token_hash, generation, created_at) VALUES (?, ?, 1, ?)').bind(mergedAccountId, newId('tok'), Date.now()).run()
+    const [dutyId, shiftId, at] = [newId('dty'), newId('shf'), Date.now()]
+    await env.DB.batch([
+      env.DB.prepare('INSERT INTO front_of_house_duties (id, name, call_before_minutes, stay_after_minutes, created_at, updated_at) VALUES (?, ?, 60, 30, ?, ?)').bind(dutyId, `Steward ${dutyId.slice(-6)}`, at, at),
+      env.DB.prepare('INSERT INTO front_of_house_shifts (id, duty_id, title, places, call_at, ends_at, window_opens_at, window_closes_at, created_at, updated_at) VALUES (?, ?, \'Open day\', 1, ?, ?, ?, ?, ?, ?)').bind(shiftId, dutyId, at, at + 1, at, at + 1, at, at),
+      env.DB.prepare('INSERT INTO front_of_house_assignments (id, shift_id, account_id, state, source, created_at, updated_at) VALUES (?, ?, ?, \'worked\', \'sign-up\', ?, ?)').bind(newId('asg'), shiftId, mergedAccountId, at, at),
+    ])
     expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
     expect(await deliver()).toContain('deferred')
     const merge = await mergeOf(mergedAccountId)
