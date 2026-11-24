@@ -1,7 +1,7 @@
 // Conditions: small trees of all, any and none over comparisons (part 3). A comparison with an
 // empty answer is false, except "is empty" and "is not". Text ignores case and surrounding spaces;
 // everything else is strict about type, so a number is never compared with text.
-import type { Answers, Comparison, Condition, Context, Entry, Operand } from './types'
+import type { Answers, Comparison, Condition, Context, Entry, MarkingOperand, Operand } from './types'
 import type { Index } from './values'
 import { daysBetween, fold, isEmpty, kindOfQuestion } from './values'
 
@@ -16,6 +16,14 @@ export interface Scope {
 }
 
 interface Resolved { value: unknown, text: boolean }
+
+/** A marking operand's value; nothing where the response was not marked. */
+function markingValue(which: MarkingOperand, marked: Context['marking']): number | boolean | undefined {
+  if (!marked) return undefined
+  if (which === 'score') return marked.score
+  if (which === 'percent') return marked.outOf ? (marked.score * 100) / marked.outOf : undefined // not-policy: a percentage
+  return marked.passed ?? undefined
+}
 
 export function resolve(operand: Operand, scope: Scope): Resolved {
   if ('answer' in operand) {
@@ -37,6 +45,7 @@ export function resolve(operand: Operand, scope: Scope): Resolved {
   if ('attribute' in operand) return { value: scope.context.attributes?.[operand.attribute], text: false }
   if ('today' in operand) return { value: scope.context.today, text: false }
   if ('option' in operand) return { value: operand.option, text: false }
+  if ('marking' in operand) return { value: markingValue(operand.marking, scope.context.marking), text: false }
   return { value: operand.value, text: typeof operand.value === 'string' }
 }
 

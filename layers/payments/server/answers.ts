@@ -12,6 +12,7 @@ import { isTestMoney } from './test-money'
 import type { Method, ProviderAnswer } from './points/provider'
 import { rowsOf, splitsForPart } from './splits'
 import { sessionChanged } from './sessions'
+import { ownerEntries } from './owner-entries'
 
 export type AttemptState = 'started' | 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'unknown'
 export interface AttemptRow { id: string, intent_id: string, provider_account_id: string, method: Method, amount_minor: number, state: AttemptState, idempotency_key: string, provider_ref: string | null, reader_id: string | null, started_at: number, refunded_minor: number }
@@ -114,7 +115,7 @@ async function settle(unit: UnitView, intent: IntentRow, parts: PartRow[], attem
     if (test) continue
     const total = entries.reduce((sum, e) => sum + e.amountMinor, 0)
     if (total !== -part.amount_minor) throw new SettlementRefused(part.owner_module, new Refusal('payments.settlement.part-mismatch', `${part.owner_module}'s ledger entries for its part total ${-total}, not the part's ${part.amount_minor}.`, { status: 500 }))
-    for (const e of entries) owned.push({ account: e.account, amountMinor: e.amountMinor, forModule: part.owner_module, productionId: e.productionId ?? null, performanceId: e.performanceId ?? null })
+    owned.push(...await ownerEntries(entries, part.owner_module))
   }
   // Each receipt asked for at the till goes now the sale is whole, with any owner's link on it: one
   // person at a time, each in a unit of their own, so a sale shared by any number of people settles

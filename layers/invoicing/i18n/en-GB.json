@@ -1,0 +1,16 @@
+{
+  "invoicing.module.name": "Invoices and exports",
+  "invoicing.module.description": "Export the ledger in the layout another set of books takes, such as a students' union's return, with each account under that book's own code. Invoices and bills follow.",
+
+  "invoicing.settings-sections.exports": "Exports",
+  "invoicing.settings.exports.default-profile.label": "Export profile the Exports screen opens on",
+  "invoicing.settings.exports.default-profile.help": "With none chosen, Exports opens on the first profile by name.",
+  "invoicing.settings.exports.starter.label": "First export profile",
+  "invoicing.settings.exports.starter.help": "The profile made when the module is first switched on. A students' society starts from its union's return.",
+  "invoicing.settings.exports.starter.options.journal": "A journal for any accounting package",
+  "invoicing.settings.exports.starter.options.union": "The students' union return",
+
+  "invoicing.abilities.export.take.label": "Take exports of the ledger and see past exports",
+  "invoicing.abilities.export.manage.label": "Make and change export profiles and their codes",
+  "invoicing.abilities.settings.manage.label": "Change the invoices and exports settings"
+}

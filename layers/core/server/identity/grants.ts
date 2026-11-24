@@ -1,7 +1,7 @@
 // Roles and grants as the permission check reads them (part 3, "The grant"). A grant is live from
 // its start until its expiry or its row in core_grant_ends, whichever is first. Grants on an
 // unclaimed or unusable account count for nothing, because such an account is never an actor.
-import { all, first, nowMs, useContext, type Grant, type UnitView } from '#kit'
+import { all, first, nowMs, useContext, type Grant, type PinnedMapping, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { impliedAbility } from '#kit/abilities'
 
@@ -128,6 +128,42 @@ export async function factAbilityMap(): Promise<Record<string, string[]>> {
   }
   context.cache.identityFacts = map
   return map
+}
+
+/**
+ * The mappings pinned to one record (Foundations, "A fact mapping may be pinned"), with the same
+ * confirmation rule. A mapping whose fact is not pinnable or whose record is gone is left out: it
+ * grants nothing, and the facts screen shows it as broken.
+ */
+export async function pinnedFactAbilityMap(): Promise<PinnedMapping[]> {
+  const context = useContext()
+  if (context.cache.identityPinnedFacts) return context.cache.identityPinnedFacts as PinnedMapping[]
+  const registry = useRegistry()
+  const rows = await all<{ fact: string, ability: string, pinned_record: string, confirmed_privileged_at: number | null }>('SELECT fact, ability, pinned_record, confirmed_privileged_at FROM core_fact_abilities WHERE pinned_record <> \'\'')
+  const out = new Map<string, PinnedMapping>()
+  for (const row of rows) {
+    const declared = registry.abilities.get(row.ability)
+    const fact = registry.facts.get(row.fact)?.decl
+    if (!declared || !fact?.pin || !fact.on) continue
+    if (declared.decl.risk === 'privileged' && !row.confirmed_privileged_at) continue
+    const key = `${row.fact} ${row.pinned_record}`
+    if (!out.has(key)) {
+      if (!(await pinnedRecordExists(fact.on, row.pinned_record))) continue
+      out.set(key, { fact: row.fact, record: row.pinned_record, abilities: [] })
+    }
+    out.get(key)!.abilities.push(row.ability)
+  }
+  const list = [...out.values()]
+  context.cache.identityPinnedFacts = list
+  return list
+}
+
+/** Whether a record of this type still exists, read from its table (a type without one lists its ids). */
+export async function pinnedRecordExists(type: string, id: string): Promise<boolean> {
+  const decl = useRegistry().records.get(type)?.decl
+  if (!decl) return false
+  if (!decl.table) return (decl.ids ?? []).includes(id)
+  return !!(await first(`SELECT 1 AS found FROM "${decl.table}" WHERE id = ?`, id))
 }
 
 /**

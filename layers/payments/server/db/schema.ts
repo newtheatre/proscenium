@@ -283,4 +283,71 @@ export const webhookEvents = defineTable('payments_webhook_events', {
   ],
 })
 
-export const tables = { providerAccounts, readers, sessions, intents, intentParts, attempts, attemptEvents, refunds, webhookEvents, tillSplits }
+/**
+ * Where the theatre pays someone: a person's or a company's bank details, sealed with the core key
+ * (Invoices and exports, part 4, P-A1). The only place a bank account number is kept. Shown masked
+ * except to payments.payee.read, which audits each read; never in an export, event, job or log.
+ */
+export const payees = defineTable('payments_payees', {
+  id: col.id(),
+  // Whose details: `core` and an account id, or `companies` and a company id.
+  partyModule: col.internal(text('party_module').notNull()),
+  partyId: col.internal(text('party_id').notNull()),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'a person has one set of bank details; the survivor keeps them', nullable: true }),
+  // Null once cleared: by erasure, by the person, or after payments.payees.keep-for unused.
+  accountName: col.personal(text('account_name'), { erase: 'clear', encrypted: true }),
+  sortCode: col.personal(text('sort_code'), { erase: 'clear', encrypted: true }),
+  accountNumber: col.personal(text('account_number'), { erase: 'clear', encrypted: true }),
+  // The last two digits of the account number, kept apart so a masked view needs no key.
+  lastDigits: col.personal(text('last_digits'), { erase: 'clear' }),
+  lastUsedOn: col.localDate('last_used_on'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'ppy',
+  realm: 'operational',
+  subject: { account: 'account_id', unlinked: 'staff' },
+  retention: 'payments.payees.keep-for',
+  onErasure: 'keep-row',
+  extra: t => [
+    uniqueIndex('payments_payees_party').on(t.partyModule, t.partyId),
+    index('payments_payees_account').on(t.accountId).where(sql`account_id IS NOT NULL`),
+  ],
+})
+
+/**
+ * Money the theatre paid out, recorded after a person paid it in the bank or from petty cash (P-A1):
+ * Payments never sends money. One owner record per row; a mistake is undone by a reversing row.
+ */
+export const disbursements = defineTable('payments_disbursements', {
+  id: col.id(),
+  method: col.internal(text('method', { enum: ['bank-transfer', 'cheque', 'theatre-card', 'petty-cash', 'parent-body'] }).notNull()),
+  amountMinor: col.minor('amount_minor').notNull(),
+  currency: col.currency('currency').notNull(),
+  // `invoicing` and a bill id, or `budgets` and a claim id.
+  ownerModule: col.internal(text('owner_module').notNull()),
+  ownerRecord: col.internal(text('owner_record').notNull()),
+  payeeId: col.ref('payments_payees', { nullable: true }),
+  paidOn: col.localDate('paid_on').notNull(),
+  // The bank reference or cheque number.
+  reference: col.internal(text('reference')),
+  reversesId: col.internal(text('reverses_id')),
+  postingId: col.internal(text('posting_id').notNull()),
+  by: col.account('by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'pdb',
+  realm: 'operational',
+  subject: 'none',
+  appendOnly: true,
+  extra: t => [
+    uniqueIndex('payments_disbursements_reverses').on(t.reversesId).where(sql`reverses_id IS NOT NULL`),
+    index('payments_disbursements_owner').on(t.ownerModule, t.ownerRecord),
+    index('payments_disbursements_paid').on(t.paidOn),
+    check('payments_disbursements_amount', sql`${t.amountMinor} > 0`),
+    check('payments_disbursements_method', sql`${t.method} IN ('bank-transfer', 'cheque', 'theatre-card', 'petty-cash', 'parent-body')`),
+    check('payments_disbursements_reference', sql`${t.reference} IS NULL OR length(${t.reference}) <= 40`),
+  ],
+})
+
+export const tables = { providerAccounts, readers, sessions, intents, intentParts, attempts, attemptEvents, refunds, webhookEvents, tillSplits, payees, disbursements }

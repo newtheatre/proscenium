@@ -12,7 +12,8 @@ import { all, first, newId, nowMs, refuse, theatreTimeZone, useSetting, type Uni
 import { accountScopeSql } from '#kit/accounts'
 import { getPerformance, getProduction, notify } from '#modules/core'
 import { postEntries } from '#modules/finance'
-import { takenBack } from './cancel'
+import { takenBackNet } from './cancel'
+import { codedLines } from './vat'
 import { confirmOrder } from './confirm'
 import { refundOrder } from './refunds'
 import { passCovers } from './db/schema'
@@ -349,14 +350,16 @@ async function switchLines(unit: UnitView, items: readonly Item[], by: string | 
     if (creditMinor > 0) {
       // Money the show had for these tickets now pays for the pass instead.
       const shows = new Map<string, number>()
-      for (const i of list) shows.set(i.ticket.performanceId, (shows.get(i.ticket.performanceId) ?? 0) + i.creditMinor)
+      const lineCodes = await codedLines(list.map(i => ({ id: i.ticket.lineId, performance_id: i.ticket.performanceId })))
+      list.forEach((i, n) => shows.set(lineCodes[n]!.performance_id, (shows.get(lineCodes[n]!.performance_id) ?? 0) + i.creditMinor))
+      const off = await takenBackNet(shows)
       await postEntries(unit, {
         key: `box-office:pass-cover:${coverIds.get(orderId)}`,
         source: { module: 'box-office', type: 'order', id: orderId },
         kind: 'transfer',
         currency: order.currency,
         postedBy: by,
-        entries: [...await takenBack(shows), { account: PASS_INCOME, amountMinor: -creditMinor, performanceId: null }],
+        entries: [...off.entries, { account: PASS_INCOME, amountMinor: -off.totalMinor, performanceId: null }],
       })
     }
     if (!order.account_id || !list.length) continue
