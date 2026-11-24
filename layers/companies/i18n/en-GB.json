@@ -140,5 +140,18 @@
   "companies.contacts.new-primary": "Who becomes the primary contact",
   "companies.engagements.empty": "No engagements yet",
   "companies.engagements.empty-description": "An engagement is one production or hire with this company, from first enquiry to settling up.",
-  "companies.field.website-help": "The full address, starting https://"
+  "companies.field.website-help": "The full address, starting https://",
+  "companies.navigation.mine.label": "Your companies",
+  "companies.mine.help": "The companies you act for, each engagement with its dates and anything waiting on you.",
+  "companies.mine.waiting": "{count} things waiting on you",
+  "companies.mine.waiting.one": "1 thing waiting on you",
+  "companies.mine.nothing-yet": "No engagements yet",
+  "companies.mine.nothing-yet-description": "When the theatre opens an engagement with your company, it appears here.",
+  "companies.mine.to-do": "To do",
+  "companies.mine.nothing-to-do": "Nothing to do",
+  "companies.mine.no-dates": "Dates to be confirmed",
+  "companies.mine.name-guests": "Name {count} guests by {when}",
+  "companies.mine.name-guests.one": "Name 1 guest by {when}",
+  "companies.mine.answer-agreement": "Answer the agreement",
+  "companies.mine.agree-settlement": "Agree the settlement, or ask a question"
 }

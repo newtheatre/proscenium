@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm'
 import { all, first, inAccountScope, newId, nowMs, refuse, useDb } from '#kit'
 import type { Actor, UnitOfWork } from '#kit'
 import { findOrCreateAccount } from '#modules/core'
+import { welcomeContact } from './welcome'
 import { LIMITS, RECEIVES } from '../shared/companies'
 import type { Company } from './companies'
 
@@ -37,7 +38,7 @@ export const contactChangeInput = z.object({
 /** Adds a contact. The first live contact of a company is its primary unless another is named (G4). */
 export async function addContact(unit: UnitOfWork, actor: Actor, company: Company, input: z.infer<typeof contactInput>): Promise<string> {
   if (company.archivedAt !== null) refuse('companies.company.archived', 'This company is archived.', { status: 409, remedy: 'Restore it first.' })
-  const accountId = await contactAccount(unit, input)
+  const { accountId, madeWith } = await contactAccount(unit, input)
   const id = newId('cpc')
   const at = nowMs()
   const primary = await first<{ id: string }>('SELECT id FROM companies_contacts WHERE company_id = ? AND ended_at IS NULL AND is_primary = 1', company.id)
@@ -49,6 +50,7 @@ export async function addContact(unit: UnitOfWork, actor: Actor, company: Compan
     .expect(1, { code: 'companies.contact.already', reason: 'This person is already a contact of this company.', remedy: 'Change their existing contact details instead.' })
   unit.audit({ action: 'create', record: ['companies.company', company.id], detail: { contactId: id, primary: isPrimary } })
   unit.announce('companies.contact.changed', { companyId: company.id, contactId: id }, { record: ['companies.company', company.id] })
+  await welcomeContact(unit, { actor, company, contactId: id, accountId, madeWith })
   return id
 }
 
@@ -56,10 +58,10 @@ export async function addContact(unit: UnitOfWork, actor: Actor, company: Compan
  * Rule G2: the account a new contact is. An address finds the account that verified it, or the
  * unclaimed one made with it, and otherwise makes an unclaimed account; it never joins an unverified address.
  */
-async function contactAccount(unit: UnitOfWork, input: z.infer<typeof contactInput>): Promise<string> {
-  if (input.email) return (await findOrCreateAccount(unit, { address: input.email, name: input.name ?? null, origin: 'invite' })).accountId
+async function contactAccount(unit: UnitOfWork, input: z.infer<typeof contactInput>): Promise<{ accountId: string, madeWith?: { address: string } | null }> {
+  if (input.email) return findOrCreateAccount(unit, { address: input.email, name: input.name ?? null, origin: 'invite' })
   if (!(await first('SELECT 1 FROM core_accounts WHERE id = ? AND anonymised_at IS NULL', input.accountId))) refuse('core.not-found', 'There is no such person.', { status: 404 })
-  return input.accountId!
+  return { accountId: input.accountId! }
 }
 
 /** Changes what a contact is called, is sent and whether they are the primary (G4: one at most, so the old one steps down in the same batch). */

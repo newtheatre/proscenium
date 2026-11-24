@@ -47,3 +47,18 @@ export interface CompanyDetail {
   contacts: ContactRow[]
   engagements: EngagementRow[]
 }
+
+/** Something a contact owes on an engagement: guests to name (with how many and by when), an agreement to answer, a settlement to agree. */
+export interface ToDo { kind: 'name-guests' | 'answer-agreement' | 'agree-settlement', count: number, due: number | null }
+
+export interface MyEngagement {
+  id: string
+  title: string
+  kind: EngagementKind
+  state: EngagementState
+  companyId: string
+  company: string
+  firstDate: number | null
+  lastDate: number | null
+  toDo: ToDo[]
+}

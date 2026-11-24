@@ -81,6 +81,7 @@ export default defineModule({
 
   contributes: {
     'core.navigation': [
+      { id: 'companies.mine', menu: 'account', group: 'theatre', to: '/account/companies', match: '/account/companies', icon: 'i-lucide-building-2', ability: 'signed-in', order: 38, count: 'companies.mine', hideEmpty: true },
       { id: 'companies.companies', menu: 'console', group: 'programme', section: 'everyday', to: '/console/companies', match: '/console/companies', icon: 'i-lucide-building-2', ability: 'companies.company.view', order: 30 },
     ],
     // Part 2, "Ledger accounts": made locked when the module is switched on.
@@ -93,6 +94,38 @@ export default defineModule({
       { id: 'other-income', name: 'Other company income', kind: 'income' },
       { id: 'paid-out', name: 'Paid out to companies', kind: 'asset' },
     ],
+    // CO-08: Your companies, on My account only for someone who acts for one.
+    'core.account-section': [
+      { id: 'companies.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'CompaniesMine', order: 38, to: '/account/companies', icon: 'i-lucide-building-2', count: 'companies.mine', hideEmpty: true },
+    ],
+    'core.count': [{ id: 'companies.mine', file: 'mine' }],
+    // G2: a new contact is told who added them, for which company; one who has never signed in gets the claim link.
+    'core.notification-type': [{
+      id: 'companies.contact-added',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      variables: { company: 'text' as const, by: 'text' as const, link: 'text' as const },
+      link: '/account/companies',
+      wording: {
+        'en-GB': {
+          subject: 'You are now a contact for {{ company }}',
+          body: '{{ by }} at {{ theatre }} has added you as a contact for **{{ company }}**.\n\nYou will see the company\'s dates, agreements, guest places and settlements under Your companies, and be asked when something needs you.\n\n[Open Your companies]({{ link }})',
+        },
+      },
+    }, {
+      id: 'companies.contact-added-claim',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const],
+      variables: { company: 'text' as const, by: 'text' as const, link: 'sealed' as const },
+      wording: {
+        'en-GB': {
+          subject: 'You are now a contact for {{ company }}',
+          body: '{{ by }} at {{ theatre }} has added you as a contact for **{{ company }}**.\n\nYou will see the company\'s dates, agreements, guest places and settlements under Your companies, and be asked when something needs you.\n\n[Open Your companies]({{ link }})\n\nThere is no password: the link signs you in, once, and works until you first sign in. After that, sign in with this email address.',
+        },
+      },
+    }],
     'core.record-resolver': [
       { id: 'companies.company', file: 'company' },
       { id: 'companies.engagement', file: 'engagement' },
