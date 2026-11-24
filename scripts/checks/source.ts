@@ -249,9 +249,9 @@ export function checkPolicyNumbers(modules: Loaded[]): string[] {
       if (file.includes('/server/db/')) continue
       lines(file).forEach((line, i) => {
         if (line.includes('not-policy') || /^\s*(\/\/|\/?\*)/.test(line)) return
-        // Strings and HTTP statuses are not policy.
+        // Strings, HTTP statuses and numbered SQL parameters (?3) are not policy.
         const stripped = line.replace(/(['"`])(?:\\.|(?!\1).)*\1/g, '""').replace(/status(Code)?:\s*\d{3}/g, '')
-        for (const [number] of stripped.matchAll(/(?<![\w.])\d[\d_]*(\.\d+)?(?![\w])/g)) {
+        for (const [number] of stripped.matchAll(/(?<![\w.?])\d[\d_]*(\.\d+)?(?![\w])/g)) {
           if (!['0', '1', '2'].includes(number)) problems.push(`${rel(file)}:${i + 1}: the number ${number} looks like policy; make it a setting, or mark the line // not-policy: why`)
         }
       })
