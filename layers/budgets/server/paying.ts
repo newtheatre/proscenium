@@ -30,7 +30,7 @@ export async function settlePart(unit: UnitView, part: Part) {
   logEvent(unit, claim!.id, { action: 'paid', by: actor.accountId ?? null, at, amountMinor: part.amountMinor, disbursementId: part.disbursementId })
   const full = claim!.paidMinor + part.amountMinor >= (claim!.approvedMinor ?? 0)
   unit.audit({ action: full ? 'state' : 'update', record: ['budgets.claim', claim!.id], detail: full ? { from: 'approved', to: 'paid' } : { paidMinor: claim!.paidMinor + part.amountMinor } })
-  if (full) await tellClaimant(unit, claim!, 'paid', claim!.approvedMinor ?? 0, 'The money is on its way by the route you chose.')
+  if (full) await tellClaimant(unit, claim!, { decision: 'paid', amountMinor: claim!.approvedMinor ?? 0, note: 'The money is on its way by the route you chose.' })
   return [{ account: { key: 'budgets.claims-payable' }, amountMinor: part.amountMinor }]
 }
 
