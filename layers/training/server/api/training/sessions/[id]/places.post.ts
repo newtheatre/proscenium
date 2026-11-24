@@ -13,5 +13,5 @@ export default defineRoute({
 }, async (_event, { record, input, actor, unit }) => {
   const other = !!input.accountId && input.accountId !== actor.accountId
   if (other) await requireAbility(actor, 'training.place.manage', record)
-  return bookPlace(unit.view(), actor, record!.id, input.accountId ?? actor.accountId!, other ? 'staff' : 'self')
+  return bookPlace(unit.view(), actor, { sessionId: record!.id, accountId: input.accountId ?? actor.accountId!, by: other ? 'staff' : 'self' })
 })

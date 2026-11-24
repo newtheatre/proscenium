@@ -166,28 +166,8 @@ export async function saveSteps(unit: UnitView, courseId: string, input: StepInp
   const before = new Map((await stepsOf(version.id)).map(s => [s.id, s]))
   const defaultAttempts = await useSetting('training.quizzes.default-max-attempts') as number | null
   const defaultRetry = await useSetting('training.quizzes.retry-after') as number
-  const ids: string[] = []
-  const rows = input.map((step, i) => {
-    const old = step.id ? before.get(step.id) : undefined
-    if (step.id && !old) refuse('training.step.not-found', 'A step was changed by someone else while you were editing.', { status: 409, remedy: 'Reload the course and try again.' })
-    const timesRequired = step.kind === 'practical' ? step.timesRequired : 1
-    const keepsCarry = old && !step.changed && old.kind === step.kind && old.timesRequired === timesRequired
-    const id = old?.id ?? newId('tstp')
-    ids.push(id)
-    return {
-      id, position: i + 1, title: step.title, kind: step.kind, neededFor: step.neededFor, timesRequired,
-      guidance: step.guidance ?? null,
-      materialUrl: 'materialUrl' in step ? step.materialUrl ?? null : null,
-      materialFileId: 'materialFileId' in step ? step.materialFileId ?? null : null,
-      evidenceExpiry: step.kind === 'certificate' ? step.evidenceExpiry : null,
-      evidenceFile: step.kind === 'certificate' ? step.evidenceFile : null,
-      formId: step.kind === 'quiz' ? step.formId : null,
-      maxAttempts: step.kind === 'quiz' ? (step.maxAttempts === undefined ? defaultAttempts : step.maxAttempts) : null,
-      retryAfter: step.kind === 'quiz' ? step.retryAfter ?? defaultRetry : null,
-      showAnswers: step.kind === 'quiz' ? step.showAnswers : null,
-      carriesStepId: keepsCarry ? old.carriesStepId : null,
-    }
-  })
+  const rows = input.map((step, i) => stepRowFor(step, i, { before, defaultAttempts, defaultRetry }))
+  const ids = rows.map(r => r.id)
   // A lesson's sections go out with its step and come back if the step is kept as a lesson (O5).
   const kept = new Set(rows.filter(r => r.kind === 'lesson').map(r => r.id))
   const sections = (await all<{ step_id: string }>('SELECT * FROM training_lesson_sections WHERE step_id IN (SELECT id FROM training_course_steps WHERE version_id = ?)', version.id))
@@ -207,6 +187,28 @@ export async function saveSteps(unit: UnitView, courseId: string, input: StepInp
   if (sections.length) unit.add({ sql: `INSERT INTO training_lesson_sections (${SECTION_COLUMNS.join(', ')}) SELECT ${SECTION_COLUMNS.map(c => `j.value ->> '${c}'`).join(', ')} FROM json_each(?) j`, params: [JSON.stringify(sections)] }).expect(sections.length)
   unit.audit({ action: 'update', record: ['training.course', courseId], detail: { version: version.number, steps: rows.length } })
   return ids
+}
+
+/** The row a step of the editor saves as; one kept from before keeps its id and, unless changed, what it carries from (V3). */
+function stepRowFor(step: StepInput, i: number, { before, defaultAttempts, defaultRetry }: { before: Map<string, Step>, defaultAttempts: number | null, defaultRetry: number }) {
+  const old = step.id ? before.get(step.id) : undefined
+  if (step.id && !old) refuse('training.step.not-found', 'A step was changed by someone else while you were editing.', { status: 409, remedy: 'Reload the course and try again.' })
+  const timesRequired = step.kind === 'practical' ? step.timesRequired : 1
+  const keepsCarry = old && !step.changed && old.kind === step.kind && old.timesRequired === timesRequired
+  const quiz = step.kind === 'quiz' ? step : null
+  return {
+    id: old?.id ?? newId('tstp'), position: i + 1, title: step.title, kind: step.kind, neededFor: step.neededFor, timesRequired,
+    guidance: step.guidance ?? null,
+    materialUrl: 'materialUrl' in step ? step.materialUrl ?? null : null,
+    materialFileId: 'materialFileId' in step ? step.materialFileId ?? null : null,
+    evidenceExpiry: step.kind === 'certificate' ? step.evidenceExpiry : null,
+    evidenceFile: step.kind === 'certificate' ? step.evidenceFile : null,
+    formId: quiz?.formId ?? null,
+    maxAttempts: quiz ? (quiz.maxAttempts === undefined ? defaultAttempts : quiz.maxAttempts) : null,
+    retryAfter: quiz ? quiz.retryAfter ?? defaultRetry : null,
+    showAnswers: quiz?.showAnswers ?? null,
+    carriesStepId: keepsCarry ? old.carriesStepId : null,
+  }
 }
 
 /** Starts the next version by copying the live one's steps, each carrying from the step it copies (V1). */

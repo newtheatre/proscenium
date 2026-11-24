@@ -136,3 +136,6 @@ export const sectionsInput = z.object({
 
 export const quizInput = z.object({ answers: z.record(z.string(), z.unknown()) })
 export const allowanceInput = z.object({ accountId: z.string().min(1), note: optionalText(300) }) // not-policy: the schema's limit (part 2)
+
+/** A route that takes no body. */
+export const noInput = z.object({}).strict()
