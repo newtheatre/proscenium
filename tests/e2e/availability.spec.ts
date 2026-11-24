@@ -7,7 +7,7 @@ import AxeBuilder from '@axe-core/playwright'
 
 const owner = { kind: 'person', accountId: 'acc_e2eowner', name: 'Browser Tests', assurance: 'strong', reassertedAt: Date.now(), grants: ['core.modules.manage', 'core.settings.manage'].map(ability => ({ ability, via: 'test' })) }
 const member = { kind: 'person', accountId: `acc_avail${Date.now() % 1_000_000}`, name: 'Ada Available', assurance: 'strong', reassertedAt: Date.now(), grants: [] }
-const organiser = { kind: 'person', accountId: `acc_organ${Date.now() % 1_000_000}`, name: 'Olly Organiser', assurance: 'strong', reassertedAt: Date.now(), grants: ['availability.request.send', 'availability.find.anyone', 'availability.find.use', 'availability.entry.on-behalf'].map(ability => ({ ability, via: 'test' })) }
+const organiser = { kind: 'person', accountId: `acc_organ${Date.now() % 1_000_000}`, name: 'Olly Organiser', assurance: 'strong', reassertedAt: Date.now(), grants: ['availability.request.send', 'availability.find.anyone', 'availability.find.use', 'availability.entry.on-behalf', 'availability.meeting.arrange'].map(ability => ({ ability, via: 'test' })) }
 const output = fileURLToPath(new URL('../../.output', import.meta.url))
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 // A Monday three to four weeks ahead, so every day in view can be painted.
@@ -271,6 +271,32 @@ test.describe('a poll', () => {
       await page.getByRole('button', { name: 'Choose this time' }).first().click()
       await page.getByRole('dialog').getByRole('button', { name: 'Choose this time' }).click()
       await expect(page.getByText('Chosen', { exact: true })).toBeVisible()
+    })
+
+    test('arranges a meeting at the chosen time for the poll\'s people', async ({ page }) => {
+      await visit(page, pollUrl)
+      await page.getByRole('button', { name: 'Arrange a meeting' }).click()
+      const panel = page.getByRole('dialog')
+      await expect(panel.getByRole('textbox', { name: /^Title/ })).toHaveValue('Cast reading')
+      await panel.getByRole('textbox', { name: /^Place/ }).fill('Studio')
+      await noViolations(page)
+      await panel.getByRole('button', { name: 'Arrange a meeting' }).click()
+      await expect(page.getByRole('heading', { level: 1, name: 'Cast reading' })).toBeVisible()
+      await expect(page.getByText('Studio')).toBeVisible()
+    })
+  })
+
+  test.describe('a member invited', () => {
+    test.use(as(member))
+
+    test('finds the meeting under Asked of me and says they are going', async ({ page }) => {
+      await visit(page, '/members/availability/requests')
+      await page.getByRole('link', { name: /Cast reading/ }).first().click()
+      await expect(page.getByRole('heading', { name: 'Are you going?' })).toBeVisible()
+      await noViolations(page)
+      await page.getByRole('button', { name: 'Going', exact: true }).click()
+      await expect(page.getByText('Answer saved')).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Going', exact: true })).toHaveAttribute('aria-pressed', 'true')
     })
   })
 })

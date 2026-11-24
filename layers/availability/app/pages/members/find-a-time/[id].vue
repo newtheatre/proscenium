@@ -2,6 +2,7 @@
      has not answered; "Choose this time" settles it and "Give up" ends it. Everyone asked is told. -->
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
+import type { FindOptions } from '../../../composables/useFindATime'
 import type { PollSlot, PollView } from '../../../composables/usePolls'
 
 const route = useRoute()
@@ -16,6 +17,13 @@ const words = usePollWords()
 const id = computed(() => String(route.params.id))
 const { data, status, error, refresh } = await useAPI<PollView>(() => `/api/availability/polls/${id.value}`, { key: `availability:poll:${id.value}` })
 const p = computed(() => data.value?.poll)
+const options = await useAPI<FindOptions>('/api/availability/find/options', { key: 'availability:find-options' })
+const decided = computed(() => data.value?.slots.find(s => s.id === p.value?.decidedSlotId))
+const arranging = ref(false)
+async function arranged(meetingId: string) {
+  arranging.value = false
+  await navigateTo(`/members/availability/meetings/${meetingId}`)
+}
 const people = computed(() => data.value?.people ?? [])
 const answered = computed(() => people.value.filter(x => Object.keys(x.answers).length).length)
 const facts = computed(() => [
@@ -81,6 +89,16 @@ async function abandon() {
             :facts="facts"
             framed
             row
+          />
+          <UAlert
+            v-if="decided && d.organiser"
+            :title="t('availability.poll.decided-on', { when: words.when(decided) })"
+            icon="i-lucide-calendar-check"
+            color="success"
+            variant="subtle"
+            :actions="d.poll.meetingId
+              ? [{ label: t('availability.meeting.open'), to: `/members/availability/meetings/${d.poll.meetingId}`, color: 'neutral', variant: 'outline' }]
+              : options.data.value?.arrange ? [{ label: t('availability.meeting.arrange'), icon: 'i-lucide-calendar-plus', color: 'neutral', variant: 'outline', onClick: () => { arranging = true } }] : []"
           />
           <PageSection
             :title="t('availability.poll.times')"
@@ -160,5 +178,21 @@ async function abandon() {
         </div>
       </template>
     </DataBoundary>
+    <USlideover
+      v-model:open="arranging"
+      :title="t('availability.meeting.arrange')"
+      :description="t('availability.meeting.arrange-poll-help')"
+    >
+      <template #body>
+        <AvailabilityMeetingForm
+          v-if="decided && p && options.data.value"
+          :start="{ title: p.title, date: decided.date, start: decided.start, end: decided.end }"
+          :today="options.data.value.today"
+          :step="options.data.value.grid.step"
+          :people="{ findId: p.id, groupIds: [] }"
+          @saved="arranged"
+        />
+      </template>
+    </USlideover>
   </PageFrame>
 </template>
