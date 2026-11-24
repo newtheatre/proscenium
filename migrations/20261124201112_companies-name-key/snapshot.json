@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "d186d0cf-3c0d-4659-96f0-d7af0ce70887",
+  "id": "7ef067ef-7c47-4424-935f-1117e0c90caf",
   "prevIds": [
-    "71c4e4d4-d0a6-4d9d-a8a8-2afcf3699102"
+    "63556b12-bfc6-4604-a5e1-14f4e4268d69"
   ],
   "ddl": [
     {
@@ -808,6 +808,14 @@
     },
     {
       "name": "front_of_house_timings",
+      "entityType": "tables"
+    },
+    {
+      "name": "fundraising_donations",
+      "entityType": "tables"
+    },
+    {
+      "name": "fundraising_funds",
       "entityType": "tables"
     },
     {
@@ -21567,6 +21575,436 @@
       "entityType": "columns"
     },
     {
+      "table": "fundraising_donations",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "reference",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "contact_email",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "donor_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "company_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "organisation_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fund_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "campaign_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "channel",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "how_received",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "received_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'pending'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "refunded_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "intent_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "part_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "rode_with",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "acknowledge_as",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "show_amount",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "sds_status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'none'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "message",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "has_benefit",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "gift_aid",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'none'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "gift_aid_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "declaration_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "link_hash",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "recorded_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "posting_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "purpose",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "restricted",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "is_default",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "offered",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "inventory_categories",
       "name": "id",
       "type": "text",
@@ -35489,6 +35927,158 @@
       "entityType": "indexes"
     },
     {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_reference",
+      "columns": [
+        {
+          "value": "reference",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "reference IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_part",
+      "columns": [
+        {
+          "value": "part_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "part_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_link",
+      "columns": [
+        {
+          "value": "link_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "link_hash IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "received_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_email",
+      "columns": [
+        {
+          "value": "contact_email",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_campaign",
+      "columns": [
+        {
+          "value": "campaign_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_fund",
+      "columns": [
+        {
+          "value": "fund_id",
+          "isExpression": false
+        },
+        {
+          "value": "received_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_intent",
+      "columns": [
+        {
+          "value": "intent_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "fundraising_funds_one_default",
+      "columns": [
+        {
+          "value": "is_default",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "is_default = 1 AND state = 'active'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "fundraising_funds_name",
+      "columns": [
+        {
+          "value": "lower(name)",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": "state = 'active'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "inventory_categories",
       "name": "inventory_categories_name",
       "columns": [
@@ -41034,6 +41624,36 @@
       "entityType": "fks"
     },
     {
+      "table": "fundraising_donations",
+      "name": "fk_fundraising_donations_fund_id_fundraising_funds_id_fk",
+      "columns": [
+        "fund_id"
+      ],
+      "tableTo": "fundraising_funds",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fk_fundraising_donations_intent_id_payments_intents_id_fk",
+      "columns": [
+        "intent_id"
+      ],
+      "tableTo": "payments_intents",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "inventory_categories",
       "name": "fk_inventory_categories_department_id_inventory_departments_id_fk",
       "columns": [
@@ -44926,6 +45546,24 @@
       "entityType": "pks"
     },
     {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "fundraising_funds_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "inventory_categories",
       "name": "inventory_categories_pk",
       "columns": [
@@ -47854,6 +48492,96 @@
       "table": "front_of_house_timings",
       "name": "front_of_house_timings_kind_check",
       "value": "\"kind\" IN ('house_open', 'curtain_up', 'interval_start', 'interval_end', 'curtain_down', 'house_clear')",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_amount",
+      "value": "\"amount_minor\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_refunded",
+      "value": "\"refunded_minor\" >= 0 AND \"refunded_minor\" <= \"amount_minor\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_channel",
+      "value": "\"channel\" IN ('online', 'checkout', 'till', 'recorded', 'collection', 'regular')",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_how",
+      "value": "\"how_received\" IS NULL OR \"how_received\" IN ('card', 'cash', 'cheque', 'bank-transfer', 'elsewhere')",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_recorded",
+      "value": "\"channel\" <> 'recorded' OR \"how_received\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_state",
+      "value": "\"state\" IN ('pending', 'received', 'abandoned', 'refunded')",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_received",
+      "value": "\"state\" NOT IN ('received', 'refunded') OR (\"received_on\" IS NOT NULL AND \"reference\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_gift_aid",
+      "value": "\"gift_aid\" IN ('none', 'eligible', 'claimed', 'adjusted', 'ineligible')",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_sds",
+      "value": "\"sds_status\" IN ('none', 'eligible', 'claimed', 'excluded')",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_acknowledge",
+      "value": "\"acknowledge_as\" IS NULL OR length(\"acknowledge_as\") <= 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_donations",
+      "name": "fundraising_donations_message",
+      "value": "\"message\" IS NULL OR length(\"message\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "fundraising_funds_state",
+      "value": "\"state\" IN ('active', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "fundraising_funds_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "fundraising_funds_purpose",
+      "value": "\"restricted\" = 0 OR length(coalesce(\"purpose\", '')) > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "fundraising_funds",
+      "name": "fundraising_funds_default_active",
+      "value": "\"is_default\" = 0 OR \"state\" = 'active'",
       "entityType": "checks"
     },
     {
