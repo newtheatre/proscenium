@@ -185,3 +185,15 @@ A read-through of the paper and the first six specifications against each other 
 - **The glossary's rulings bind prose, not table or column names.** "Erasure hold" and "seat hold", "account claim" and "capacity claim", "draft version" and "draft response" are how documents and screens speak; a table may still be called `holds` or `claims`.
 - **Gate stories are named in two places.** The gate lists in this tab are the authority; Foundations and Identity mark the same stories in their own story tabs.
 - **Three choices were made by integration and reported to Matt:** one setting for the committee year end (`core.organisation.year-end`); emergency contacts and access needs in the first release (ID-17); and the whole review panel, not only the chair, seeing a form's review summary after release.
+
+## Third round: Festival-ready changes (24 November 2026)
+
+The amendment across core, Identity, forms, Front of house and Box office is in the repository at
+[docs/specs/festival-ready-changes](../specs/festival-ready-changes/01-overview.md); its stories tab is the
+authority. It adds C-60 to C-64, C-66 to C-73 and C-75 to core (C-65 is Programme planning's occupancy and
+C-74 Identity's turns-18 date), ID-47 and ID-48, FB-512+ and FB-513 to FB-515, FH-48 to FH-54, and BO-73
+and BO-74. All eight of its questions were answered on 24 November 2026.
+
+Build lanes: lane A (core and kit) builds C-60 to C-62, C-66, C-68 and C-70; lane D (training and
+governance) builds C-74; lane E (programme and festival) builds the rest, starting with FB-513 and FB-515
+because Training's quizzes need them.
