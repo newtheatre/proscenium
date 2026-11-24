@@ -137,7 +137,6 @@ export const holders = defineTable('budgets_holders', {
   extra: t => [primaryKey({ columns: [t.budgetId, t.accountId] }), index('budgets_holders_account').on(t.accountId)],
 })
 
-
 export const REQUEST_STATES = ['requested', 'approved', 'declined', 'withdrawn', 'fulfilled', 'lapsed'] as const
 
 /** Asking to spend on a line before spending (BC-15): once approved, it counts as committed until it is fulfilled or lapses. */
