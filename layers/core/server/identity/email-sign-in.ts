@@ -13,7 +13,7 @@ import { useEnrolmentLink } from './recovery'
 import { checkClaimable } from './claim'
 import { labelOf, managingProvider } from './providers'
 import { linkPendingIdentity } from './oidc'
-import { holdsPrivileged } from './me'
+import { holdsPrivileged } from './privileged'
 import { LIVE } from './grants'
 
 export interface TokenRow {
