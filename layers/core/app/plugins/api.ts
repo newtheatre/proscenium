@@ -55,6 +55,26 @@ export default defineNuxtPlugin(() => {
   const base = globalThis.$fetch
   // Typed loosely inside: the typed fetch compares every route, which is too deep to restate here.
   const send = base as unknown as (request: unknown, options?: unknown) => Promise<unknown>
+  /** A refused request: sent again once the person confirms it is them, or the refusal thrown on. */
+  async function recover(error: unknown, request: unknown, options: unknown, practising: boolean): Promise<unknown> {
+    const e = error as { statusCode?: number, data?: { code?: string } | null }
+    const code = e?.data?.code
+    if (practising && code === 'core.practice.ended') {
+      practice.ended()
+      throw error
+    }
+    // Two-step sign-in not set up: an act says so over the page and is not sent again. A load only
+    // shows the refusal where its data would be, with the same way to set it up.
+    if (e?.statusCode === 403 && code === TWO_STEP_NOT_SET_UP && !path(request).startsWith(OWN)) {
+      const method = String((options as { method?: string } | undefined)?.method ?? 'GET').toUpperCase()
+      if (method !== 'GET' && method !== 'HEAD') await confirmItsYou(TWO_STEP_NOT_SET_UP)
+      throw error
+    }
+    if (e?.statusCode !== 403 || !code || !CONFIRM_REASONS.includes(code) || path(request).startsWith(OWN)) throw error
+    if (!(await (practising ? practice.confirm() : confirmItsYou(code as ConfirmReason)))) throw error
+    return send(request, options)
+  }
+
   const api = (async (request: unknown, given?: unknown) => {
     const practising = isPracticePath(router.currentRoute.value.path)
     const options = practising ? withPracticeMark(withIdempotencyKey(given)) : withIdempotencyKey(given)
@@ -64,22 +84,7 @@ export default defineNuxtPlugin(() => {
       return answer
     }
     catch (error) {
-      const e = error as { statusCode?: number, data?: { code?: string } | null }
-      const code = e?.data?.code
-      if (practising && code === 'core.practice.ended') {
-        practice.ended()
-        throw error
-      }
-      // Two-step sign-in not set up: an act says so over the page and is not sent again. A load only
-      // shows the refusal where its data would be, with the same way to set it up.
-      if (e?.statusCode === 403 && code === TWO_STEP_NOT_SET_UP && !path(request).startsWith(OWN)) {
-        const method = String((options as { method?: string } | undefined)?.method ?? 'GET').toUpperCase()
-        if (method !== 'GET' && method !== 'HEAD') await confirmItsYou(TWO_STEP_NOT_SET_UP)
-        throw error
-      }
-      if (e?.statusCode !== 403 || !code || !CONFIRM_REASONS.includes(code) || path(request).startsWith(OWN)) throw error
-      if (!(await (practising ? practice.confirm() : confirmItsYou(code as ConfirmReason)))) throw error
-      return send(request, options)
+      return recover(error, request, options, practising)
     }
   }) as unknown as Api
   // `raw` and `create` are the plain fetch's: only a call to `$api` itself confirms and retries.

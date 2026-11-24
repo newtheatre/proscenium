@@ -73,6 +73,10 @@ export function checkRouteDeclaration(decl: RouteDeclaration<any>): void {
   if (decl.protect !== undefined && decl.protect !== 'turnstile') throw new DeclarationError('protect', "is 'turnstile'")
   if (decl.body !== undefined && decl.body !== 'json' && decl.body !== 'binary') throw new DeclarationError('body', "is 'json' or 'binary'")
   if (decl.body === 'binary' && decl.idempotent) throw new DeclarationError('idempotent', 'a binary body is not kept, so it cannot be replayed')
+  checkRouteExtras(decl)
+}
+
+function checkRouteExtras(decl: RouteDeclaration<any>): void {
   if (decl.practice !== undefined && decl.practice !== 'refuse' && decl.practice !== 'outside') throw new DeclarationError('practice', "is 'refuse' or 'outside'")
   if (decl.tokens !== undefined && (!Array.isArray(decl.tokens) || !decl.tokens.every(t => typeof t === 'string' && /^[a-z][a-zA-Z0-9]*$/.test(t)))) throw new DeclarationError('tokens', 'names the path parameters that carry a link token')
 }

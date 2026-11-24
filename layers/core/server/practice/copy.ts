@@ -53,19 +53,19 @@ export async function copyStatements(staffId: string): Promise<Statement[]> {
   const pageSize = await useSetting('core.units.set-rows-limit') as number
   const out: Statement[] = []
   for (const { meta } of copiedTables()) {
-    if (!own && meta.name !== 'core_modules') continue
-    const columns = Object.values(meta.columns)
-    for (let offset = 0; ; offset += pageSize) {
-      const rows = await all<Record<string, unknown>>(`SELECT * FROM "${meta.name}" ORDER BY 1 LIMIT ? OFFSET ?`, pageSize, offset)
-      for (const row of rows) {
-        if (keptBack(meta.name, row)) continue
-        out.push({
-          sql: `INSERT INTO "${meta.name}" (${columns.map(c => `"${c.sql}"`).join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
-          params: columns.map(c => copiedValue(c.meta, row[c.sql], staffId)),
-        })
-      }
-      if (rows.length < pageSize) break
-    }
+    if (own || meta.name === 'core_modules') out.push(...await tableStatements(meta, staffId, pageSize))
   }
   return out
+}
+
+/** One table's rows as the copy writes them, read a page at a time. */
+async function tableStatements(meta: TableMeta, staffId: string, pageSize: number): Promise<Statement[]> {
+  const columns = Object.values(meta.columns)
+  const sql = `INSERT INTO "${meta.name}" (${columns.map(c => `"${c.sql}"`).join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`
+  const out: Statement[] = []
+  for (let offset = 0; ; offset += pageSize) {
+    const rows = await all<Record<string, unknown>>(`SELECT * FROM "${meta.name}" ORDER BY 1 LIMIT ? OFFSET ?`, pageSize, offset)
+    for (const row of rows.filter(r => !keptBack(meta.name, r))) out.push({ sql, params: columns.map(c => copiedValue(c.meta, row[c.sql], staffId)) })
+    if (rows.length < pageSize) return out
+  }
 }
