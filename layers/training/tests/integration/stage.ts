@@ -62,6 +62,9 @@ import verifyEvidence from '../../server/api/training/evidence/[id]/verify.post'
 import rejectEvidence from '../../server/api/training/evidence/[id]/reject.post'
 import withdrawEvidence from '../../server/api/training/evidence/[id]/withdraw.post'
 import myEvidence from '../../server/api/training/me/evidence.get'
+import catalogue from '../../server/api/training/catalogue.get'
+import myTraining from '../../server/api/training/me/index.get'
+import myCourse from '../../server/api/training/me/courses/[slug].get'
 
 export const training = server({
   'GET /api/training/courses': listCourses,
@@ -122,6 +125,9 @@ export const training = server({
   'POST /api/training/evidence/:id/reject': rejectEvidence,
   'POST /api/training/evidence/:id/withdraw': withdrawEvidence,
   'GET /api/training/me/evidence': myEvidence,
+  'GET /api/training/catalogue': catalogue,
+  'GET /api/training/me': myTraining,
+  'GET /api/training/me/courses/:slug': myCourse,
 })
 
 /** 24 November 2026, 10:00 in London. */
