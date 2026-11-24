@@ -28,6 +28,7 @@ async function save() {
     refusal.value = toRefusal(e)
   }
 }
+const formsTemplateForm = useFormRef('formsTemplateForm')
 </script>
 
 <template>
@@ -39,6 +40,7 @@ async function save() {
     <template #body>
       <UForm
         id="forms-template"
+        ref="formsTemplateForm"
         :state="state"
         :validate="() => needs({ name: state.name })"
         class="space-y-4"
@@ -75,7 +77,7 @@ async function save() {
       <UButton
         type="submit"
         form="forms-template"
-        loading-auto
+        :loading="formsTemplateForm?.loading"
         :label="t('forms.screens.templates.save-button')"
       />
     </template>

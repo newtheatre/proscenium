@@ -44,6 +44,7 @@ async function save() {
 }
 const lengthName = (id: string | null) => id ? s.value?.lengths.find(l => l.id === id)?.name ?? '' : t('membership-fees.prices.every-length')
 const shown = (minor: number | null) => minor === null ? t('membership-fees.prices.none') : money(minor)
+const membershipFeesPriceForm = useFormRef('membershipFeesPriceForm')
 </script>
 
 <template>
@@ -91,6 +92,7 @@ const shown = (minor: number | null) => minor === null ? t('membership-fees.pric
       <template #body>
         <UForm
           id="membership-fees-price"
+          ref="membershipFeesPriceForm"
           :state="form"
           :validate="() => needs({ amountMinor: form.amountMinor, fromDate: form.fromDate })"
           class="space-y-4"
@@ -141,7 +143,7 @@ const shown = (minor: number | null) => minor === null ? t('membership-fees.pric
         <UButton
           type="submit"
           form="membership-fees-price"
-          loading-auto
+          :loading="membershipFeesPriceForm?.loading"
           :label="t('membership-fees.prices.save')"
         />
       </template>

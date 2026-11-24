@@ -168,7 +168,7 @@ async function retry(d: WebhookDelivery) {
   <PageFrame
     :title="title"
     :trail="[{ label: t('core.webhooks.title'), to: '/admin/webhooks' }]"
-    width="reading"
+    width="standard"
   >
     <template #status>
       <StatusBadge

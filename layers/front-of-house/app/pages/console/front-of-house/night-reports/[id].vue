@@ -112,6 +112,7 @@ function problem(checklistId: string, x: { item: string, reasonCode: string | nu
 const figure = useFigureValue()
 const trail = computed(() => [{ label: t('front-of-house.navigation.night-reports.label'), to: '/console/front-of-house/night-reports' }])
 const title = computed(() => data.value?.performance ? t('front-of-house.report.title', { show: data.value.performance.title }) : t('front-of-house.navigation.night-reports.label'))
+const dialogForm = useFormRef('dialogForm')
 </script>
 
 <template>
@@ -255,6 +256,7 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
         <template #body>
           <UForm
             id="front-of-house-report-dialog"
+            ref="dialogForm"
             class="space-y-4"
             :state="{ noteForm, noShows }"
             :validate="() => needs({ body: dialog === 'note' ? noteForm.body : true })"
@@ -311,6 +313,7 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
         <template #footer>
           <UButton
             type="submit"
+            :loading="dialogForm?.loading"
             form="front-of-house-report-dialog"
             :label="dialog === 'sign-off' ? t('front-of-house.report.sign-off') : t('front-of-house.save')"
           />

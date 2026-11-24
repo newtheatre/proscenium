@@ -19,7 +19,7 @@ const retention = computed<number | null | undefined>({
   set: (seconds) => { state.retentionDays = seconds === null || seconds === undefined ? null : Math.max(1, Math.round(seconds / DAY)) },
 })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('formEl')
+const formEl = useFormRef('formEl')
 watch(open, (now) => {
   if (!now) return
   Object.assign(state, { slug: props.form.slug, title: props.form.title, retentionDays: props.form.retentionDays, anonymous: props.form.anonymous, allowEdits: props.form.allowEdits })
@@ -125,7 +125,7 @@ async function save() {
       <UButton
         type="submit"
         form="forms-settings"
-        loading-auto
+        :loading="formEl?.loading"
         :label="t('forms.screens.settings.save')"
       />
     </template>
