@@ -1,7 +1,6 @@
 {
   "invoicing.module.name": "Invoices and exports",
-  "invoicing.module.description": "Export the ledger in the layout another set of books takes, such as a students' union's return, with each account under that book's own code. Invoices and bills follow.",
-
+  "invoicing.module.description": "Raise numbered invoices and record what is paid against them, and export the ledger in the layout another set of books takes, such as a students' union's return. Bills and credit notes follow.",
   "invoicing.settings-sections.exports": "Exports",
   "invoicing.settings.exports.default-profile.label": "Export profile the Exports screen opens on",
   "invoicing.settings.exports.default-profile.help": "With none chosen, Exports opens on the first profile by name.",
@@ -9,8 +8,25 @@
   "invoicing.settings.exports.starter.help": "The profile made when the module is first switched on. A students' society starts from its union's return.",
   "invoicing.settings.exports.starter.options.journal": "A journal for any accounting package",
   "invoicing.settings.exports.starter.options.union": "The students' union return",
-
   "invoicing.abilities.export.take.label": "Take exports of the ledger and see past exports",
   "invoicing.abilities.export.manage.label": "Make and change export profiles and their codes",
-  "invoicing.abilities.settings.manage.label": "Change the invoices and exports settings"
+  "invoicing.abilities.settings.manage.label": "Change the invoices and exports settings",
+  "invoicing.settings-sections.terms": "Payment terms",
+  "invoicing.settings.terms.days.label": "Days to pay",
+  "invoicing.settings.terms.days.help": "How many days after an invoice's date it falls due, unless the customer has terms of their own.",
+  "invoicing.settings-sections.issue": "Issuing invoices",
+  "invoicing.settings.issue.backdate-limit.label": "Furthest back an invoice may be dated",
+  "invoicing.settings.issue.backdate-limit.help": "How long before it is issued an invoice may be dated, such as for work done before it was written.",
+  "invoicing.settings.issue.second-person-over.label": "Second person needed above",
+  "invoicing.settings.issue.second-person-over.help": "An invoice for more than this is issued by someone other than whoever wrote it. Leave it empty for anyone to issue any invoice.",
+  "invoicing.settings-sections.pay": "Paying an invoice",
+  "invoicing.settings.pay.bank-details.label": "Bank details printed on invoices",
+  "invoicing.settings.pay.bank-details.help": "The account name, sort code and account number customers pay into. These are printed on every invoice, so they are not a secret.",
+  "invoicing.settings-sections.records": "Keeping records",
+  "invoicing.settings.records.keep-for.label": "Keep invoices for",
+  "invoicing.settings.records.keep-for.help": "How long an issued invoice keeps its customer's details once the accounts it belongs to have closed. It cannot be shorter than the law allows.",
+  "invoicing.abilities.invoice.view.label": "See invoices and what has been paid against them",
+  "invoicing.abilities.invoice.draft.label": "Write and change draft invoices",
+  "invoicing.abilities.invoice.issue.label": "Issue invoices, which numbers them and posts them to the ledger",
+  "invoicing.abilities.payment.record.label": "Record bank transfers and cheques received against invoices"
 }

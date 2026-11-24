@@ -80,7 +80,7 @@ The VAT stories are not in the cut order: VAT is in the first release by decisio
 
 Built in layer `layers/invoicing`. Where the build differs from the parts above:
 
-- Only the three export tables exist so far (profiles, codes, runs); the invoice tables, schedules and `invoicing.exports.keep-files-for` arrive with their stories (IE-07 onwards, IE-30). Runs carry `file_id` for kept copies, still unused.
+- The gate made only the three export tables (profiles, codes, runs); schedules and `invoicing.exports.keep-files-for` arrive with IE-30. Runs carry `file_id` for kept copies, still unused.
 - Switching on makes the five ledger accounts and one profile. Presets are not applied at run time yet, so the `student-society` preset works through the setting `invoicing.exports.starter`; S10 can also make the union profile at any time.
 - Formats `journal` and `custom` only; the package formats are IE-21.
 - `signs` gains `credit` (one amount, credits positive), so the union return keeps sales positive and refunds negative while the ledger is double entry. The total line is always money in positive.
@@ -90,3 +90,31 @@ Built in layer `layers/invoicing`. Where the build differs from the parts above:
 - Taking an export and checking a past run are GET routes, as Finance's own export is: `invoicing.export.take` skips the fresh sign-in, which the kit allows only for reads. The run row is the audited record of the read.
 - Coverage counts entries through Finance's new `entryCounts`; Finance also exports `rangeOf`, `rangeClosed`, `listPeriods` and `ledgerAccounts` for the exports.
 - E-07's refusal at 50,000 entries is in place but not exercised by a test, which would need 50,001 entries.
+
+## As built: invoices out, slice 1 (IE-07 to IE-09, IE-13, IE-14)
+
+Series, drafts, issuing and money received, with screens S1, S2, S6 and S9. Where the build differs from
+the parts above:
+
+- Tables `invoicing_series`, `invoicing_parties`, `invoicing_invoices`, `invoicing_lines` and
+  `invoicing_allocations` (append-only). Bills (`direction = 'in'`) and credit notes share the tables
+  and arrive with their stories.
+- An issued invoice is frozen by its service, not a trigger: every change is predicated on
+  `state = 'draft'` and the version, and issue on the total shown as well (decision 0004).
+- An invoice's subject is its party's account, with unlinked rows staff-only. A one-off party's
+  email is a personal column on the row rather than a second subject, which the kit does not allow.
+- Money received is Payments' new `recordReceived`: a desk intent with no till session and an
+  attested attempt on an Other payment-method account, settled through Invoices' `payments.settlement`
+  handler in the same batch. No new `office` channel was needed. Payments' `Part` gains `receivedOn`,
+  so the allocation and the posting carry the day the money arrived rather than the day it was typed.
+- A refund of that payment (Payments' own refund flow) reverses the allocation and reopens the
+  invoice. A payment may be reversed in parts, so `reverses_id` is indexed but not unique.
+- VAT uses Finance's `finance.tax.default-code`; there is no `invoicing.tax.default-code`. A party's
+  own default code is read from `invoicing_parties`, which has no screen yet.
+- Issue posts kind `transfer`, purpose `invoice`: Dr Debtors the gross; Cr each line's income account
+  its net with its VAT code and VAT; Cr Finance's output VAT account the VAT.
+- Lines post to Invoices' own income accounts (`accountsOf('invoicing', 'income')`); choosing any
+  income account in the ledger waits for Finance to offer one list for every module.
+- The treasurer's role template gains `invoicing.invoice.issue` and `invoicing.payment.record`.
+- Not yet: the PDF, sending, the public pay page, reminders, debtors and the over-payment give-back
+  (slice 2), and bills, credit notes and write-offs after it.

@@ -13,6 +13,8 @@ export interface Part {
   record: string
   amountMinor: number
   currency: string
+  /** For money recorded as received away from the desk (P-A2), the day it arrived, theatre-local. */
+  receivedOn?: string
   /**
    * For a till sale split between people by item: who paid for which of this part's summary lines
    * (by index, and by the line's `key` where the panel gave one), with the address each person gave
