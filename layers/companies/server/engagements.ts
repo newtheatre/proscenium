@@ -18,6 +18,7 @@ export interface Engagement {
   seasonId: string | null
   title: string
   state: EngagementState
+  currency: string
 }
 
 export const engagementInput = z.object({
@@ -33,7 +34,7 @@ export const moveInput = z.object({ reason: z.string().trim().min(1).max(LIMITS.
 export type MoveRequest = z.infer<typeof moveInput> & { move: Move }
 
 const COLUMNS = `e.id, e.company_id AS companyId, c.name AS companyName, coalesce(c.public_name, c.name) AS companyPublicName, e.kind, e.production_id AS productionId,
-  e.season_id AS seasonId, e.title, e.state`
+  e.season_id AS seasonId, e.title, e.state, e.currency`
 
 export async function requireEngagement(id: string): Promise<Engagement> {
   const engagement = await first<Engagement>(`SELECT ${COLUMNS} FROM companies_engagements e JOIN companies_companies c ON c.id = e.company_id WHERE e.id = ?`, id)

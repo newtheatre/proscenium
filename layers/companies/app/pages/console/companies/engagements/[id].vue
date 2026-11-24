@@ -49,11 +49,11 @@ const summary = computed(() => {
     { label: t('companies.field.dates'), value: when(e) },
   ]
 })
-const tabs = computed(() => [{ id: 'overview', label: t('companies.tabs.overview') }, { id: 'history', label: t('companies.tabs.history') }])
+const tabs = computed(() => [{ id: 'overview', label: t('companies.tabs.overview') }, { id: 'agreement', label: t('companies.tabs.agreement') }, { id: 'history', label: t('companies.tabs.history') }])
 const historyItems = computed(() => (engagement.value?.history ?? []).map(h => ({
   value: h.id,
   date: dates.dateTime(h.at),
-  title: t(`companies.history.${h.kind}`, { to: h.toState ? t(`companies.states.${h.toState}`) : '' }),
+  title: t(`companies.history.${h.kind}`, { to: h.toState ? t(h.kind === 'agreement-answered' ? `companies.agreements.states.${h.toState}` : `companies.states.${h.toState}`) : '' }),
   description: h.actor ?? undefined,
 })))
 function linked(title: string) {
@@ -103,6 +103,14 @@ function cancelled() {
             :description="t(`companies.engagements.next.${engagement.state}`)"
           />
         </div>
+      </template>
+      <template #tab-agreement>
+        <CompaniesAgreementTab
+          :engagement-id="engagement.id"
+          :currency="engagement.currency"
+          :closed="['cancelled', 'settled'].includes(engagement.state)"
+          @changed="refresh()"
+        />
       </template>
       <template #tab-history>
         <UTimeline

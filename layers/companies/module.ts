@@ -49,6 +49,9 @@ export default defineModule({
     'engagement.view': ability({ on: 'companies.engagement', implies: ['company.view'] }),
     'engagement.manage': ability({ on: 'companies.engagement', implies: ['engagement.view'] }),
     'allocation.manage': ability({ on: 'companies.engagement', implies: ['engagement.view'] }),
+    'agreement.manage': ability({ on: 'companies.engagement', implies: ['engagement.view'] }),
+    'agreement.record': ability({ on: 'companies.agreement', owner: 'refuses', implies: ['agreement.manage'] }),
+    'agreement.answer': ability({ on: 'companies.engagement', implies: ['engagement.view-own'] }),
     'settlement.view': ability({ on: 'companies.engagement', implies: ['engagement.view'] }),
     'settlement.approve': ability({ on: 'companies.settlement', risk: 'privileged', owner: 'refuses', implies: ['settlement.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
@@ -60,7 +63,7 @@ export default defineModule({
   facts: defineFacts('companies', {
     'contact-of': factDecl({
       on: 'companies.engagement',
-      defaults: ['companies.engagement.view-own', 'companies.guest.name'],
+      defaults: ['companies.engagement.view-own', 'companies.guest.name', 'companies.agreement.answer'],
     }),
   }),
 
@@ -126,10 +129,25 @@ export default defineModule({
           body: '{{ by }} at {{ theatre }} has added you as a contact for **{{ company }}**.\n\nYou will see the company\'s dates, agreements, guest places and settlements under Your companies, and be asked when something needs you.\n\n[Open Your companies]({{ link }})\n\nThere is no password: the link signs you in, once, and works until you first sign in. After that, sign in with this email address.',
         },
       },
+    }, {
+      // A2: a version sent to the contacts set to receive agreements.
+      id: 'companies.agreement-sent',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      variables: { company: 'text' as const, title: 'text' as const, version: 'text' as const },
+      link: '/account/companies',
+      wording: {
+        'en-GB': {
+          subject: 'An agreement for {{ title }} is waiting for your answer',
+          body: '{{ theatre }} has sent **{{ company }}** the terms for **{{ title }}** (version {{ version }}).\n\nRead them and accept or decline them under Your companies. Nothing is settled until you answer.\n\n[Open Your companies]({{ link }})',
+        },
+      },
     }],
     'core.record-resolver': [
       { id: 'companies.company', file: 'company' },
       { id: 'companies.engagement', file: 'engagement' },
+      { id: 'companies.agreement', file: 'agreement' },
       { id: 'companies.settlement', file: 'settlement' },
     ],
   },

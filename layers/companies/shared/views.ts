@@ -82,6 +82,7 @@ export interface EngagementDetail {
   kind: EngagementKind
   state: EngagementState
   cancelReason: string | null
+  currency: string
   productionId: string | null
   production: string | null
   seasonId: string | null
@@ -92,4 +93,28 @@ export interface EngagementDetail {
   lastDate: number | null
   canManage: boolean
   history: { id: string, kind: string, fromState: EngagementState | null, toState: EngagementState | null, at: number, actor: string | null }[]
+}
+
+/** One version of an engagement's agreement as the screens show it; durations in seconds. */
+export interface AgreementVersion {
+  id: string
+  version: number
+  dealType: 'split' | 'guarantee' | 'guarantee-or-split' | 'hire' | 'none'
+  companyShareBp: number | null
+  shareBasis: 'net-of-fees' | 'gross' | null
+  guaranteeMinor: number | null
+  hireFeeMinor: number | null
+  hireFeeBasis: 'flat' | 'per-performance' | 'per-hour' | null
+  depositMinor: number
+  guestPlaces: number
+  guestNamesDue: number
+  settleWithin: number
+  clauses: string | null
+  state: 'draft' | 'sent' | 'accepted' | 'declined' | 'superseded' | 'withdrawn'
+  sentAt: number | null
+  createdAt: number
+  answer: 'accepted' | 'declined' | null
+  answeredAt: number | null
+  onPaper: boolean
+  responder: string | null
 }

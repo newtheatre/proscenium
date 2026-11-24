@@ -66,7 +66,7 @@ export async function listEngagements(): Promise<EngagementListRow[]> {
 
 /** One engagement for its staff page: the outline, the production, and its history newest first. */
 export async function engagementDetail(actor: Actor, id: string): Promise<EngagementDetail> {
-  const engagement = await first<Omit<EngagementDetail, 'history' | 'canManage'>>(`SELECT e.id, e.title, e.kind, e.state, e.cancel_reason AS cancelReason,
+  const engagement = await first<Omit<EngagementDetail, 'history' | 'canManage'>>(`SELECT e.id, e.title, e.kind, e.state, e.cancel_reason AS cancelReason, e.currency,
       e.production_id AS productionId, p.title AS production, e.season_id AS seasonId, c.id AS companyId, c.name AS company, e.created_at AS createdAt,
       (SELECT min(pf.starts_at) FROM core_performances pf WHERE pf.production_id = e.production_id) AS firstDate,
       (SELECT max(pf.starts_at) FROM core_performances pf WHERE pf.production_id = e.production_id) AS lastDate
@@ -79,4 +79,10 @@ export async function engagementDetail(actor: Actor, id: string): Promise<Engage
       FROM companies_engagement_events v WHERE v.engagement_id = ? ORDER BY v.at DESC, v.id DESC`, id),
   ])
   return { ...engagement!, canManage, history }
+}
+
+/** A company's live contacts by name, for picking who answered on paper. */
+export async function liveContactNames(companyId: string): Promise<{ accountId: string, name: string }[]> {
+  return all(`SELECT k.account_id AS accountId, ${PERSON} AS name FROM companies_contacts k JOIN core_accounts a ON a.id = k.account_id
+    WHERE k.company_id = ? AND k.ended_at IS NULL ORDER BY k.is_primary DESC, name COLLATE NOCASE`, companyId)
 }

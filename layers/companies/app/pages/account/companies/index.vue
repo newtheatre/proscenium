@@ -37,6 +37,14 @@ const { stateBadge } = useCompanyWords()
         >
           <template #actions>
             <StatusBadge v-bind="stateBadge(e.state)" />
+            <UButton
+              :label="t('companies.mine.open')"
+              :to="`/account/companies/${e.id}`"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              trailing-icon="i-lucide-chevron-right"
+            />
           </template>
           <ul
             v-if="e.toDo.length"
