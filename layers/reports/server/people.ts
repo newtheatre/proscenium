@@ -11,6 +11,7 @@ import { keyName, runById, type Headline, type RunQuestion, type RunRow, type Un
 import type { FigureColumn, ReportView } from '../shared/reports'
 import type { Shown } from '../shared/table'
 import type { PeopleRow, PeopleTable } from '../shared/people'
+import { personRows } from './db/schema'
 
 const OWNER = 'reports.run'
 export const PEOPLE_MAX = 6 // not-policy: rule P8, figures side by side
@@ -108,15 +109,8 @@ export async function keepPeople(unit: UnitView, actor: Actor, reportId: string,
     sql: "INSERT INTO reports_runs (id, definition_id, question, requested_by, state, rows_count, unavailable, headline, started_at, finished_at, created_at) VALUES (?, ?, ?, ?, 'done', ?, ?, ?, ?, ?, ?)",
     params: [id, view.id, JSON.stringify(question), actor.accountId!, new Set(table.rows.map(r => r.person)).size, JSON.stringify(table.unavailable), JSON.stringify(headline), at, at, at],
   })
-  for (const row of table.rows) {
-    row.values.forEach((value, i) => {
-      if (value === null) return
-      unit.add({
-        sql: 'INSERT INTO reports_person_rows (id, run_id, account_id, measure, breakdown_value, value) VALUES (?, ?, ?, ?, ?, ?)',
-        params: [newId('rpe'), id, row.person, table.columns[i]!.id, row.key ?? null, value],
-      })
-    })
-  }
+  const kept = table.rows.flatMap(row => row.values.flatMap((value, i) => value === null ? [] : [{ id: newId('rpe'), runId: id, accountId: row.person, measure: table.columns[i]!.id, breakdownValue: row.key ?? null, value }]))
+  if (kept.length) unit.insertSet(personRows, kept)
   unit.audit({ action: 'create', ability: 'reports.people.view', record: [OWNER, id], detail: { report: view.id, people: new Set(table.rows.map(r => r.person)).size } })
   return { id }
 }
