@@ -189,7 +189,12 @@ async function tellClaimant(unit: UnitView, claim: Claim, told: { decision: stri
 }
 
 /** Sends a claim back to its claimant to change (BC-23), or declines it; either way with a note they see. */
-export async function reject(unit: UnitView, actor: Actor, claim: Claim, input: { version: number, note: string, decline: boolean }): Promise<void> {
+/** Sends a claim back to its claimant to change. */
+export const sendBack = (unit: UnitView, actor: Actor, claim: Claim, input: { version: number, note: string }) => reject(unit, actor, claim, { ...input, decline: false })
+/** Declines a claim; nothing is posted. */
+export const decline = (unit: UnitView, actor: Actor, claim: Claim, input: { version: number, note: string }) => reject(unit, actor, claim, { ...input, decline: true })
+
+async function reject(unit: UnitView, actor: Actor, claim: Claim, input: { version: number, note: string, decline: boolean }): Promise<void> {
   submitted(claim)
   await notOwn(actor, claim)
   await requireApprover(actor, claim, await itemsOf(claim.id))

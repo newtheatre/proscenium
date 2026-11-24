@@ -9,12 +9,10 @@ interface OfferedLine { id: string, name: string, budgetId: string, budgetName: 
 interface Category { id: string, name: string, description: string }
 type NoteKind = 'return' | 'decline' | 'void'
 
-const route = useRoute()
-const id = computed(() => String(route.params.id))
 const { t } = useT()
 const { day } = useDates()
 const text = useBudgetText()
-const { data, status, error, refresh, act, title } = await useClaim(id)
+const { data, status, error, refresh, act, title } = await useClaim()
 const { data: choices } = await useAPI<{ lines: OfferedLine[], categories: Category[] }>('/api/budgets/claims/choices', { key: 'budgets:claim-choices' })
 
 const yours = computed(() => new Set(data.value?.review?.yours ?? []))

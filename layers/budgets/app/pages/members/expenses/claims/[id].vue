@@ -8,12 +8,10 @@ import type { ClaimItem } from '../../../../composables/useClaim'
 interface OfferedLine { id: string, name: string, budgetId: string, budgetName: string, currency: string }
 interface Category { id: string, name: string, description: string }
 
-const route = useRoute()
-const id = computed(() => String(route.params.id))
 const { t } = useT()
 const { day } = useDates()
 const text = useBudgetText()
-const { data, status, error, refresh, act, title } = await useClaim(id)
+const { id, data, status, error, refresh, act, title } = await useClaim()
 const { data: choices } = await useAPI<{ lines: OfferedLine[], categories: Category[] }>('/api/budgets/expenses', { key: 'budgets:expenses' })
 
 const editable = computed(() => !!data.value && data.value.mine && ['draft', 'returned'].includes(data.value.claim.state))

@@ -29,7 +29,10 @@ export interface ClaimView {
   canVoid: boolean
 }
 
-export async function useClaim(id: Ref<string>) {
+/** The claim the page's address names. */
+export async function useClaim() {
+  const route = useRoute()
+  const id = computed(() => String(route.params.id))
   const { t } = useT()
   const { $api } = useNuxtApp()
   const { toRefusal } = useRefusal()
@@ -56,5 +59,5 @@ export async function useClaim(id: Ref<string>) {
     const c = request.data.value?.claim
     return c ? (c.number ? t('budgets.screens.claims.numbered', { number: c.number, title: c.title }) : c.title) : ''
   })
-  return { ...request, act, title }
+  return { ...request, id, act, title }
 }
