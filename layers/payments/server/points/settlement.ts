@@ -43,6 +43,8 @@ export interface OwnerEntry {
   amountMinor: number
   productionId?: string | null
   performanceId?: string | null
+  /** The amount includes VAT at this Finance tax code, as a till price does; Payments splits it out (FIN-07). */
+  taxCode?: string
 }
 
 export interface Settlement {

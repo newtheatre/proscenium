@@ -94,6 +94,11 @@ export interface ModuleManifest {
   /** false: has its own layer and id but is always on. */
   switchable?: boolean
   /**
+   * true: a support module (C-65). It has no switch: it is on while any module that is on requires
+   * it, and off otherwise. Its migrations run like any module's.
+   */
+  support?: boolean
+  /**
    * true: a new site starts with it on. First-run setup switches it on, unless someone has already
    * switched it either way, and the module may treat itself as on before then (maintenance mode,
    * so a new site is closed until its Owner opens it).
@@ -158,7 +163,7 @@ const SIGNING_MIN = 86_400 // not-policy: a signing key lives at least a day, in
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*'
 const kebab = new RegExp(`^${KEBAB}$`)
 const SEMVER = /^\d+\.\d+\.\d+(-[0-9a-z.-]+)?$/
-const FIELDS = new Set(['id', 'manifest', 'since', 'stability', 'switchable', 'onAtSetup', 'requires', 'uses', 'settings', 'settingRules', 'settingGroups', 'settingPages', 'settingsIn', 'abilities', 'facts', 'records', 'tables', 'events', 'jobs', 'tasks', 'calls', 'points', 'contributes', 'secrets', 'credentials', 'signing', 'presets'])
+const FIELDS = new Set(['id', 'manifest', 'since', 'stability', 'switchable', 'support', 'onAtSetup', 'requires', 'uses', 'settings', 'settingRules', 'settingGroups', 'settingPages', 'settingsIn', 'abilities', 'facts', 'records', 'tables', 'events', 'jobs', 'tasks', 'calls', 'points', 'contributes', 'secrets', 'credentials', 'signing', 'presets'])
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 export function snake(id: string): string {
@@ -176,6 +181,9 @@ export function validateManifest(m: ModuleManifest): void {
   if (m.switchable !== undefined && typeof m.switchable !== 'boolean') throw new DeclarationError('switchable', 'is true or false')
   if (m.onAtSetup !== undefined && typeof m.onAtSetup !== 'boolean') throw new DeclarationError('onAtSetup', 'is true or false')
   if (m.onAtSetup && m.switchable === false) throw new DeclarationError('onAtSetup', 'is for a module that can be switched; one that cannot is always on')
+  if (m.support !== undefined && typeof m.support !== 'boolean') throw new DeclarationError('support', 'is true or false')
+  if (m.support && m.switchable === false) throw new DeclarationError('support', 'a support module is on while a module needing it is on; one that cannot be switched is always on, so it is not both')
+  if (m.support && m.onAtSetup) throw new DeclarationError('onAtSetup', 'a support module has no switch; it comes on with the modules that require it')
   const id = m.id
   const own = (kind: string, rest: string) => new RegExp(`^${escape(id)}\\.${rest}$`)
 

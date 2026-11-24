@@ -90,9 +90,19 @@ function startAdding(s: Shift) {
   refusal.value = null
 }
 async function add() {
-  const ok = await act(shiftPath(adding.value!, '/assign'), { accountId: person.value, ...(needsOverride.value ? { override: true } : {}) }, t('front-of-house.rota.added'))
-  if (ok) adding.value = null
-  else needsOverride.value = refusal.value?.code === 'front-of-house.not-eligible'
+  refusal.value = null
+  try {
+    const done = await write<{ crewQuestions: { name: string } | null }>(shiftPath(adding.value!, '/assign'), { method: 'POST', body: { accountId: person.value, ...(needsOverride.value ? { override: true } : {}) } })
+    toast.add({ title: t('front-of-house.rota.added'), color: 'success' })
+    // A crew call's questions come first for volunteers; a manager is only told (CC1).
+    if (done.crewQuestions) toast.add({ title: t('front-of-house.crew-calls.assigned-unanswered', { call: done.crewQuestions.name }), color: 'warning', icon: 'i-lucide-clipboard-list' })
+    adding.value = null
+    await refresh()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+    needsOverride.value = refusal.value?.code === 'front-of-house.not-eligible'
+  }
 }
 
 // Changing a shift: its times, briefing and places, or cancelling it.

@@ -1,7 +1,7 @@
 // FB-208 (1): each shipped template is in the format and passes the problems list with no error.
 // FB-510: so is each template another module ships through forms.template, wherever it is written.
 import { describe, expect, it } from 'vitest'
-import { checkDefinition, parseDefinition } from '../../shared/engine'
+import { checkDefinition, parseDefinition, questionsOf, totalPoints } from '../../shared/engine'
 import { SHIPPED_TEMPLATES, templateFaults } from '../../shared/templates'
 
 describe('shipped templates', () => {
@@ -31,5 +31,21 @@ describe('contributed templates', () => {
     const unlabelled = structuredClone(def)
     ;(unlabelled.pages[0]!.items[0] as { label: string }).label = ''
     expect(templateFaults({ key: 'awards.x', name: 'x', description: 'y', mode: 'record', definition: unlabelled }, 'awards')).toEqual(['definition: no-label at overall'])
+  })
+})
+
+// FB-515: a quiz to start from, and the sign-up a crew call asks (FH-49).
+describe('the quiz and crew templates', () => {
+  const of = (key: string) => SHIPPED_TEMPLATES.find(t => t.key === key)!.definition
+  it('ships a quiz with correct answers, points, a pass mark it can reach and its score and feedback shown', () => {
+    const quiz = of('forms.quiz')
+    expect(totalPoints(quiz)).toBeGreaterThanOrEqual(quiz.marking!.passMark!)
+    expect(quiz.marking!.show).toBe('score-and-feedback')
+    expect(quiz.pages).toHaveLength(1)
+    expect(questionsOf(quiz).every(({ question }) => question.answer)).toBe(true)
+  })
+  it('ships a crew sign-up whose dietary needs are special category', () => {
+    const crew = of('forms.crew-sign-up')
+    expect(questionsOf(crew).map(({ question }) => [question.key, question.dataClass])).toEqual([['t_shirt', 'personal'], ['meal_days', 'personal'], ['dietary', 'special']])
   })
 })

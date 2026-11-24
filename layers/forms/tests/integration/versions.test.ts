@@ -1,7 +1,7 @@
 // Version history (screen 9): every published version stays readable as it was, with what changed
 // and how many responses it took, and an earlier one can be made the draft again.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { person } from '../../../../tests/integration/helpers'
+import { person, rows } from '../../../../tests/integration/helpers'
 import { account, definition, offered, publish, question, ready, req, save, send } from './stage'
 
 const member = person([], { name: 'Mo Member' })
@@ -34,5 +34,20 @@ describe('version history', () => {
     const after = await req('GET', `/api/forms/forms/${formId}`)
     expect(after.body.draft.definition.pages[0].items).toHaveLength(1)
     expect(after.body.form.liveVersion).toBe(2)
+  })
+})
+
+describe('publishing a long form', () => {
+  it('records every question in a fixed number of statements, however many there are', async () => {
+    const many = Array.from({ length: 120 }, (_, i) => question(`q${i}`)) // not-policy: more questions than the statement limit
+    const { formId } = await offered(definition(...many))
+    const fields = () => rows<{ id: string, retired: number | null }>('SELECT question_id AS id, retired_in_version AS retired FROM forms_fields WHERE form_id = ? ORDER BY question_id', formId)
+    expect((await fields()).filter(f => f.retired === null)).toHaveLength(120)
+
+    const fewer = await publish(formId, definition(...many.slice(0, 10)), { confirm: true })
+    expect(fewer.status, JSON.stringify(fewer.body)).toBe(200)
+    const after = await fields()
+    expect(after.filter(f => f.retired === null)).toHaveLength(10)
+    expect(after.filter(f => f.retired === 2)).toHaveLength(110)
   })
 })

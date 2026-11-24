@@ -26,6 +26,7 @@ interface ShiftView {
   mine: { assignmentId: string, state: string, calendar: string, freeRelease: boolean } | null
   clash: { shiftId: string, dutyName: string, productionTitle: string | null, title: string | null, callAt: number, endsAt: number } | null
   coverFor: string | null
+  questionsFirst: { crewCallId: string, name: string } | null
 }
 
 const { t } = useT()
@@ -91,7 +92,7 @@ async function giveUp() {
   await act(`/api/front-of-house/assignments/${encodeURIComponent(s.mine!.assignmentId)}/release`, {}, t(free ? 'front-of-house.shift.give-up.done' : 'front-of-house.shift.give-up.asked'))
 }
 
-type Action = { label: string, icon: string, run?: () => Promise<void>, href?: string, disabled?: boolean }
+type Action = { label: string, icon: string, run?: () => Promise<void>, href?: string, to?: string, disabled?: boolean }
 const LIVE = ['confirmed', 'release_requested', 'checked_in']
 // The one main action. Giving up is never it: that is the quieter button beside the details.
 const primary = computed<Action | null>(() => {
@@ -107,7 +108,11 @@ const primary = computed<Action | null>(() => {
     return { label: t('front-of-house.shift.add-to-calendar'), icon: 'i-lucide-calendar-plus', href: mine.calendar }
   if (!mine && s.coverFor)
     return { label: t('front-of-house.shift.take-cover'), icon: 'i-lucide-hand-helping', disabled: !!s.clash, run: () => act(`/api/front-of-house/assignments/${encodeURIComponent(s.coverFor!)}/cover`, {}, t('front-of-house.shift.taken')) }
-  if (!mine && s.placesTaken < s.places && s.signUpClosesAt !== null && s.signUpClosesAt > now.value)
+  const open = !mine && s.placesTaken < s.places && s.signUpClosesAt !== null && s.signUpClosesAt > now.value
+  // A crew call's questions come before its shifts (CC1): the way to them takes sign-up's place.
+  if (open && s.questionsFirst)
+    return { label: t('front-of-house.crew-calls.answer-first'), icon: 'i-lucide-clipboard-list', to: `/members/front-of-house/crew-calls/${encodeURIComponent(s.questionsFirst.crewCallId)}` }
+  if (open)
     return { label: t('front-of-house.shift.sign-up'), icon: 'i-lucide-calendar-plus', disabled: !!s.clash, run: () => act(`/api/front-of-house/shifts/${encodeURIComponent(s.id)}/sign-up`, {}, t('front-of-house.shift.signed-up')) }
   return null
 })
@@ -178,6 +183,12 @@ const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label
             download
           />
           <UButton
+            v-else-if="primary?.to"
+            :icon="primary.icon"
+            :label="primary.label"
+            :to="primary.to"
+          />
+          <UButton
             v-else-if="primary"
             :icon="primary.icon"
             :label="primary.label"
@@ -188,6 +199,13 @@ const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label
         </template>
         <div class="space-y-6">
           <RefusalNotice :refusal="refusal" />
+          <UAlert
+            v-if="s.questionsFirst && !s.mine"
+            color="info"
+            variant="subtle"
+            icon="i-lucide-clipboard-list"
+            :title="t('front-of-house.crew-calls.questions-first', { call: s.questionsFirst.name })"
+          />
           <p
             v-if="clashName && !s.mine"
             class="text-sm text-muted"

@@ -12,6 +12,7 @@ const MIXER_PRICING = ['included', 'fixed', 'own_price'] as const satisfies type
 const name = z.string().trim().min(1).max(80) // not-policy: a name's bounds
 const amount = z.number().int().min(0).max(1_000_000) // not-policy: a bound on a typed price
 const id = z.string().min(1).max(64) // not-policy: an id's length
+const taxCode = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/) // not-policy: a Finance tax code's shape
 // A named colour token from the theme, never a hex value.
 export const COLOURS = ['primary', 'secondary', 'success', 'info', 'warning', 'error', 'neutral'] as const
 
@@ -25,10 +26,12 @@ export const productInput = z.object({
   name,
   // null: as the category.
   ageRestricted: z.boolean().nullable().optional(),
+  // null: the theatre's usual code (BAR-60).
+  taxCode: taxCode.nullable().optional(),
   variantName: z.string().trim().max(80).optional(), // not-policy: a name's bound
   amountMinor: amount.nullable().optional(),
 }).strict()
-export const productPatch = z.object({ categoryId: id, name, ageRestricted: z.boolean().nullable(), active: z.boolean() }).partial().strict()
+export const productPatch = z.object({ categoryId: id, name, ageRestricted: z.boolean().nullable(), taxCode: taxCode.nullable(), active: z.boolean() }).partial().strict()
 
 export const variantInput = z.object({ name, barcode: z.string().trim().min(1).max(64).nullable().optional(), amountMinor: amount.nullable().optional() }).strict() // not-policy: a barcode's bound
 export const variantPatch = z.object({ name, barcode: z.string().trim().min(1).max(64).nullable(), active: z.boolean() }).partial().strict() // not-policy: a barcode's bound

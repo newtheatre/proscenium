@@ -46,5 +46,11 @@
   "payments.report.sessions-not-closed": "Till sessions not yet closed",
   "payments.report.expected": "Cash expected",
   "payments.report.counted": "Cash counted",
-  "payments.report.difference": "Difference"
+  "payments.report.difference": "Difference",
+  "payments.settings-sections.payees": "Bank details",
+  "payments.settings.payees.keep-for.label": "Clear bank details unused for",
+  "payments.settings.payees.keep-for.help": "Bank details nobody has been paid with for this long are cleared, counted from the last payment to them or, if never paid, from when they were given. Payments already made keep their record.",
+  "payments.abilities.disbursement.record.label": "Record payments the theatre makes",
+  "payments.abilities.payee.read.label": "See full bank details to make a payment",
+  "payments.abilities.payee.manage.label": "Save bank details for people and companies"
 }
