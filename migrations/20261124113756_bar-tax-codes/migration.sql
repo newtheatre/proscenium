@@ -1,0 +1,1 @@
+ALTER TABLE `bar_products` ADD `tax_code` text;
