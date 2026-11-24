@@ -13,8 +13,10 @@ export default defineModule({
   contributes: {
     'payments.settlement': [{ id: 'snacks' }],
     'payments.desk-basket': [{ id: 'snacks' }],
+    'payments.disbursement': [{ id: 'snacks' }],
     'finance.system-account': [
       { id: 'income', name: 'Snack income', kind: 'income' },
+      { id: 'payable', name: 'Snack bills to pay', kind: 'liability' },
     ],
   },
 })

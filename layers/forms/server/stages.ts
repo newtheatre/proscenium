@@ -5,14 +5,14 @@
 // together, and a second person making a move at the same moment is refused.
 import { all, can, newId, refuse, today, type Actor, type UnitView } from '#kit'
 import type { Answers, Definition, Stage, Transition } from '../shared/engine'
-import { evaluate, hasStages, isDecision, resubmitMove, staffMoves, stageOf, statusOf, workflowOf } from '../shared/engine'
+import { evaluate, hasStages, isDecision, mark, resubmitMove, staffMoves, stageOf, statusOf, workflowOf } from '../shared/engine'
 import { answers as answersTable } from './db/schema'
 import type { FormRow } from './forms'
 import { queueActions } from './actions'
 import { tellMoved } from './notices'
 import { closeRounds, conflicted, namedIn, openRound } from './review'
 import { attachFileAnswers, refuseFileProblems, settleFileAnswers } from './files'
-import { answerRows, owns, recordMove, refuseInvalid, retentionFrom, type ResponseRow } from './responses'
+import { answerRows, markingColumns, owns, recordMove, refuseInvalid, retentionFrom, type ResponseRow } from './responses'
 
 const CONFLICT = 409 // not-policy: HTTP status
 
@@ -32,7 +32,7 @@ export async function movesFor(def: Definition, response: ResponseRow, actor: Ac
   return staffMoves(def, response.stageKey, await mayDecide(actor, response.formId))
 }
 
-async function apply(unit: UnitView, input: { form: FormRow, response: ResponseRow, def: Definition, move: Transition, actorId: string | null, at: number, note: string | null, reason?: string | null, revision: number, calculated?: string | null, answers?: Answers }): Promise<Stage> {
+async function apply(unit: UnitView, input: { form: FormRow, response: ResponseRow, def: Definition, move: Transition, actorId: string | null, at: number, note: string | null, reason?: string | null, revision: number, calculated?: string | null, marking?: [number | null, number | null, boolean | null], answers?: Answers }): Promise<Stage> {
   const to = stageOf(input.def, input.move.to)
   if (!to) return refuse('forms.stage.unknown', 'This move leads to a stage the form does not have.', { status: CONFLICT })
   const resend = input.revision !== input.response.currentRevision
@@ -40,8 +40,8 @@ async function apply(unit: UnitView, input: { form: FormRow, response: ResponseR
   // Every move clears the emailed link for changes (R-19): a new return issues a new one, and the person's own move spends it.
   const decision = isDecision(input.def, input.move)
   unit.add({
-    sql: `UPDATE forms_responses SET stage_key = ?2, stage_kind = ?3, stage_note = ?4, current_revision = ?5, updated_at = ?6, retention_due_at = ?7, decided_at = ?10, decision_reason = ?11, change_token_hash = NULL, change_token_expires_at = NULL${resend ? ', calculated = ?12' : ''} WHERE id = ?1 AND state = 'submitted' AND stage_key IS ?8 AND current_revision = ?9`, // not-policy: numbered parameters
-    params: [input.response.id, to.key, to.kind, input.note, input.revision, input.at, retentionFrom(input.form, to.kind, input.at), input.response.stageKey, input.response.currentRevision, decision ? input.at : null, decision ? input.reason ?? null : null, ...(resend ? [input.calculated ?? null] : [])],
+    sql: `UPDATE forms_responses SET stage_key = ?2, stage_kind = ?3, stage_note = ?4, current_revision = ?5, updated_at = ?6, retention_due_at = ?7, decided_at = ?10, decision_reason = ?11, change_token_hash = NULL, change_token_expires_at = NULL${resend ? ', calculated = ?12, score = ?13, out_of = ?14, passed = ?15' : ''} WHERE id = ?1 AND state = 'submitted' AND stage_key IS ?8 AND current_revision = ?9`, // not-policy: numbered parameters
+    params: [input.response.id, to.key, to.kind, input.note, input.revision, input.at, retentionFrom(input.form, to.kind, input.at), input.response.stageKey, input.response.currentRevision, decision ? input.at : null, decision ? input.reason ?? null : null, ...(resend ? [input.calculated ?? null, ...(input.marking ?? [null, null, null])] : [])],
   }).expect(1, { code: 'forms.stage.moved', reason: 'This response has just been moved by somebody else.', remedy: 'Open it again to see where it is now.' })
   recordMove(unit, { responseId: input.response.id, from: input.response.stageKey, to, transitionKey: input.move.key, revision: input.revision, actorId: input.actorId, at: input.at })
   // What staff wrote with the move is kept beside the history, for staff: the person stops seeing it once the response moves on.
@@ -90,7 +90,8 @@ export async function resubmit(unit: UnitView, input: { form: FormRow, response:
   refuseInvalid(evaluation)
   const revision = input.response.currentRevision + 1
   const calculated = Object.keys(evaluation.calculated).length ? JSON.stringify(evaluation.calculated) : null
-  const to = await apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: null, revision, calculated, answers: evaluation.answers })
+  // MK5: changed answers are marked again; the earlier score stays readable from the earlier revision.
+  const to = await apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: null, revision, calculated, marking: markingColumns(mark(input.def, evaluation)), answers: evaluation.answers })
   const rows = await answerRows(input.def, evaluation.answers, input.response.id, revision)
   if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
   attachFileAnswers(unit, input.response.id, fileIds, input.at)
@@ -167,9 +168,10 @@ export async function amend(unit: UnitView, input: { form: FormRow, response: Re
   refuseInvalid(evaluation)
   const revision = input.response.currentRevision + 1
   const calculated = Object.keys(evaluation.calculated).length ? JSON.stringify(evaluation.calculated) : null
+  const [score, outOf, passed] = markingColumns(mark(input.def, evaluation))
   unit.add({
-    sql: 'UPDATE forms_responses SET current_revision = ?2, calculated = ?3, updated_at = ?4 WHERE id = ?1 AND state = \'submitted\' AND current_revision = ?5 AND stage_key IS ?6',
-    params: [input.response.id, revision, calculated, input.at, input.response.currentRevision, input.response.stageKey],
+    sql: 'UPDATE forms_responses SET current_revision = ?2, calculated = ?3, score = ?7, out_of = ?8, passed = ?9, updated_at = ?4 WHERE id = ?1 AND state = \'submitted\' AND current_revision = ?5 AND stage_key IS ?6',
+    params: [input.response.id, revision, calculated, input.at, input.response.currentRevision, input.response.stageKey, score, outOf, passed],
   }).expect(1, { code: 'forms.stage.moved', reason: 'This response has just been moved by somebody else.', remedy: 'Open it again to see where it is now.' })
   const rows = await answerRows(input.def, evaluation.answers, input.response.id, revision)
   if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
