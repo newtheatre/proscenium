@@ -21,6 +21,7 @@
   "forms.abilities.form.create.label": "Start a new form",
   "forms.abilities.form.edit.label": "Build and edit a form",
   "forms.abilities.form.publish.label": "Publish a form",
+  "forms.abilities.form.mark.label": "Set a form's correct answers, points and pass mark",
   "forms.abilities.settings.manage.label": "Change the forms settings",
   "forms.abilities.template.manage.label": "Save and remove form templates",
   "forms.settings.limits.response-size.label": "Largest response, in kilobytes",
