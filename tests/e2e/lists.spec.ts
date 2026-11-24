@@ -10,7 +10,13 @@ async function visit(page: Page, url: string) {
   await page.goto(url)
   await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
 }
-const noViolations = async (page: Page) => expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations.map(v => v.id)).toEqual([])
+async function noViolations(page: Page) {
+  // A menu still opening or closing is not what the page settles to.
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter(a => a.effect?.getComputedTiming().iterations !== Infinity)
+    .map(a => a.finished.catch(() => null))))
+  expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations.map(v => v.id)).toEqual([])
+}
 
 test.describe('a list with views and rows that open', () => {
   test.use({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(staff) } })
