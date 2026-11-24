@@ -7,6 +7,7 @@ import { postEntries, type EntryInput } from '#modules/finance'
 import { addAttempt } from './answers'
 import { createIntent, settlements } from './intents'
 import { clearingFor, methodsFor } from './providers'
+import { ownerEntries } from './owner-entries'
 
 export interface OutsideInput {
   owner: { module: string, record: string }
@@ -56,7 +57,7 @@ export async function recordTakenOutside(unit: UnitView, input: OutsideInput): P
   const own = await handler.kept(unit, part)
   const total = own.reduce((sum, e) => sum + e.amountMinor, 0)
   if (total !== -input.amountMinor) throw new Refusal('payments.settlement.part-mismatch', `${input.owner.module}'s entries for this payment total ${-total}, not ${input.amountMinor}.`, { status: 500 })
-  const entries: EntryInput[] = own.map(e => ({ account: e.account, amountMinor: e.amountMinor, forModule: input.owner.module, productionId: e.productionId ?? null, performanceId: e.performanceId ?? null }))
+  const entries: EntryInput[] = await ownerEntries(own, input.owner.module)
   await postEntries(unit, {
     key: `payments:intent:${intentId}:paid`,
     source: { module: 'payments', type: 'payments.intent', id: intentId },

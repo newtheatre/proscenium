@@ -89,6 +89,8 @@ export default defineModule({
 
   contributes: {
     'core.notification-topic': [{ id: 'training.records', side: 'members' as const, order: 70 }],
+    // Two places on one session after an account merge: the stronger is kept.
+    'core.merge-handler': [{ id: 'training.places', file: 'places' }],
     'core.notification-type': [{
       id: 'training.record-awarded',
       category: 'optional' as const,
