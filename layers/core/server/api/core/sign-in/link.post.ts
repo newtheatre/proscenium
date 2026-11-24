@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { useLink, useLinkHere } from '../../../identity/email-sign-in'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   public: true,
   rateLimit: 'sign-in-network',
   input: z.object({ token: z.string().min(20).max(100), here: z.boolean().optional() }), // not-policy: a link token is 43 characters

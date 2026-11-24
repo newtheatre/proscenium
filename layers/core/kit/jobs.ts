@@ -8,7 +8,7 @@ import { createUnit } from './unit'
 import { isEnabled, enabledModules } from './modules-store'
 import { useSetting } from './settings-store'
 import { nowMs, localDateOf, localParts, instantOfLocal, previousDate } from './clock'
-import { dispatch, type Lane } from './dispatch'
+import { dispatch, setStoreJobRunner, type Lane } from './dispatch'
 import { log } from './log'
 import { isRefusal, Refusal } from './refusal'
 import type { TaskDecl, Weekday } from './manifest'
@@ -115,6 +115,8 @@ export async function runJob(jobId: string): Promise<JobOutcome> {
     return fail(env, row, attempts, message)
   }
 }
+
+setStoreJobRunner(runJob)
 
 /** Puts a job back unrun: nothing it did is kept, the attempt is given back, and it waits longer each time. */
 async function deferWhole(env: KitEnv, row: JobRow, reason: string): Promise<JobOutcome> {
