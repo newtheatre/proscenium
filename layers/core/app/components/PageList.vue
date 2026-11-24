@@ -127,6 +127,8 @@ function onSearch(value: string) {
   timer = setTimeout(() => set({ search: value }, { replace: true }), 300) // not-policy: a typing pause
 }
 onBeforeUnmount(() => clearTimeout(timer))
+// A pause ending after a row's link is followed would replace that navigation with this list's.
+onBeforeRouteLeave(() => clearTimeout(timer))
 
 // One panel holds every filter; a chip for each one that is on says so and opens the panel.
 const panel = ref(false)

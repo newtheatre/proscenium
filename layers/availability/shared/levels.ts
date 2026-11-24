@@ -1,0 +1,23 @@
+// The words a person's availability is made of (spec parts 2 and 3), shared by the server and screens.
+
+export const LEVELS = ['free', 'maybe', 'busy'] as const
+export type Level = typeof LEVELS[number]
+/** What `levels()` answers: a stated level, or unknown where nothing is stated (rule A4). */
+export type ShownLevel = Level | 'unknown'
+export const UNMARKED = ['unknown', 'free'] as const
+export type Unmarked = typeof UNMARKED[number]
+
+export const REQUEST_STATES = ['open', 'closed'] as const
+export const ASKED_STATES = ['asked', 'answered', 'lapsed', 'withdrawn'] as const
+export type AskedState = typeof ASKED_STATES[number]
+
+const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/
+
+/** Minutes past local midnight of an "HH:MM" wall-clock time, "24:00" allowed as an end. */
+export function minutesOf(clock: string): number {
+  if (!HHMM.test(clock)) throw new RangeError(`not a time of day: ${clock}`)
+  return Number(clock.slice(0, 2)) * 60 + Number(clock.slice(3, 5)) // not-policy: minutes in an hour
+}
+
+/** Rule A2: a time sits on the grid step. */
+export const onStep = (clock: string, step: number) => minutesOf(clock) % step === 0

@@ -3,10 +3,12 @@
 import { getRouterParam } from 'h3'
 import { defineRoute, refuse } from '#kit'
 import { currentProductions, publicVenue } from '#modules/core'
+import { sectionsFor } from '../../../shape'
 
 export default defineRoute({ public: true, rateLimit: 'default' }, async (event) => {
   const slug = getRouterParam(event, 'slug', { decode: true }) ?? ''
   const venue = await publicVenue(slug)
   if (!venue) refuse('core.not-found', 'There is nothing here.', { status: 404 })
-  return { venue, productions: await currentProductions({ venue: venue.slug }) }
+  // Other modules' blocks on the page, such as a festival's "In this festival" (C-69).
+  return { venue, productions: await currentProductions({ venue: venue.slug }), sections: await sectionsFor('public-site.venue-section', venue.id) }
 })
