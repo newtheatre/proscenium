@@ -70,6 +70,9 @@ import teachingPeople from '../../server/api/training/teaching/people.get'
 import teachingProgress from '../../server/api/training/teaching/progress.get'
 import consoleCourses from '../../server/api/training/console/courses.get'
 import consolePeople from '../../server/api/training/console/people.get'
+import consoleSessions from '../../server/api/training/console/sessions.get'
+import sessionOptions from '../../server/api/training/console/session-options.get'
+import sessionPeople from '../../server/api/training/sessions/[id]/people.get'
 
 export const training = server({
   'GET /api/training/courses': listCourses,
@@ -138,6 +141,9 @@ export const training = server({
   'GET /api/training/teaching/progress': teachingProgress,
   'GET /api/training/console/courses': consoleCourses,
   'GET /api/training/console/people': consolePeople,
+  'GET /api/training/console/sessions': consoleSessions,
+  'GET /api/training/console/session-options': sessionOptions,
+  'GET /api/training/sessions/:id/people': sessionPeople,
 })
 
 /** 24 November 2026, 10:00 in London. */

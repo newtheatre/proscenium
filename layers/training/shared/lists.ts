@@ -1,7 +1,7 @@
 // Training's declared lists (training-records part 5, "Console"): what a manager can filter, sort and
 // search by. The sources in server/lists bind each key to the table.
 import { defineList } from '#kit/list-declaration'
-import { COURSE_STATES } from './states'
+import { COURSE_STATES, SESSION_STATES } from './states'
 
 /** K1: every course with its state, live version, holders and those lapsing soon. */
 export const coursesList = defineList('training.courses', {
@@ -25,4 +25,33 @@ export const coursesList = defineList('training.courses', {
   },
   defaultView: 'active',
   defaultSort: { key: 'title', order: 'asc' },
+})
+
+/** K3: sessions with their course, places taken of capacity, those waiting and their state. Courses are the page's options. */
+export const sessionsList = defineList('training.sessions', {
+  filters: {
+    course: { kind: 'choice', label: 'Course' },
+    when: { kind: 'choice', label: 'When', options: [{ value: 'upcoming', label: 'upcoming' }, { value: 'unmarked', label: 'unmarked' }, { value: 'past', label: 'past' }] },
+    status: { kind: 'choices', label: 'State', options: SESSION_STATES.map(value => ({ value, label: value })) },
+  },
+  sorts: {
+    starts: { label: 'Starts', type: 'date', natural: 'asc' },
+  },
+  columns: {
+    starts: { label: 'Starts', sort: 'starts', always: true },
+    course: { label: 'Course', card: true },
+    space: { label: 'Space', card: true },
+    places: { label: 'Places', card: true },
+    waiting: { label: 'Waiting', card: true },
+    status: { label: 'State', card: true },
+  },
+  views: {
+    upcoming: { label: 'Upcoming', filters: { when: 'upcoming' } },
+    unmarked: { label: 'Needs marking', filters: { when: 'unmarked' } },
+    past: { label: 'Past', filters: { when: 'past' }, sort: 'starts', order: 'desc' },
+    cancelled: { label: 'Cancelled', filters: { status: 'cancelled' }, sort: 'starts', order: 'desc' },
+    all: { label: 'All', sort: 'starts', order: 'desc' },
+  },
+  defaultView: 'upcoming',
+  defaultSort: { key: 'starts', order: 'asc' },
 })

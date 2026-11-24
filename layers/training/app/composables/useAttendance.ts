@@ -5,10 +5,11 @@ import type { SessionView } from './useSessionPlace'
 
 export interface AttendanceView extends Omit<SessionView, 'actions'> {
   places: Place[] | null
-  actions: SessionView['actions'] & { run: boolean, manage: boolean }
+  actions: SessionView['actions'] & { run: boolean, manage: boolean, places: boolean }
 }
 
-export function useAttendance(id: Ref<string>, data: Ref<AttendanceView | undefined>, refresh: () => Promise<void>) {
+/** `afterClose` runs once attendance is closed: by default back to Teaching, as M8 is reached from there. */
+export function useAttendance(id: Ref<string>, data: Ref<AttendanceView | undefined>, refresh: () => Promise<void>, afterClose: () => unknown = () => navigateTo('/members/training/teaching')) {
   const { t } = useT()
   const act = useTrainingAct()
   const toast = useToast()
@@ -40,7 +41,7 @@ export function useAttendance(id: Ref<string>, data: Ref<AttendanceView | undefi
     try {
       await act(`${base.value}/close`, { method: 'POST', body: {} })
       toast.add({ title: t('training.attendance.closed'), color: 'success' })
-      await navigateTo('/members/training/teaching')
+      await afterClose()
     }
     catch (e) {
       fail(e)
