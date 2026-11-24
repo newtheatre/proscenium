@@ -22,6 +22,7 @@ interface TicketType {
   needsPaidTicket: boolean
   active: boolean
   channel: Channel
+  taxCode: string | null
   sort: number
   managedBy: string | null
   available: boolean
@@ -47,12 +48,13 @@ const labelOf = (ref: string) => {
 // `box-office.companion` is kept by box-office: the module's own name for it.
 const moduleName = (managedBy: string) => t(`${managedBy.slice(0, managedBy.lastIndexOf('.'))}.module.name`)
 
-interface FormState { name: string, kind: 'standard' | 'concession', channel: Channel, proofNote: string, requirementRefs: string[], maxPerHolder: number, active: boolean }
-const blank = (): FormState => ({ name: '', kind: 'standard', channel: 'all', proofNote: '', requirementRefs: [], maxPerHolder: 1, active: true })
+interface FormState { name: string, kind: 'standard' | 'concession', channel: Channel, taxCode: string | null, proofNote: string, requirementRefs: string[], maxPerHolder: number, active: boolean }
+const blank = (): FormState => ({ name: '', kind: 'standard', channel: 'all', taxCode: null, proofNote: '', requirementRefs: [], maxPerHolder: 1, active: true })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const taxRegistered = useTaxRegistered()
 
 function body(f: FormState, managed: boolean) {
-  const common = { name: f.name.trim(), channel: f.channel, proofNote: f.proofNote.trim() || null }
+  const common = { name: f.name.trim(), channel: f.channel, proofNote: f.proofNote.trim() || null, ...(taxRegistered.value ? { taxCode: f.taxCode } : {}) }
   if (managed) return common
   return { ...common, kind: f.kind, requirementRefs: f.requirementRefs, ...(f.requirementRefs.length ? { maxPerHolder: f.maxPerHolder } : {}) }
 }
@@ -61,7 +63,7 @@ const url = (id: string) => `/api/box-office/ticket-types/${encodeURIComponent(i
 const patch = (id: string, b: Record<string, unknown>) => $api(url(id), { method: 'PATCH', body: b })
 const create = (b: Record<string, unknown>) => $api<{ ticketTypeId: string }>('/api/box-office/ticket-types', { method: 'POST', body: b })
 // The form as it stood for a type, so a change can be put back.
-const asForm = (type: TicketType): FormState => ({ name: type.name, kind: type.kind === 'concession' ? 'concession' : 'standard', channel: type.channel, proofNote: type.proofNote ?? '', requirementRefs: [...type.requirementRefs], maxPerHolder: type.maxPerHolder, active: type.active })
+const asForm = (type: TicketType): FormState => ({ name: type.name, kind: type.kind === 'concession' ? 'concession' : 'standard', channel: type.channel, taxCode: type.taxCode, proofNote: type.proofNote ?? '', requirementRefs: [...type.requirementRefs], maxPerHolder: type.maxPerHolder, active: type.active })
 
 // Does the act, then says so with an Undo that does its reverse.
 async function run<T>(fn: () => Promise<T>, done: string, undo?: (result: T) => Promise<unknown>, onRefusal = refusal) {
@@ -392,6 +394,17 @@ function describe(type: TicketType): string {
             <USelect
               v-model="editForm.channel"
               :items="channels"
+            />
+          </UFormField>
+          <UFormField
+            v-if="taxRegistered"
+            :label="t('finance.screens.tax-code-select.label')"
+            :help="t('finance.screens.tax-code-select.help')"
+            name="taxCode"
+          >
+            <FinanceTaxCodeSelect
+              v-model="editForm.taxCode"
+              usual
             />
           </UFormField>
           <UFormField
