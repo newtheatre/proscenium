@@ -583,6 +583,10 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
               />
             </template>
           </PageSection>
+          <ProductionCollections
+            :production-id="production!.id"
+            :season-id="production!.seasonId"
+          />
         </div>
       </template>
 

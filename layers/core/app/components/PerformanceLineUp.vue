@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { parseTime } from '@internationalized/date'
-import { watchDebounced } from '@vueuse/core'
 
 // One performance's line-up (C-61): the acts in running order, each one of the theatre's productions
 // or simply a name, with an optional set time inside the performance and a length. Acts are dragged
@@ -80,26 +79,7 @@ const timeValue = (value: string) => {
   catch { return undefined }
 }
 
-const search = ref('')
-const found = ref<Choice[]>([])
-const searching = ref(false)
-watchDebounced(search, async (q) => {
-  if (q.trim().length < 2) {
-    found.value = []
-    return
-  }
-  searching.value = true
-  try {
-    const answer = await $api<{ rows: { id: string, title: string }[] }>('/api/core/productions', { query: { q, size: 10 } }) // not-policy: a picker's length
-    found.value = answer.rows.filter(r => r.id !== props.productionId).map(r => ({ id: r.id, label: r.title }))
-  }
-  catch {
-    found.value = []
-  }
-  finally {
-    searching.value = false
-  }
-}, { debounce: 250 }) // not-policy: typing pause before a search
+const { search, found, searching } = useProductionSearch({ keep: id => id !== props.productionId })
 const productionItems = computed(() => {
   const picked = form.value.production
   return picked && !found.value.some(p => p.id === picked.id) ? [picked, ...found.value] : found.value

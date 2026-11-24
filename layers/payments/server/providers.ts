@@ -1,12 +1,13 @@
 // Providers and the accounts configured with them. A provider is a contribution to payments.provider;
 // a provider account is one configured connection, with the methods it offers on each channel.
-import { all, credential, first, usePoint } from '#kit'
+import { all, credential, first, useContext, usePoint } from '#kit'
 import type { Method, PaymentProvider, ProviderAttempt } from './points/provider'
 
 export interface ProviderAccountRow { id: string, provider: string, label: string, channels: string, mode: 'live' | 'test', external_ref: string | null, active: number }
 
 export async function providers(): Promise<Map<string, PaymentProvider>> {
-  return new Map((await usePoint<PaymentProvider>('payments.provider')).map(c => [c.id, c.value]))
+  const practising = !!useContext().practice
+  return new Map((await usePoint<PaymentProvider>('payments.provider')).filter(c => practising || !c.value.practiceOnly).map(c => [c.id, c.value]))
 }
 
 /** Whether the theatre takes cash: it has a cash account in use (Matt, 19 November: no separate setting). */

@@ -22,6 +22,7 @@ export const providerAccounts = defineTable('payments_provider_accounts', {
   updatedAt: col.updatedAt(),
 }, {
   id: 'ppa',
+  practice: 'replace',
   realm: 'operational',
   subject: 'none',
   extra: t => [check('payments_provider_accounts_mode', sql`${t.mode} IN ('live', 'test')`)],

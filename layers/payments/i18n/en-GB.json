@@ -52,5 +52,11 @@
   "payments.settings.payees.keep-for.help": "Bank details nobody has been paid with for this long are cleared, counted from the last payment to them or, if never paid, from when they were given. Payments already made keep their record.",
   "payments.abilities.disbursement.record.label": "Record payments the theatre makes",
   "payments.abilities.payee.read.label": "See full bank details to make a payment",
-  "payments.abilities.payee.manage.label": "Save bank details for people and companies"
+  "payments.abilities.payee.manage.label": "Save bank details for people and companies",
+  "payments.practice.till": "Take payments at the till",
+  "payments.practice.till-summary": "Open the till with its float, sell tickets for tonight, handle a declined card and cash up at the end.",
+  "payments.practice.declined-then-good": "Take a card that is declined, then one that works",
+  "payments.practice.cash-change": "Take cash and give change",
+  "payments.practice.close-right": "Close the till with the right count",
+  "payments.practice.reader": "Practice card reader"
 }
