@@ -80,7 +80,7 @@ export async function moveOrAsk(unit: UnitView, acting: Acting, actor: Actor, to
   const bookingId = insertBooking(unit, {
     bookable, purposeId: booking.purposeId, startsAt: to.startsAt, endsAt: to.endsAt, state: 'requested', bookedFor: booking.bookedFor, requestedBy: by!,
     title: booking.title, notes: booking.notes, attendees: booking.attendees, productionId: booking.productionId, replacesId: booking.id,
-    overrideReason: verdict.overridden.length ? to.overrideReason : null,
+    overrideReason: verdict.overridden.length ? to.overrideReason : null, bumps: !!verdict.bumps,
   }, by)
   return { bookingId, state: 'requested', verdict }
 }

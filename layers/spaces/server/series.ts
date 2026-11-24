@@ -50,6 +50,11 @@ export async function checkSeries(actor: Actor, input: SeriesAsk): Promise<{ occ
     if (previous !== null && startsAt < previous + length) refuse('spaces.series.overlaps-itself', 'Each date of the series would overlap the next.', { status: 422, remedy: 'Make each booking shorter, or repeat less often.' })
     previous = startsAt
     const verdict = await checkRequest(actor, { ...input, startsAt, endsAt: startsAt + length })
+    // C5 is for one booking at a time: a series never moves other bookings aside.
+    if (verdict.bumps) {
+      occurrences.push({ date, startsAt, endsAt: startsAt + length, outcome: 'refused', rule: 'C1', code: 'spaces.series.would-bump', reason: 'Something else is booked at that time; a series cannot move it aside.' })
+      continue
+    }
     occurrences.push({ date, startsAt, endsAt: startsAt + length, outcome: verdict.outcome, rule: verdict.rule ?? null, code: verdict.code ?? null, reason: verdict.reason ?? null })
   }
   return { occurrences, needsDecision: occurrences.some(o => o.outcome === 'request') }

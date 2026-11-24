@@ -5,6 +5,7 @@
 import { sql } from 'drizzle-orm'
 import { all, can, fact, first, inAccountScope, nowMs, refuse, requirements, theatreTimeZone, useDb, useSetting, type Actor, type UnitView } from '#kit'
 import { localParts } from '#kit/clock'
+import { bumpVerdict } from './bumping'
 import { blockersOf, insertBooking, requireBookable, type Bookable, type Blocker } from './bookings'
 import { clockMinutes } from '../shared/setup'
 
@@ -28,7 +29,7 @@ export interface AskInput {
   replaces?: string | null
 }
 
-export type Rule = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6' | 'P7' | 'P8' | 'P9' | 'C1'
+export type Rule = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6' | 'P7' | 'P8' | 'P9' | 'C1' | 'B3'
 
 export interface Verdict {
   outcome: 'confirm' | 'request' | 'refused'
@@ -45,6 +46,8 @@ export interface Verdict {
   waiting: number
   /** Rules set aside by an override, with the reason stored on the booking. */
   overridden: Rule[]
+  /** C5: confirming it would bump the lower-tier bookings in `blockers`. */
+  bumps?: boolean
 }
 
 interface PurposeHere {
@@ -218,7 +221,15 @@ export async function checkRequest(actor: Actor, input: AskInput): Promise<Verdi
   const waiting = (await useDb().all<{ n: number }>(sql`SELECT count(*) AS n FROM spaces_bookings WHERE bookable_id = ${bookable.id} AND state = 'requested'
     AND starts_at < ${input.endsAt} AND ends_at > ${input.startsAt} AND NOT ${inAccountScope('booked_for', who)}`))[0]!.n
   if (blockers.length) {
+    // C5: only lower-tier bookings that may be bumped are in the way, so it is asked for and always decided.
+    const bump = await bumpVerdict(blockers, purpose.tier, now)
+    if (bump.verdict === 'notice' && overriding) overridden.push('B3')
+    if (bump.verdict === 'ok' || (bump.verdict === 'notice' && overriding)) return { outcome: 'request', bumps: true, external, blockers, waiting, overridden }
     const nearest = nearestFree({ from: input.startsAt, to: input.endsAt, blockers: await blockersOf(bookable, input.startsAt - DAY, input.endsAt + DAY, input.replaces ?? null), slotMinutes: slot, zone, open }) ?? undefined
+    if (bump.verdict === 'notice') {
+      return refused('B3', 'spaces.bump.notice', 'A booking in the way starts too soon to be moved aside.',
+        { blockers, nearest, external, waiting, figure: { minutes: bump.noticeMinutes }, remedy: nearest ? 'Choose the nearest free time.' : 'Choose another day.' })
+    }
     return refused('C1', 'spaces.clash', 'Something else is booked at that time.', { blockers, nearest, external, waiting, remedy: nearest ? 'Choose the nearest free time.' : 'Choose another day.' })
   }
   const needsDecision = external || rules.approval === 'always' || (purpose.here_approval ?? purpose.approval) === 'approval'
@@ -254,6 +265,7 @@ export async function requestBooking(unit: UnitView, actor: Actor, input: Reques
     attendees: input.attendees ?? null,
     productionId: input.productionId ?? null,
     overrideReason: verdict.overridden.length ? input.overrideReason!.trim() : null,
+    bumps: !!verdict.bumps,
   }, actor.accountId ?? null)
   if (verdict.overridden.length) unit.audit({ action: 'create', record: ['spaces.booking', bookingId], ability: 'spaces.booking.override', detail: { overridden: verdict.overridden.length } })
   if (who !== actor.accountId) unit.audit({ action: 'create', record: ['spaces.booking', bookingId], ability: 'spaces.booking.manage', detail: { onBehalf: true } })

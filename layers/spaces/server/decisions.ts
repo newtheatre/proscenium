@@ -3,7 +3,8 @@
 import { sql } from 'drizzle-orm'
 import { all, can, first, inAccountScope, nowMs, refuse, useDb, useSetting, wordsFrom, type Actor, type UnitView } from '#kit'
 import { accountLabel, holdersOf, notify } from '#modules/core'
-import { confirmRequest, getBooking, history, moveBooking, requireBookable, requireBooking, type Booking } from './bookings'
+import { blockersOf, confirmRequest, getBooking, history, moveBooking, requireBookable, requireBooking, type Booking } from './bookings'
+import { bumpForRequest } from './bumping'
 import { releaseReplaced } from './changes'
 import { listBookables } from './setup'
 import { assertNoUse } from './uses'
@@ -37,6 +38,8 @@ export interface QueueRow {
   seriesId: string | null
   /** X3: confirming it moves a booking the person already has. */
   replaces: boolean
+  /** C5: the bookings confirming it would bump, as they stand now. */
+  bumps: { title: string, bookedForName: string, startsAt: number, endsAt: number }[]
   /** Other requests for an overlapping time in the same room. */
   clashes: number
   /** For a request that is the viewer's own: listed, never decidable (A2). */
@@ -60,6 +63,7 @@ interface QueueSql {
   created_at: number
   series_id: string | null
   replaces_id: string | null
+  bumps: number
   asked: number
   clashes: number
 }
@@ -69,7 +73,7 @@ export async function decisionQueue(actor: Actor): Promise<QueueRow[]> {
   const at = nowMs()
   const urgentWithin = (await useSetting('spaces.requests.remind-after') as number) * SECOND
   const rows = await all<QueueSql>(
-    `SELECT b.id, b.bookable_id, b.starts_at, b.ends_at, b.title, b.notes, b.attendees, p.name AS purpose, b.tier, pr.title AS production_title, b.booked_for, b.created_at, b.series_id, b.replaces_id,
+    `SELECT b.id, b.bookable_id, b.starts_at, b.ends_at, b.title, b.notes, b.attendees, p.name AS purpose, b.tier, pr.title AS production_title, b.booked_for, b.created_at, b.series_id, b.replaces_id, b.bumps,
         EXISTS (SELECT 1 FROM spaces_booking_events e WHERE e.booking_id = b.id AND e.kind = 'external-placed') AS asked,
         (SELECT count(*) FROM spaces_bookings o WHERE o.bookable_id = b.bookable_id AND o.state = 'requested' AND o.id <> b.id AND o.starts_at < b.ends_at AND o.ends_at > b.starts_at) AS clashes
        FROM spaces_bookings b JOIN spaces_purposes p ON p.id = b.purpose_id LEFT JOIN core_productions pr ON pr.id = b.production_id
@@ -105,10 +109,22 @@ export async function decisionQueue(actor: Actor): Promise<QueueRow[]> {
       urgent: r.starts_at - at < urgentWithin,
       seriesId: r.series_id,
       replaces: !!r.replaces_id,
+      bumps: r.bumps ? await inTheWay(r, names) : [],
       clashes: r.clashes,
       own,
       record: records.get(r.booked_for)!,
     })
+  }
+  return out
+}
+
+async function inTheWay(r: QueueSql, names: Map<string, string>): Promise<QueueRow['bumps']> {
+  const blockers = (await blockersOf(await requireBookable(r.bookable_id), r.starts_at, r.ends_at, r.replaces_id)).filter(b => b.kind === 'booking')
+  const out: QueueRow['bumps'] = []
+  for (const b of blockers) {
+    if (!names.has(b.bookedFor!)) names.set(b.bookedFor!, await accountLabel(b.bookedFor!))
+    const title = (await first<{ title: string }>('SELECT title FROM spaces_bookings WHERE id = ?', b.id))?.title ?? ''
+    out.push({ title, bookedForName: names.get(b.bookedFor!)!, startsAt: b.startsAt, endsAt: b.endsAt })
   }
   return out
 }
@@ -130,12 +146,13 @@ async function waiting(id: string): Promise<Booking> {
  * A4 and E2: confirms a request. The move carries the clash predicate again; an external room's
  * answer needs the owner's reference.
  */
-export async function decideConfirm(unit: UnitView, id: string, decider: string, input: { note: string | null, reference: string | null }): Promise<Booking> {
+export async function decideConfirm(unit: UnitView, id: string, decider: string, input: { note: string | null, reference: string | null, overrideReason?: string | null, actor?: Actor }): Promise<Booking> {
   const booking = await waiting(id)
   const bookable = await requireBookable(booking.bookableId)
   const reference = input.reference?.trim() || null
   if (bookable.control === 'external' && !reference) refuse('spaces.booking.reference-needed', 'Give the owner\'s reference for this booking.', { status: 422 })
   await assertNoUse(bookable.spaceId, booking.startsAt, booking.endsAt)
+  if (booking.bumps) await bumpForRequest(unit, booking, bookable, input.actor ?? { kind: 'person', accountId: decider }, input.overrideReason ?? null)
   releaseReplaced(unit, booking, booking.replacesId ? await getBooking(booking.replacesId) : null, decider)
   confirmRequest(unit, booking, bookable, decider, input.note?.trim() || null)
   if (reference) unit.add(sql`UPDATE spaces_bookings SET external_ref = ${reference} WHERE id = ${booking.id}`)

@@ -7,7 +7,7 @@ import { watchDebounced } from '@vueuse/core'
 
 interface Moving { id: string, bookableId: string, purposeId: string, startsAt: number, endsAt: number }
 interface Option { id: string, name: string, venueName: string | null, kind: 'space' | 'resource', external: boolean, override: boolean, purposes: string[] }
-interface Check { outcome: 'confirm' | 'request' | 'refused', rule: string | null, reason: string | null, remedy: string | null, external: boolean, blockers: { kind: string, startsAt: number, endsAt: number, label?: string }[], nearest: { startsAt: number, endsAt: number } | null, overridden: string[] }
+interface Check { outcome: 'confirm' | 'request' | 'refused', rule: string | null, reason: string | null, remedy: string | null, external: boolean, blockers: { kind: string, startsAt: number, endsAt: number, label?: string }[], nearest: { startsAt: number, endsAt: number } | null, overridden: string[], bumps: boolean }
 
 const props = defineProps<{ booking: Moving }>()
 const open = defineModel<boolean>('open', { required: true })
@@ -65,13 +65,13 @@ watchDebounced(body, async (b) => {
   finally { checking.value = false }
 }, { debounce: 400, deep: true }) // not-policy: a pause in typing
 
-const OVERRIDABLE = ['P5', 'P6', 'P7', 'P8', 'P9']
+const OVERRIDABLE = ['P5', 'P6', 'P7', 'P8', 'P9', 'B3']
 const mayOverride = computed(() => !!room.value?.override && (form.overrideReason.length > 0 || (check.value?.outcome === 'refused' && OVERRIDABLE.includes(check.value.rule ?? ''))))
 const verdict = computed(() => {
   const c = check.value
   if (!c) return null
   if (c.outcome === 'refused') return { color: 'error' as const, icon: 'i-lucide-circle-x', title: c.reason ?? t('spaces.book.refused'), description: c.remedy ?? undefined }
-  if (c.outcome === 'request') return { color: 'warning' as const, icon: 'i-lucide-hourglass', title: t('spaces.move.will-request'), description: undefined }
+  if (c.outcome === 'request') return { color: 'warning' as const, icon: 'i-lucide-hourglass', title: c.bumps ? t('spaces.move.will-bump', { count: c.blockers.length }) : t('spaces.move.will-request'), description: undefined }
   return { color: 'success' as const, icon: 'i-lucide-circle-check', title: t('spaces.move.will-move'), description: undefined }
 })
 function takeNearest() {

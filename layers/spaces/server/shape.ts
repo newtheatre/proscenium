@@ -44,6 +44,7 @@ export async function shapeVerdict(actor: Actor, bookableId: string, verdict: Ve
     nearest: verdict.nearest ?? null,
     waiting: verdict.waiting,
     overridden: verdict.overridden,
+    bumps: !!verdict.bumps,
   }
 }
 

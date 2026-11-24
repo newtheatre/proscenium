@@ -48,6 +48,8 @@ export interface Blocker {
   endsAt: number
   tier?: number
   bookedFor?: string
+  /** B1: the booking's purpose lets a higher tier bump it. */
+  canBeBumped?: boolean
 }
 
 export const CLASH = { code: 'spaces.clash', reason: 'Someone else has just taken this time.', remedy: 'Choose another time.' }
@@ -96,10 +98,11 @@ export function bookableFree(bookable: Bookable, from: number | SQL, to: number 
 
 /** Everything in the way of a window, soonest first (rule C1). A read, for showing and for choosing a refusal. */
 export async function blockersOf(bookable: Bookable, from: number, to: number, except: string | null = null): Promise<Blocker[]> {
-  const found: Blocker[] = (await all<{ id: string, starts_at: number, ends_at: number, tier: number, booked_for: string }>(
-    'SELECT id, starts_at, ends_at, tier, booked_for FROM spaces_bookings WHERE bookable_id = ? AND state = \'confirmed\' AND starts_at < ? AND ends_at > ? AND id IS NOT ? ORDER BY starts_at, id',
+  const found: Blocker[] = (await all<{ id: string, starts_at: number, ends_at: number, tier: number, booked_for: string, can_be_bumped: number }>(
+    `SELECT b.id, b.starts_at, b.ends_at, b.tier, b.booked_for, p.can_be_bumped FROM spaces_bookings b JOIN spaces_purposes p ON p.id = b.purpose_id
+      WHERE b.bookable_id = ? AND b.state = 'confirmed' AND b.starts_at < ? AND b.ends_at > ? AND b.id IS NOT ? ORDER BY b.starts_at, b.id`,
     bookable.id, to, from, except,
-  )).map(r => ({ kind: 'booking', id: r.id, startsAt: r.starts_at, endsAt: r.ends_at, tier: r.tier, bookedFor: r.booked_for }))
+  )).map(r => ({ kind: 'booking', id: r.id, startsAt: r.starts_at, endsAt: r.ends_at, tier: r.tier, bookedFor: r.booked_for, canBeBumped: !!r.can_be_bumped }))
   if (bookable.kind === 'space') {
     for (const p of await listPerformances({ spaceId: bookable.spaceId!, state: 'scheduled', from, to }))
       found.push({ kind: 'performance', id: p.id, startsAt: p.startsAt, endsAt: p.endsAt })

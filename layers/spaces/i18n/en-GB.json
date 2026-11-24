@@ -466,5 +466,17 @@
   "spaces.impact.requests.one": "{count} room request will be declined.",
   "spaces.impact.requests.other": "{count} room requests will be declined.",
   "spaces.impact.external.one": "{count} room booking will need placing with the owner.",
-  "spaces.impact.external.other": "{count} room bookings will need placing with the owner."
+  "spaces.impact.external.other": "{count} room bookings will need placing with the owner.",
+  "spaces.book.will-bump.one": "This time is held by a lower-priority booking. A room manager will decide, and if they confirm it, that booking is moved aside and its booker told.",
+  "spaces.book.will-bump.other": "This time is held by {count} lower-priority bookings. A room manager will decide, and if they confirm it, those bookings are moved aside and their bookers told.",
+  "spaces.move.will-bump.one": "The new time is held by a lower-priority booking. A room manager will decide; your booking keeps its time until then.",
+  "spaces.move.will-bump.other": "The new time is held by {count} lower-priority bookings. A room manager will decide; your booking keeps its time until then.",
+  "spaces.requests.bumps.one": "Moves 1 booking aside",
+  "spaces.requests.bumps.other": "Moves {count} bookings aside",
+  "spaces.requests.bumps-title.one": "Confirming moves 1 booking aside",
+  "spaces.requests.bumps-title.other": "Confirming moves {count} bookings aside",
+  "spaces.requests.bumps-help": "Each booker is told at once, with the reason and who to talk to.",
+  "spaces.requests.bumps-line": "{title}, booked by {name}, {when}",
+  "spaces.requests.override-help": "Only if you may override: say why the booking in the way should still be moved aside. It is recorded.",
+  "spaces.displace.note.higher-tier": "A booking with a higher priority needs the room at that time."
 }
