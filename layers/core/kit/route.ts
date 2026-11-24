@@ -19,6 +19,7 @@ import { useSetting } from './settings-store'
 import { ensureMigrated } from './migrations'
 import type { AbilityName } from './registry-types'
 import { PRACTICE_HEADER, usePracticeGate } from './practice/gate'
+import type { PracticeAnswer } from './practice/sample'
 import { log } from './log'
 
 export interface RouteDeclaration<I extends z.ZodType | undefined = undefined> {
@@ -269,11 +270,11 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
         unit.add({ sql: 'INSERT OR REPLACE INTO core_idempotency_keys (key, route, account_id, request_hash, status, response, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', params: [idempotency.key, idempotency.route, actor.accountId ?? null, idempotency.hash, 200, JSON.stringify(body), nowMs()] }) // not-policy: HTTP OK
       }
       await unit.commit()
-      if (context.practice && !reads) await afterPracticeChange()
     }
     else if (idempotency) {
       await context.env.DB.prepare('INSERT OR REPLACE INTO core_idempotency_keys (key, route, account_id, request_hash, status, response, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(idempotency.key, idempotency.route, actor.accountId ?? null, idempotency.hash, 200, JSON.stringify(body), nowMs()).run() // not-policy: HTTP OK
     }
+    if (context.practice && !reads) await afterPracticeChange({ path: event.path.split('?')[0]!, body })
     return body
   }
 
@@ -305,9 +306,9 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
 }
 
 /** Ticks the scenario's tasks after a practice change commits; a failure never undoes the change. */
-async function afterPracticeChange(): Promise<void> {
+async function afterPracticeChange(answer: PracticeAnswer): Promise<void> {
   try {
-    await usePracticeGate().changed?.()
+    await usePracticeGate().changed?.(answer)
   }
   catch (error) {
     log.error('core.practice.tasks-failed', { error: String((error as Error)?.message ?? error) })
