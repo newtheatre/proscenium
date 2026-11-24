@@ -26,6 +26,19 @@ export const identitySettings = defineSettings('core', {
   'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, onChange: 'confirm', screen: providerScreen }),
   'sign-in.managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, audience: 'public', onChange: 'confirm' }),
   'sign-in.provider-is-strong': setting.boolean({ default: false, change, onChange: 'confirm' }),
+  // Microsoft and a general OpenID Connect provider (ID-47), each set up on its card like Google.
+  'sign-in.microsoft': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm', screen: providerScreen }),
+  'sign-in.microsoft-client-id': setting.text({ unset: true, maxLength: 200, change, screen: providerScreen }),
+  'sign-in.microsoft-tenants': setting.list({ default: [], of: 'text', maxLength: 36, change, onChange: 'confirm', screen: providerScreen }),
+  'sign-in.microsoft-personal': setting.boolean({ default: false, change, screen: providerScreen }),
+  'sign-in.microsoft-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, screen: providerScreen }),
+  'sign-in.microsoft-managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, audience: 'public', onChange: 'confirm', screen: providerScreen }),
+  'sign-in.oidc': setting.boolean({ default: false, change, audience: 'public', onChange: 'confirm', screen: providerScreen }),
+  'sign-in.oidc-label': setting.text({ unset: true, minLength: 1, maxLength: 40, change, audience: 'public', screen: providerScreen }),
+  'sign-in.oidc-discovery': setting.text({ unset: true, maxLength: 300, change, screen: providerScreen }),
+  'sign-in.oidc-client-id': setting.text({ unset: true, maxLength: 200, change, screen: providerScreen }),
+  'sign-in.oidc-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, screen: providerScreen }),
+  'sign-in.oidc-managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, audience: 'public', onChange: 'confirm', screen: providerScreen }),
   // An authenticator app (TOTP), offered to people whose roles reach the console. Never a way to sign
   // in on its own: it confirms it is you, and after an email or Google sign-in it can make the session
   // strong, standing in for a passkey on a shared machine.
@@ -62,6 +75,9 @@ export const identitySettings = defineSettings('core', {
   'privacy.data-location': setting.text({ unset: true, maxLength: 80, change, audience: 'public', quotable: true }),
   // The youngest a person may be to hold an account, as the terms of use and privacy notice state it.
   'accounts.minimum-age': setting.integer({ default: 16, min: 13, max: 21, change, audience: 'public', quotable: true, onChange: 'confirm' }),
+  // The latest a call or shift should end for someone under 18 (C-74, R3-25), read by Rehearsals and
+  // Productions to warn, never to refuse. Unset, nobody is warned.
+  'under-18.latest-finish': setting.time({ unset: true, change }),
 
   'access-scheme.enabled': setting.boolean({ default: true, change, audience: 'public' }),
   'access-scheme.name': setting.text({ default: 'Access scheme', maxLength: 40, change, audience: 'public', quotable: true }),
@@ -79,11 +95,26 @@ export const identitySettings = defineSettings('core', {
   'retention.armed': setting.boolean({ default: false, change: 'core.retention.arm', audience: 'public', onChange: 'reason' }),
 })
 
+// A Microsoft tenant id: a GUID.
+const TENANT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const DOMAIN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/
 
 export const identitySettingRules: SettingRule[] = [
   { id: 'idle-within-lifetime', check: s => s['sessions.idle-limit'] <= s['sessions.lifetime'] },
-  { id: 'managed-domains-need-provider', check: s => !s['sign-in.managed-domains'].length || s['sign-in.google'] },
+  { id: 'managed-domains-need-provider', check: s => (!s['sign-in.managed-domains'].length || s['sign-in.google']) && (!s['sign-in.microsoft-managed-domains'].length || s['sign-in.microsoft']) && (!s['sign-in.oidc-managed-domains'].length || s['sign-in.oidc']) },
+  // MS4: an address signs in through one provider only.
+  { id: 'managed-domain-one-provider', check: (s) => {
+    const all = [...s['sign-in.managed-domains'], ...s['sign-in.microsoft-managed-domains'], ...s['sign-in.oidc-managed-domains']] as string[]
+    return new Set(all).size === all.length
+  } },
+  // A managed domain's people cannot be sent a code, so the provider must be trusted for its addresses (MS3).
+  { id: 'managed-domains-are-trusted', check: s => s['sign-in.microsoft-managed-domains'].every((d: string) => s['sign-in.microsoft-domains'].includes(d)) && s['sign-in.oidc-managed-domains'].every((d: string) => s['sign-in.oidc-domains'].includes(d)) },
+  { id: 'microsoft-needs-client-id', check: s => !s['sign-in.microsoft'] || !!s['sign-in.microsoft-client-id'] },
+  { id: 'microsoft-needs-client-secret', check: async s => !s['sign-in.microsoft'] || !!(await credential('CORE_MICROSOFT_CLIENT_SECRET')) },
+  { id: 'microsoft-tenants-are-ids', check: s => s['sign-in.microsoft-tenants'].every((t: string) => TENANT.test(t)) },
+  { id: 'oidc-needs-set-up', check: s => !s['sign-in.oidc'] || (!!s['sign-in.oidc-label'] && !!s['sign-in.oidc-discovery'] && !!s['sign-in.oidc-client-id']) },
+  { id: 'oidc-needs-client-secret', check: async s => !s['sign-in.oidc'] || !!(await credential('CORE_OIDC_CLIENT_SECRET')) },
+  { id: 'oidc-discovery-https', check: s => !s['sign-in.oidc-discovery'] || /^https:\/\/[^\s/]+/.test(s['sign-in.oidc-discovery']) },
   { id: 'strong-provider-needs-managed-domain', check: s => !s['sign-in.provider-is-strong'] || s['sign-in.managed-domains'].length > 0 },
   // Ruling R-09: year-end expiry reads core.organisation.year-end, and cannot be chosen while it is unset.
   { id: 'default-expiry-needs-year-end', check: s => s['grants.default-expiry'] !== 'year-end' || !!s['organisation.year-end'] },
@@ -91,7 +122,7 @@ export const identitySettingRules: SettingRule[] = [
   // Rules run while a setting is saved, inside the request, so the key saved on Admin > Sign-in can
   // be read here.
   { id: 'google-needs-client-secret', check: async s => !s['sign-in.google'] || !!(await credential('CORE_GOOGLE_CLIENT_SECRET')) },
-  { id: 'domains-are-domains', check: s => [...s['sign-in.google-domains'], ...s['sign-in.managed-domains']].every((d: string) => DOMAIN.test(d)) },
+  { id: 'domains-are-domains', check: s => ['google-domains', 'managed-domains', 'microsoft-domains', 'microsoft-managed-domains', 'oidc-domains', 'oidc-managed-domains'].every(k => s[`sign-in.${k}`].every((d: string) => DOMAIN.test(d))) },
 ]
 
 export const identityRecords = defineRecords('core', {
@@ -131,6 +162,9 @@ export const identityAbilities = defineAbilities('core', {
   // Read one member's emergency contacts, with a reason. Strong but never asked again, so an
   // emergency is not slowed; an Owner does not hold it by being an Owner (OWNER_DOES_NOT_READ).
   'emergency-contact.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', grantAt: ['site'] }),
+  // Record or clear the day someone under 18 turns 18, after seeing ID (C-74). Seeing whether someone
+  // is under 18 is each module's own ability, through ageStatus.
+  'age.record': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
 })
 
 /**
@@ -205,6 +239,8 @@ export const identitySecrets = {
 // secret, and the secret half of the Turnstile bot check.
 export const identityCredentials = {
   CORE_GOOGLE_CLIENT_SECRET: credentialDecl({ needed: 'when-used', manage: 'core.identity-settings.manage' }),
+  CORE_MICROSOFT_CLIENT_SECRET: credentialDecl({ needed: 'when-used', manage: 'core.identity-settings.manage' }),
+  CORE_OIDC_CLIENT_SECRET: credentialDecl({ needed: 'when-used', manage: 'core.identity-settings.manage' }),
   CORE_TURNSTILE_SECRET_KEY: credentialDecl({ needed: 'optional', manage: 'core.identity-settings.manage' }),
 }
 

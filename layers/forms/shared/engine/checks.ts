@@ -6,7 +6,7 @@ import { OTHER, PATTERNS } from './types'
 import { unreached } from './reach'
 import { isDecision, isFinal } from './workflow'
 import { isMarkable, totalPoints } from './marking'
-import type { Comparison, Condition, Correct, Definition, Expression, Operand, Question, Rule, RuleName } from './types'
+import type { Comparison, Condition, Correct, Definition, Expression, Operand, Question, Rule, RuleName, Transition } from './types'
 import { calculationsRead } from './calculations'
 import { conditionsOf, questionsOf } from './definition'
 import type { Index, ValueKind } from './values'
@@ -26,6 +26,7 @@ export type ProblemCode
     | 'unknown-action' | 'action-unmapped' | 'action-wrong-question'
     | 'answer-wrong-type' | 'answer-in-group' | 'answer-special' | 'answer-empty' | 'answer-unknown-option' | 'answer-range' | 'answer-never-right'
     | 'pass-mark-over' | 'marking-no-answers'
+    | 'system-no-condition' | 'condition-not-system' | 'system-loop' | 'marking-unmarked'
 export interface Problem { level: 'error' | 'warning', code: ProblemCode, at: string, params?: Record<string, string> }
 
 export interface CheckOptions {
@@ -141,6 +142,10 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
       return 'any'
     }
     if ('today' in o) return 'date'
+    if ('marking' in o) {
+      if (!totalPoints(def)) return error('marking-unmarked', at), null
+      return o.marking === 'passed' ? 'any' : 'number'
+    }
     return 'any'
   }
   function checkComparison(c: Comparison, at: string, ownerPage: number | null, ownerGroup?: string) {
@@ -267,6 +272,9 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
       if (!seen.has(move.from) || !seen.has(move.to)) error('move-unknown-stage', at)
       else if (move.from === move.to) error('move-nowhere', at)
       else if (move.needsReason && !isDecision(def, move)) error('reason-not-decision', at)
+      // AT1: the system moves only on its condition, and nobody else's move has one.
+      if (move.who === 'system' && !move.when) error('system-no-condition', at)
+      if (move.who !== 'system' && move.when) error('condition-not-system', at)
       for (const use of move.actions ?? []) {
         const action = options.actions?.find(a => a.key === use.action)
         if (options.actions && !action) error('unknown-action', at, { action: use.action })
@@ -282,6 +290,7 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
         }
       }
     }
+    for (const key of systemLoop(transitions)) error('system-loop', `move:${key}`)
     // Somebody sent back must be able to send their changes in again.
     for (const stage of stages) if (stage.kind === 'returned' && !transitions.some(t => t.from === stage.key && t.who === 'submitter' && seen.has(t.to))) error('returned-no-way-back', `stage:${stage.key}`)
     const reached = new Set([stages[0]!.key])
@@ -336,4 +345,22 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
 }
 
 /** Whether a definition may be published: it has no error. Warnings do not block. */
+/** The system moves that can lead back to where they started (AT3), which the builder refuses: each could go round for ever. */
+function systemLoop(transitions: readonly Transition[]): string[] {
+  const system = transitions.filter(t => t.who === 'system' && t.from !== t.to)
+  const leadsBack = (start: string, first: Transition): boolean => {
+    const seen = new Set<string>()
+    const queue = [first.to]
+    while (queue.length) {
+      const at = queue.shift()!
+      if (at === start) return true
+      if (seen.has(at)) continue
+      seen.add(at)
+      queue.push(...system.filter(t => t.from === at).map(t => t.to))
+    }
+    return false
+  }
+  return system.filter(t => leadsBack(t.from, t)).map(t => t.key)
+}
+
 export const publishable = (problems: Problem[]): boolean => !problems.some(p => p.level === 'error')

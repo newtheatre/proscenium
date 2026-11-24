@@ -4,7 +4,7 @@
 // grant waiting for its first sign-in is never a holder.
 import { all, can, factHolders, nowMs, type Actor } from '#kit'
 import { useRegistry } from '#kit/registry'
-import { HOLDER, LIVE, OWNER, OWNER_DOES_NOT_READ, factAbilityMap, withImplied } from './grants'
+import { HOLDER, LIVE, OWNER, OWNER_DOES_NOT_READ, factAbilityMap, pinnedFactAbilityMap, withImplied } from './grants'
 import type { Scope } from './roles'
 
 const USABLE = 'a.first_signed_in_at IS NOT NULL AND a.disabled_at IS NULL AND a.merged_into_id IS NULL AND a.anonymised_at IS NULL'
@@ -58,6 +58,11 @@ export async function holdersOf(ability: string, record?: RecordRef): Promise<st
   for (const [fact, abilities] of Object.entries(mapping)) {
     if (!abilities.some(a => bringers.includes(a))) continue
     for (const id of await factHolders(fact, record) ?? []) candidates.add(id)
+  }
+  for (const pinned of await pinnedFactAbilityMap()) {
+    if (!pinned.abilities.some(a => bringers.includes(a))) continue
+    const on = registry.facts.get(pinned.fact)!.decl.on!
+    for (const id of await factHolders(pinned.fact, [on, pinned.record]) ?? []) candidates.add(id)
   }
 
   if (record && declared.decl.owner === 'grants') {

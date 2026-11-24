@@ -130,7 +130,7 @@ export async function ensureVocabularies(moduleId?: string): Promise<number> {
     unit.add(sql`INSERT INTO core_vocabularies (key, owner, label, description, ordering, locked, term_class, grouped)
       VALUES (${decl.id}, ${module}, ${decl.label}, ${decl.description ?? null}, ${decl.ordering ?? 'manual'}, ${decl.locked ? 1 : 0}, ${decl.termClass ?? 'public'}, ${decl.groups ? 1 : 0})`)
     const groupIds = new Map((decl.groups ?? []).map(label => [label, newId('tgr')]))
-    if (groupIds.size) unit.insertSet(termGroups, [...groupIds].map(([label, id], sort) => ({ id, vocabularyKey: decl.id, label, sort })))
+    if (groupIds.size) unit.insertSet(termGroups, [...groupIds].map(([label, id], sort) => ({ id, vocabularyKey: decl.id, label, slug: slugFrom(label), sort })))
     unit.insertSet(terms, decl.terms.map((t, sort) => ({ vocabularyKey: decl.id, slug: t.slug, label: t.label, description: t.description ?? null, icon: t.icon ?? null, sort, seeded: true, groupId: t.group ? groupIds.get(t.group) ?? null : null })))
   }
   try {
@@ -180,7 +180,7 @@ async function adoptHeadings(declared: { module: string, decl: VocabularyDecl }[
     if (own) labels.push('Other')
     const groupIds = new Map(labels.map(label => [label, newId('tgr')]))
     unit.add(sql`UPDATE core_vocabularies SET grouped = 1 WHERE key = ${decl.id}`)
-    unit.insertSet(termGroups, [...groupIds].map(([label, id], sort) => ({ id, vocabularyKey: decl.id, label, sort })))
+    unit.insertSet(termGroups, [...groupIds].map(([label, id], sort) => ({ id, vocabularyKey: decl.id, label, slug: slugFrom(label), sort })))
     await topUpTerms(unit, decl, groupIds)
     if (own) unit.add(sql`UPDATE core_terms SET group_id = ${groupIds.get('Other')!} WHERE vocabulary_key = ${decl.id} AND group_id IS NULL`)
   }
@@ -211,12 +211,22 @@ export async function listVocabularies(): Promise<(Vocabulary & { live: number, 
   return rows.map(r => ({ ...toVocabulary(r), live: r.live, retired: r.retired }))
 }
 
-/** Terms in the vocabulary's order. Pickers leave retired terms out. */
-export async function listTerms(vocabularyKey: string, options: { includeRetired?: boolean } = {}): Promise<Term[]> {
+/**
+ * Terms in the vocabulary's order. Pickers leave retired terms out. `group` narrows to the terms
+ * under one declared heading, by its slug: a term's kind (core.department's production or
+ * organisation, R3-07).
+ */
+export async function listTerms(vocabularyKey: string, options: { includeRetired?: boolean, group?: string } = {}): Promise<Term[]> {
   const vocabulary = await getVocabulary(vocabularyKey)
   if (!vocabulary) return []
   const order = vocabulary.ordering === 'alphabetical' ? 'lower(label), sort' : 'sort, lower(label)'
-  const rows = await all<TermRow>(`SELECT * FROM core_terms WHERE vocabulary_key = ? ${options.includeRetired ? '' : 'AND retired_at IS NULL'} ORDER BY ${order}`, vocabularyKey)
+  const params: unknown[] = [vocabularyKey]
+  let narrow = ''
+  if (options.group !== undefined) {
+    narrow = 'AND group_id IN (SELECT id FROM core_term_groups WHERE vocabulary_key = ? AND slug = ?)'
+    params.push(vocabularyKey, options.group)
+  }
+  const rows = await all<TermRow>(`SELECT * FROM core_terms WHERE vocabulary_key = ? ${options.includeRetired ? '' : 'AND retired_at IS NULL'} ${narrow} ORDER BY ${order}`, ...params)
   return rows.map(toTerm)
 }
 

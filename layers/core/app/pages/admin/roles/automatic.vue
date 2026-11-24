@@ -1,10 +1,12 @@
 <!-- Automatic access, the second tab of Roles (ID-22; identity spec part 6): each fact a module
      declares, such as "leads tonight's shift", with the abilities the theatre maps to it. Whoever the
-     fact names holds them while it holds. A privileged one needs the theatre's confirmation. -->
+     fact names holds them while it holds. A privileged one needs the theatre's confirmation. A
+     pinnable fact can also give abilities for one named record, such as holding one post. -->
 <script setup lang="ts">
 import type { CatalogueAbility } from '../../../components/AbilityPicker.vue'
+import type { PinnedMapping } from '../../../components/FactPins.vue'
 
-interface Fact { name: string, module: string, on: string | null, standing: boolean, label: string, abilities: { ability: string, confirmed: boolean }[] }
+interface Fact { name: string, module: string, on: string | null, standing: boolean, pin: boolean, label: string, abilities: { ability: string, confirmed: boolean }[], pinned: PinnedMapping[] }
 
 const { t, te } = useT()
 const { $api } = useNuxtApp()
@@ -38,8 +40,11 @@ const open = reactive<Record<string, boolean>>({})
 const saved = (fact: Fact) => fact.abilities.map(a => a.ability)
 const SUMMARY_NAMES = 3 // not-policy: how many abilities the closed line names before "and N more"
 function summary(fact: Fact): string {
+  return summaryOf(saved(fact))
+}
+function summaryOf(abilities: string[]): string {
   const catalogue = new Map((data.value?.catalogue ?? []).map(a => [a.name, a]))
-  const names = saved(fact).map((name) => {
+  const names = abilities.map((name) => {
     const ability = catalogue.get(name)
     return ability && te(ability.label) ? t(ability.label) : name
   })
@@ -136,6 +141,17 @@ async function save(fact: Fact) {
             :description="t('core.facts.confirm-help')"
           />
         </template>
+        <FactPins
+          v-if="fact.pin && fact.on && data && !open[fact.name]"
+          :fact="fact.name"
+          :on="fact.on"
+          :fact-name="nameOf(fact)"
+          :pinned="fact.pinned"
+          :catalogue="data.catalogue"
+          :shown="fits(fact)"
+          :summary="summaryOf"
+          @saved="refresh()"
+        />
         <template
           v-if="open[fact.name]"
           #footer
