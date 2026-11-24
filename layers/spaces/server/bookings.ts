@@ -72,7 +72,7 @@ export async function requireBooking(id: string): Promise<Booking> {
 }
 
 /** No Confirmed booking of this bookable overlaps [from, to). `except` leaves out the booking being moved. */
-export function noOverlap(bookableId: string | SQL, from: number | SQL, to: number | SQL, except: string | null = null): SQL {
+export function noOverlap(bookableId: string | SQL, from: number | SQL, to: number | SQL, except: string | SQL | null = null): SQL {
   return sql`NOT EXISTS (SELECT 1 FROM spaces_bookings o WHERE o.bookable_id = ${bookableId} AND o.state = 'confirmed'
     AND o.starts_at < ${to} AND o.ends_at > ${from} AND o.id IS NOT ${except})`
 }
@@ -82,7 +82,7 @@ export function noOverlap(bookableId: string | SQL, from: number | SQL, to: numb
  * a space no scheduled performance or blocking closure does (core's assertSpaceFree); for a resource,
  * no blocking closure of its home venue or of the whole theatre. On the statement, never in a read.
  */
-export function bookableFree(bookable: Bookable, from: number, to: number, except: string | null = null): SQL {
+export function bookableFree(bookable: Bookable, from: number | SQL, to: number | SQL, except: string | SQL | null = null): SQL {
   const place = bookable.kind === 'space' ? assertSpaceFree(bookable.spaceId!, from, to) : assertNoVenueClosure(bookable.homeVenueId, from, to)
   return sql`(${noOverlap(bookable.id, from, to, except)} AND ${place})`
 }
