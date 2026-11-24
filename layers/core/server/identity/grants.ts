@@ -1,7 +1,7 @@
 // Roles and grants as the permission check reads them (part 3, "The grant"). A grant is live from
 // its start until its expiry or its row in core_grant_ends, whichever is first. Grants on an
 // unclaimed or unusable account count for nothing, because such an account is never an actor.
-import { all, first, nowMs, useContext, type Grant, type PinnedMapping, type UnitView } from '#kit'
+import { all, first, nowMs, useContext, usePoint, type Grant, type PinnedMapping, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { impliedAbility } from '#kit/abilities'
 
@@ -162,6 +162,7 @@ export async function pinnedFactAbilityMap(): Promise<PinnedMapping[]> {
 export async function pinnedRecordExists(type: string, id: string): Promise<boolean> {
   const decl = useRegistry().records.get(type)?.decl
   if (!decl) return false
+  if (decl.point) return (await usePoint(decl.point)).some(c => c.id === id)
   if (!decl.table) return (decl.ids ?? []).includes(id)
   return !!(await first(`SELECT 1 AS found FROM "${decl.table}" WHERE id = ?`, id))
 }

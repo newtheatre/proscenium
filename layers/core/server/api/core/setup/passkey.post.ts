@@ -5,7 +5,7 @@ import { verifyRegistration } from '../../../identity/passkeys'
 import { readTicket, requireSetupNeeded, writeTicket } from '../../../identity/setup'
 import { randomRecoveryCode } from '../../../identity/crypto'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   public: true,
   rateLimit: 'sign-in',
   input: z.object({ response: z.looseObject({ id: z.string() }) }),
