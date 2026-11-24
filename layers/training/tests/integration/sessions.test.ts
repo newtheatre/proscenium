@@ -4,6 +4,7 @@ import { advanceClock, createUnit, setClock, type Actor } from '#kit'
 import { isSpaceFree } from '#modules/core'
 import { call, inContext, person, rows, server } from '../../../../tests/integration/helpers'
 import createVenue from '../../../core/server/api/core/venues/index.post'
+import { mergePlaces, undoMergePlaces } from '../../server/merge'
 import { sendReminders } from '../../server/sessions'
 import { DAY, liveCourse, MANAGER, NOV_24, ready, req, someone } from './stage'
 
@@ -199,5 +200,34 @@ describe('attendance (TR-12, TR-13; S6, P7)', () => {
     expect(own.body.code).toBe('training.own-attendance')
     advanceClock(10 * DAY)
     expect((await req(trainer, 'POST', `/api/training/sessions/${sessionId}/walk-ins`, { name: 'Too late' })).body.code).toBe('training.attendance.too-late')
+  })
+})
+
+describe('two accounts merged with a place each on one session', () => {
+  const run = <T>(fn: (unit: ReturnType<ReturnType<typeof createUnit>['view']>) => Promise<T>) => inContext(async () => {
+    const unit = createUnit()
+    const out = await fn(unit.view())
+    await unit.commit()
+    return out
+  })
+
+  it('keeps the stronger place, cancels the other by the merge, and undo puts it back on the waiting list', async () => {
+    const manager = await someone(MANAGER)
+    const { sessionId } = await session(manager, { capacity: 3 })
+    const [keep, lose] = [await learner('Kim'), await learner('Kim again')]
+    const lost = (await req(lose, 'POST', `/api/training/sessions/${sessionId}/places`, {})).body.placeId as string
+    await req(keep, 'POST', `/api/training/sessions/${sessionId}/places`, {})
+    const ref = { mergeId: `mrg_${Date.now()}`, survivorId: keep.accountId!, mergedAccountId: lose.accountId! }
+    await rows('INSERT INTO core_account_merges (id, survivor_id, merged_account_id, started_by, performed_by, performed_at, undo_until) VALUES (?, ?, ?, \'staff\', ?, ?, ?)', ref.mergeId, ref.survivorId, ref.mergedAccountId, ref.survivorId, NOV_24, NOV_24 + 30 * DAY)
+
+    // Both are booked, so the older place is kept.
+    await run(unit => mergePlaces(unit, ref))
+    await run(unit => mergePlaces(unit, ref))
+    expect(await rows('SELECT state, cancel_kind FROM training_session_places WHERE session_id = ? AND state != \'cancelled\'', sessionId)).toEqual([{ state: 'booked', cancel_kind: null }])
+    expect(await rows('SELECT id FROM training_session_places WHERE session_id = ? AND state != \'cancelled\'', sessionId)).toEqual([{ id: lost }])
+    expect(await rows('SELECT places_taken FROM training_sessions WHERE id = ?', sessionId)).toEqual([{ places_taken: 1 }])
+
+    expect(await run(unit => undoMergePlaces(unit, ref))).toEqual({ notRestored: 0 })
+    expect(await rows('SELECT state FROM training_session_places WHERE session_id = ? AND state != \'cancelled\' ORDER BY state', sessionId)).toEqual([{ state: 'booked' }, { state: 'waiting' }])
   })
 })
