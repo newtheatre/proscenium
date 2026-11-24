@@ -14,7 +14,7 @@ const theatre = z.object({
   contactEmail: z.union([z.literal(''), z.email().max(254)]).optional(), // not-policy: the setting's own length
 })
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   public: true,
   rateLimit: 'sign-in',
   input: z.object({ name: z.string().trim().min(1).max(120), address: z.email().max(254), theatre }), // not-policy: the column's own lengths

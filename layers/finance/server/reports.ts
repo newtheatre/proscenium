@@ -1,7 +1,8 @@
 // What Finance reports from the ledger (Box office specification, part 5; FIN-04, FIN-05, FIN-06):
 // a production's statement, the postings of a date range as CSV, and the money held in clearing
 // accounts against the payouts that empty them. Every figure is read from sealed postings only.
-import { all, first, Refusal, theatreTimeZone } from '#kit'
+import { sql, type SQL } from 'drizzle-orm'
+import { all, first, Refusal, theatreTimeZone, useDb } from '#kit'
 import { instantOfLocal, previousDate } from '#kit/clock'
 
 const SEALED = 'EXISTS (SELECT 1 FROM finance_seals s WHERE s.posting_id = p.id)'
@@ -177,4 +178,20 @@ export async function clearingAccounts(): Promise<ClearingLine[]> {
         AND (a.scope IS NOT NULL OR EXISTS (SELECT 1 FROM finance_entries x JOIN finance_postings q ON q.id = x.posting_id WHERE x.account_id = a.id AND q.kind = 'payout' AND x.amount_minor < 0))
       GROUP BY a.id, e.currency ORDER BY a.code`)
   return rows.map(r => ({ accountId: r.account_id, code: r.code, name: r.name, scope: r.scope, currency: r.currency, balanceMinor: r.balance, paidOutMinor: r.paid_out, lastPayoutAt: r.last_payout }))
+}
+
+export interface PerformanceTotal { performanceId: string, currency: string, kind: string, creditsMinor: number, taxMinor: number }
+
+/**
+ * A module's money by performance (Reports' figures, REP-02): credits less debits on its own accounts
+ * for each kind of sealed posting, and the tax within them. `performances` is a subquery of ids (M9).
+ */
+export async function performanceTotals(module: string, performances: SQL): Promise<PerformanceTotal[]> {
+  const rows = await useDb().all<{ performance_id: string, currency: string, kind: string, credits: number, tax: number }>(sql`
+    SELECT e.performance_id, e.currency, p.kind, -sum(e.amount_minor) AS credits,
+      sum(CASE WHEN e.amount_minor < 0 THEN e.tax_minor ELSE -e.tax_minor END) AS tax
+    FROM finance_entries e JOIN finance_postings p ON p.id = e.posting_id JOIN finance_accounts a ON a.id = e.account_id
+    WHERE a.module = ${module} AND e.performance_id IN (${performances}) AND ${sql.raw(SEALED)}
+    GROUP BY e.performance_id, e.currency, p.kind`)
+  return rows.map(r => ({ performanceId: r.performance_id, currency: r.currency, kind: r.kind, creditsMinor: r.credits, taxMinor: r.tax }))
 }

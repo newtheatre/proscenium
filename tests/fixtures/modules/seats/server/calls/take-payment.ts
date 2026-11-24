@@ -11,4 +11,6 @@ export default defineCall({
   async reconcile(attempt) {
     return provider.known.get(attempt.idempotencyKey) ?? 'unknown'
   },
+  // In practice the trainee chooses on the practice card reader.
+  practice: () => 'ask-trainee',
 })

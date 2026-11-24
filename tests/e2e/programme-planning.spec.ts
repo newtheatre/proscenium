@@ -5,7 +5,7 @@ import AxeBuilder from '@axe-core/playwright'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
 const owner = { kind: 'person', accountId: 'acc_e2eowner', name: 'Browser Tests', assurance: 'strong', reassertedAt: Date.now(), grants: ['core.modules.manage', 'core.settings.manage'].map(grant) }
-const programmer = { kind: 'person', accountId: 'acc_planprogrammer', name: 'Pat Programmer', assurance: 'strong', reassertedAt: Date.now(), grants: ['programme-planning.plan.manage', 'core.production.view', 'core.production.create', 'core.season.manage'].map(grant) }
+const programmer = { kind: 'person', accountId: 'acc_planprogrammer', name: 'Pat Programmer', assurance: 'strong', reassertedAt: Date.now(), grants: ['programme-planning.plan.manage', 'core.production.view', 'core.production.create', 'core.season.manage', 'core.venue.manage'].map(grant) }
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 const seasonName = `Planning ${RUN}`
@@ -26,6 +26,8 @@ test.beforeAll(async ({ playwright }) => {
   const seasonId = (await season.json()).id as string
   const made = await api.post('/api/core/productions', { data: { title: draftTitle, kind: 'own', seasonId } })
   expect(made.status(), await made.text()).toBe(200)
+  const venue = await api.post('/api/core/venues', { data: { name: `Board Hall ${RUN}` } })
+  expect(venue.status(), await venue.text()).toBe(200)
   await api.dispose()
 })
 test.use(as(programmer))
@@ -69,4 +71,21 @@ test('a programmer starts a plan, adds an entry and brings a draft production on
 
   await visit(page, '/console/programme')
   await expect(page.getByRole('link', { name: new RegExp(seasonName) })).toContainText('0 of 1 placed · 1 to decide')
+})
+
+test('the board shows a day at a time, spaces across, and moves on fourteen days', async ({ page }) => {
+  await visit(page, '/console/programme')
+  await page.getByRole('link', { name: new RegExp(seasonName) }).click()
+  await page.getByRole('link', { name: 'Open the board' }).click()
+  await expect(page.getByRole('heading', { name: '1 January 2034' })).toBeVisible()
+  await expect(page.getByRole('tab')).toHaveCount(14)
+  await expect(page.getByRole('region', { name: `Board Hall ${RUN}` })).toBeVisible()
+  await expect(page.getByText('Nothing placed on this day yet.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Earlier' })).toBeDisabled()
+  await noViolations(page)
+  await page.getByRole('tab', { name: 'Tue 3 Jan' }).click()
+  await expect(page.getByRole('heading', { name: '3 January 2034' })).toBeVisible()
+  await page.getByRole('button', { name: 'Later' }).click()
+  await expect(page.getByRole('heading', { name: '15 January 2034' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Earlier' })).toBeEnabled()
 })
