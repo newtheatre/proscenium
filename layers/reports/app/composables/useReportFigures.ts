@@ -45,27 +45,37 @@ export function useReportFigures(view: Ref<ReportView | undefined | null>, by: R
     return [f.id, toShown(answer)]
   })))
 
+  type OkAnswer = Extract<FigureAnswer, { state: 'ok' }>
+  type Answers = NonNullable<typeof data.value>
+
+  function gather(out: Map<string, ReportRow>, figureId: string, answer: OkAnswer, r: OkAnswer['rows'][number]) {
+    const key = r.keys[by.value ?? ''] ?? ''
+    const row = out.get(key) ?? { key, label: labelOf(key, answer), sortBy: sortOf(key, answer), cells: {} }
+    const cell = row.cells[figureId] as Cell | undefined
+    row.cells[figureId] = { state: 'ok', amounts: [...(cell?.amounts ?? []), ...amountsOf([r])] }
+    out.set(key, row)
+  }
+
+  function fillGaps(out: Map<string, ReportRow>, answers: Answers) {
+    // A figure that answered nothing for a row has nought there; one that could not answer is told as such.
+    for (const row of out.values()) {
+      for (const f of visible.value) {
+        const answer = answers[f.id]?.rows
+        if (row.cells[f.id]) continue
+        row.cells[f.id] = answer && answer.state !== 'ok' ? toShown(answer) : { state: 'ok', amounts: f.unit === 'money' ? [] : [{ value: 0 }] }
+      }
+    }
+  }
+
   const rows = computed<ReportRow[]>(() => {
     if (!by.value || !data.value) return []
     const out = new Map<string, ReportRow>()
     for (const f of visible.value) {
       const answer = data.value[f.id]?.rows
-      if (!answer || answer.state !== 'ok') continue
-      for (const r of answer.rows) {
-        const key = r.keys[by.value] ?? ''
-        const row = out.get(key) ?? { key, label: labelOf(key, answer), sortBy: sortOf(key, answer), cells: {} }
-        const cell = row.cells[f.id] as Cell | undefined
-        row.cells[f.id] = { state: 'ok', amounts: [...(cell?.amounts ?? []), ...amountsOf([r])] }
-        out.set(key, row)
-      }
+      if (answer?.state !== 'ok') continue
+      for (const r of answer.rows) gather(out, f.id, answer, r)
     }
-    // A figure that answered nothing for a row has nought there; one that could not answer is told as such.
-    for (const row of out.values()) {
-      for (const f of visible.value) {
-        const answer = data.value[f.id]?.rows
-        if (!row.cells[f.id]) row.cells[f.id] = answer && answer.state !== 'ok' ? toShown(answer) : { state: 'ok', amounts: f.unit === 'money' ? [] : [{ value: 0 }] }
-      }
-    }
+    fillGaps(out, data.value)
     return [...out.values()].sort((a, b) => a.sortBy < b.sortBy ? -1 : a.sortBy > b.sortBy ? 1 : 0)
   })
 
