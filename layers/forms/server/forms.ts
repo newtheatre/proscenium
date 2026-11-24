@@ -258,15 +258,14 @@ export function writePublish(unit: UnitView, form: FormRow, draft: DraftRow, pla
     sql: 'UPDATE forms_forms SET live_version_id = ?, status = CASE status WHEN \'draft\' THEN \'live\' ELSE status END WHERE id = ? AND live_version_id IS ?',
     params: [versionId, form.id, form.liveVersionId],
   }).expect(1, stale)
-  const present = questionsOf(plan.definition).map(q => q.question)
-  for (const q of present) {
-    unit.add({
-      sql: `INSERT INTO forms_fields (form_id, question_id, key, type, data_class, label, first_version, retired_in_version) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
-            ON CONFLICT (form_id, question_id) DO UPDATE SET key = excluded.key, data_class = excluded.data_class, label = excluded.label, retired_in_version = NULL`,
-      params: [form.id, q.id, q.key, q.type, q.dataClass, q.label, plan.number],
-    })
-  }
-  for (const c of plan.summary.changes) {
-    if (c.kind === 'retired') unit.add({ sql: 'UPDATE forms_fields SET retired_in_version = ? WHERE form_id = ? AND question_id = ?', params: [plan.number, form.id, c.questionId] })
-  }
+  // One statement each, however many questions, so a long form stays inside the unit's statement limit.
+  const present = questionsOf(plan.definition).map(({ question: q }) => ({ id: q.id, key: q.key, type: q.type, dataClass: q.dataClass, label: q.label }))
+  unit.add({
+    sql: `INSERT INTO forms_fields (form_id, question_id, key, type, data_class, label, first_version, retired_in_version)
+          SELECT ?, json_extract(j.value, '$.id'), json_extract(j.value, '$.key'), json_extract(j.value, '$.type'), json_extract(j.value, '$.dataClass'), json_extract(j.value, '$.label'), ?, NULL FROM json_each(?) j WHERE true
+          ON CONFLICT (form_id, question_id) DO UPDATE SET key = excluded.key, data_class = excluded.data_class, label = excluded.label, retired_in_version = NULL`,
+    params: [form.id, plan.number, JSON.stringify(present)],
+  })
+  const retired = plan.summary.changes.filter(c => c.kind === 'retired').map(c => c.questionId)
+  if (retired.length) unit.add({ sql: 'UPDATE forms_fields SET retired_in_version = ? WHERE form_id = ? AND question_id IN (SELECT value FROM json_each(?))', params: [plan.number, form.id, JSON.stringify(retired)] })
 }
