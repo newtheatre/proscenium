@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import type { DonationLine } from '../../../../composables/useDonationText'
 
-interface Donation extends DonationLine { fundId: string, accountId: string | null, email: string | null, acknowledgeAs: string | null, message: string | null, intentId: string | null, createdAt: number }
+interface Donation extends DonationLine { fundId: string, campaignId: string | null, campaign: string | null, accountId: string | null, email: string | null, acknowledgeAs: string | null, message: string | null, intentId: string | null, createdAt: number }
 
 const { t } = useT()
 const text = useDonationText()
@@ -51,6 +51,16 @@ const gift = computed(() => data.value?.donation)
               {{ t('fundraising.donation.channel') }}
             </dt>
             <dd>{{ t(`fundraising.channels.${gift.channel}`) }}</dd>
+            <template v-if="gift.campaignId">
+              <dt class="text-muted">
+                {{ t('fundraising.donation.campaign') }}
+              </dt>
+              <dd>
+                <ULink :to="`/console/fundraising/campaigns/${gift.campaignId}`">
+                  {{ gift.campaign }}
+                </ULink>
+              </dd>
+            </template>
             <dt class="text-muted">
               {{ t('fundraising.donation.donor') }}
             </dt>

@@ -1,12 +1,12 @@
 <!-- Give (P3, FR-07): an amount from the buttons or typed within the limits, a fund where the theatre
-     offers a choice, who is giving, then the card. Nothing is chosen for the donor. Signed in, the
-     gift is on their account; otherwise they give an email address for the thanks. -->
+     offers a choice (or the campaign the page was opened from), who is giving, then the card. Nothing
+     is chosen for the donor. Signed in, the gift is on their account; otherwise they give an email. -->
 <script setup lang="ts">
 definePageMeta({ key: 'fundraising-give' })
 const { t } = useT()
 const { money } = useMoneyText()
 useSeoMeta({ title: () => t('fundraising.give.title') })
-const { options, fund, form, challenge, refusal, card, token, choose, validate, give, signedIn } = await useGive()
+const { options, campaign, mayShowAmount, fund, purpose, form, challenge, refusal, card, token, choose, validate, give, signedIn } = await useGive()
 const { data, status, error, refresh } = options
 const formEl = useFormRef('formEl')
 const fundItems = computed(() => (data.value?.funds ?? []).map(f => ({ value: f.id, label: f.name })))
@@ -19,7 +19,7 @@ watch(token, (link) => {
 
 <template>
   <PageFrame
-    :title="t('fundraising.give.title')"
+    :title="campaign ? t('fundraising.give.title-campaign', { campaign: campaign.title }) : t('fundraising.give.title')"
     :description="t('fundraising.give.help')"
     width="reading"
   >
@@ -36,6 +36,13 @@ watch(token, (link) => {
         >
           {{ t('fundraising.give.no-online') }}
         </p>
+        <UAlert
+          v-else-if="campaign && !campaign.open"
+          color="info"
+          variant="subtle"
+          :title="t('fundraising.support.closed')"
+          :actions="[{ label: t('fundraising.support.give-to', { fund: campaign.fund.name }), to: `/support/give?fund=${campaign.fund.id}` }]"
+        />
         <div
           v-else-if="card"
           class="space-y-4"
@@ -66,10 +73,10 @@ watch(token, (link) => {
             @choose="choose"
           />
           <UFormField
-            v-if="fundItems.length > 1"
+            v-if="!campaign && fundItems.length > 1"
             name="fundId"
             :label="t('fundraising.give.fund')"
-            :help="fund?.purpose ?? undefined"
+            :help="purpose ?? undefined"
           >
             <USelect
               v-model="form.fundId"
@@ -84,6 +91,16 @@ watch(token, (link) => {
             v-model:message="form.message"
             :signed-in="signedIn"
           />
+          <UFormField
+            v-if="mayShowAmount"
+            name="showAmount"
+            :help="t('fundraising.give.show-amount-help')"
+          >
+            <UCheckbox
+              v-model="form.showAmount"
+              :label="t('fundraising.give.show-amount')"
+            />
+          </UFormField>
           <TurnstileCheck
             quiet
             @token="challenge = $event"

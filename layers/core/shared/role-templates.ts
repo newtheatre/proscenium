@@ -13,6 +13,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'core.performance.schedule', 'core.season.manage', 'core.collection.manage',
       'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.order.view', 'box-office.report.view', 'box-office.comp.approve',
       'front-of-house.shift.view', 'front-of-house.night-report.view',
+      'fundraising.campaign.manage',
     ],
   },
   {
@@ -53,7 +54,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'bar.sale.view',
       'budgets.budget.view', 'budgets.budget.manage', 'budgets.budget.approve', 'budgets.category.manage',
       'invoicing.export.manage', 'invoicing.settings.manage',
-      'fundraising.donation.view', 'fundraising.fund.manage', 'fundraising.settings.manage',
+      'fundraising.donation.view', 'fundraising.fund.manage', 'fundraising.campaign.manage', 'fundraising.settings.manage',
     ],
   },
 ]

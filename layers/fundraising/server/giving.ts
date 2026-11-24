@@ -1,33 +1,56 @@
-// Giving online (FR-07, rules D1, D4, D5): the Give page's choices, a gift started as a pending
+// Giving online (FR-07, rules D1, D4, D5, K3): the Give page's choices, a gift started as a pending
 // donation with a payment of its own, and the thanks page opened by the link the browser keeps. The
 // link is a token handed out once; only its keyed hash is stored (Foundations, T1 to T5).
 import { z } from 'zod'
 import { all, first, linkTokens, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { collect, intentStatus, methodsFor, refreshIntent, startAttempt, type StartResult } from '#modules/payments'
-import { defaultFund, getFund } from './funds'
+import { getCampaign } from './campaigns'
+import { defaultFund } from './funds'
 
 export const giveFields = z.object({
   amountMinor: z.number().int().min(1),
   fundId: z.string().optional(),
+  campaignId: z.string().optional(),
   name: z.string().trim().max(120).optional(), // not-policy: shape bound
   email: z.string().trim().email().max(254).optional(), // not-policy: the longest address the mail standards allow
   acknowledgeAs: z.string().trim().max(60).optional(), // not-policy: the column's bound
   message: z.string().trim().max(500).optional(), // not-policy: the column's bound
+  showAmount: z.boolean().optional(),
 }).strict()
 export type GiveFields = z.infer<typeof giveFields>
 
-export interface GiveOptions { presets: number[], minMinor: number, maxMinor: number, currency: string, online: boolean, funds: { id: string, name: string, purpose: string | null, isDefault: boolean }[] }
+export interface OfferedFund { id: string, name: string, purpose: string | null, isDefault: boolean }
+export interface GiveCampaign { id: string, slug: string, title: string, open: boolean, fund: { id: string, name: string }, listAmounts: 'none' | 'band' | 'exact', listNames: boolean }
+export interface GiveOptions { presets: number[], minMinor: number, maxMinor: number, currency: string, online: boolean, funds: OfferedFund[], campaign: GiveCampaign | null }
 
-export async function giveOptions(): Promise<GiveOptions> {
+// A fund takes gifts on the Give page when it is offered or the default, or when a public campaign's
+// page (open or closed) points donors to it.
+const GIVABLE = `state = 'active' AND (offered = 1 OR is_default = 1 OR EXISTS (SELECT 1 FROM fundraising_campaigns c
+  WHERE c.fund_id = fundraising_funds.id AND c.state IN ('open', 'closed')))`
+
+/** The funds a donor may choose outside a campaign, the default first; with `also`, that fund too if it takes gifts. */
+export async function offeredFunds(also?: string): Promise<OfferedFund[]> {
   const funds = await all<{ id: string, name: string, purpose: string | null, isDefault: number }>(
-    "SELECT id, name, purpose, is_default AS isDefault FROM fundraising_funds WHERE state = 'active' AND (offered = 1 OR is_default = 1) ORDER BY is_default DESC, sort, name")
+    `SELECT id, name, purpose, is_default AS isDefault FROM fundraising_funds
+      WHERE state = 'active' AND (offered = 1 OR is_default = 1) OR (id = ? AND ${GIVABLE}) ORDER BY is_default DESC, sort, name`, also ?? '')
+  return funds.map(f => ({ ...f, isDefault: !!f.isDefault }))
+}
+
+async function campaignOption(slug: string | undefined): Promise<GiveCampaign | null> {
+  const c = slug ? await getCampaign({ slug }) : null
+  if (!c || (c.state !== 'open' && c.state !== 'closed')) return null
+  return { id: c.id, slug: c.slug, title: c.title, open: c.state === 'open', fund: { id: c.fundId, name: c.fund }, listAmounts: c.listAmounts, listNames: c.listNames }
+}
+
+export async function giveOptions(campaignSlug?: string, fundId?: string): Promise<GiveOptions> {
   return {
     presets: await useSetting('fundraising.giving.presets') as number[],
     minMinor: await useSetting('fundraising.giving.min') as number,
     maxMinor: await useSetting('fundraising.giving.max') as number,
     currency: await useSetting('core.locale.currency') as string,
     online: (await methodsFor('online')).length > 0,
-    funds: funds.map(f => ({ ...f, isDefault: !!f.isDefault })),
+    funds: await offeredFunds(fundId),
+    campaign: await campaignOption(campaignSlug),
   }
 }
 
@@ -38,11 +61,20 @@ async function checkAmount(amountMinor: number) {
   if (amountMinor > max) refuse('fundraising.give.too-large', 'That is more than we can take online.', { status: 422, fields: { amountMinor: 'fundraising.give.too-large' }, remedy: 'Contact the theatre to give a larger amount.' })
 }
 
-/** D4: a fund the donor chose among those offered, or the default. */
+/** D4: a campaign's gift goes to its fund; otherwise the fund the donor chose, or the default. */
+async function destinationFor(input: GiveFields): Promise<{ fundId: string, campaignId: string | null, productionId: string | null, showAmount: boolean }> {
+  if (!input.campaignId) return { fundId: await fundFor(input.fundId), campaignId: null, productionId: null, showAmount: false }
+  const c = await getCampaign({ id: input.campaignId })
+  if (!c || c.state !== 'open') refuse('fundraising.give.campaign-closed', 'This campaign is not taking gifts.', { status: 409, fields: { campaignId: 'fundraising.give.campaign-closed' }, remedy: 'Give to the theatre from the Give page.' })
+  // K3: the amount shows beside a name only where the campaign shows amounts and a name was given.
+  const showAmount = !!input.showAmount && c!.listNames && c!.listAmounts !== 'none' && !!input.acknowledgeAs
+  return { fundId: c!.fundId, campaignId: c!.id, productionId: c!.productionId, showAmount }
+}
+
 async function fundFor(fundId: string | undefined): Promise<string> {
   if (!fundId) return (await defaultFund() ?? refuse('fundraising.fund.none', 'Giving is not set up here yet.', { status: 409 })).id
-  const fund = await getFund(fundId)
-  if (!fund || fund.state !== 'active' || !(fund.offered || fund.isDefault)) refuse('fundraising.give.fund-closed', 'That fund is not taking gifts.', { status: 409, fields: { fundId: 'fundraising.give.fund-closed' } })
+  const fund = await first<{ id: string }>(`SELECT id FROM fundraising_funds WHERE id = ? AND ${GIVABLE}`, fundId)
+  if (!fund) refuse('fundraising.give.fund-closed', 'That fund is not taking gifts.', { status: 409, fields: { fundId: 'fundraising.give.fund-closed' } })
   return fund!.id
 }
 
@@ -56,16 +88,16 @@ function donorOf(actor: Actor, input: GiveFields): { accountId: string | null, e
 /** A pending gift with its own payment, and the link to its thanks page. */
 export async function startGift(unit: UnitView, actor: Actor, input: GiveFields): Promise<{ token: string, amountMinor: number, currency: string }> {
   await checkAmount(input.amountMinor)
-  const fundId = await fundFor(input.fundId)
+  const to = await destinationFor(input)
   const donor = donorOf(actor, input)
   const currency = await useSetting('core.locale.currency') as string
   const id = newId('gdn')
   const { token, hash } = await linkTokens.issue()
   const at = nowMs()
   unit.add({
-    sql: `INSERT INTO fundraising_donations (id, account_id, contact_email, donor_name, amount_minor, currency, fund_id, channel, state, acknowledge_as, message, link_hash, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'online', 'pending', ?, ?, ?, ?, ?)`,
-    params: [id, donor.accountId, donor.email, input.name || null, input.amountMinor, currency, fundId, input.acknowledgeAs || null, input.message || null, hash, at, at],
+    sql: `INSERT INTO fundraising_donations (id, account_id, contact_email, donor_name, amount_minor, currency, fund_id, campaign_id, production_id, channel, state, acknowledge_as, show_amount, message, link_hash, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', 'pending', ?, ?, ?, ?, ?, ?)`,
+    params: [id, donor.accountId, donor.email, input.name || null, input.amountMinor, currency, to.fundId, to.campaignId, to.productionId, input.acknowledgeAs || null, to.showAmount ? 1 : 0, input.message || null, hash, at, at],
   })
   const expiresAt = at + (await useSetting('fundraising.giving.pay-within') as number) * 1000 // not-policy: seconds to milliseconds
   const { intentId, partIds } = await collect(unit, { parts: [{ owner: { module: 'fundraising', record: id }, amountMinor: input.amountMinor }], currency, expiresAt })

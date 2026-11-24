@@ -1,5 +1,5 @@
-// Fundraising (third round, spec 10, part 2): funds and donations so far. A donation is what a
-// charity needs about a gift; its money lives in Payments and Finance. Gift Aid, campaigns,
+// Fundraising (third round, spec 10, part 2): funds, campaigns and donations so far. A donation is
+// what a charity needs about a gift; its money lives in Payments and Finance. Gift Aid,
 // sponsorships, collections and grants add their tables with their slices.
 import { check, index, integer, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
@@ -11,6 +11,8 @@ export const HOW_RECEIVED = ['card', 'cash', 'cheque', 'bank-transfer', 'elsewhe
 export const DONATION_STATES = ['pending', 'received', 'abandoned', 'refunded'] as const
 export const GIFT_AID = ['none', 'eligible', 'claimed', 'adjusted', 'ineligible'] as const
 export const SDS = ['none', 'eligible', 'claimed', 'excluded'] as const
+export const CAMPAIGN_STATES = ['draft', 'open', 'closed', 'archived'] as const
+export const LIST_AMOUNTS = ['none', 'band', 'exact'] as const
 
 const inList = (values: readonly string[]) => sql.raw(values.map(v => `'${v}'`).join(', '))
 
@@ -37,6 +39,51 @@ export const funds = defineTable('fundraising_funds', {
     check('fundraising_funds_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
     check('fundraising_funds_purpose', sql`${t.restricted} = 0 OR length(coalesce(${t.purpose}, '')) > 0`),
     check('fundraising_funds_default_active', sql`${t.isDefault} = 0 OR ${t.state} = 'active'`),
+  ],
+})
+
+/** Appeals with a page of their own (part 2, Campaigns). Every gift to one goes to its fund (D4). */
+export const campaigns = defineTable('fundraising_campaigns', {
+  id: col.id(),
+  slug: col.public(text('slug').notNull()),
+  title: col.public(text('title').notNull()),
+  summary: col.public(text('summary').notNull()),
+  body: col.public(text('body')),
+  fundId: col.ref('fundraising_funds'),
+  productionId: col.internal(text('production_id')),
+  targetMinor: col.minor('target_minor'),
+  currency: col.currency('currency').notNull(),
+  offsetMinor: col.minor('offset_minor').notNull().default(0),
+  offsetNote: col.internal(text('offset_note')),
+  opensAt: col.timestamp('opens_at').notNull(),
+  closesAt: col.timestamp('closes_at'),
+  // Published but waiting for opens_at: the task opens it then.
+  publishedAt: col.timestamp('published_at'),
+  state: col.internal(text('state', { enum: CAMPAIGN_STATES }).notNull().default('draft')),
+  showTotal: col.internal(integer('show_total', { mode: 'boolean' }).notNull()),
+  countGiftAid: col.internal(integer('count_gift_aid', { mode: 'boolean' }).notNull()),
+  listNames: col.internal(integer('list_names', { mode: 'boolean' }).notNull().default(false)),
+  listAmounts: col.internal(text('list_amounts', { enum: LIST_AMOUNTS }).notNull().default('none')),
+  targetReachedAt: col.timestamp('target_reached_at'),
+  createdBy: col.account('created_by', { role: 'actor', onMerge: 'alias' }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'gcp',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('fundraising_campaigns_slug').on(t.slug),
+    index('fundraising_campaigns_state').on(t.state, t.opensAt),
+    index('fundraising_campaigns_production').on(t.productionId),
+    check('fundraising_campaigns_state', sql`${t.state} IN (${inList(CAMPAIGN_STATES)})`),
+    check('fundraising_campaigns_list_amounts', sql`${t.listAmounts} IN (${inList(LIST_AMOUNTS)})`),
+    check('fundraising_campaigns_slug_shape', sql`${t.slug} GLOB '[a-z0-9]*' AND ${t.slug} NOT GLOB '*[^a-z0-9-]*' AND ${t.slug} NOT LIKE '%-' AND length(${t.slug}) <= 80`),
+    check('fundraising_campaigns_title', sql`length(${t.title}) BETWEEN 1 AND 120`),
+    check('fundraising_campaigns_summary', sql`length(${t.summary}) BETWEEN 1 AND 200`),
+    check('fundraising_campaigns_target', sql`${t.targetMinor} IS NULL OR ${t.targetMinor} > 0`),
+    check('fundraising_campaigns_offset', sql`${t.offsetMinor} >= 0 AND (${t.offsetMinor} = 0 OR length(coalesce(${t.offsetNote}, '')) > 0)`),
+    check('fundraising_campaigns_closes', sql`${t.closesAt} IS NULL OR ${t.closesAt} > ${t.opensAt}`),
   ],
 })
 
@@ -104,4 +151,4 @@ export const donations = defineTable('fundraising_donations', {
   ],
 })
 
-export const tables = { funds, donations }
+export const tables = { funds, campaigns, donations }

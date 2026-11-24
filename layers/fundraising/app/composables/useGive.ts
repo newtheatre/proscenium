@@ -1,7 +1,8 @@
-// The Give page's state (P3, rules D1, D5): the amount from a preset or typed, the fund, who is
-// giving, then the payment. Starting makes a pending gift and its link; paying goes to the
+// The Give page's state (P3, rules D1, D4, D5, K3): the amount from a preset or typed, the fund or the
+// campaign the page was opened from, who is giving, then the payment. Starting makes a pending gift and its link; paying goes to the
 // provider's card form here, or its own page and back to the thanks page.
-export interface GiveOptions { presets: number[], minMinor: number, maxMinor: number, currency: string, online: boolean, funds: { id: string, name: string, purpose: string | null, isDefault: boolean }[] }
+export interface GiveCampaign { id: string, slug: string, title: string, open: boolean, fund: { id: string, name: string }, listAmounts: 'none' | 'band' | 'exact', listNames: boolean }
+export interface GiveOptions { presets: number[], minMinor: number, maxMinor: number, currency: string, online: boolean, funds: { id: string, name: string, purpose: string | null, isDefault: boolean }[], campaign: GiveCampaign | null }
 export interface CardStep { kind: 'client-secret', provider: string, secret: string, publishableKey: string }
 
 export async function useGive() {
@@ -9,10 +10,17 @@ export async function useGive() {
   const { $api } = useNuxtApp()
   const { toRefusal, fieldErrors } = useRefusal()
   const { viewer } = useViewer()
-  const options = await useAPI<GiveOptions>('/api/fundraising/give/options', { key: 'fundraising:give:options' })
-  const fund = computed(() => options.data.value?.funds.find(f => f.id === form.fundId) ?? options.data.value?.funds.find(f => f.isDefault))
+  const route = useRoute()
+  const param = (name: string) => typeof route.query[name] === 'string' ? route.query[name] as string : undefined
+  const query = computed(() => ({ campaign: param('campaign'), fund: param('fund') }))
+  const options = await useAPI<GiveOptions>('/api/fundraising/give/options', { key: 'fundraising:give:options', query })
+  const campaign = computed(() => options.data.value?.campaign ?? null)
+  const fund = computed(() => campaign.value?.fund ?? options.data.value?.funds.find(f => f.id === form.fundId) ?? options.data.value?.funds.find(f => f.isDefault))
+  const purpose = computed(() => options.data.value?.funds.find(f => f.id === fund.value?.id)?.purpose ?? null)
+  // K3: the amount may show beside a name only on a campaign that shows amounts.
+  const mayShowAmount = computed(() => !!campaign.value?.listNames && campaign.value.listAmounts !== 'none' && !!form.acknowledgeAs.trim())
 
-  const form = reactive({ amountMinor: null as number | null, other: false, fundId: undefined as string | undefined, name: '', email: '', acknowledgeAs: '', message: '' })
+  const form = reactive({ amountMinor: null as number | null, other: false, fundId: param('fund'), name: '', email: '', acknowledgeAs: '', message: '', showAmount: false })
   const challenge = ref('')
   const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
   const card = ref<CardStep | null>(null)
@@ -40,7 +48,9 @@ export async function useGive() {
       headers: { 'idempotency-key': idempotency, ...(challenge.value ? { 'cf-turnstile-response': challenge.value } : {}) },
       body: {
         amountMinor: form.amountMinor,
-        fundId: form.fundId,
+        fundId: campaign.value ? undefined : form.fundId,
+        campaignId: campaign.value?.id,
+        showAmount: mayShowAmount.value && form.showAmount ? true : undefined,
         name: form.name.trim() || undefined,
         email: viewer.value.signedIn ? undefined : form.email.trim(),
         acknowledgeAs: form.acknowledgeAs.trim() || undefined,
@@ -68,5 +78,5 @@ export async function useGive() {
     }
   }
 
-  return { options, fund, form, challenge, refusal, card, token, choose, validate, give, signedIn: computed(() => viewer.value.signedIn) }
+  return { options, campaign, mayShowAmount, fund, purpose, form, challenge, refusal, card, token, choose, validate, give, signedIn: computed(() => viewer.value.signedIn) }
 }

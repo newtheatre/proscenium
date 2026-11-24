@@ -1,5 +1,5 @@
 // Donations in the console (FR-17, screens C2 and C3): newest first, searched by reference or donor,
-// filtered by fund and state. Pending and abandoned gifts show only when asked for: they are tries,
+// filtered by fund, campaign and state. Pending and abandoned gifts show only when asked for: they are tries,
 // not gifts. Reading them is audited by the ability.
 import { z } from 'zod'
 import { all, first, refuse } from '#kit'
@@ -8,12 +8,15 @@ import { DONATION_STATES } from './db/schema'
 export const donationQuery = z.object({
   q: z.string().trim().max(120).optional(), // not-policy: shape bound
   fundId: z.string().optional(),
+  campaignId: z.string().optional(),
   state: z.enum(DONATION_STATES).optional(),
 }).strict()
 
 export interface DonationLine { id: string, reference: string | null, donor: string | null, amountMinor: number, refundedMinor: number, currency: string, fund: string, channel: string, state: string, receivedOn: string | null, giftAid: string }
 export interface Donation extends DonationLine {
   fundId: string
+  campaignId: string | null
+  campaign: string | null
   accountId: string | null
   email: string | null
   acknowledgeAs: string | null
@@ -35,15 +38,16 @@ export async function listDonations(query: z.infer<typeof donationQuery>): Promi
     `SELECT ${LINE} ${FROM}
       WHERE (? IS NULL OR lower(coalesce(d.reference, '')) LIKE ? OR lower(coalesce(${DONOR}, '')) LIKE ?)
         AND (? IS NULL OR d.fund_id = ?)
+        AND (? IS NULL OR d.campaign_id = ?)
         AND (CASE WHEN ? IS NULL THEN d.state IN ('received', 'refunded') ELSE d.state = ? END)
       ORDER BY coalesce(d.received_on, '') DESC, d.created_at DESC LIMIT ${PAGE}`,
-    like, like, like, query.fundId ?? null, query.fundId ?? null, query.state ?? null, query.state ?? null,
+    like, like, like, query.fundId ?? null, query.fundId ?? null, query.campaignId ?? null, query.campaignId ?? null, query.state ?? null, query.state ?? null,
   )
 }
 
 export async function getDonation(id: string): Promise<Donation> {
   const row = await first<Donation>(
-    `SELECT ${LINE}, d.fund_id AS fundId, d.account_id AS accountId, d.contact_email AS email, d.acknowledge_as AS acknowledgeAs,
+    `SELECT ${LINE}, d.fund_id AS fundId, d.campaign_id AS campaignId, (SELECT title FROM fundraising_campaigns WHERE id = d.campaign_id) AS campaign, d.account_id AS accountId, d.contact_email AS email, d.acknowledge_as AS acknowledgeAs,
        d.message, d.intent_id AS intentId, d.gift_aid_reason AS giftAidReason, d.created_at AS createdAt ${FROM} WHERE d.id = ?`, id)
   return row ?? refuse('core.not-found', 'There is no gift with that reference.', { status: 404 })
 }
