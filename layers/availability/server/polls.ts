@@ -17,7 +17,7 @@ const MINUTE_MS = 60_000 // not-policy: a minute
 
 export interface PollInput { title: string, groupIds: string[], accountIds: string[], must: string[], spaceIds: string[], length: number, slots: { date: string, start: number }[], answersBy: string }
 
-interface FindRow { id: string, title: string, length_minutes: number, created_by: string, answers_by: number, state: PollState, decided_slot_id: string | null, decided_at: number | null, abandoned_at: number | null }
+interface FindRow { id: string, title: string, length_minutes: number, created_by: string, answers_by: number, state: PollState, decided_slot_id: string | null, decided_at: number | null, abandoned_at: number | null, outcome_ref: string | null }
 export interface PollSlot { id: string, date: string, start: number, end: number }
 
 const local = async (ms: number) => {
@@ -93,7 +93,7 @@ const isAsked = async (findId: string, accountId: string) =>
   !!await useDb().get(sql`SELECT 1 FROM availability_find_people WHERE find_id = ${findId} AND ${inAccountScope('account_id', accountId)}`)
 
 export interface PollView {
-  poll: { id: string, title: string, length: number, answersBy: number, state: PollState, open: boolean, decidedSlotId: string | null, organiser: string }
+  poll: { id: string, title: string, length: number, answersBy: number, state: PollState, open: boolean, decidedSlotId: string | null, organiser: string, meetingId: string | null }
   slots: PollSlot[]
   organiser: boolean
   asked: boolean
@@ -124,7 +124,7 @@ export async function pollView(id: string, viewer: Actor): Promise<PollView> {
   const mine = Object.fromEntries(votes.filter(v => v.account_id === viewer.accountId).map(v => [v.slot_id, v.answer]))
   const names = await useDb().all<{ id: string, name: string | null }>(sql`SELECT id, name FROM core_accounts WHERE id = ${f.created_by}`)
   const view: PollView = {
-    poll: { id, title: f.title, length: f.length_minutes, answersBy: f.answers_by, state: f.state, open: f.state === 'polling' && f.answers_by > nowMs(), decidedSlotId: f.decided_slot_id, organiser: names[0]?.name ?? '' },
+    poll: { id, title: f.title, length: f.length_minutes, answersBy: f.answers_by, state: f.state, open: f.state === 'polling' && f.answers_by > nowMs(), decidedSlotId: f.decided_slot_id, organiser: names[0]?.name ?? '', meetingId: f.outcome_ref?.startsWith('availability.meeting:') ? f.outcome_ref.slice('availability.meeting:'.length) : null },
     slots,
     organiser,
     asked,

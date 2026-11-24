@@ -54,6 +54,14 @@ What the build settled that the parts above leave open, and where it differs fro
 - **The loop warning** is an audit entry (`detail.loop`) on the response; the health check joins it to the form's live version, so publishing a fixed version clears it.
 - **Not done.** Records' own fields (FB-508) never take system moves, since they have no stages.
 
+## C-67: a season's own public words
+
+- **Where it lives.** The contract in `layers/core/server/points/public-wording.ts`; `publicWordingFor` and the clash check in `layers/core/server/programme/wording.ts`; the health check `core.public-wording`. On the public site, `usePublicWords` and the `public-site.words.*` defaults. `docs/kit/interface.md` ("A season's own public words") is the guide.
+- **What changes.** The production page (the about heading, the access and effects lines of a date, the "has no warnings" sentences) and the season page's empty state take the words. The public production and season answers carry `wording`.
+- **Emails and the feed.** No booking email names any of the eight words today (they say the show's title and date), so none changes. The calendar feed (C-70, lane A) should call `publicWordingFor` when it lands.
+- **Failing contributors** count as not applying.
+- **Tests.** `layers/public-site/tests/integration/public-wording.test.ts`, through the `worded` fixture module.
+
 ## BO-73: door headcount
 
 - **Where it lives.** The counter is `/live/door/<performance>/count`, reached by the Scan and Count tabs at the top of the live door. A performance never put on sale and with no bookings opens on Count (HC1). The server is `layers/box-office/server/headcount.ts`; the arithmetic, shared with the device, is `layers/box-office/shared/headcount.ts`.
