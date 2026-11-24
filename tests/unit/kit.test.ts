@@ -275,13 +275,15 @@ describe('tables', () => {
     expect(out).toContain('CREATE TABLE `lost_property_bins` (\n\t`id` text PRIMARY KEY\n);')
     expect(withoutRowidSql(out, ['lost_property_votes'])).toBe(out)
   })
-  it('let an append-only table name the columns that may still change, and refuse one it does not have', () => {
+  it('let an append-only table name the columns that may still change, but never one of decision 0010\'s tables', () => {
     const columns = () => ({ id: col.id(), state: col.internal(text('state')), terms: col.internal(text('terms')) })
     const versions = defineTable('lost_property_terms', columns(), { id: 'lpt', realm: 'operational', subject: 'none', appendOnly: { except: ['state'] } })
     const update = appendOnlyTriggers(tableMeta(versions)!).find(t => t.name.endsWith('_update'))!.sql
     expect(update).toContain('NEW.`terms` IS OLD.`terms`')
     expect(update).not.toContain('`state`')
     expect(() => defineTable('lost_property_terms', columns(), { id: 'lpt', realm: 'operational', subject: 'none', appendOnly: { except: ['status'] } })).toThrow(/"status" in except/)
+    for (const table of ['finance_ledger_lines', 'lost_property_prices', 'lost_property_stock_movements', 'core_audit'])
+      expect(() => defineTable(table, columns(), { id: 'lpt', realm: 'operational', subject: 'none', appendOnly: { except: ['state'] } })).toThrow(/decision 0010/)
   })
   it('mark a column to be sealed with the core key', () => {
     expect(columnMeta(col.internal(text('secret'), { encrypted: true }))?.encrypted).toBe(true)

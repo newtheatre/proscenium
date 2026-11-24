@@ -184,6 +184,9 @@ export const col = {
   perRow: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: { classColumn: string }) => tag(builder, { class: 'perRow', helper: 'wrapped', classColumn: options.classColumn }),
 }
 
+// Decision 0010's tables: no column of theirs may ever change, so appendOnly: { except } refuses them.
+const WHOLLY_APPEND_ONLY = [/^finance_/, /^core_audit$/, /_stock_movements$/, /_incidents?$/, /_incident_updates$/, /_age_checks$/, /_prices$/, /_records$/]
+
 /** Every table declared so far, by SQL name. `col.ref` resolves through it. */
 const tables = new Map<string, unknown>()
 
@@ -269,8 +272,10 @@ export function defineTable<TName extends string, TColumns extends Record<string
     for (const [key, c] of Object.entries(metas)) {
       if (c.meta.account && c.meta.account.onMerge !== 'alias') throw new DeclarationError(field(key), "an append-only table cannot be rewritten by a merge, so its account columns use onMerge: 'alias'")
     }
-    for (const name of typeof options.appendOnly === 'object' ? options.appendOnly.except : []) {
-      if (!all.some(c => c.sql === name)) throw new DeclarationError(field('appendOnly'), `"${name}" in except is not a column of this table`)
+    if (typeof options.appendOnly === 'object' && WHOLLY_APPEND_ONLY.some(p => p.test(name)))
+      throw new DeclarationError(field('appendOnly'), 'the ledger, stock, incidents, age checks, prices, records and audit are wholly append-only (decision 0010): correct by superseding, with appendOnly: true')
+    for (const column of typeof options.appendOnly === 'object' ? options.appendOnly.except : []) {
+      if (!all.some(c => c.sql === column)) throw new DeclarationError(field('appendOnly'), `"${column}" in except is not a column of this table`)
     }
   }
   if (options.timestamps !== undefined) {
