@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { defineRoute, idSchema, nowMs, refuse } from '#kit'
 import { getFormBySlug, getVersion } from '../../../../forms'
 import { sendResponse } from '../../../../responses'
+import { arrive } from '../../../../stages'
 import type { Answers, Definition } from '../../../../../shared/engine'
 import { shownMarking } from '../../../../../shared/engine'
 
@@ -23,7 +24,9 @@ export default defineRoute({ public: true, rateLimit: 'public-form', protect: 't
   const version = form ? await getVersion(form.liveVersionId) : null
   if (!form || !link || !version) return refuse('forms.form.not-found', 'There is no form here.', { status: 404 })
 
-  const sent = await sendResponse(unit, { form, version, link, actor, responseId: input.responseId, answers: input.answers as Answers, email: input.email ?? null, at: nowMs() })
+  const at = nowMs()
+  const sent = await sendResponse(unit, { form, version, link, actor, responseId: input.responseId, answers: input.answers as Answers, email: input.email ?? null, at })
+  await arrive(unit, form, sent, at)
   // MK4: the person is told only what the form says to show; a crafted score in the request is never read.
   const marking = sent.marking ? shownMarking(JSON.parse(version.definition) as Definition, sent.marking) : null
   return { responseId: sent.responseId, reference: sent.reference, marking }

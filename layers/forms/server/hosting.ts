@@ -12,6 +12,7 @@ import { publicDefinition, questionsOf, withoutWorkflow } from '../shared/engine
 import { VERSION, getForm, getVersion, type VersionRow } from './forms'
 import { PLACE, draftOf, readAnswers, sendResponse, shut, words, type LinkRow, type Shut, type StoredPlace } from './responses'
 import { EVERY, attachedTo, modeOf, slotOf, type FormsSlot } from './slots'
+import { arrive } from './stages'
 
 async function slotIn(slotId: string, mode: 'submission' | 'record'): Promise<FormsSlot> {
   const slot = await slotOf(slotId)
@@ -179,7 +180,9 @@ export async function addResponse(unit: UnitView, input: { slot: string, subject
   if (!version) return refuse(input.versionId === undefined ? 'forms.form.not-found' : 'forms.version-not-of-form', input.versionId === undefined ? 'There is no form here.' : 'That version is not one of this form\'s.', { status: 404 }) // not-policy: HTTP status
   if (input.responseId !== undefined && !/^fres_[0-9A-Za-z]{26}$/.test(input.responseId)) return refuse('forms.response.not-found', 'There is no response here.', { status: 404 }) // not-policy: HTTP status; an id is its prefix and 26 characters
   const link: LinkRow = { ...row, onePerPerson: !!row.onePerPerson }
-  const sent = await sendResponse(unit, { form, version, link, actor: input.actor, responseId: input.responseId ?? newId('fres'), answers: input.answers, email: input.email?.trim().toLowerCase() || null, at: nowMs() })
+  const at = nowMs()
+  const sent = await sendResponse(unit, { form, version, link, actor: input.actor, responseId: input.responseId ?? newId('fres'), answers: input.answers, email: input.email?.trim().toLowerCase() || null, at })
+  await arrive(unit, form, sent, at)
   return { responseId: sent.responseId, reference: sent.reference, ...(sent.marking ? { marking: sent.marking } : {}) }
 }
 

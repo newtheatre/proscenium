@@ -177,7 +177,10 @@ export interface Sending {
 /** A marking as the response row keeps it: score, out of and passed, each null where nothing is marked. */
 export const markingColumns = (marked: Marked | null): [number | null, number | null, boolean | null] => marked ? [marked.score, marked.outOf, marked.passed] : [null, null, null]
 
-export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ reference: string, marking: Marked | null }> {
+/** A response just stored, as the system's moves from its first stage need it (FB-514). */
+export interface Arrived { response: ResponseRow, def: Definition, stage: Stage, answers: Answers, marking: Marked | null }
+
+export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ reference: string, marking: Marked | null, arrived: Arrived }> {
   const def = JSON.parse(s.version.definition) as Definition
   // Each file answer is read back from core's store first, so the engine checks what core holds; a file must have passed its check.
   const fileProblems = await settleFileAnswers(def, s.answers, s.responseId)
@@ -226,7 +229,12 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   unit.audit({ action: 'create', record: ['forms.response', s.responseId], detail: { formId: s.form.id, version: s.version.number } })
   unit.announce('forms.response.submitted', { responseId: s.responseId, formId: s.form.id }, { record: ['forms.response', s.responseId] })
   await tellReceived(unit, s.form, { id: s.responseId, reference, personId, respondentEmail: email })
-  return { reference, marking }
+  const response: ResponseRow = {
+    id: s.responseId, reference, formId: s.form.id, versionId: s.version.id, placementId: s.link.id, subjectType: s.link.subjectType, subjectId: s.link.subjectId,
+    personId, respondentEmail: email, state: 'submitted', stageKey: stage.key, stageKind: stage.kind, stageNote: null, currentRevision: 1,
+    submittedAt: s.at, decidedAt: null, decisionReason: null, calculated, score, outOf, passed, createdAt: s.draft?.createdAt ?? s.at,
+  }
+  return { reference, marking, arrived: { response, def, stage, answers: evaluation.answers, marking } }
 }
 
 /**
@@ -237,7 +245,7 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
  * written in the caller's unit by writeSubmission. Shared by POST /api/forms/open/:slug/responses
  * and the addResponse service another module calls.
  */
-export async function sendResponse(unit: UnitView, input: { form: FormRow, version: VersionRow, link: LinkRow, actor: Actor, responseId: string, answers: Answers, email: string | null, at: number }): Promise<{ responseId: string, reference: string, marking: Marked | null }> {
+export async function sendResponse(unit: UnitView, input: { form: FormRow, version: VersionRow, link: LinkRow, actor: Actor, responseId: string, answers: Answers, email: string | null, at: number }): Promise<{ responseId: string, reference: string, marking: Marked | null, arrived?: Arrived }> {
   const { form, link, actor } = input
   const existing = await getResponse(input.responseId)
   const theirs = existing ? await owns(existing, actor) : false
@@ -255,8 +263,8 @@ export async function sendResponse(unit: UnitView, input: { form: FormRow, versi
   if (!form.anonymous && !actor.accountId && !input.email)
     return refuse('forms.response.email-needed', 'Give an email address so we know who these answers are from.', { status: 422, fields: { email: 'forms.response.email-needed' } }) // not-policy: HTTP status
 
-  const { reference, marking } = await writeSubmission(unit, { responseId: input.responseId, form, version: input.version, link, actor, email: input.email, answers: input.answers, draft: existing, at: input.at })
-  return { responseId: input.responseId, reference, marking }
+  const { reference, marking, arrived } = await writeSubmission(unit, { responseId: input.responseId, form, version: input.version, link, actor, email: input.email, answers: input.answers, draft: existing, at: input.at })
+  return { responseId: input.responseId, reference, marking, arrived }
 }
 
 /**
