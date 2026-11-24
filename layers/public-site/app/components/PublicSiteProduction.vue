@@ -11,6 +11,8 @@ interface Note { termId: string, label: string, detail: string | null }
 interface Booking { state: 'available' | 'limited' | 'sold-out' | 'not-yet' | 'closed', link?: string, seatsLeft?: number, sellingFast?: true, opensAt?: number, waitingList?: string, label?: string, external?: true }
 interface Performance {
   id: string
+  /** Absent from an answer cached before drop-in performances were added. */
+  shape?: 'timed' | 'drop-in'
   startsAt: number
   doorsAt: number | null
   endsAt: number
@@ -479,7 +481,7 @@ useHead(() => {
                         <span v-if="p.label"> · {{ p.label }}</span>
                       </p>
                       <p class="text-sm text-muted">
-                        <span :class="p.state === 'cancelled' ? undefined : 'font-medium text-default'">{{ time(p.startsAt) }}</span>{{ [where(p), p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).map(x => ` · ${x}`).join('') }}
+                        <span :class="p.state === 'cancelled' ? undefined : 'font-medium text-default'">{{ p.shape === 'drop-in' ? t('public-site.production.open-hours', { from: time(p.startsAt), until: time(p.endsAt) }) : time(p.startsAt) }}</span>{{ [where(p), p.shape !== 'drop-in' && p.doorsAt && p.state === 'scheduled' ? t('public-site.production.doors', { time: time(p.doorsAt) }) : ''].filter(Boolean).map(x => ` · ${x}`).join('') }}
                       </p>
                       <p
                         v-if="p.effectsOff.length && p.state === 'scheduled'"

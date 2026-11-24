@@ -61,6 +61,7 @@ const LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/ // not-policy: a local date and 
 const instant = z.union([z.number().int().positive(), z.string().regex(LOCAL)])
 
 const performanceFields = z.object({
+  shape: z.enum(['timed', 'drop-in']),
   venueId: z.string().min(1),
   spaceId: z.string().min(1),
   startsAt: instant,
