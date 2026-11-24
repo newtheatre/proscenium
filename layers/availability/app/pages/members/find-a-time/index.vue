@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { clockOf, DAY_MINUTES, rowStarts } from '../../../../shared/grid'
 import { minutesOf, type ShownLevel } from '../../../../shared/levels'
 import { SLOTS_MAX, SLOTS_MIN } from '../../../../shared/find'
+import type { MeetingRow } from '../../../composables/useMeetings'
 import type { PollRow } from '../../../composables/usePolls'
 
 const { t } = useT()
@@ -14,6 +15,13 @@ const { options, choices, found, refusal, searching, shown, picked } = f
 const words = usePollWords()
 const sent = await useAPI<{ polls: PollRow[] }>('/api/availability/polls/sent', { key: 'availability:polls-sent' })
 const sending = ref(false)
+const meetings = await useAPI<{ meetings: MeetingRow[] }>('/api/availability/meetings/arranged', { key: 'availability:meetings-arranged' })
+const mwords = useMeetingWords()
+const arranging = ref<{ date: string, start: number, end: number } | null>(null)
+async function arranged(meetingId: string) {
+  arranging.value = null
+  await navigateTo(`/members/availability/meetings/${meetingId}`)
+}
 const schema = z.object({
   groupIds: z.array(z.string()).min(1, t('availability.sent.groups-needed')),
   period: z.object({ start: z.string().min(1, t('availability.find.dates-needed')), end: z.string().min(1, t('availability.find.dates-needed')) }),
@@ -173,6 +181,22 @@ const pollLine = (p: PollRow) => t('availability.poll.sent-line', { answered: p.
                 :title="t('availability.find.start')"
                 :description="t('availability.find.start-help')"
               />
+              <PageSection
+                v-if="meetings.data.value?.meetings.length"
+                :title="t('availability.meeting.mine')"
+              >
+                <RecordList flush>
+                  <RecordListItem
+                    v-for="m in meetings.data.value.meetings"
+                    :key="m.id"
+                    :to="`/members/availability/meetings/${m.id}`"
+                    icon="i-lucide-calendar-days"
+                    :name="m.title"
+                    :description="t('availability.meeting.arranged-line', { when: mwords.when(m), going: m.going, invited: m.invited })"
+                    :muted="m.state === 'cancelled'"
+                  />
+                </RecordList>
+              </PageSection>
               <PageSection
                 v-if="sent.data.value?.polls.length"
                 :title="t('availability.poll.mine')"
@@ -362,6 +386,15 @@ const pollLine = (p: PollRow) => t('availability.poll.sent-line', { answered: p.
             variant="outline"
             @click="f.pick(chosen)"
           />
+          <UButton
+            v-if="options.data.value?.arrange"
+            :label="t('availability.meeting.arrange')"
+            icon="i-lucide-calendar-plus"
+            color="neutral"
+            variant="outline"
+            class="ms-2"
+            @click="arranging = chosen; chosen = null"
+          />
           <UAlert
             v-for="(s, i) in takenHere"
             :key="i"
@@ -406,6 +439,23 @@ const pollLine = (p: PollRow) => t('availability.poll.sent-line', { answered: p.
             </ul>
           </section>
         </div>
+      </template>
+    </USlideover>
+    <USlideover
+      :open="!!arranging"
+      :title="t('availability.meeting.arrange')"
+      :description="t('availability.meeting.arrange-help')"
+      @update:open="v => { if (!v) arranging = null }"
+    >
+      <template #body>
+        <AvailabilityMeetingForm
+          v-if="arranging"
+          :start="arranging"
+          :today="options.data.value?.today ?? ''"
+          :step="found?.step ?? 30"
+          :people="{ findId: null, groupIds: choices.groupIds }"
+          @saved="arranged"
+        />
       </template>
     </USlideover>
     <UModal
