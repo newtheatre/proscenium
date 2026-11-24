@@ -358,13 +358,13 @@ export async function revive(unit: UnitView, courseId: string): Promise<void> {
 // Trainers (TR-04). A row means the person may teach the course; the fact training.course-trainer
 // reads it, so naming one needs course.manage at the course and no grant from Identity.
 
-export interface Trainer { accountId: string, addedAt: number }
+export interface Trainer { accountId: string, name: string | null, addedAt: number }
 
 /** The course's trainers, each person once however many of their merged accounts are listed. */
 export async function trainersOf(courseId: string): Promise<Trainer[]> {
   return all<Trainer>(
-    `SELECT coalesce(a.merged_into_id, t.account_id) AS accountId, min(t.added_at) AS addedAt FROM training_course_trainers t
-      LEFT JOIN core_accounts a ON a.id = t.account_id WHERE t.course_id = ? GROUP BY 1 ORDER BY 2`,
+    `SELECT coalesce(a.merged_into_id, t.account_id) AS accountId, (SELECT name FROM core_accounts n WHERE n.id = coalesce(a.merged_into_id, t.account_id)) AS name,
+      min(t.added_at) AS addedAt FROM training_course_trainers t LEFT JOIN core_accounts a ON a.id = t.account_id WHERE t.course_id = ? GROUP BY 1 ORDER BY addedAt`,
     courseId,
   )
 }

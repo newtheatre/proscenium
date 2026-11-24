@@ -19,7 +19,7 @@ Inventory is tested in the three tiers Foundations fixed: unit tests for pure ru
 
 P-1 to P-6 run locally and then against a deployed D1, and the result is recorded in this tab, dated. Rule C5, the Spaces predicate, is proved by I-39 once Spaces' amendments exist.
 
-**Not yet run.** This part specifies the proof; no code exists.
+**Run locally, 24 November 2026.** P-1 to P-6 pass against local D1 in workerd (`layers/inventory/tests/integration/gate.test.ts`); part 12 records how the check is built. The run against a deployed D1 is still to do.
 
 ## Unit tests
 

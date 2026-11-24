@@ -17,7 +17,7 @@ export default defineModule({
   stability: 'experimental',
   requires: ['payments', 'finance'],
   // Form builder joins this list with the checkout questions (R-17), once its module id exists.
-  uses: ['front-of-house', 'communications', 'promotions', 'maintenance', 'reports'],
+  uses: ['front-of-house', 'communications', 'promotions', 'maintenance', 'reports', 'companies'],
 
   settings: defineSettings('box-office', {
     'baskets.hold-for': setting.duration({ default: '10m', min: '2m', max: '60m', change, audience: 'public', quotable: true }),
@@ -318,6 +318,8 @@ export default defineModule({
     'core.quick-action': [{ id: 'box-office.door', to: '/live/door', icon: 'i-lucide-scan-line', ability: 'box-office.ticket.admit', keywords: 'box-office.quick-actions.door.keywords', order: 20 }],
     // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
     'payments.desk-basket': [{ id: 'box-office' }],
+    // BO-75: a company's named guests get complimentary tickets.
+    'companies.guest-issuer': [{ id: 'box-office', file: 'box-office' }],
     // A performance with bookings is not cancelled, rescheduled or moved until someone decides what happens to them.
     'core.change-guard': [{ id: 'box-office' }],
     'core.change-impact': [{ id: 'box-office' }],

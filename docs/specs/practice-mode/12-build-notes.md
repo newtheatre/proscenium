@@ -94,3 +94,64 @@ Three scenarios with their sample sets and checks, tested in
 - **The bar till's tab** is not built in Bar yet, so `bar.till` has no tab task when it comes.
 - **Checks may read the change just made** (`context.answer`), and a task may depend on a result
   (`when`), so turning a ticket away and taking cash can be tasks without new tables.
+
+## Slice 3, part 2: the bar (BAR-59)
+
+One scenario and its sample set, tested in `layers/bar/tests/integration/practice.test.ts`.
+
+| Part | As built |
+| --- | --- |
+| `bar.stocked` | Seeded, not copied: made with the bar's own services (`catalogue.ts`, `stock.ts`, `stock-moves.ts`), so it works on a site whose bar has no catalogue yet and the tasks always have the products they name. A bar outlet, "Practice bar", at tonight's space, selling from Standard and taking stock from a "Bar" location there. Spirits and Beer need the age check, Soft drinks and snacks do not. A gin and tonic (25 ml of gin and a tonic water), a pint of lager, a cola and crisps, each with its price and recipe, and a delivery of every item received. Returns `ageCheck` while `bar.age-check.enabled` is on |
+| `bar.till` | Opens `/live/till`, where the bar panel opens on the store's one outlet. Sample sets `core.tonight`, `payments.float` and `bar.stocked`. Abilities `payments.session.open`, `payments.session.view`, `payments.attempt.attest`, `bar.sale.sell` and `bar.opening.manage` |
+| Task: sell a recipe drink | A paid sale has a line whose recipe moved two or more stock items (its `bar_stock_movements` of kind `sale`) |
+| Task: refuse after a failed age check | The register has a refusal naming a product that needs the age check, as the till's prompt sends it. A customer turned away before anything was rung up names no product and does not count. Set only with `ageCheck` |
+| Copied | Nothing of the bar's: its tables stay empty until the sample set runs. The refusal reasons come with core's copy of `core_terms`, and bar income with Finance's accounts |
+
+### Departures from the wording
+
+- **No tab task**: bar tabs are not built in Bar yet (see part 1's departures). The scenario has two
+  tasks, and its version is raised when the tab task comes.
+- **A "recipe drink"** is read as a mixed drink, one whose recipe takes two or more stock items, so
+  selling a pint or a bag of crisps does not tick it.
+- **The bar's selling abilities** are `bar.sale.sell` and `bar.opening.manage` (closing the outlet
+  from the till), with Payments' `payments.session.view` and `payments.attempt.attest` for the
+  till's own session and cash.
+- **The theatre's own catalogue is not used**, even with `core.practice.copy-configuration` on:
+  copying it would mean products, sizes, prices, lists, choices, recipes, stock items, locations and
+  outlets, and the levels would be the real cellar's, so the sample set's small bar stands in.
+
+## Slice 3, part 3: front of house (FH-55)
+
+Two scenarios and their sample set, tested in
+`layers/front-of-house/tests/integration/practice.test.ts`.
+
+| Part | As built |
+| --- | --- |
+| `front-of-house.on-shift` | Two published shifts for tonight: a lead duty with the trainee on it, and a second duty with the four practice people `core.people` names first, all confirmed by the store's "Practice staff" (a unit each, as a manager putting people on the rota makes them). Both are called for now, or earlier where the duty's own call is, so the window is open as the trainee arrives. The theatre's own copied duties serve, or "Duty manager" and "Steward" are made; its first opening checklist for the venue serves, or a four-item "Opening checklist" is made; its card for tonight's venue serves, or a card that says it was made for practice. Returns `venue` and `checklist` |
+| `front-of-house.night` | Opens `/live/front-of-house/{tonight}`. Needs Front of house and Box office (for `box-office.sold-house`, which fills the board's figures). Tasks: check in the team (everyone on tonight's rota has checked in or was marked as not coming; working the checklist checks the trainee in, as part 3 of Front of house says), complete the opening checklist (its run for tonight is complete, with or without exceptions), write a note in the night report and sign it off |
+| `front-of-house.incident` | Opens `/live/front-of-house/{tonight}`, whose foot has "Report an incident" and "Emergency card". Tasks: find the emergency card for the venue (the card's own read answered with tonight's venue's card), report an incident where first aid was given, with at least one person named |
+| Ticking on a read | Opening a card writes nothing, so the kit gains a route option, `practice: 'ticks'`: inside a store the checks run after such a read as after a change, and a response that ticked a task carries `Proscenium-Practice-Ticked: 1`, on which `$api` reads the panel again. The card's page now reads `GET /api/front-of-house/emergency-cards/:venueId`, which is that read. The list still keeps every card on the device, and the board and front of house tonight still fetch it ahead, which ticks nothing |
+| Copied | Front of house's duties, checklists, checklist items and emergency cards |
+| Device copies | A practice tab keeps its emergency cards under a key of its own, which leaving practice forgets, so a practice card never shows on the real card page with no signal |
+
+### Departures from the wording
+
+- **Abilities.** In a store the on-shift fact grants nothing, as the theatre's fact mappings are
+  Identity's and not copied, so each scenario lists what being on shift tonight gives for real.
+  `front-of-house.night` also holds `front-of-house.night-report.sign-off`: submitting the report is
+  signing it off, which needs someone leading. `front-of-house.incident` also holds
+  `front-of-house.shift.view`, which opens tonight's board, ties the report to tonight and lets its
+  people be picked from tonight's rota.
+- **Routes.** A scenario's routes are page prefixes and the board's address is a performance id, so
+  both scenarios allow the whole of `/live/front-of-house`: the board, people, checklists, report,
+  handouts, incident and emergency card. `front-of-house.incident` opens tonight's board rather than
+  the report page, so that finding the card is a task and not where it starts. Neither holds
+  `front-of-house.handout.record`, so the handouts pages are covered but refuse in practice.
+- **Rota templates are not copied**: no practised screen reads them.
+- **The card task** needed the kit option above: rule T1 runs checks only after a change.
+
+## The live coverage check (PM-20)
+
+`bun run check:conformance` reports "Every live page can be practised" (`scripts/checks/practice.ts`):
+any page under `/live`, other than the live home, that no `core.practice-scenario` lists in its
+`routes` fails the build. A route covers its own address and every page below it.

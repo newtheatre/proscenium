@@ -7,6 +7,7 @@ import { checkAbilities, checkAccountComparisons, checkChangeCounts, checkConten
 import { checkSite } from './checks/site.ts'
 import { checkPolicies } from './checks/policies.ts'
 import { checkInterface } from './checks/interface.ts'
+import { checkPracticeCoverage } from './checks/practice.ts'
 
 let failed = 0
 function report(name: string, problems: string[]) {
@@ -41,6 +42,7 @@ report('sealSpecial and sealColumn write encrypted columns, never a token', chec
 report('Counts of changed rows are tested against nought, and SQL never reads changes()', checkChangeCounts(modules))
 report('Translations', [...checkTranslations(modules, registry), ...checkLiteralKeys(modules)])
 report('Navigation coverage', checkNavigation(modules, registry))
+report('Every live page can be practised', checkPracticeCoverage(modules))
 report('Screens are built from the kit', checkInterface(modules))
 report('Migrations', await checkMigrations(modules, registry))
 
