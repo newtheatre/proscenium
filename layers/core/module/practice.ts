@@ -41,7 +41,7 @@ export const practicePoints = {
       start: z.string().startsWith('/live'),
       routes: z.array(z.string().startsWith('/live')).min(1),
       abilities: z.array(z.string()).min(1),
-      tasks: z.array(z.object({ id: z.string(), label: z.string() }).strict()).optional(),
+      tasks: z.array(z.object({ id: z.string(), label: z.string(), when: z.string().optional() }).strict()).optional(),
       runnable: z.array(z.string()).optional(),
       outcomes: z.record(z.string(), z.array(z.enum(['approved', 'declined', 'removed', 'no-answer']))).optional(),
     }).strict(),
