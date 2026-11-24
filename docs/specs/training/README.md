@@ -5,3 +5,5 @@ This is the third-round amended Training specification (spec 14). It supersedes 
 Source doc: https://claude.ai/artifact/CnDiA4hRpvXTXonrQRCgaC
 
 Exported 24 November 2026.
+
+What the build changed is in [12-as-built.md](12-as-built.md).
