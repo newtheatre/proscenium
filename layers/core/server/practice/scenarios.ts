@@ -14,7 +14,8 @@ export interface PracticeScenario {
   start: string
   routes: string[]
   abilities: string[]
-  tasks?: { id: string, label: string }[]
+  /** `when` names a sample set's result: the task is the trainee's only where the store has it, such as cash. */
+  tasks?: { id: string, label: string, when?: string }[]
   runnable?: string[]
   outcomes?: Record<string, ('approved' | 'declined' | 'removed' | 'no-answer')[]>
 }
@@ -25,6 +26,9 @@ export type Unavailable = { code: 'core.practice.switched-off' } | { code: 'core
 export async function scenarios(): Promise<PracticeScenario[]> {
   return (await usePoint<PracticeScenario>('core.practice-scenario')).map(c => c.value)
 }
+
+/** The scenario's tasks this store sets, leaving out one whose `when` result no sample set gave. */
+export const tasksFor = (s: PracticeScenario, results: Readonly<Record<string, string>>) => (s.tasks ?? []).filter(task => !task.when || !!results[task.when])
 
 export async function scenario(id: string): Promise<PracticeScenario | undefined> {
   return (await scenarios()).find(s => s.id === id)

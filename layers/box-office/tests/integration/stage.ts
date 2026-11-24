@@ -213,7 +213,7 @@ export const manager = person(['core.production.create', 'core.production.edit',
 
 let keys = 0
 export async function req<T = any>(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> | null = manager, headers: Record<string, string> = {}): Promise<{ status: number, body: T }> {
-  const idempotency = method === 'POST' ? { 'idempotency-key': `bo${++keys}-${newId('req')}` } : {}
+  const idempotency: Record<string, string> = method === 'POST' ? { 'idempotency-key': `bo${++keys}-${newId('req')}` } : {}
   const response = await call(handle, method, path, { actor: actor ?? undefined, body, headers: { ...idempotency, ...headers } })
   return { status: response.status, body: await response.json() as T }
 }
