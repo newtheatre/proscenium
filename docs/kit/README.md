@@ -192,6 +192,17 @@ Any module may import core's services without listing core: `import { notifyAddr
   once that passes, and it is not served after. A slot with `access: 'record'` is served only to
   someone your `core.file-access` contribution allows: key it by the owning record type and export
   `{ canRead(actor, record, file) }` (type `FileAccess` from `#modules/core`).
+- Write services for productions, performances and credits (C-68), each adding to your unit and
+  checking no ability (your route checks its own): `createProduction(unit, { title, kind, seasonId?,
+  summary?, categoryTermId?, companyName?, runningMinutes?, credits? })` and `createPerformance(unit,
+  { productionId, spaceId, startsAt, endsAt?, ..., made? })` make drafts (pass `made` with the
+  production's running time when it was made earlier in the same unit; the statement checks it
+  exists); `movePerformance(unit, id, { spaceId, startsAt, endsAt })`; `schedulePerformances(unit,
+  ids)` answers `{ scheduled, refused: { id, reason }[] }`, reason `space-taken`, `closed`,
+  `not-draft` or `started`, and catches drafts that clash with each other;
+  `setProductionCompanyName(unit, productionId, name)`; `listCredits(productionId)`,
+  `addCredit(unit, { productionId, creditedName, role, sectionTermId, accountId?, visibility? })`,
+  `updateCredit(unit, creditId, patch)` (never visibility) and `removeCredit(unit, creditId)`.
 - `isSpaceFree(spaceId, from, to, { except? })`: no scheduled performance or blocking closure, and
   nothing another module reports to `core.space-busy`, overlaps the window; `except` leaves out one
   module's own times. A read for showing and for a module's check just before its own write; a core
