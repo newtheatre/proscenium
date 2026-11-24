@@ -5,6 +5,8 @@
 // connection returns, with an id made here so sending it twice admits nobody twice. A booking found
 // by name is admitted the same way. What the door shows is shaped as the server's answers are.
 
+import { deviceId } from '../../shared/device-ids'
+
 interface Key { keyId: string, publicKey: string }
 export interface PackBooking { id: string, reference: string, buyer: string | null, channel: string, at: number, tickets: number, admitted: number, unpaid?: { amountDueMinor: number, currency: string }, deskHash?: string }
 interface Pack {
@@ -28,21 +30,8 @@ export interface OfflineOutcome {
 
 const TICKET_KIND = 'tkt' // not-policy: the ticket's kind in a door code, as tickets.ts makes it
 const PARTS = 4 // not-policy: kind, key id, code and signature
-const ID_ALPHABET = '234567abcdefghijklmnopqrstuvwxyz' // not-policy: the kit's id alphabet (kit/ids.ts)
-const TIME_CHARS = 10 // not-policy: the id format
-const RANDOM_CHARS = 16 // not-policy: the id format
-
-/** A scan id as the kit makes one (`scan_` and 26 characters, time first), made on the device. */
-function newScanId(): string {
-  let rest = Date.now()
-  let time = ''
-  for (let i = 0; i < TIME_CHARS; i++) {
-    time = ID_ALPHABET[rest % ID_ALPHABET.length] + time
-    rest = Math.floor(rest / ID_ALPHABET.length)
-  }
-  const random = [...crypto.getRandomValues(new Uint8Array(RANDOM_CHARS))].map(b => ID_ALPHABET[b % ID_ALPHABET.length]).join('')
-  return `scan_${time}${random}`
-}
+/** A scan id, made on the device. */
+const newScanId = () => deviceId('scan')
 
 const toBase64Url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 function fromBase64Url(text: string): Uint8Array<ArrayBuffer> | null {

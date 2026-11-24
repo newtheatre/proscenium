@@ -45,7 +45,8 @@ export interface TableOptions {
    * table that holds nothing about a person (subject 'none', no personal, free-text or special column).
    */
   retention?: string | { fixed: string }
-  appendOnly?: boolean
+  /** Rows are never deleted or changed, except erasure and the columns (SQL names) in `except`. */
+  appendOnly?: boolean | { except: readonly string[] }
   onErasure?: 'keep-row' | 'delete-row'
   /** Indexes and other table extras, given the built columns. */
   extra?: (table: any) => any[]
@@ -56,6 +57,12 @@ export interface TableOptions {
   timestamps?: false
   /** true: made WITHOUT ROWID, so storage order follows the primary key, not insertion (R3-23). */
   withoutRowid?: true
+  /**
+   * What a practice store holds of this table when it is made (Practice mode, part 2): 'empty' (the
+   * default) for sample sets to fill, 'copy' for the theatre's own setup, each column through its
+   * erasure rule, or 'replace': copied as well, for the module's sample set to swap for stand-ins.
+   */
+  practice?: 'empty' | 'copy' | 'replace'
 }
 
 /** TableOptions with `extra` given the table's own built columns, so `t.key` is typed. */
@@ -177,6 +184,9 @@ export const col = {
   perRow: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: { classColumn: string }) => tag(builder, { class: 'perRow', helper: 'wrapped', classColumn: options.classColumn }),
 }
 
+// Decision 0010's tables: no column of theirs may ever change, so appendOnly: { except } refuses them.
+const WHOLLY_APPEND_ONLY = [/^finance_/, /^core_audit$/, /_stock_movements$/, /_incidents?$/, /_incident_updates$/, /_age_checks$/, /_prices$/, /_records$/]
+
 /** Every table declared so far, by SQL name. `col.ref` resolves through it. */
 const tables = new Map<string, unknown>()
 
@@ -262,6 +272,11 @@ export function defineTable<TName extends string, TColumns extends Record<string
     for (const [key, c] of Object.entries(metas)) {
       if (c.meta.account && c.meta.account.onMerge !== 'alias') throw new DeclarationError(field(key), "an append-only table cannot be rewritten by a merge, so its account columns use onMerge: 'alias'")
     }
+    if (typeof options.appendOnly === 'object' && WHOLLY_APPEND_ONLY.some(p => p.test(name)))
+      throw new DeclarationError(field('appendOnly'), 'the ledger, stock, incidents, age checks, prices, records and audit are wholly append-only (decision 0010): correct by superseding, with appendOnly: true')
+    for (const column of typeof options.appendOnly === 'object' ? options.appendOnly.except : []) {
+      if (!all.some(c => c.sql === column)) throw new DeclarationError(field('appendOnly'), `"${column}" in except is not a column of this table`)
+    }
   }
   if (options.timestamps !== undefined) {
     if (options.timestamps !== false) throw new DeclarationError(field('timestamps'), 'is false or left out; a table keeps times unless it says otherwise')
@@ -272,6 +287,15 @@ export function defineTable<TName extends string, TColumns extends Record<string
     if (options.retention !== undefined) throw new DeclarationError(field('retention'), 'a table that keeps no times cannot tell how old a row is, so it has no retention; its module removes rows with what they belong to')
   }
   if (options.withoutRowid !== undefined && options.withoutRowid !== true) throw new DeclarationError(field('withoutRowid'), 'is true or left out')
+  if (options.practice !== undefined && !['empty', 'copy', 'replace'].includes(options.practice)) throw new DeclarationError(field('practice'), "is 'empty', 'copy' or 'replace'")
+  if (options.practice === 'copy') {
+    // The theatre's setup, never its people or its records of what happened.
+    if (realm === 'audience' || realm === 'members' || typeof realm === 'object') throw new DeclarationError(field('practice'), `a table of the ${typeof realm === 'object' ? 'per-row' : realm} realm holds people's records, so a practice store never copies it`)
+    if (options.appendOnly) throw new DeclarationError(field('practice'), 'an append-only table is a record of what happened (a ledger, audit or events), so a practice store never copies it')
+    for (const [key, builder] of Object.entries(columns)) {
+      if (metas[key]!.meta.class === 'special' && (builder as any).config?.notNull) throw new DeclarationError(field(key), 'a practice copy leaves special data out, so a copied table may not require it')
+    }
+  }
   if (typeof realm === 'object' && !all.some(c => c.sql === realm.column)) throw new DeclarationError(field('realm'), `realm column "${realm.column}" is not a column of this table`)
 
   const table = snakeTable(name, columns, options.extra as any)
@@ -305,7 +329,8 @@ function erasedValue(erase: Erasure): string | undefined {
  */
 export function appendOnlyTriggers(meta: TableMeta): { name: string, sql: string }[] {
   const t = meta.name
-  const conditions = Object.values(meta.columns).map(({ sql, meta: m }) => {
+  const except = new Set(typeof meta.options.appendOnly === 'object' ? meta.options.appendOnly.except : [])
+  const conditions = Object.values(meta.columns).filter(({ sql }) => !except.has(sql)).map(({ sql, meta: m }) => {
     const erased = erasedValue(m.erase)
     const same = `NEW.${quote(sql)} IS OLD.${quote(sql)}`
     // A column classed row by row is erased as its row's class says: emptied, or replaced by a marker.

@@ -10,8 +10,9 @@ import { newId } from './ids'
 import { nowMs } from './clock'
 import { useSetting } from './settings-store'
 import { parseDuration } from './duration'
-import { isRefusal } from './refusal'
+import { isRefusal, Refusal } from './refusal'
 import { log } from './log'
+import { isPractice } from './practice/gate'
 import type { CallAttempt, CallOutcome } from './handlers'
 
 export interface ExternalCallResult { state: 'succeeded' | 'failed' | 'unknown', outcome?: CallOutcome, attempt: CallAttempt }
@@ -57,6 +58,7 @@ export async function externalCall(name: string, options: {
   const outcome = found.outcome
   let attempt = found.attempt
   if (attempt && outcome) return { state: outcome.result as 'succeeded' | 'failed', outcome: { result: outcome.result as any, providerReference: outcome.provider_reference ?? undefined }, attempt: asAttempt(attempt) }
+  if (isPractice() && !handler.practice) throw new Refusal('core.practice.no-outside-calls', 'Nothing leaves practice.', { status: 409, remedy: 'This step cannot be practised.' })
 
   if (!attempt) {
     const unit = createUnit()
@@ -71,6 +73,7 @@ export async function externalCall(name: string, options: {
     attempt = (await rowsFor(key)).attempt!
   }
 
+  if (isPractice()) return practiseCall(name, attempt, handler, module)
   const timeout = await useSetting('core.external.timeout') as number
   let result: CallOutcome
   try {
@@ -85,6 +88,28 @@ export async function externalCall(name: string, options: {
     return { state: 'unknown', attempt: asAttempt(attempt) }
   }
   return settle(name, attempt, result, handler, module)
+}
+
+/** The call's practice answer, recorded in the store and settled as the provider's would be (O1). */
+async function practiseCall(name: string, attempt: Row, handler: ReturnType<typeof lookup>['handler'], module: string): Promise<ExternalCallResult> {
+  const answer = await handler.practice!(asAttempt(attempt))
+  const { env } = useContext()
+  await env.DB.prepare('INSERT INTO core_practice_calls (id, attempt_id, call, reference, answer, chosen_by, at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(newId('pca'), attempt.id, name, attempt.reference, answer === 'ask-trainee' ? 'waiting' : answer.result, answer === 'ask-trainee' ? 'trainee' : 'default', nowMs()).run()
+  if (answer === 'ask-trainee') return { state: 'unknown', attempt: asAttempt(attempt) }
+  return settle(name, attempt, answer, handler, module)
+}
+
+/** Settles a practice call the trainee answered on the practice card reader (PM-S7). */
+export async function answerPracticeCall(attemptId: string, outcome: CallOutcome): Promise<ExternalCallResult> {
+  if (!isPractice()) throw new Error('Only a practice call can be answered by the trainee')
+  const { env } = useContext()
+  const attempt = await env.DB.prepare("SELECT * FROM core_external_calls WHERE id = ? AND phase = 'attempt'").bind(attemptId).first<Row>()
+  if (!attempt) throw new Refusal('core.not-found', 'There is nothing here.', { status: 404 })
+  const { handler, module } = lookup(attempt.purpose)
+  await env.DB.prepare('INSERT INTO core_practice_calls (id, attempt_id, call, reference, answer, chosen_by, at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(newId('pca'), attempt.id, attempt.purpose, attempt.reference, outcome.result, 'trainee', nowMs()).run()
+  return settle(attempt.purpose, attempt, outcome, handler, module)
 }
 
 async function settle(name: string, attempt: Row, result: CallOutcome, handler: ReturnType<typeof lookup>['handler'], module: string): Promise<ExternalCallResult> {

@@ -46,6 +46,13 @@ export default defineModule({
     'core.file-slot': [{ id: 'seats.door-list', owner: 'seats.performance', ability: 'seats.settings.manage', accepts: ['json'], limit: 'core.files.brand-limit', access: 'record', textClass: 'personal', clean: false, source: 'server' }],
     'core.file-access': [{ id: 'seats.performance', file: 'seats-performance' }],
     'core.measure': [{ id: 'seats.sold', file: 'sold' }, { id: 'seats.capacity', file: 'capacity' }, { id: 'seats.fill', file: 'fill' }, { id: 'seats.takings', file: 'takings' }],
+    // Practice mode (kit tests): two scenarios on one live page, a sample set and a task check.
+    'core.practice-scenario': [
+      { id: 'seats.door', version: 1, label: 'seats.practice.door', summary: 'seats.practice.door-summary', minutes: 5, needs: ['seats'], samples: ['seats.sold'], start: '/live/door/{show}', routes: ['/live/door'], abilities: ['seats.orders.sell'], tasks: [{ id: 'sell', label: 'seats.practice.sell' }], runnable: ['seats.count-seats'] },
+      { id: 'seats.desk', version: 1, label: 'seats.practice.desk', summary: 'seats.practice.desk-summary', minutes: 5, needs: ['seats'], samples: [], start: '/live/door', routes: ['/live/door'], abilities: ['seats.orders.find'] },
+    ],
+    'core.practice-sample': [{ id: 'seats.sold', file: 'sold' }],
+    'core.practice-check': [{ id: 'seats.door', file: 'door' }],
     'core.operating-day': [{ id: 'seats.performances', table: 'seats_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],
   },
 })

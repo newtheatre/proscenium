@@ -48,6 +48,9 @@ import doorAdmit from '../../server/api/box-office/performances/[id]/door/admit.
 import doorOverride from '../../server/api/box-office/performances/[id]/door/override.post'
 import copyPost from '../../server/api/box-office/performances/[id]/sales/copy.post'
 import copySources from '../../server/api/box-office/performances/[id]/sales/sources.get'
+import headcountGet from '../../server/api/box-office/performances/[id]/headcount.get'
+import headcountTaps from '../../server/api/box-office/performances/[id]/headcount/taps.post'
+import headcountCorrect from '../../server/api/box-office/performances/[id]/headcount/correct.post'
 import doorSummary from '../../server/api/box-office/performances/[id]/door/summary.get'
 import doorOfflineGet from '../../server/api/box-office/performances/[id]/door/offline.get'
 import doorOfflinePost from '../../server/api/box-office/performances/[id]/door/offline.post'
@@ -147,6 +150,9 @@ export const handle = server({
   'PUT /api/box-office/productions/:id/sales/seats': runSeatsPut,
   'GET /api/box-office/performances/:id/sales/sources': copySources,
   'GET /api/box-office/performances/:id/door/summary': doorSummary,
+  'GET /api/box-office/performances/:id/headcount': headcountGet,
+  'POST /api/box-office/performances/:id/headcount/taps': headcountTaps,
+  'POST /api/box-office/performances/:id/headcount/correct': headcountCorrect,
   'GET /api/box-office/door/tonight': doorTonight,
   'GET /api/core/live/tonight': liveTonight,
   'GET /api/box-office/productions/lookup': productionsLookup,
@@ -207,7 +213,7 @@ export const manager = person(['core.production.create', 'core.production.edit',
 
 let keys = 0
 export async function req<T = any>(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> | null = manager, headers: Record<string, string> = {}): Promise<{ status: number, body: T }> {
-  const idempotency = method === 'POST' ? { 'idempotency-key': `bo${++keys}-${newId('req')}` } : {}
+  const idempotency: Record<string, string> = method === 'POST' ? { 'idempotency-key': `bo${++keys}-${newId('req')}` } : {}
   const response = await call(handle, method, path, { actor: actor ?? undefined, body, headers: { ...idempotency, ...headers } })
   return { status: response.status, body: await response.json() as T }
 }

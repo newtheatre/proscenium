@@ -7,7 +7,7 @@ import { startAuthenticator } from '../../../../identity/authenticator'
 import { addressFor } from '../../../../identity/addresses'
 import { relyingParty } from '../../../../identity/web'
 
-export default defineRoute({ ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { unit, actor }) => {
+export default defineRoute({ practice: 'refuse', ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { unit, actor }) => {
   const session = await sessionOf(event)
   await requireFresh(actor)
   // What the app lists the entry under: the theatre's name, else the site's host; and the person's address.
