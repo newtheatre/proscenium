@@ -4,7 +4,8 @@
 // left out while past shows are not public. Drafts, withdrawn and unlisted productions never appear.
 import { all, nowMs } from '#kit'
 
-export async function publicProgrammePaths(options: { pastVisible?: boolean, now?: number } = {}): Promise<string[]> {
+/** `productionBase`, while a module moves production pages (C-73), puts every production under it instead. */
+export async function publicProgrammePaths(options: { pastVisible?: boolean, now?: number, productionBase?: string | null } = {}): Promise<string[]> {
   const pastVisible = options.pastVisible ?? true
   const now = options.now ?? nowMs()
   const productions = await all<{ slug: string, past: number }>(
@@ -20,7 +21,7 @@ export async function publicProgrammePaths(options: { pastVisible?: boolean, now
     `SELECT slug FROM core_seasons WHERE state = 'published' ${pastVisible ? 'OR state = \'archived\'' : ''} ORDER BY slug`,
   )
   return [
-    ...productions.filter(p => pastVisible || !p.past).map(p => `${p.past ? '/shows' : '/whats-on'}/${p.slug}`),
+    ...productions.filter(p => pastVisible || !p.past).map(p => `/${options.productionBase ?? (p.past ? 'shows' : 'whats-on')}/${p.slug}`),
     ...venues.map(v => `/venues/${v.slug}`),
     ...seasons.map(s => `/seasons/${s.slug}`),
   ]

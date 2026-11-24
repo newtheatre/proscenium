@@ -82,10 +82,12 @@ Checked free by Integration on 23 November 2026 (R3-26). All time-sorted.
 | `message` | text | at most 1,000 | free text | keep | The organiser's words. The screen says not to name anyone |
 | `from_date`, `to_date` | local date | not null, to on or after from, at most 366 days apart | internal | keep | The period to check |
 | `due_on` | local date | not null, on or after today when opened | internal | keep |  |
-| `group_refs` | JSON | not null, list of group ids, may be empty | internal | keep | As chosen; people added by name are in the people table only |
+| `group_refs` | JSON | not null, list of group ids, may be empty | internal | keep | As chosen |
+| `account_refs` | JSON | not null, list of account ids, may be empty | internal | keep | People named beside the groups, so the daily task never withdraws them as leavers (R6) |
 | `source_ref` | text | nullable, unique among open requests | internal | keep | Set when a module opened it: `rehearsals.schedule:<id>`. Such a request is closed by its module, not by hand |
 | `opened_by` | account, role actor, on merge alias | not null | internal | keep |  |
 | `state` | text | one of open, closed | internal | keep | See part 3 |
+| `reminded_at` | timestamp | nullable | internal | keep | The last "Remind now", which goes at most once a day (S11) |
 | `closed_at` | timestamp | nullable | internal | keep |  |
 
 **`availability_request_people`**: realm members; subject `account_id`; onErasure delete-row; unique (`request_id`, `account_id`).

@@ -1,7 +1,7 @@
 // Privacy (part 3, "Privacy" and "Account merge and undo"; FH-35): the merge handler for two
 // accounts on one shift, the daily retention sweep, the erasure hold while an incident is open, and
 // the staff search and redaction for a person with no account.
-import { all, first, nowMs, recordMergeItems, refuse, useSetting, type MergeRef, type MergeUndoAnswer, type UnitView } from '#kit'
+import { all, first, localDate, nowMs, recordMergeItems, refuse, useSetting, type MergeRef, type MergeUndoAnswer, type UnitView } from '#kit'
 import { ERASED } from '#kit/db'
 import { sql } from 'drizzle-orm'
 import { accountScopeSql } from '#kit/accounts'
@@ -88,6 +88,12 @@ export async function sweep(unit: UnitView): Promise<void> {
     sql: `DELETE FROM front_of_house_assignments WHERE state NOT IN (${live})
       AND shift_id IN (SELECT id FROM front_of_house_shifts WHERE ends_at < ?)`,
     params: [at - assignments * SECOND],
+  })
+  // A handout's size, counted from its crew call's last day. The rows stay: they are append-only.
+  unit.add({
+    sql: `UPDATE front_of_house_handouts SET size = NULL WHERE size IS NOT NULL
+      AND crew_call_id IN (SELECT id FROM front_of_house_crew_calls WHERE ends_on < ?)`,
+    params: [await localDate(at - assignments * SECOND)],
   })
   // Checklist runs and their entries.
   const oldRuns = 'SELECT id FROM front_of_house_checklist_runs WHERE created_at < ?'
