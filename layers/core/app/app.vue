@@ -8,11 +8,17 @@ const locale = useUiLocale()
 // In live mode the foot of the screen holds the actions that matter most (report an incident, the
 // emergency card), so a toast comes in at the top, one at a time, and goes sooner.
 const route = useRoute()
-const toaster = computed(() => route.path === '/live' || route.path.startsWith('/live/') ? { position: 'top-center' as const, max: 1, duration: 3000 } : {}) // not-policy: how long a live toast stays
+const { practising, framed } = usePractising()
+const toaster = computed(() => route.path === '/live' || route.path.startsWith('/live/') || framed.value ? { position: 'top-center' as const, max: 1, duration: 3000 } : {}) // not-policy: how long a live toast stays
 // The brand's tokens go into the head of every page in every shell, live mode included, so no
 // stylesheet request holds up the first paint and a saved brand shows on the next page load.
 useHead(() => ({ style: brand.value?.css ? [{ key: 'core-brand', innerHTML: brand.value.css }] : [] }))
-useHead({ titleTemplate: title => title && title !== site.value ? `${title} · ${site.value}` : site.value })
+// A practice page is framed here, so no page can leave the frame out (PM-10), and its title starts
+// "Practice ·", so a practice tab shows as one in the tab bar and the app switcher.
+useHead({ titleTemplate: (title) => {
+  const named = title && title !== site.value ? `${title} · ${site.value}` : site.value
+  return practising.value && title !== t('core.practice.title') ? `${t('core.practice.title-prefix')} · ${named}` : named
+} })
 // Until the theatre says its site is ready, every page asks search engines to stay away (C-42).
 const { data: settings } = await usePublicSettings()
 useSeoMeta({ robots: () => settings.value?.['public-site.search.hidden']?.value === true ? 'noindex' : undefined })
@@ -28,6 +34,11 @@ useSeoMeta({ robots: () => settings.value?.['public-site.search.hidden']?.value 
     <NuxtRouteAnnouncer />
     <!-- Reads what changed without a navigation, such as a list's new count after a filter. -->
     <NuxtAnnouncer />
+    <PracticeFrame
+      v-if="practising"
+      :key="framed ? 'framed' : 'plain'"
+      :framed="framed"
+    />
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>

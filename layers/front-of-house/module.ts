@@ -15,8 +15,9 @@ export default defineModule({
   manifest: 1,
   since: '0.1.0',
   stability: 'experimental',
-  // A crew call's sign-up questions are a form in forms' slot (FH-49). Forms is always on.
-  requires: ['forms'],
+  // A crew call's sign-up questions are a form in forms' slot (FH-49). Forms is always on. Shifts go
+  // into each person's one calendar feed (C-70).
+  requires: ['forms', 'calendar-feed'],
 
   settings: defineSettings('front-of-house', {
     // Read when a shift is made or its times change; a later change does not move shifts that exist.
@@ -143,6 +144,7 @@ export default defineModule({
   },
 
   contributes: {
+    'core.calendar-feed': [{ id: 'front-of-house.shifts', file: 'shifts', from: ['front_of_house_duties.name', 'front_of_house_shifts.title', 'core_productions.title', 'core_venues.name', 'core_spaces.name'] }],
     // A crew call's sign-up questions, answered once each (FH-49, CC1, CC2).
     'forms.slot': [{ id: 'front-of-house.crew-call', subject: 'front-of-house.crew-call', attach: 'front-of-house.crew-call.manage', label: 'front-of-house.crew-calls.slot', limit: 1 }],
     // Front of house's lines of the privacy notice's "what we hold" table (/policies/privacy).

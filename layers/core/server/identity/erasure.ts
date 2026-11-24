@@ -11,6 +11,7 @@
 // tombstone. To the person it is all or nothing: locked out from the first stage, a tombstone after
 // the last. Every statement only touches what is still there to erase, so any stage, or the whole
 // run, can be repeated and do no harm; a second run on a tombstone writes nothing.
+import { endPractice } from '../practice/session'
 import { all, createUnit, first, nowMs, usePoint, useSetting, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { ERASED, type TableMeta } from '#kit/db'
@@ -18,6 +19,7 @@ import { accountScopeSql } from '#kit/accounts'
 import type { ErasureHandler } from '../points/erasure-handler'
 import type { ErasureHold } from '../points/erasure-hold'
 import { accountById, verifiedAddressesOf } from './accounts'
+import { allOf } from './all-of'
 import { guardLastOwner, isOwner, LIVE } from './grants'
 import { endSessionsOf } from './sessions'
 
@@ -152,10 +154,10 @@ function statementOf(step: ErasureStep, params: unknown[]): { sql: string, param
 
 /** SQL that is true while none of `steps` has anything left to erase. */
 function noneLeft(steps: ErasureStep[]): string {
-  return steps.filter(s => s.table !== 'core_accounts' && (s.action === 'delete' || s.set.length)).map(s =>
+  return allOf(steps.filter(s => s.table !== 'core_accounts' && (s.action === 'delete' || s.set.length)).map(s =>
     s.action === 'delete'
       ? `NOT EXISTS (SELECT 1 FROM ${q(s.table)} WHERE ${s.match})`
-      : `NOT EXISTS (SELECT 1 FROM ${q(s.table)} WHERE (${s.match}) AND (${s.set.map(leftOver).join(' OR ')}))`).join(' AND ') || '1'
+      : `NOT EXISTS (SELECT 1 FROM ${q(s.table)} WHERE (${s.match}) AND (${s.set.map(leftOver).join(' OR ')}))`))
 }
 
 const INCOMPLETE = { code: 'core.erasure.incomplete', reason: 'The erasure did not clear everything, so nothing was changed.', remedy: 'Report this; the request will be tried again.' }
@@ -190,6 +192,8 @@ export async function eraseStage(unit: UnitView, accountId: string, stage: numbe
     // append-only and keeps who held what.
     unit.add({ sql: 'UPDATE core_accounts SET disabled_at = coalesce(disabled_at, ?), disabled_reason = ? WHERE id = ? AND anonymised_at IS NULL', params: [at, ERASING, accountId] }).expect(1, INCOMPLETE)
     endSessionsOf(unit, accountId, 'erased')
+    // A practice store holds the person's name: it is gone before erasure reports done (Practice mode, S9).
+    await endPractice(accountId, 'erased')
     unit.add(bound(`INSERT INTO core_grant_ends (grant_id, ended_at, ended_by, ended_reason) SELECT g.id, ?3, NULL, 'account_closed' FROM core_grants g WHERE g.account_id ${SCOPE} AND ${LIVE.replaceAll('?', '?3')}`, params))
     if (await isOwner(accountId)) guardLastOwner(unit)
     return next

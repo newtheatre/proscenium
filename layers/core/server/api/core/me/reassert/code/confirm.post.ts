@@ -4,7 +4,7 @@ import { defineRoute } from '#kit'
 import { sessionOf } from '../../../../../identity/guards'
 import { confirmWithCode } from '../../../../../identity/reassert'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   ability: 'signed-in',
   rateLimit: 'sign-in',
   input: z.object({ code: z.string().trim().regex(/^\d{4,10}$/) }).strict(), // not-policy: a short run of digits

@@ -5,7 +5,7 @@ import { defineRoute } from '#kit'
 import { requireFresh, sessionOf } from '../../../identity/guards'
 import { removeAuthenticator } from '../../../identity/authenticator'
 
-export default defineRoute({ ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { unit, actor }) => {
+export default defineRoute({ practice: 'refuse', ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { unit, actor }) => {
   const session = await sessionOf(event)
   await requireFresh(actor)
   removeAuthenticator(unit, session.accountId)

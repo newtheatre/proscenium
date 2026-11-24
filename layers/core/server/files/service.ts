@@ -196,6 +196,21 @@ export async function storeFile(unit: UnitView, input: { slot: string, ownerType
   return id
 }
 
+/** Stores a personal upload for a module's own record, pending until core.check-file passes it. */
+export async function stageUpload(unit: UnitView, input: { ownerType: string, ownerId: string, slot: string, name: string | null, bytes: Uint8Array, by: string | null }): Promise<string> {
+  const id = newId('fil', { random: true })
+  const objectKey = `files/${crypto.randomUUID()}`
+  await store.put(objectKey, input.bytes)
+  const row = [id, objectKey, input.ownerType, input.ownerId, input.slot, input.name, 'personal', input.bytes.length, await sha256(input.bytes), 'record', input.by, nowMs()]
+  unit.add({
+    sql: "INSERT INTO core_files (id, object_key, owner_type, owner_id, slot, original_name, text_class, media_type, byte_size, sha256, access, state, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'application/octet-stream', ?, ?, ?, 'pending', ?, ?)",
+    params: row,
+  })
+  unit.enqueue('core.check-file', { fileId: id })
+  unit.audit({ action: 'create', record: ['core.file', id], detail: { slot: input.slot } })
+  return id
+}
+
 /** Whether this account may read a file with `record` access: the owning record type's module decides. */
 export async function mayReadRecordFile(actor: Actor, row: { id: string, slot: string, owner_type: string, owner_id: string }): Promise<boolean> {
   const access = (await usePoint<FileAccess>('core.file-access')).find(c => c.id === row.owner_type)

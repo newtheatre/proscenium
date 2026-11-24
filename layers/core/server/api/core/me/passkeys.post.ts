@@ -12,7 +12,7 @@ import { reassert } from '../../../identity/sessions'
 import { credentialNotice } from '../../../identity/notices'
 import { hasOtherWayIn, holdsPrivileged } from '../../../identity/me'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   ability: 'signed-in',
   rateLimit: 'write',
   input: z.object({ challengeId: z.string().max(40), response: z.looseObject({ id: z.string() }), label: z.string().trim().max(60).optional() }), // not-policy: an id and a label are short
