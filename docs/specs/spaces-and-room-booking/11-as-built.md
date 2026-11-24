@@ -71,3 +71,12 @@ Integration tests: `layers/spaces/tests/integration/series.test.ts`; unit tests:
 - **The calendar** draws uses in the room's column with a double edge, labelled as the reporting module allows, or "In use".
 
 Integration tests: `layers/spaces/tests/integration/occupancy.test.ts`; the occupancy module's own test now expects Room bookings among the modules that need it.
+
+## Changes, no-shows and erasure (SP-19, SP-35, SP-36), 24 November 2026
+
+- **Moving a booking (X2, X3).** A Confirmed booking not yet started offers "Change time or room" to its booker and to holders of `spaces.booking.manage`: a dialog with the room, day and times and the same live check as Book a room, leaving the booking's own time out (`replaces` on `POST /api/spaces/bookings/check`). `POST /api/spaces/bookings/<id>/move` runs every rule from P1 against the new time with the booking's purpose, production and booker. With no decision needed it moves in one statement carrying the clash condition; otherwise it makes a request with `replaces_id`, and the booking keeps its time. Confirming that request cancels the old booking first, in the same unit, so its time is free for the new one; declining it, or letting it lapse, loses nothing. One change waits at a time (`spaces.booking.change-waiting`). A date of a series can be moved on its own; moving a whole series is not built.
+- **What people see.** The booking shows "A change to ... is waiting for a decision" with a link; the request shows the booking it would replace; the requests page marks it "Moves an existing booking".
+- **No-shows (X6).** On a Completed booking, holders of `spaces.booking.manage` mark or clear a no-show for 14 days after it ends (`POST /api/spaces/bookings/<id>/no-show`), each once; it feeds the booker's record in the requests queue and nothing else.
+- **Erasure (SP-36).** A `core.erasure-handler` contribution cancels the erased person's future Confirmed bookings and withdraws their open requests, set-wise, before the registry anonymises `booked_for` and redacts the free text. Past bookings keep their time, room and purpose. The data download needs nothing from Spaces: the registry finds bookings by `booked_for`.
+
+Integration tests: `layers/spaces/tests/integration/change.test.ts`.

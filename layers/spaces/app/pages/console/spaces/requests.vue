@@ -22,6 +22,7 @@ interface Row {
   asked: boolean
   urgent: boolean
   seriesId: string | null
+  replaces: boolean
   clashes: number
   own: boolean
   record: { noShows: number, lateCancels: number }
@@ -153,6 +154,12 @@ async function markAsked(row: Row) {
                     color="neutral"
                     variant="subtle"
                     :label="r.asked ? t('spaces.requests.asked') : t('spaces.requests.external')"
+                  />
+                  <UBadge
+                    v-if="r.replaces"
+                    color="neutral"
+                    variant="subtle"
+                    :label="t('spaces.requests.replaces')"
                   />
                   <UBadge
                     v-if="r.seriesId"

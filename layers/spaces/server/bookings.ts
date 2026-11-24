@@ -32,6 +32,10 @@ export interface Booking {
   originId: string | null
   title: string
   bumps: boolean
+  /** X3: the Confirmed booking this request would move. */
+  replacesId: string | null
+  notes: string | null
+  attendees: number | null
 }
 
 /** Something in the way of a window (rule C1). A title is given only where the reader may see it (K2). */
@@ -53,7 +57,7 @@ const toBookable = (r: any): Bookable => ({ id: r.id, kind: r.kind, spaceId: r.s
 const toBooking = (r: any): Booking => ({
   id: r.id, bookableId: r.bookable_id, purposeId: r.purpose_id, tier: r.tier, seriesId: r.series_id, startsAt: r.starts_at, endsAt: r.ends_at,
   state: r.state, bookedFor: r.booked_for, requestedBy: r.requested_by, productionId: r.production_id, originType: r.origin_type, originId: r.origin_id,
-  title: r.title, bumps: !!r.bumps,
+  title: r.title, bumps: !!r.bumps, replacesId: r.replaces_id ?? null, notes: r.notes ?? null, attendees: r.attendees ?? null,
 })
 
 export async function getBookable(id: string): Promise<Bookable | null> {

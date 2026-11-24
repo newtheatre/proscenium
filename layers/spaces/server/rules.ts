@@ -24,6 +24,8 @@ export interface AskInput {
   bookedFor?: string | null
   /** Given by a holder of spaces.booking.override, it passes P5 to P9 (P10). */
   overrideReason?: string | null
+  /** X2: the booking being moved, whose own time is not in the way. */
+  replaces?: string | null
 }
 
 export type Rule = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6' | 'P7' | 'P8' | 'P9' | 'C1'
@@ -212,11 +214,11 @@ export async function checkRequest(actor: Actor, input: AskInput): Promise<Verdi
 
   // C1: anything in the way. A1: whether a decision is needed.
   const external = bookable.control === 'external'
-  const blockers = await blockersOf(bookable, input.startsAt, input.endsAt)
+  const blockers = await blockersOf(bookable, input.startsAt, input.endsAt, input.replaces ?? null)
   const waiting = (await useDb().all<{ n: number }>(sql`SELECT count(*) AS n FROM spaces_bookings WHERE bookable_id = ${bookable.id} AND state = 'requested'
     AND starts_at < ${input.endsAt} AND ends_at > ${input.startsAt} AND NOT ${inAccountScope('booked_for', who)}`))[0]!.n
   if (blockers.length) {
-    const nearest = nearestFree({ from: input.startsAt, to: input.endsAt, blockers: await blockersOf(bookable, input.startsAt - DAY, input.endsAt + DAY), slotMinutes: slot, zone, open }) ?? undefined
+    const nearest = nearestFree({ from: input.startsAt, to: input.endsAt, blockers: await blockersOf(bookable, input.startsAt - DAY, input.endsAt + DAY, input.replaces ?? null), slotMinutes: slot, zone, open }) ?? undefined
     return refused('C1', 'spaces.clash', 'Something else is booked at that time.', { blockers, nearest, external, waiting, remedy: nearest ? 'Choose the nearest free time.' : 'Choose another day.' })
   }
   const needsDecision = external || rules.approval === 'always' || (purpose.here_approval ?? purpose.approval) === 'approval'

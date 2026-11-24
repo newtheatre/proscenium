@@ -141,6 +141,10 @@ export interface BookingView {
   closedReason: string | null
   lateCancel: boolean
   overrideReason: string | null
+  noShow: boolean
+  /** X3: the request that would move this booking, while it waits; or the booking a request would move. */
+  change: { id: string, bookableName: string, startsAt: number, endsAt: number } | null
+  replaces: { id: string, bookableName: string, startsAt: number, endsAt: number } | null
   history: { kind: string, at: number, note: string | null, byBooker: boolean }[]
 }
 
@@ -151,6 +155,10 @@ export async function bookingView(id: string): Promise<BookingView> {
   if (!r) refuse('spaces.booking.not-found', 'There is no such room booking.', { status: 404 })
   const bookable = (await listBookables()).find(b => b.id === r.bookable_id)
   const history = await all<{ kind: string, at: number, note: string | null, actor: string | null }>('SELECT kind, at, note, actor FROM spaces_booking_events WHERE booking_id = ? ORDER BY at, id', id)
+  const names = new Map((await listBookables()).map(b => [b.id, b.name]))
+  const brief = (x: { id: string, bookable_id: string, starts_at: number, ends_at: number } | null) => x ? { id: x.id, bookableName: names.get(x.bookable_id) ?? '', startsAt: x.starts_at, endsAt: x.ends_at } : null
+  const change = await first<{ id: string, bookable_id: string, starts_at: number, ends_at: number }>('SELECT id, bookable_id, starts_at, ends_at FROM spaces_bookings WHERE replaces_id = ? AND state = \'requested\' ORDER BY created_at DESC LIMIT 1', id)
+  const replaces = r.replaces_id ? await first<{ id: string, bookable_id: string, starts_at: number, ends_at: number }>('SELECT id, bookable_id, starts_at, ends_at FROM spaces_bookings WHERE id = ?', r.replaces_id) : null
   return {
     id: r.id,
     bookableId: r.bookable_id,
@@ -174,6 +182,9 @@ export async function bookingView(id: string): Promise<BookingView> {
     closedReason: r.closed_reason,
     lateCancel: !!r.late_cancel,
     overrideReason: r.override_reason,
+    noShow: !!r.no_show,
+    change: brief(change),
+    replaces: brief(replaces),
     history: history.map(h => ({ kind: h.kind, at: h.at, note: h.note, byBooker: h.actor === r.booked_for })),
   }
 }
