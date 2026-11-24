@@ -193,3 +193,6 @@ export const seenInput = z.object({
 export type SeenInput = z.infer<typeof seenInput>
 
 export const rejectInput = z.object({ reason: z.string().trim().min(1).max(300) }).strict() // not-policy: the schema's limit (part 2)
+
+/** A route that takes no body. */
+export const noInput = z.object({}).strict()

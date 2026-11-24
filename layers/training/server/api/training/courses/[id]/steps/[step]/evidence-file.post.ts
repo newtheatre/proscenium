@@ -16,5 +16,5 @@ export default defineRoute({
   }),
 }, async (event, { input, record, actor, unit }) => {
   const body = await readRawBody(event, false)
-  return uploadEvidenceFile(unit.view(), actor, record!.id, getRouterParam(event, 'step')!, { ...input, bytes: body ? new Uint8Array(body) : new Uint8Array() })
+  return uploadEvidenceFile(unit.view(), actor, { courseId: record!.id, stepId: getRouterParam(event, 'step')! }, { ...input, bytes: body ? new Uint8Array(body) : new Uint8Array() })
 })
