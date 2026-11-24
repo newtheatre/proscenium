@@ -55,6 +55,8 @@ export default defineModule({
     'booking.request': ability({ on: 'spaces.bookable', implies: ['calendar.view'] }),
     // A booker always sees their own booking, with its notes.
     'booking.view': ability({ on: 'spaces.booking', owner: 'grants', audit: 'read', implies: ['calendar.view', 'core.account.find'] }),
+    // Nobody decides a booking that is for them, whatever their role (A2).
+    'booking.decide': ability({ on: 'spaces.booking', owner: 'refuses', implies: ['booking.view'] }),
     'booking.manage': ability({ on: 'spaces.booking', implies: ['booking.view', 'booking.request'] }),
     // Sets aside the limits, hours and requirements everyone else is held to, with a reason (P10).
     'booking.override': ability({ on: 'spaces.bookable', risk: 'privileged', implies: ['booking.manage'] }),
@@ -69,6 +71,8 @@ export default defineModule({
     // Confirmed past its end becomes Completed; Requested past its start becomes Expired.
     'spaces.sweep-bookings': task({ every: '15m' }),
     'spaces.send-reminders': task({ every: '15m' }),
+    // One message a day to each approver with requests waiting longer than requests.remind-after.
+    'spaces.remind-approvers': task({ dailyAt: '09:00' }),
   },
 
   contributes: {
@@ -76,6 +80,7 @@ export default defineModule({
     'core.navigation': [
       { id: 'spaces.bookables', menu: 'admin', group: 'modules', to: '/admin/modules/spaces/bookables', icon: 'i-lucide-door-open', ability: 'spaces.bookable.manage', order: 60 },
       { id: 'spaces.calendar', menu: 'members', to: '/members/spaces', icon: 'i-lucide-calendar-range', ability: 'spaces.calendar.view', order: 40 },
+      { id: 'spaces.requests', menu: 'console', group: 'spaces', section: 'everyday', to: '/console/spaces/requests', icon: 'i-lucide-inbox', ability: 'spaces.booking.decide', order: 10, count: 'spaces.requests-waiting' },
       { id: 'spaces.purposes', menu: 'admin', group: 'modules', to: '/admin/modules/spaces/purposes', icon: 'i-lucide-list-ordered', ability: 'spaces.purpose.manage', order: 70 },
     ],
     // Nothing can be booked until a room is bookable and there is something to book it for.
@@ -113,7 +118,84 @@ export default defineModule({
           action: 'Book again',
         },
       },
+    }, {
+      id: 'spaces.request-confirmed',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/spaces/bookings',
+      variables: { room: 'text' as const, date: 'text' as const, when: 'text' as const, title: 'text' as const, note: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your room request is confirmed: {{ room }}, {{ date }}',
+          body: 'Your request for **{{ room }}** on {{ date }}, {{ when }}, for {{ title }}, has been confirmed.\n\n{{ note }}',
+          action: 'See my bookings',
+        },
+      },
+    }, {
+      id: 'spaces.request-declined',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/spaces/book',
+      variables: { room: 'text' as const, date: 'text' as const, when: 'text' as const, title: 'text' as const, note: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your room request is declined: {{ room }}, {{ date }}',
+          body: 'Your request for **{{ room }}** on {{ date }}, {{ when }}, for {{ title }}, has been declined.\n\n{{ note }}',
+          action: 'Book another time',
+        },
+      },
+    }, {
+      id: 'spaces.request-expired',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/spaces/book',
+      variables: { room: 'text' as const, date: 'text' as const, when: 'text' as const, title: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your room request was not decided in time: {{ room }}, {{ date }}',
+          body: 'Nobody decided your request for **{{ room }}** on {{ date }}, {{ when }}, for {{ title }}, before it was due to start, so it has lapsed.\n\nPlease make other plans, or book another time.',
+          action: 'Book a room',
+        },
+      },
+    }, {
+      id: 'spaces.request-new',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/console/spaces/requests',
+      variables: { room: 'text' as const, date: 'text' as const, when: 'text' as const, title: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'A room request to decide: {{ room }}, {{ date }}',
+          body: 'Someone has asked for **{{ room }}** on {{ date }}, {{ when }}, for {{ title }}. It needs a decision before it starts.',
+          action: 'Decide',
+        },
+      },
+    }, {
+      id: 'spaces.requests-waiting',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/console/spaces/requests',
+      variables: { count: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Room requests are waiting for a decision',
+          body: '{{ count }} room booking requests you may decide have been waiting a while. Each one lapses if it is not decided before it starts.',
+          action: 'Decide',
+        },
+      },
     }],
+    'core.count': [{ id: 'spaces.requests-waiting', file: 'requests-waiting' }],
+    'core.health-check': [{ id: 'spaces.no-approver', file: 'no-approver' }],
+    // The room manager and read-only oversight of part 6's presets; a theatre's own role of the same key is kept.
+    'core.role-preset': [
+      { id: 'spaces.technical-manager', key: 'technical-manager', name: 'Technical manager', description: 'Looks after the rooms: sets them up, decides booking requests and manages anyone\'s booking.', abilities: ['spaces.booking.view', 'spaces.booking.decide', 'spaces.booking.manage', 'spaces.bookable.manage'], opensMembersArea: true },
+      { id: 'spaces.committee-member', key: 'committee-member', name: 'Committee member', description: 'Sees every room booking in full.', abilities: ['spaces.booking.view'], opensMembersArea: true },
+    ],
     'core.record-resolver': [
       { id: 'spaces.bookable', file: 'bookable' },
       { id: 'spaces.booking', file: 'booking' },
@@ -143,6 +225,7 @@ export default defineModule({
       'core.space.managed-changed': 'follow-managed',
       'core.space.archived': 'follow-archived',
       'core.venue.archived': 'follow-archived',
+      'spaces.booking.requested': 'tell-approvers',
     },
   },
 

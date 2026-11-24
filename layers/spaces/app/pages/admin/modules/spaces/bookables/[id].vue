@@ -42,6 +42,7 @@ const tabs = computed(() => [
   { id: 'details', label: t('spaces.bookable.tabs.details') },
   { id: 'hours', label: t('spaces.bookable.tabs.hours') },
   { id: 'purposes', label: t('spaces.bookable.tabs.purposes') },
+  { id: 'people', label: t('spaces.bookable.tabs.people') },
 ])
 
 // ---- Details
@@ -464,6 +465,9 @@ const summary = computed(() => {
               @click="savePurposes"
             />
           </div>
+        </template>
+        <template #tab-people>
+          <SpacesBookablePeople :bookable-id="id" />
         </template>
       </PageRecord>
     </template>

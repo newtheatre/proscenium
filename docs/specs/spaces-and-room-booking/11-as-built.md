@@ -38,6 +38,17 @@ Integration tests: `layers/spaces/tests/integration/setup.test.ts`.
 - **Overrides (P10).** A holder of `spaces.booking.override` is offered the reason box only when the check is refused by P5 to P9; the reason is stored on the booking and the audit records how many rules were set aside.
 - **Changing and cancelling (X1, X4, X5).** The booker may change the title, notes and head count until the booking ends, cancel a confirmed booking (inside `spaces.bookings.cancel-notice` it is a late cancellation), or withdraw a request. Staff cancelling someone else's booking must give a note, which is sent to the booker. A booking made by another module is changed there.
 - **Sweeps and reminders.** Every 15 minutes confirmed bookings past their end become Completed and requests past their start Expired, set-wise; reminders go once, `spaces.reminders.before` ahead, under the members' notification topic Room booking reminders.
-- **Not yet.** The requests queue, decisions and the console screens for staff come with the approval slice; until then a booking that needs approval waits as Requested and expires at its start.
+- **Staff screens.** The requests queue and decisions follow in the approval slice (below).
 
 Integration tests: `layers/spaces/tests/integration/booking.test.ts`.
+
+## Approval (SP-25 to SP-28, SP-31, SP-11, SP-30, SP-13), 24 November 2026
+
+- **Requests** is a console page at `/console/spaces/requests` (navigation entry under Spaces, with a count of requests the person may decide). Each row shows the time, room, purpose, booker, when it was asked, badges (starts soon, clashes with other requests, booked elsewhere or owner asked, part of a series), the notes and the booker's no-shows and late cancellations in 90 days. Confirm and Decline open one dialog; a decline needs a note, an external room's confirm needs the owner's reference. Selecting several to confirm at once, the day strip, and "would bump" come with the series and priority slices.
+- **Deciding (A2, A4).** `spaces.booking.decide` acts on the booking and refuses its owner, so nobody decides their own request; the queue still lists it, greyed. Confirming runs the clash predicate again; a time taken since leaves the request Requested and answers `spaces.clash`.
+- **External rooms (E2).** "Mark as asked" records an `external-placed` event once (`spaces.booking.already-asked` after); the reference is stored in `external_ref`.
+- **Messages.** A new request tells everyone who may decide it (a listener on `spaces.booking.requested`, after the request is saved), never the booker. The booker is told of a confirm or a decline (`spaces.request-confirmed`, `spaces.request-declined`; with no note, a fixed sentence stands in) and of a request that lapsed (`spaces.request-expired`, from the sweep). `spaces.remind-approvers` runs daily at 09:00 and sends each approver one `spaces.requests-waiting` message a day while requests they may decide have waited longer than `spaces.requests.remind-after`.
+- **Who can decide (SP-13).** A People tab on each room lists who may decide and who may manage its bookings, and counts who may book it. The health check `spaces.no-approver` fails while an active room has nobody to decide.
+- **Role presets.** `technical-manager` (view, decide, manage bookings and set up rooms) and `committee-member` (view every booking) are offered when the module is first switched on; a theatre's own role of the same key is kept. Part 6's `administrator` holdings and `small-venue`'s `front-of-house-manager` holding are left to the theatre, since presets are keyed by role and front of house already offers its manager.
+
+Integration tests: `layers/spaces/tests/integration/approval.test.ts`.
