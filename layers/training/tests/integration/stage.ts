@@ -70,6 +70,8 @@ import teachingPeople from '../../server/api/training/teaching/people.get'
 import teachingProgress from '../../server/api/training/teaching/progress.get'
 import consoleCourses from '../../server/api/training/console/courses.get'
 import consolePeople from '../../server/api/training/console/people.get'
+import consoleCompetencies from '../../server/api/training/console/competencies.get'
+import routeOptions from '../../server/api/training/competencies/route-options.get'
 import consoleSessions from '../../server/api/training/console/sessions.get'
 import sessionOptions from '../../server/api/training/console/session-options.get'
 import sessionPeople from '../../server/api/training/sessions/[id]/people.get'
@@ -142,6 +144,8 @@ export const training = server({
   'GET /api/training/console/courses': consoleCourses,
   'GET /api/training/console/people': consolePeople,
   'GET /api/training/console/sessions': consoleSessions,
+  'GET /api/training/console/competencies': consoleCompetencies,
+  'GET /api/training/competencies/route-options': routeOptions,
   'GET /api/training/console/session-options': sessionOptions,
   'GET /api/training/sessions/:id/people': sessionPeople,
 })

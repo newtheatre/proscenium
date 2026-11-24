@@ -67,23 +67,11 @@ export function useStepEditor(courseId: Ref<string>, steps: Ref<Step[]>) {
   const act = useTrainingAct()
   const toast = useToast()
   const { toRefusal } = useRefusal()
-  const drafts = ref<StepDraft[]>([])
+  const { drafts, put, move, remove } = useDraftList<StepDraft>()
   watch(steps, (s) => { drafts.value = s.map(draftOf) }, { immediate: true })
   const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
   const saving = ref(false)
   const editing = ref<StepDraft | null>(null)
-
-  function put(draft: StepDraft) {
-    const i = drafts.value.findIndex(d => d.key === draft.key)
-    if (i < 0) drafts.value.push(draft)
-    else drafts.value.splice(i, 1, draft)
-  }
-  function move(from: number, to: number) {
-    if (to < 0 || to >= drafts.value.length) return
-    const [item] = drafts.value.splice(from, 1)
-    drafts.value.splice(to, 0, item!)
-  }
-  const remove = (key: string) => { drafts.value = drafts.value.filter(d => d.key !== key) }
 
   async function save(): Promise<boolean> {
     refusal.value = null
