@@ -7,4 +7,10 @@ export const notes = defineTable('notify_notes', {
   performanceId: col.internal(text('performance_id').notNull()),
 }, { id: 'nn', realm: 'operational' })
 
-export const tables = { notes }
+// A table whose rows cannot be dated: no time column, random ids, stored WITHOUT ROWID (R3-23).
+export const ballots = defineTable('notify_ballots', {
+  id: col.id(),
+  choice: col.internal(text('choice').notNull()),
+}, { id: 'nbl', realm: 'members', subject: 'none', random: true, timestamps: false, withoutRowid: true })
+
+export const tables = { notes, ballots }

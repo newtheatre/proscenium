@@ -75,6 +75,16 @@ export function assertNoBlockingClosure(spaceId: string | SQL, from: number | SQ
     AND (c.venue_id IS NULL OR (c.space_id IS NULL AND c.venue_id = (SELECT venue_id FROM core_spaces WHERE id = ${spaceId})) OR c.space_id = ${spaceId}))`
 }
 
+/**
+ * The same predicate for something kept at a venue rather than in a space, such as a van: no blocking
+ * closure of that venue or of the whole theatre covers any of [from, to). With no venue, only the
+ * whole theatre's closures count.
+ */
+export function assertNoVenueClosure(venueId: string | null | SQL, from: number | SQL, to: number | SQL): SQL {
+  return sql`NOT EXISTS (SELECT 1 FROM core_closures c WHERE c.blocks_performances = 1 AND c.starts_at < ${to} AND c.ends_at > ${from}
+    AND (c.venue_id IS NULL OR (c.space_id IS NULL AND c.venue_id = ${venueId})))`
+}
+
 export async function createClosure(unit: UnitView, input: ClosureInput, actorId: string | null): Promise<string> {
   const venueId = input.venueId ?? null
   const spaceId = input.spaceId ?? null
