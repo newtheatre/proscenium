@@ -250,6 +250,10 @@ export default defineModule({
       },
     }, ...SESSION_NOTICES],
     'core.requirement': [{ id: 'training', file: 'training' }],
+    // Part 5, "Navigation entries": each is added with its screens.
+    'core.navigation': [
+      { id: 'training.home', menu: 'members', to: '/members/training', icon: 'i-lucide-graduation-cap', ability: 'training.course.view', order: 50 },
+    ],
     'core.record-resolver': [
       { id: 'training.course', file: 'course' },
       { id: 'training.session', file: 'session' },
