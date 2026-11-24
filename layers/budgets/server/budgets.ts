@@ -206,7 +206,7 @@ export const budgetFields = z.object({
 })
 
 /** A department budget is for one of the organisation's departments, not a production's (R3-07). */
-export const departments = () => listTerms('core.department', { groupKey: 'organisation' })
+export const departments = () => listTerms('core.department', { group: 'organisation' })
 
 /** What a new budget is about, its default name and the finance year it falls in. */
 export async function subjectOf(input: z.infer<typeof budgetFields> | Omit<z.infer<typeof budgetFields>, 'name'>): Promise<{ name: string | null, yearStartsOn: string }> {

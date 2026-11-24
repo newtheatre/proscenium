@@ -1,0 +1,4 @@
+{
+  "person-busy.module.name": "Busy elsewhere",
+  "person-busy.module.description": "Tells planners when people are already committed: a performance they are credited on, a shift, a rehearsal call or a time they said they are busy. It has no switch: it comes on with Availability, Rehearsals or Programme planning, whichever is on."
+}

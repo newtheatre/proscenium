@@ -70,3 +70,18 @@ export const hoursQuery = z.object({
   accountId: z.string().min(1).max(40).optional(), // not-policy: shape bound
   dutyId: z.string().min(1).max(40).optional(), // not-policy: shape bound
 }).refine(q => (q.from !== undefined && q.to !== undefined) || (q.fromDay !== undefined && q.toDay !== undefined), { message: 'Give from and to, or fromDay and toDay.' })
+
+// A crew call's create and edit (FH-49).
+const DATE = /^\d{4}-\d{2}-\d{2}$/ // not-policy: a date's shape
+const key = z.string().trim().min(1).max(80).optional() // not-policy: a question key's bound
+
+export const crewCallInput = z.object({
+  name: z.string().trim().min(1).max(80), // not-policy: shape bound, as the table's CHECK
+  seasonId: z.string().min(1).max(40).nullish(), // not-policy: shape bound
+  startsOn: z.string().regex(DATE),
+  endsOn: z.string().regex(DATE),
+  questionRoles: z.object({ tshirtSize: key, mealDays: key, dietaryNeed: key }).strict().optional(),
+  tshirtMinShifts: z.number().int().min(1).max(50).nullish(), // not-policy: shape bound, as the table's CHECK
+  mealMinMinutes: z.number().int().min(30).max(720).nullish(), // not-policy: shape bound, as the table's CHECK
+  mealsOnRequest: z.boolean().optional(),
+}).strict()

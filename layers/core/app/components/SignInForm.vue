@@ -31,7 +31,7 @@ const codeSchema = z.object({ code: z.string().regex(/^\d{6}$/, t('core.form.inv
 const addressForm = useTemplateRef('addressForm')
 const codeForm = useTemplateRef('codeForm')
 const turnstile = useTemplateRef('turnstile')
-interface Methods { email: boolean, providers: { id: string, label: string, domains: string[] }[], managed: { domains: string[], provider: string } | null, openSignUp?: boolean }
+interface Methods { email: boolean, providers: { id: string, label: string, domains: string[] }[], managed: { domains: string[], provider: string }[], openSignUp?: boolean }
 const { data: me } = await useAPI<{ signedIn: boolean, signIn?: Methods }>('/api/core/me', { key: 'core:me' })
 const providers = computed(() => me.value?.signIn?.providers ?? [])
 const email = computed(() => !!me.value?.signIn?.email)
@@ -49,8 +49,14 @@ const providerErrors: Record<string, string> = {
   'core.sign-in.provider-cancelled': 'core.sign-in.page.error.provider-cancelled',
   'core.sign-in.closed': 'core.sign-in.page.error.closed',
   'core.account.disabled': 'core.sign-in.page.error.disabled',
+  'core.sign-in.provider-managed-elsewhere': 'core.sign-in.page.error.provider-managed-elsewhere',
 }
-const providerError = computed(() => errorCode ? t(providerErrors[errorCode] ?? 'core.sign-in.page.error.provider-other', { provider: providerName.value }) : null)
+// A provider that has not proven the person's address leaves it waiting for an emailed code (MS3).
+const proving = ref<{ address: string, provider: string } | null>(null)
+const providerError = computed(() => {
+  if (!errorCode || proving.value) return null
+  return t(providerErrors[errorCode] ?? 'core.sign-in.page.error.provider-other', { provider: providerName.value })
+})
 const providerHref = (id: string, loginHint?: string) => {
   const query = new URLSearchParams({ ...(props.next ? { next: props.next } : {}), ...(loginHint ? { login_hint: loginHint } : {}) }).toString()
   return `/api/core/sign-in/${id}${query ? `?${query}` : ''}`
@@ -62,8 +68,8 @@ async function carryOn() {
   nowhere.value = false
   const given = address.value.trim().toLowerCase()
   const domain = given.split('@').pop() ?? ''
-  const managed = me.value?.signIn?.managed
-  if (managed?.domains.includes(domain)) return navigateTo(providerHref(managed.provider, given), { external: true })
+  const managed = me.value?.signIn?.managed.find(m => m.domains.includes(domain))
+  if (managed) return navigateTo(providerHref(managed.provider, given), { external: true })
   const fitting = providers.value.filter(p => !p.domains.length || p.domains.includes(domain))
   if (fitting.length) {
     choosing.value = { address: given, providers: fitting }
@@ -91,6 +97,14 @@ async function withPasskey() {
 // Offer the site's passkeys among the address box's suggestions (its autocomplete says webauthn).
 // Waits in the background; a pick signs in. Pressing the passkey button cancels it and starts afresh.
 onMounted(async () => {
+  if (errorCode === 'core.sign-in.provider-prove-address' && email.value) {
+    const waiting = await useNuxtApp().$api<{ address: string | null, provider: string | null }>('/api/core/sign-in/proving' as string).catch(() => null)
+    if (waiting?.address && waiting.provider) {
+      proving.value = { address: waiting.address, provider: waiting.provider }
+      address.value = waiting.address
+      void sendLink()
+    }
+  }
   const answer = await provePasskey<{ next: string }>('/api/core/sign-in/passkey/options', '/api/core/sign-in/passkey', props.next ? { next: props.next } : {}, true)
   if (answer.ok) return arriveSignedIn(answer.data)
   if (answer.refusal.code !== 'core.passkey.cancelled') refusal.value = answer.refusal
@@ -131,6 +145,14 @@ async function useCode() {
       role="alert"
       color="error"
       :title="providerError"
+    />
+    <UAlert
+      v-if="proving"
+      role="status"
+      color="info"
+      variant="subtle"
+      icon="i-lucide-mail"
+      :title="t('core.sign-in.page.error.provider-prove-address', proving)"
     />
     <RefusalNotice :refusal="refusal" />
 

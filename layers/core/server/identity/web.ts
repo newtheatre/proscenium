@@ -10,8 +10,10 @@ export const SESSION_COOKIE = '__Host-proscenium-session'
 export const BROWSER_COOKIE = '__Host-proscenium-browser'
 /** Carries first-run setup between its steps, sealed. */
 export const SETUP_COOKIE = '__Host-proscenium-setup'
-/** Carries Google's state, nonce and verifier between the redirect and the callback, sealed. */
+/** Carries a provider's state, nonce and verifier between the redirect and the callback, sealed. */
 export const PROVIDER_COOKIE = '__Host-proscenium-provider'
+/** A provider identity waiting for its address to be proven by emailed code (MS3), sealed. */
+export const PROVIDER_LINK_COOKIE = '__Host-proscenium-provider-link'
 
 // The return path after signing in is checked in shared code, so pages apply the same rule.
 export { safeNext } from '../../shared/next'

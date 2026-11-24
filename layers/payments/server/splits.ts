@@ -9,6 +9,7 @@
 // nobody gets two emails.
 import { all, createUnit, first, log, newId, nowMs, refuse, type UnitView } from '#kit'
 import { notify, notifyAddress } from '#modules/core'
+import { unitShares } from '../shared/till'
 import { getIntent, partsOf, settlements, type IntentRow, type PartRow } from './intents'
 import type { SummaryLine } from './points/desk-basket'
 import type { Destination, ReceiptLink, Settlement } from './points/settlement'
@@ -22,13 +23,6 @@ export interface SplitRow { id: string, intent_id: string, position: number, amo
 
 /** One panel of the sale, as the split works it out: its summary lines and whose part it made. */
 export interface SplitPanel { basket: string, owner: { module: string, record: string }, lines: SummaryLine[] }
-
-/** The amount of each of a line's `quantity` units, the first ones taking the odd pennies. */
-export function unitShares(amountMinor: number, quantity: number): number[] {
-  const each = Math.floor(amountMinor / quantity)
-  const over = amountMinor - each * quantity
-  return Array.from({ length: quantity }, (_, i) => each + (i < over ? 1 : 0))
-}
 
 /** How many separate things a sale holds: a split needs at least two. */
 export const itemCount = (panels: Pick<SplitPanel, 'lines'>[]) => panels.reduce((n, p) => n + p.lines.reduce((m, l) => m + (l.quantity ?? 1), 0), 0)
