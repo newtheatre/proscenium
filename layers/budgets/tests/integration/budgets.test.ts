@@ -9,6 +9,7 @@ import { balances, ensureSystemAccounts, postEntries } from '../../../finance/se
 import { ensureVocabularies, removeTermGroup } from '../../../core/server/vocabularies/service'
 import { ensureModuleDefaults } from '../../../core/server/identity/defaults'
 import { identityAccess } from '../../../core/server/identity/access'
+import { eraseAccount } from '../../../core/server/identity/erasure'
 import seed from '../../server/listeners/categories'
 import budgetsGet from '../../server/api/budgets/budgets/index.get'
 import budgetsPost from '../../server/api/budgets/budgets/index.post'
@@ -419,6 +420,14 @@ describe('holders (BC-14)', () => {
     expect((await view(budgetId)).holders).toEqual([])
     expect((await req('GET', `/api/budgets/budgets/${budgetId}`, undefined, holder)).status).toBe(403)
     expect((await req('DELETE', `/api/budgets/budgets/${budgetId}/holders/${holderId}`, undefined)).status).toBe(404)
+  })
+
+  it('an erased person stops holding any budget', async () => {
+    const goneId = await account('Gus Gone')
+    const { budgetId } = await approved()
+    await ok('POST', `/api/budgets/budgets/${budgetId}/holders`, { accountId: goneId })
+    await inContext(() => eraseAccount(goneId))
+    expect(await rows('SELECT 1 FROM budgets_holders WHERE account_id = ?', goneId)).toEqual([])
   })
 })
 

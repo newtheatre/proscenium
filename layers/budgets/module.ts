@@ -58,6 +58,7 @@ export default defineModule({
     // The Budget tab and fact on a production's page (BC-11).
     'core.record-tab': [{ id: 'budgets.production', record: 'core.production', ability: 'budgets.budget.view', component: 'BudgetsProductionTab', order: 40 }],
     'core.record-fact': [{ id: 'budgets.production', record: 'core.production', ability: 'budgets.budget.view', component: 'BudgetsProductionFact', order: 40 }],
+    'core.erasure-handler': [{ id: 'budgets', file: 'budgets' }],
     'core.record-resolver': [{ id: 'budgets.budget', file: 'budget' }, { id: 'budgets.line', file: 'line' }, { id: 'budgets.category', file: 'category' }],
     'core.navigation': [
       { id: 'budgets.budgets', menu: 'console', group: 'money', section: 'everyday', to: '/console/budgets', icon: 'i-lucide-piggy-bank', ability: 'budgets.budget.view', order: 85 },
