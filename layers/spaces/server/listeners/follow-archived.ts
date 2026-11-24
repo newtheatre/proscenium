@@ -1,6 +1,7 @@
-// A space or a venue was archived: its bookables are archived too (rule L4). Bookings ahead are
-// cancelled by the change-and-priority slice's set-wise listener.
+// A space or a venue was archived: its bookables are archived too, and bookings ahead cancelled
+// with reason bookable-removed, requests declined (rule L4).
 import { all, defineListener } from '#kit'
+import { displace } from '../displace'
 import { followArchived } from '../setup'
 
 export default defineListener(async (event, unit) => {
@@ -11,4 +12,6 @@ export default defineListener(async (event, unit) => {
   if (!ids.length) return
   followArchived(unit, where)
   unit.announce('spaces.bookable.archived', ids.map(r => ({ payload: { bookableId: r.id }, record: ['spaces.bookable', r.id] as const })))
+  const d = { reason: 'bookable-removed' as const, ...where }
+  if ((await displace(unit, d)).more) unit.enqueue('spaces.clear-window', d)
 })

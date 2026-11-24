@@ -456,5 +456,15 @@
   "spaces.requests.note-help": "Sent to the booker with the decision.",
   "spaces.requests.confirmed": "Confirmed. {name} has been told.",
   "spaces.requests.declined": "Declined. {name} has been told.",
-  "spaces.words.dates": "{from} to {to}"
+  "spaces.words.dates": "{from} to {to}",
+  "spaces.displace.note.performance": "A performance has been scheduled in the room at that time.",
+  "spaces.displace.note.closure": "The room is closed at that time.",
+  "spaces.displace.note.bookable-removed": "The room is no longer available for booking.",
+  "spaces.displace.contact": "the theatre",
+  "spaces.impact.bookings.one": "{count} room booking will be moved aside, and its booker told.",
+  "spaces.impact.bookings.other": "{count} room bookings will be moved aside, and their bookers told.",
+  "spaces.impact.requests.one": "{count} room request will be declined.",
+  "spaces.impact.requests.other": "{count} room requests will be declined.",
+  "spaces.impact.external.one": "{count} room booking will need placing with the owner.",
+  "spaces.impact.external.other": "{count} room bookings will need placing with the owner."
 }

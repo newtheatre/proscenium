@@ -88,7 +88,7 @@ export async function moveOrAsk(unit: UnitView, acting: Acting, actor: Actor, to
 /** X3: once the request replacing it is confirmed, the old booking is cancelled in the same unit, first, so its time is free. */
 export function releaseReplaced(unit: UnitView, request: Booking, replaced: Booking | null, decider: string): void {
   if (!replaced || replaced.state !== 'confirmed') return
-  moveBooking(unit, replaced, { to: 'cancelled', actor: decider, reason: 'by-booker', note: null, where: sql`ends_at > ${nowMs()}`, payload: { reason: 'by-booker', late: false, replacedBy: request.id } })
+  moveBooking(unit, replaced, { to: 'cancelled', actor: decider, reason: 'by-booker', note: null, where: sql`ends_at > ${nowMs()}`, payload: { reason: 'by-booker', late: false } })
 }
 
 /** X6: the no-show mark on a Completed booking, for 14 days after it ends. It changes nothing by itself. */
@@ -99,6 +99,7 @@ export function setNoShow(unit: UnitView, booking: Booking, actor: string, noSho
     WHERE id = ${booking.id} AND state = 'completed' AND no_show = ${noShow ? 0 : 1} AND ends_at > ${at - NO_SHOW_DAYS * DAY}`)
     .expect(1, { code: 'spaces.booking.no-show-closed', reason: `A no-show can be marked only within ${NO_SHOW_DAYS} days of the booking, and only once.`, remedy: 'Reload it.' })
   history(unit, booking.id, noShow ? 'no-show-set' : 'no-show-cleared', actor, at)
+  unit.announce('spaces.booking.no-show', { bookingId: booking.id, bookableId: booking.bookableId, set: noShow }, { record: ['spaces.booking', booking.id] })
 }
 
 /** The booker takes back a request before it is decided. */

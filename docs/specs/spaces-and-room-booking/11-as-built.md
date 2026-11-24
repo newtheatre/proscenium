@@ -80,3 +80,14 @@ Integration tests: `layers/spaces/tests/integration/occupancy.test.ts`; the occu
 - **Erasure (SP-36).** A `core.erasure-handler` contribution cancels the erased person's future Confirmed bookings and withdraws their open requests, set-wise, before the registry anonymises `booked_for` and redacts the free text. Past bookings keep their time, room and purpose. The data download needs nothing from Spaces: the registry finds bookings by `booked_for`.
 
 Integration tests: `layers/spaces/tests/integration/change.test.ts`.
+
+## When other things change (SP-33, SP-34; rules L1, L2, L4, B4), 24 November 2026
+
+- **Performances (L1).** Spaces listens to `core.performance.scheduled`, `.rescheduled` and `.moved`. Confirmed bookings ahead in the performance's space that overlap it become Bumped with reason `performance`; requests that overlap are Declined with a standard note.
+- **Closures (L2).** On `core.closure.created` for a blocking closure, the same with reason `closure`, for space bookables in the closure's spaces and resources kept at its venue (or anywhere, for the whole theatre's). The scope is core's new statement fragment `closureSpaces(closureId)`, with `closureSpaceIds(closureId)` as its read; both are exported from core's services. A public holiday or a closure that does not block performances does nothing.
+- **Rooms taken away (L4).** When a space or venue is archived its bookables are archived and bookings ahead Cancelled with reason `bookable-removed`; requests are Declined. Archiving a bookable directly still waits until nothing is booked ahead.
+- **Set-wise (I-33).** Each displacement reads the bookings in the way by a predicate on the statement, never a list of ids from the event; then one guarded update per state, one insert of history rows, one set of events and one set of messages. Past `core.units.set-rows-limit` the soonest are done and the job `spaces.clear-window` (bulk lane) repeats until none is left.
+- **Telling people (B4).** A bumped booker gets `spaces.booking-bumped` with the reason, who to contact (`spaces.bumping.contact`, else "the theatre") and a Book again button to the request form; a cancelled one `spaces.booking-cancelled`; a declined request `spaces.request-declined`. The form is not yet filled with the old details.
+- **Seeing it first (SP-34).** A `core.change-impact` contribution counts the bookings a rescheduled or moved performance would move aside and the requests it would decline, and, for a space the theatre stops running, the bookings that will need placing with the owner (C6). Core shows these lines on its confirmation. Scheduling a new performance and creating a closure have no confirmation step in core yet, so those counts are not shown.
+
+Integration tests: `layers/spaces/tests/integration/displace.test.ts`.
