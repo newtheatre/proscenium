@@ -1,8 +1,9 @@
-<!-- Approvals (BC-16): requests to spend waiting on this person, oldest first: on the budgets they
-     hold, or every one for the treasurer, never their own. Each shows how far over budget approving
-     it would go; over budget, only the treasurer approves, and a holder sees who it needs. Declining
-     asks for a note the requester reads. Claims join the queue with their slice. -->
+<!-- Approvals (BC-16, BC-21): claims and requests to spend waiting on this person, oldest first: on
+     the budgets they hold, or every one for the treasurer, never their own. Each shows how far over
+     budget approving it would go; over budget, only the treasurer approves, and a holder sees who it
+     needs. A claim opens for review beside its receipts, marked when late or not asked for first. -->
 <script setup lang="ts">
+interface WaitingClaim { id: string, number: string | null, title: string, claimant: string | null, currency: string, totalMinor: number, submittedAt: number | null, overMinor: number, late: boolean, notAskedFirst: boolean }
 interface Waiting { id: string, lineName: string, budgetId: string, budgetName: string, currency: string, amountMinor: number, description: string, neededBy: string | null, createdAt: number, overMinor: number }
 
 const { t } = useT()
@@ -11,7 +12,7 @@ const { toRefusal, fieldErrors } = useRefusal()
 const { day } = useDates()
 const toast = useToast()
 const text = useBudgetText()
-const { data, status, error, refresh } = await useAPI<{ requests: Waiting[], approvesAny: boolean }>('/api/budgets/approvals', { key: 'budgets:approvals' })
+const { data, status, error, refresh } = await useAPI<{ requests: Waiting[], claims: WaitingClaim[], approvesAny: boolean }>('/api/budgets/approvals', { key: 'budgets:approvals' })
 
 function describe(r: Waiting) {
   return [
@@ -21,6 +22,10 @@ function describe(r: Waiting) {
     t('budgets.screens.approvals.asked', { day: day(r.createdAt) }),
   ].filter(Boolean).join(' · ')
 }
+function describeClaim(c: WaitingClaim) {
+  return [c.claimant, c.submittedAt ? t('budgets.screens.approvals.submitted', { day: day(c.submittedAt) }) : null, c.late ? t('budgets.screens.claims.late') : null, c.notAskedFirst ? t('budgets.screens.claims.not-asked-first') : null].filter(Boolean).join(' · ')
+}
+const empty = computed(() => !!data.value && !data.value.requests.length && !data.value.claims.length)
 const mayApprove = (r: Waiting) => !r.overMinor || !!data.value?.approvesAny
 async function approve(r: Waiting) {
   try {
@@ -79,36 +84,67 @@ async function decline() {
       @retry="refresh()"
     >
       <EmptyState
-        v-if="data && !data.requests.length"
+        v-if="data && empty"
         icon="i-lucide-inbox"
         :title="t('budgets.screens.approvals.none')"
       />
-      <RecordList
+      <div
         v-else-if="data"
-        :label="t('budgets.navigation.approvals.label')"
+        class="space-y-6"
       >
-        <RecordListItem
-          v-for="r in data.requests"
-          :key="r.id"
-          icon="i-lucide-hand-coins"
-          :name="text.money(r.amountMinor, r.currency)"
-          :description="describe(r)"
-          :to="`/console/budgets/${r.budgetId}`"
+        <PageSection
+          v-if="data.claims.length"
+          :title="t('budgets.screens.approvals.claims')"
         >
-          <template #below>
-            <span
-              v-if="r.overMinor"
-              class="text-sm text-warning"
+          <RecordList :label="t('budgets.screens.approvals.claims')">
+            <RecordListItem
+              v-for="c in data.claims"
+              :key="c.id"
+              icon="i-lucide-receipt"
+              :name="`${c.number ?? ''} ${c.title}: ${text.money(c.totalMinor, c.currency)}`"
+              :description="describeClaim(c)"
+              :to="`/console/budgets/claims/${c.id}`"
             >
-              {{ mayApprove(r) ? t('budgets.screens.approvals.over', { amount: text.money(r.overMinor, r.currency) }) : t('budgets.screens.approvals.needs-treasurer', { amount: text.money(r.overMinor, r.currency) }) }}
-            </span>
-          </template>
-          <RowActions
-            :items="actions(r)"
-            :label="t('budgets.screens.approvals.actions')"
-          />
-        </RecordListItem>
-      </RecordList>
+              <template #below>
+                <span
+                  v-if="c.overMinor"
+                  class="text-sm text-warning"
+                >
+                  {{ data.approvesAny ? t('budgets.screens.approvals.over', { amount: text.money(c.overMinor, c.currency) }) : t('budgets.screens.approvals.needs-treasurer', { amount: text.money(c.overMinor, c.currency) }) }}
+                </span>
+              </template>
+            </RecordListItem>
+          </RecordList>
+        </PageSection>
+        <PageSection
+          v-if="data.requests.length"
+          :title="t('budgets.screens.approvals.requests')"
+        >
+          <RecordList :label="t('budgets.screens.approvals.requests')">
+            <RecordListItem
+              v-for="r in data.requests"
+              :key="r.id"
+              icon="i-lucide-hand-coins"
+              :name="text.money(r.amountMinor, r.currency)"
+              :description="describe(r)"
+              :to="`/console/budgets/${r.budgetId}`"
+            >
+              <template #below>
+                <span
+                  v-if="r.overMinor"
+                  class="text-sm text-warning"
+                >
+                  {{ mayApprove(r) ? t('budgets.screens.approvals.over', { amount: text.money(r.overMinor, r.currency) }) : t('budgets.screens.approvals.needs-treasurer', { amount: text.money(r.overMinor, r.currency) }) }}
+                </span>
+              </template>
+              <RowActions
+                :items="actions(r)"
+                :label="t('budgets.screens.approvals.actions')"
+              />
+            </RecordListItem>
+          </RecordList>
+        </PageSection>
+      </div>
     </DataBoundary>
 
     <UModal

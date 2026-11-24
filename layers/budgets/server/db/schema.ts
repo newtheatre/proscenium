@@ -181,4 +181,120 @@ export const requests = defineTable('budgets_spending_requests', {
   ],
 })
 
-export const tables = { categories, budgets, lines, lineAmounts, lineSources, holders, requests }
+export const CLAIM_STATES = ['draft', 'submitted', 'returned', 'approved', 'declined', 'withdrawn', 'voided', 'paid'] as const
+export const PAY_ROUTES = ['bank-transfer', 'parent-body', 'cash', 'cheque'] as const
+export const CLAIM_ACTIONS = ['submitted', 'returned', 'resubmitted', 'approved', 'declined', 'withdrawn', 'voided', 'paid', 'payment-reversed'] as const
+
+// A claim is a financial record: its claimant's words stay while the accounts may be asked for.
+const kept = { erase: 'retain', until: 'budgets.retention.claims', reason: 'budgets.retention.financial-record' } as const
+
+/** An expense claim (BC-19 on): numbered when first submitted; its content is fixed once submitted. */
+export const claims = defineTable('budgets_claims', {
+  id: col.id(),
+  // "2026-0042": the finance year and a counter; null while a draft.
+  number: col.internal(text('number')),
+  // Null once anonymised at the end of retention.
+  claimantId: col.account('claimant_id', { role: 'subject', onMerge: 'move', reason: 'The surviving account is owed the money', nullable: true }),
+  requestId: col.ref('budgets_spending_requests', { nullable: true }),
+  title: col.freeText(text('title').notNull(), kept),
+  state: col.internal(text('state', { enum: CLAIM_STATES }).notNull().default('draft')),
+  currency: col.currency('currency').notNull(),
+  totalMinor: col.minor('total_minor').notNull().default(0),
+  approvedMinor: col.minor('approved_minor'),
+  paidMinor: col.minor('paid_minor').notNull().default(0),
+  payRoute: col.internal(text('pay_route', { enum: PAY_ROUTES }).notNull()),
+  declaredAt: col.timestamp('declared_at'),
+  submittedAt: col.timestamp('submitted_at'),
+  decidedAt: col.timestamp('decided_at'),
+  expensePostingId: col.internal(text('expense_posting_id')),
+  version: col.internal(integer('version').notNull().default(0)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'ecl',
+  realm: 'members',
+  subject: { account: 'claimant_id', unlinked: 'staff' },
+  retention: 'budgets.retention.claims',
+  extra: t => [
+    uniqueIndex('budgets_claims_number').on(t.number).where(sql`number IS NOT NULL`),
+    uniqueIndex('budgets_claims_posting').on(t.expensePostingId).where(sql`expense_posting_id IS NOT NULL`),
+    index('budgets_claims_claimant').on(t.claimantId, t.createdAt),
+    index('budgets_claims_state').on(t.state, t.submittedAt),
+    index('budgets_claims_request').on(t.requestId),
+    check('budgets_claims_state', sql`${t.state} IN ('draft', 'submitted', 'returned', 'approved', 'declined', 'withdrawn', 'voided', 'paid')`),
+    check('budgets_claims_route', sql`${t.payRoute} IN ('bank-transfer', 'parent-body', 'cash', 'cheque')`),
+    check('budgets_claims_title', sql`length(${t.title}) <= 80`),
+    check('budgets_claims_total', sql`${t.totalMinor} >= 0`),
+    check('budgets_claims_paid', sql`${t.paidMinor} >= 0 AND ${t.paidMinor} <= coalesce(${t.approvedMinor}, 0)`),
+    check('budgets_claims_numbered', sql`${t.state} IN ('draft', 'withdrawn') OR ${t.number} IS NOT NULL`),
+  ],
+})
+
+/** One purchase on a claim; it owns the receipts in the file slot budgets.receipt. */
+export const claimItems = defineTable('budgets_claim_items', {
+  id: col.id(),
+  claimId: col.ref('budgets_claims'),
+  spentOn: col.localDate('spent_on').notNull(),
+  description: col.freeText(text('description').notNull(), kept),
+  supplier: col.internal(text('supplier')),
+  amountMinor: col.minor('amount_minor').notNull(),
+  // The claimant suggests; the approver confirms.
+  lineId: col.ref('budgets_lines', { nullable: true }),
+  categoryId: col.ref('budgets_categories', { nullable: true }),
+  noReceiptReason: col.freeText(text('no_receipt_reason'), kept),
+  approvedMinor: col.minor('approved_minor'),
+  partReason: col.freeText(text('part_reason'), kept),
+  sortOrder: col.internal(integer('sort_order').notNull()),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'eci',
+  realm: 'members',
+  subject: { via: 'claim_id' },
+  extra: t => [
+    index('budgets_claim_items_claim').on(t.claimId, t.sortOrder),
+    index('budgets_claim_items_line').on(t.lineId),
+    check('budgets_claim_items_amount', sql`${t.amountMinor} > 0`),
+    check('budgets_claim_items_approved', sql`${t.approvedMinor} IS NULL OR ${t.approvedMinor} BETWEEN 0 AND ${t.amountMinor}`),
+    check('budgets_claim_items_part', sql`${t.approvedMinor} IS NULL OR ${t.approvedMinor} = ${t.amountMinor} OR ${t.partReason} IS NOT NULL`),
+    check('budgets_claim_items_description', sql`length(${t.description}) <= 200`),
+    check('budgets_claim_items_supplier', sql`${t.supplier} IS NULL OR length(${t.supplier}) <= 80`),
+    check('budgets_claim_items_reason', sql`${t.noReceiptReason} IS NULL OR length(${t.noReceiptReason}) <= 300`),
+    check('budgets_claim_items_part_reason', sql`${t.partReason} IS NULL OR length(${t.partReason}) <= 300`),
+  ],
+})
+
+/** The decision log of a claim. */
+export const claimEvents = defineTable('budgets_claim_events', {
+  id: col.id(),
+  claimId: col.ref('budgets_claims'),
+  action: col.internal(text('action', { enum: CLAIM_ACTIONS }).notNull()),
+  by: col.account('by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  at: col.timestamp('at').notNull(),
+  amountMinor: col.minor('amount_minor'),
+  // Seen by the claimant; required when returned, declined or voided.
+  note: col.freeText(text('note'), kept),
+  disbursementId: col.internal(text('disbursement_id')),
+  postingId: col.internal(text('posting_id')),
+}, {
+  id: 'ece',
+  realm: 'members',
+  subject: { via: 'claim_id' },
+  appendOnly: true,
+  extra: t => [
+    index('budgets_claim_events_claim').on(t.claimId, t.at),
+    check('budgets_claim_events_action', sql`${t.action} IN ('submitted', 'returned', 'resubmitted', 'approved', 'declined', 'withdrawn', 'voided', 'paid', 'payment-reversed')`),
+    check('budgets_claim_events_note', sql`${t.note} IS NULL OR length(${t.note}) <= 500`),
+  ],
+})
+
+/** The next claim number in each finance year, raised in the batch that numbers a claim. */
+export const counters = defineTable('budgets_counters', {
+  yearStartsOn: col.localDate('year_starts_on').primaryKey(),
+  nextNumber: col.internal(integer('next_number').notNull()),
+}, {
+  realm: 'system',
+  subject: 'none',
+})
+
+export const tables = { categories, budgets, lines, lineAmounts, lineSources, holders, requests, claims, claimItems, claimEvents, counters }

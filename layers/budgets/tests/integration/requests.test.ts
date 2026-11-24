@@ -18,7 +18,7 @@ import approvePost from '../../server/api/budgets/budgets/[id]/approve.post'
 import closePost from '../../server/api/budgets/budgets/[id]/close.post'
 import linesPost from '../../server/api/budgets/budgets/[id]/lines.post'
 import holdersPost from '../../server/api/budgets/budgets/[id]/holders.post'
-import requestsGet from '../../server/api/budgets/requests/index.get'
+import requestsGet from '../../server/api/budgets/expenses.get'
 import requestsPost from '../../server/api/budgets/requests/index.post'
 import requestApprove from '../../server/api/budgets/requests/[id]/approve.post'
 import requestDecline from '../../server/api/budgets/requests/[id]/decline.post'
@@ -33,7 +33,7 @@ const handle = server({
   'POST /api/budgets/budgets/:id/close': closePost,
   'POST /api/budgets/budgets/:id/lines': linesPost,
   'POST /api/budgets/budgets/:id/holders': holdersPost,
-  'GET /api/budgets/requests': requestsGet,
+  'GET /api/budgets/expenses': requestsGet,
   'POST /api/budgets/requests': requestsPost,
   'POST /api/budgets/requests/:id/approve': requestApprove,
   'POST /api/budgets/requests/:id/decline': requestDecline,
@@ -116,14 +116,14 @@ describe('asking to spend (BC-15)', () => {
     const categoryId = (await rows<{ id: string }>("SELECT id FROM budgets_categories WHERE slug = 'set'"))[0]!.id
     const draftLine = (await ok('POST', `/api/budgets/budgets/${draftId}/lines`, { name: 'Paint', kind: 'expense', categoryId, amountMinor: 500 }, manager)).lineId
     const asker = await member()
-    const offered = await ok('GET', '/api/budgets/requests', undefined, asker)
+    const offered = await ok('GET', '/api/budgets/expenses', undefined, asker)
     expect(offered.lines.map((l: { id: string }) => l.id)).toContain(lineId)
     expect(offered.lines.map((l: { id: string }) => l.id)).not.toContain(draftLine)
     expect((await ask(draftLine, 500, asker)).body.code).toBe('budgets.request.line')
     const { requestId } = (await ask(lineId, 4_000, asker)).body
     const told = await rows<{ account_id: string }>("SELECT account_id FROM core_notifications WHERE type_key = 'budgets.request-to-approve'")
     expect(told.map(r => r.account_id)).toContain(holder.accountId)
-    const mine = (await ok('GET', '/api/budgets/requests', undefined, asker)).requests
+    const mine = (await ok('GET', '/api/budgets/expenses', undefined, asker)).requests
     expect(mine).toMatchObject([{ id: requestId, state: 'requested', amountMinor: 4_000 }])
   })
 })
@@ -172,7 +172,7 @@ describe('deciding (BC-16)', () => {
     const { requestId } = (await ask(lineId, 1_000, asker)).body
     expect((await req('POST', `/api/budgets/requests/${requestId}/decline`, {}, holder)).status).toBe(422)
     await ok('POST', `/api/budgets/requests/${requestId}/decline`, { note: 'Use the paint in the store' }, holder)
-    expect((await ok('GET', '/api/budgets/requests', undefined, asker)).requests[0]).toMatchObject({ state: 'declined', decisionNote: 'Use the paint in the store' })
+    expect((await ok('GET', '/api/budgets/expenses', undefined, asker)).requests[0]).toMatchObject({ state: 'declined', decisionNote: 'Use the paint in the store' })
     const told = await rows<{ account_id: string }>("SELECT account_id FROM core_notifications WHERE type_key = 'budgets.request-decided'")
     expect(told.map(r => r.account_id)).toContain(asker.accountId)
   })

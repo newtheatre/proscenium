@@ -1,6 +1,7 @@
-// Words shared by the Budgets screens: a finance year's name, a budget's or request's badge, and money.
+// Words shared by the Budgets screens: a finance year's name, a budget's, request's or claim's badge, and money.
 export type BudgetState = 'draft' | 'proposed' | 'approved' | 'closed'
 export type RequestState = 'requested' | 'approved' | 'declined' | 'withdrawn' | 'fulfilled' | 'lapsed'
+export type ClaimState = 'draft' | 'submitted' | 'returned' | 'approved' | 'declined' | 'withdrawn' | 'voided' | 'paid'
 
 export function useBudgetText() {
   const { t } = useT()
@@ -14,5 +15,7 @@ export function useBudgetText() {
   const state = (s: BudgetState) => ({ tone: TONES[s], label: t(`budgets.screens.states.${s}`) })
   const REQUEST_TONES: Record<RequestState, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = { requested: 'info', approved: 'success', declined: 'danger', withdrawn: 'neutral', fulfilled: 'neutral', lapsed: 'warning' }
   const requestState = (s: RequestState) => ({ tone: REQUEST_TONES[s], label: t(`budgets.screens.request-states.${s}`) })
-  return { year, state, requestState, money }
+  const CLAIM_TONES: Record<ClaimState, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = { draft: 'neutral', submitted: 'info', returned: 'warning', approved: 'success', declined: 'danger', withdrawn: 'neutral', voided: 'neutral', paid: 'success' }
+  const claimState = (s: ClaimState) => ({ tone: CLAIM_TONES[s], label: t(`budgets.screens.claim-states.${s}`) })
+  return { year, state, requestState, claimState, money }
 }
