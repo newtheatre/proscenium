@@ -194,10 +194,8 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
         else if (!entry.handlers.contributions?.[name]?.[c.file ?? c.id]) {
           fail(entry, `contributes.${name}.${c.id}`, `the file ${entry.root}/server/contributions/${name}/${c.file ?? c.id}.ts does not exist`)
         }
-        if (declared!.decl.kind === 'code' && declared!.decl.publicSafe) {
-          const problem = publicSafeProblem(r, c.from)
-          if (problem) fail(entry, `contributes.${name}.${c.id}.from`, problem)
-        }
+        const problem = declared!.decl.kind === 'code' && declared!.decl.publicSafe ? publicSafeProblem(r, c.from) : null
+        if (problem) fail(entry, `contributes.${name}.${c.id}.from`, problem)
       }
     }
     placeSettings(r, entry, fail)
@@ -290,7 +288,6 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
   return r
 }
 
-/** The part of a job, task or call name after the module: `box-office.sweep-holds` → `sweep-holds`. */
 const ABOUT_A_PERSON = new Set(['personal', 'freeText', 'special', 'perRow'])
 
 /** Why a public-safe contribution's `from` (its <table>.<column> sources) is not safe, or null. */
@@ -305,6 +302,7 @@ function publicSafeProblem(r: Registry, from: unknown): string | null {
   return null
 }
 
+/** The part of a job, task or call name after the module: `box-office.sweep-holds` → `sweep-holds`. */
 export function short(name: string): string {
   return name.slice(name.indexOf('.') + 1)
 }
