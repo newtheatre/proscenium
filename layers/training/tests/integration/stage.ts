@@ -51,6 +51,8 @@ import reached from '../../server/api/training/courses/[id]/steps/[step]/section
 import getQuiz from '../../server/api/training/courses/[id]/steps/[step]/quiz.get'
 import sendQuiz from '../../server/api/training/courses/[id]/steps/[step]/quiz.post'
 import allowance from '../../server/api/training/courses/[id]/steps/[step]/allowances.post'
+import readActivity from '../../server/api/training/courses/[id]/activity.post'
+import stepSources from '../../server/api/training/step-sources.get'
 
 export const training = server({
   'GET /api/training/courses': listCourses,
@@ -100,6 +102,8 @@ export const training = server({
   'GET /api/training/courses/:id/steps/:step/quiz': getQuiz,
   'POST /api/training/courses/:id/steps/:step/quiz': sendQuiz,
   'POST /api/training/courses/:id/steps/:step/allowances': allowance,
+  'POST /api/training/courses/:id/activity': readActivity,
+  'GET /api/training/step-sources': stepSources,
 })
 
 /** 24 November 2026, 10:00 in London. */

@@ -111,6 +111,8 @@ export default defineModule({
 
   tasks: {
     'training.send-reminders': task({ every: '30m' }),
+    // Reads step sources again for people with progress on an activity step (H2).
+    'training.sweep-records': task({ dailyAt: '06:00' }),
   },
 
   points: {

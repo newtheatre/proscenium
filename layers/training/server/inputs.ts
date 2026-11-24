@@ -37,6 +37,14 @@ export const stepInput = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('session'), ...common, ...material }),
   z.object({ kind: z.literal('practical'), ...common, ...material, timesRequired: z.number().int().min(1).max(20).default(1) }), // not-policy: the schema's limit (part 2)
   z.object({ kind: z.literal('reading'), ...common, ...material }),
+  // Signed off by another module's confirmed activity, such as a shadowed shift (H1).
+  z.object({
+    kind: z.literal('activity'),
+    ...common,
+    sourceId: z.string().min(1).max(100), // not-policy: an id's length
+    sourceParams: z.record(z.string(), z.unknown()).default({}),
+    timesRequired: z.number().int().min(1).max(20).default(1), // not-policy: the schema's limit (part 2)
+  }),
   z.object({ kind: z.literal('certificate'), ...common, evidenceExpiry: z.enum(EVIDENCE_EXPIRY), evidenceFile: z.enum(EVIDENCE_FILE) }),
   // A lesson's teaching is its sections, saved on their own (O5), so it carries no guidance.
   z.object({ kind: z.literal('lesson'), ...common, guidance: z.null().optional() }),

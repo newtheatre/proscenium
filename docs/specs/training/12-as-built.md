@@ -11,7 +11,7 @@ Where the build departs from, or is narrower than, this specification and the se
 - **Reading steps.** Opening the material is noted in the cache for a day, keyed by the sign-in session and the step; confirming without that note is refused `training.reading.not-opened`.
 - **Guards and the Owner.** The own-sign-off and own-award guards apply to everyone, the Owner included: they are four-eyes rules, which Matt's ruling of 23 November 2026 on own records leaves in place. Revoking one's own record is not guarded, since it is never to one's benefit.
 - **Abilities** are declared with the first route that needs them, as the conformance check requires. This slice declares `course.view`, `course.manage`, `sign-off.record`, `record.view`, `record.award`, `record.revoke` and `settings.manage`. The fact `training.competent` comes with competencies.
-- **The point `training.step-source`** is declared in this slice, for Front of house's FH-51, with no contract file yet; its contract is part 4's table.
+- **The point `training.step-source`** is declared in this slice, for Front of house's FH-51; its contract file came with shadowed shifts (below).
 - **Notifications.** Only `training.record-awarded` (topic `training.records`, can be switched off) and `training.record-revoked` so far. Telling holders a version cut their training short waits for the job `training.notify-holders`.
 - **Settings.** The seventeen of the second round plus `evidence.chase-after` and the two quiz settings. The video settings and Stream credentials come with uploaded video. Training's settings are on its page under Admin > Modules, following the platform's convention, not at `/console/training/settings`.
 
@@ -49,3 +49,14 @@ Where the build departs from, or is narrower than, this specification and the se
 - **A passed quiz** is refused `training.quiz.passed` while it still counts towards completing the course; once a training record is awarded, taking it again counts towards renewal (A2).
 - **Allowances** need `training.sign-off.record` at the course and are refused for oneself (`training.own-allowance`).
 - **Sessions on a new version.** Publishing a version moves sessions not yet started onto it (V7).
+
+## Shadowed shifts and step sources (TR-49), 24 November 2026
+
+- **The contract** for `training.step-source` is `layers/training/server/points/step-source.ts`: part 5's table, with the picker as an optional component name and `since` a theatre-local day. A source's parameters are checked against its schema when the steps are saved, and a source that is not on is refused `training.step.source-unknown`. `GET /api/training/step-sources` lists the sources of modules switched on, for the course editor.
+- **An activity step** takes `sourceId`, `sourceParams` and `timesRequired` (1 to 20). Starting a version copies the source and its parameters.
+- **Reading a source** asks for the person's merged accounts at once, from the later of the start of the progress window and the day of their last award. An occurrence is skipped, never refused, when it is unconfirmed, confirmed by the person themself, outside that range, or already signed off for the course. Each new one writes an `activity` sign-off dated on its day, keeping the source, the occurrence and who confirmed it, and the award is evaluated once per course after them. The partial unique index settles two reads at once: the second insert does nothing.
+- **Once per course.** An occurrence counts once towards a course, even when two of its steps read the same source; it counts again towards another course that reads it.
+- **When Training reads** (H2): on `POST /api/training/courses/<id>/activity`, which the course page calls when the person opens it; from the listener `step-source-confirmed`, which reads the sources whose `event` is the one heard; and in the daily task `training.sweep-records` at 06:00, one unit per person and course, for everyone with a sign-off inside the progress window on a live course with an activity step.
+- **Listening.** Training's `events.listens` cannot name an event no module announces yet, so the entry `'front-of-house.shadow.confirmed': 'step-source-confirmed'` is added in Front of house's FH-51 pull request. Each later source adds its own line naming the same listener.
+- **The sweep's other work** (expiry warnings and lapse events, L3) is not built yet; the task does only H2 so far.
+- **Tests** use the fixture module `stint` in `tests/fixtures/modules`, whose source `stint.shift` keeps shifts in memory, so Training's tests do not need Front of house.
