@@ -47,6 +47,8 @@ export interface Invoice {
   issuedBy: string | null
   issuedAt: number | null
   createdAt: number
+  returnedNote: string
+  pdfFileId: string | null
 }
 
 export interface Line {
@@ -70,7 +72,7 @@ export const COLUMNS = `i.id, i.direction, i.kind, i.credits_id AS creditsId, i.
   i.supplied_on AS suppliedOn, i.currency, i.net_minor AS netMinor, i.tax_minor AS taxMinor, i.total_minor AS totalMinor,
   i.allocated_minor AS allocatedMinor, i.state, i.notes, i.internal_note AS internalNote, i.source_module AS sourceModule,
   i.source_type AS sourceType, i.source_id AS sourceId, i.posting_id AS postingId, i.version, i.created_by AS createdBy,
-  i.issued_by AS issuedBy, i.issued_at AS issuedAt, i.created_at AS createdAt`
+  i.issued_by AS issuedBy, i.issued_at AS issuedAt, i.created_at AS createdAt, i.returned_note AS returnedNote, i.pdf_file_id AS pdfFileId`
 
 const changed = { code: 'invoicing.invoice.changed', reason: 'Someone else changed this invoice a moment ago.', remedy: 'Reload it and try again.' }
 
@@ -103,7 +105,7 @@ export async function draftChoices() {
   }
 }
 
-interface Worked { lines: (Omit<Line, 'id' | 'ownerKey'>)[], netMinor: number, taxMinor: number }
+export interface Worked { lines: (Omit<Line, 'id' | 'ownerKey'>)[], netMinor: number, taxMinor: number }
 
 /** Works out each line's net and VAT on the server, checking accounts and codes (I-05, I-06, I-07, I-42). */
 async function work(input: DraftInput, partyTaxCode: string | null): Promise<Worked> {
@@ -125,7 +127,7 @@ async function work(input: DraftInput, partyTaxCode: string | null): Promise<Wor
 }
 
 /** The party's columns: a person's account (their name, the party row's address) or a one-off name. */
-async function partyOf(input: DraftInput): Promise<{ module: string | null, id: string | null, accountId: string | null, name: string, address: string, email: string | null, taxCode: string | null }> {
+export async function partyOf(input: Pick<DraftInput, 'party' | 'billToName' | 'billToAddress' | 'billToEmail'>): Promise<{ module: string | null, id: string | null, accountId: string | null, name: string, address: string, email: string | null, taxCode: string | null }> {
   if (input.party.kind === 'one-off') {
     if (!input.billToName) refuse('invoicing.invoice.party', 'Give the name the invoice is made out to.', { status: 422, fields: { billToName: 'invoicing.invoice.party' } })
     return { module: null, id: null, accountId: null, name: input.billToName!, address: input.billToAddress, email: input.billToEmail ?? null, taxCode: null }
@@ -138,7 +140,7 @@ async function partyOf(input: DraftInput): Promise<{ module: string | null, id: 
   return { module: 'core', id: accountId, accountId, name: input.billToName || await accountLabel(accountId), address: input.billToAddress || party?.address || '', email, taxCode: party?.defaultTaxCode ?? null }
 }
 
-function writeLines(unit: UnitView, invoiceId: string, worked: Worked): void {
+export function writeLines(unit: UnitView, invoiceId: string, worked: Worked): void {
   unit.add({ sql: "DELETE FROM invoicing_lines WHERE invoice_id IN (SELECT id FROM invoicing_invoices WHERE id = ? AND state = 'draft')", params: [invoiceId] })
   if (!worked.lines.length) return
   unit.insertSet(lineTable, worked.lines.map(l => ({ invoiceId, ...l, ownerKey: null, performanceId: null, budgetLineId: null, budgetRequestId: null })))

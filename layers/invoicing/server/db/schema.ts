@@ -157,7 +157,7 @@ export const parties = defineTable('invoicing_parties', {
   ],
 })
 
-/** An invoice or credit note out (bills in come later). Its document columns are fixed once out of draft (I-14). */
+/** An invoice or credit note out, or a supplier's bill in. Its document columns are fixed once out of draft (I-14). */
 export const invoices = defineTable('invoicing_invoices', {
   id: col.id(),
   direction: col.internal(text('direction', { enum: ['out', 'in'] }).notNull()),
@@ -185,6 +185,8 @@ export const invoices = defineTable('invoicing_invoices', {
   state: col.internal(text('state', { enum: INVOICE_STATES }).notNull().default('draft')),
   notes: col.freeText(text('notes').notNull().default('')),
   internalNote: col.freeText(text('internal_note').notNull().default('')),
+  // Why an approver sent a bill back, for whoever logged it; cleared when it is submitted again.
+  returnedNote: col.freeText(text('returned_note').notNull().default('')),
   sourceModule: col.internal(text('source_module')),
   sourceType: col.internal(text('source_type')),
   sourceId: col.internal(text('source_id')),
@@ -227,6 +229,7 @@ export const invoices = defineTable('invoicing_invoices', {
     check('invoicing_invoices_tax_number', sql`length(${t.taxNumber}) <= 30`),
     check('invoicing_invoices_reference', sql`length(${t.reference}) <= 60`),
     check('invoicing_invoices_notes', sql`length(${t.notes}) <= 1000 AND length(${t.internalNote}) <= 1000`),
+    check('invoicing_invoices_returned', sql`length(${t.returnedNote}) <= 500`),
     check('invoicing_invoices_amounts', sql`${t.netMinor} >= 0 AND ${t.taxMinor} >= 0 AND ${t.totalMinor} = ${t.netMinor} + ${t.taxMinor}`),
     check('invoicing_invoices_allocated', sql`${t.allocatedMinor} BETWEEN 0 AND ${t.totalMinor}`),
     check('invoicing_invoices_source_set', sql`(${t.sourceModule} IS NULL) = (${t.sourceId} IS NULL) AND (${t.sourceType} IS NULL) = (${t.sourceId} IS NULL)`),

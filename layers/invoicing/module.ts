@@ -62,6 +62,10 @@ export default defineModule({
     'invoice.issue': ability({ on: 'invoicing.invoice', risk: 'privileged', implies: ['invoice.draft'] }),
     // A bank transfer or cheque received, through Payments' office channel (I-21).
     'payment.record': ability({ on: 'invoicing.invoice', risk: 'privileged', implies: ['invoice.view'] }),
+    // Bills in: whoever logs one sees bills; approving is never one's own, an Owner included (I-10, R3-17).
+    'bill.view': ability({ on: 'invoicing.invoice', fresh: false, audit: 'read' }),
+    'bill.log': ability({ implies: ['bill.view'] }),
+    'bill.approve': ability({ on: 'invoicing.invoice', risk: 'privileged', implies: ['bill.view'] }),
   }),
 
   tables,
@@ -71,6 +75,7 @@ export default defineModule({
       'invoicing.export.taken': event({ version: 1, payload: z.object({ runId: z.string(), profileId: z.string() }), internal: false }),
       'invoicing.invoice.issued': event({ version: 1, payload: z.object({ invoiceId: z.string(), kind: z.enum(['invoice', 'credit_note']), totalMinor: z.number().int() }), internal: false }),
       // Nothing left outstanding (I-23), carrying the source record so an owner can update its own.
+      'invoicing.bill.approved': event({ version: 1, payload: z.object({ invoiceId: z.string(), totalMinor: z.number().int() }), internal: false }),
       'invoicing.invoice.paid': event({ version: 1, payload: z.object({ invoiceId: z.string(), sourceModule: code().nullable(), sourceType: code().nullable(), sourceId: z.string().nullable() }), internal: false }),
     },
     listens: { 'core.module.enabled': 'starter-profile' },
@@ -98,7 +103,11 @@ export default defineModule({
     // Money received against an invoice: the receivable is credited and the payment allocated (I-20, I-21).
     'payments.settlement': [{ id: 'invoicing' }],
     // The PDF of an issued invoice, made by the server and read by whoever may see the invoice.
-    'core.file-slot': [{ id: 'invoicing.invoice-pdf', owner: 'invoicing.invoice', ability: 'invoicing.invoice.view', accepts: ['pdf' as const], limit: 'core.files.document-limit', access: 'record' as const, textClass: 'personal' as const, clean: false, source: 'server' as const }],
+    'core.file-slot': [
+      { id: 'invoicing.invoice-pdf', owner: 'invoicing.invoice', ability: 'invoicing.invoice.view', accepts: ['pdf' as const], limit: 'core.files.document-limit', access: 'record' as const, textClass: 'personal' as const, clean: false, source: 'server' as const },
+      // The supplier's own invoice, uploaded with the bill and required before it is submitted (I-11).
+      { id: 'invoicing.bill-file', owner: 'invoicing.invoice', ability: 'invoicing.bill.log', accepts: ['pdf' as const, 'png' as const, 'jpeg' as const], limit: 'core.files.document-limit', access: 'record' as const, textClass: 'personal' as const, clean: true, source: 'upload' as const },
+    ],
     'core.file-access': [{ id: 'invoicing.invoice', file: 'invoice' }],
     'core.notification-type': [{
       id: 'invoicing.invoice',
@@ -128,6 +137,7 @@ export default defineModule({
     }],
     'core.navigation': [
       { id: 'invoicing.invoices', menu: 'console', group: 'money', section: 'everyday', to: '/console/invoicing/invoices', icon: 'i-lucide-receipt-text', ability: 'invoicing.invoice.view', order: 88 },
+      { id: 'invoicing.bills', menu: 'console', group: 'money', section: 'everyday', to: '/console/invoicing/bills', icon: 'i-lucide-file-input', ability: 'invoicing.bill.view', order: 89 },
       { id: 'invoicing.owed', menu: 'console', group: 'money', section: 'everyday', to: '/console/invoicing/owed', icon: 'i-lucide-hourglass', ability: 'invoicing.invoice.view', order: 89 },
       { id: 'invoicing.series', menu: 'admin', group: 'modules', to: '/admin/modules/invoicing/series', icon: 'i-lucide-list-ordered', ability: 'invoicing.settings.manage', order: 31 },
       { id: 'invoicing.exports', menu: 'console', group: 'money', section: 'everyday', to: '/console/invoicing/exports', icon: 'i-lucide-file-spreadsheet', ability: 'invoicing.export.take', order: 90 },

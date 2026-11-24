@@ -42,5 +42,8 @@
   "invoicing.settings.reminders.second-after.help": "How long after the due date the second and last automatic reminder goes.",
   "invoicing.settings.reminders.send-at.label": "Reminders go from",
   "invoicing.settings.reminders.send-at.help": "The time of day reminders are sent.",
-  "invoicing.settings.rules.second-after-first": "The second overdue reminder goes later than the first."
+  "invoicing.settings.rules.second-after-first": "The second overdue reminder goes later than the first.",
+  "invoicing.abilities.bill.view.label": "See bills from suppliers",
+  "invoicing.abilities.bill.log.label": "Log suppliers' bills with their invoice and submit them for approval",
+  "invoicing.abilities.bill.approve.label": "Approve or send back bills, which posts them to the ledger; never one's own"
 }

@@ -142,3 +142,31 @@ differs from the parts above:
   no closed days yet, so I-33's closed-day rule waits for it.
 - Ageing adds a "Not yet due" band before I-34's four. S5's creditors tab follows with bills.
 - `/invoice` joins the reserved address prefixes.
+
+## As built: bills, slice 3 (IE-19, IE-20)
+
+Logging a supplier's bill with their invoice, submitting it, and approving or sending it back. Where
+the build differs from the parts above:
+
+- A bill is a row of `invoicing_invoices` with direction `in`, no series, and the supplier's own
+  invoice number in `number`. The supplier is a one-off name for now; a supplier as a party (an
+  account or a company) follows with Companies.
+- I-11's duplicate check matches a party's bills by party and a one-off supplier's by name, ignoring
+  case, and runs when the bill is saved as well as when it is submitted, so the unique index never
+  refuses first. The refusal names the earlier bill.
+- The supplier's file goes into the file slot `invoicing.bill-file` (PDF, PNG or JPEG, cleaned) and
+  is checked before it can be attached; the screen waits for the check. Submitting needs the file,
+  the supplier's number and date, and a line with an amount. With no due date given, the bill falls
+  due after the usual terms.
+- Lines take any active expense account in the ledger, from every module. While VAT-registered each
+  line keeps the VAT typed from the supplier's invoice (I-43); with none typed it takes the rate's.
+- I-10 is a guard in the service over the logger's merged accounts, so it binds an Owner too. A send
+  back needs a reason, which is kept in `returned_note` and shown on the draft until it is submitted
+  again.
+- Approval posts at the moment of approval, with purpose `bill`: Dr each line's account its net with
+  the line's code and VAT, Dr `finance.vat-input` the VAT (for Finance), Cr `invoicing.payable` the
+  gross. It announces `invoicing.bill.approved` with the total rather than a source.
+- `invoicing.bill.log` implies `invoicing.bill.view`, as part 7 says, so whoever logs bills sees them
+  all. The treasurer's role template gains log and approve; the producer's gains log.
+- Not yet: the `invoicing.bill-waiting` notification to approvers, paying a bill (IE-22, which needs
+  Budgets' disbursement route), budget lines on bill lines (IE-24) and S5's creditors tab.

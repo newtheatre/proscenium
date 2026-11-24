@@ -52,3 +52,26 @@ export const draftFields = z.object({
   lines: z.array(draftLine).max(200), // not-policy: lines one invoice holds
 }).strict()
 export type DraftInput = z.infer<typeof draftFields>
+
+/** A bill's line: as an invoice's, with the VAT typed from the supplier's invoice (I-43). */
+export const billLine = z.object({
+  description: z.string().trim().min(1).max(300), // not-policy: the column's bound
+  quantityMilli: z.number().int().min(1).max(1_000_000_000).default(1000), // not-policy: the column's bound; one by default
+  unitMinor: z.number().int().min(0).max(100_000_000_00), // not-policy: a sanity bound of a million pounds
+  accountId: z.string().min(1),
+  taxCode: z.string().min(1).max(32).optional(), // not-policy: Finance's code length
+  taxMinor: z.number().int().min(0).optional(),
+  productionId: z.string().min(1).nullable().optional(),
+}).strict()
+
+export const billFields = z.object({
+  party: draftParty,
+  billToName: z.string().trim().max(120).optional(), // not-policy: the column's bound
+  supplierNumber: z.string().trim().max(60).default(''), // not-policy: a supplier's invoice number
+  issueOn: z.iso.date().nullable().optional(),
+  dueOn: z.iso.date().nullable().optional(),
+  taxNumber: z.string().trim().max(30).default(''), // not-policy: the column's bound
+  internalNote: z.string().trim().max(1000).default(''), // not-policy: the column's bound
+  lines: z.array(billLine).max(200), // not-policy: lines one bill holds
+}).strict()
+export type BillInput = z.infer<typeof billFields>
