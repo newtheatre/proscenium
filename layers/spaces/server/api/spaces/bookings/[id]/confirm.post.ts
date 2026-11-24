@@ -9,8 +9,8 @@ export default defineRoute({
   record: event => ['spaces.booking', getRouterParam(event, 'id')],
   rateLimit: 'write',
   idempotent: true,
-  input: z.object({ note: z.string().trim().max(500).nullish(), reference: z.string().trim().max(120).nullish() }).strict(), // not-policy: as the table's CHECKs
+  input: z.object({ note: z.string().trim().max(500).nullish(), reference: z.string().trim().max(120).nullish(), overrideReason: z.string().trim().max(300).nullish() }).strict(), // not-policy: as the table's CHECKs
 }, async (event, { actor, input, unit }) => {
-  const booking = await decideConfirm(unit.view(), getRouterParam(event, 'id')!, actor.accountId!, { note: input.note ?? null, reference: input.reference ?? null })
+  const booking = await decideConfirm(unit.view(), getRouterParam(event, 'id')!, actor.accountId!, { note: input.note ?? null, reference: input.reference ?? null, overrideReason: input.overrideReason ?? null, actor })
   return { bookingId: booking.id }
 })
