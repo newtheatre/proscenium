@@ -256,7 +256,7 @@ test.describe('a poll', () => {
       await page.getByRole('radio', { name: 'If need be' }).nth(1).check()
       await noViolations(page)
       await page.getByRole('button', { name: 'Save answers' }).click()
-      await expect(page.getByText('Answers saved')).toBeVisible()
+      await expect(page.getByText('Answers saved', { exact: true }).first()).toBeVisible()
     })
   })
 
