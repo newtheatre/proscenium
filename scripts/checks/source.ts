@@ -261,7 +261,7 @@ export function checkPolicyNumbers(modules: Loaded[]): string[] {
 }
 
 /** The route a page file answers, with dynamic parts kept as `[name]`. */
-function pageRoute(pagesDir: string, file: string): string {
+export function pageRoute(pagesDir: string, file: string): string {
   const parts = file.slice(pagesDir.length).replace(/\.vue$/, '').split('/').filter(Boolean)
   if (parts.at(-1) === 'index') parts.pop()
   return `/${parts.join('/')}`

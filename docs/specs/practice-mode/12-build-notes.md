@@ -124,3 +124,9 @@ Two scenarios and their sample set, tested in
   `front-of-house.handout.record`, so the handouts pages are covered but refuse in practice.
 - **Rota templates are not copied**: no practised screen reads them.
 - **The card task** needed the kit option above: rule T1 runs checks only after a change.
+
+## The live coverage check (PM-20)
+
+`bun run check:conformance` reports "Every live page can be practised" (`scripts/checks/practice.ts`):
+any page under `/live`, other than the live home, that no `core.practice-scenario` lists in its
+`routes` fails the build. A route covers its own address and every page below it.
