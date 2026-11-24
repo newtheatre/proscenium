@@ -1,10 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "076e91b4-3d55-4861-ac16-5fd211e7ef87",
+  "id": "fa34856b-169c-493d-b402-28d1e4dffa78",
   "prevIds": [
-    "91aae97a-4c87-4070-8eef-9a204bc5fe0c",
-    "fac31bd0-474f-4c1c-93d3-8515d3a03d00"
+    "8b377ba6-2bf3-4377-adca-fccba078b30d"
   ],
   "ddl": [
     {
@@ -281,6 +280,10 @@
     },
     {
       "name": "core_accounts",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_age_markers",
       "entityType": "tables"
     },
     {
@@ -689,6 +692,18 @@
     },
     {
       "name": "front_of_house_timings",
+      "entityType": "tables"
+    },
+    {
+      "name": "invoicing_export_codes",
+      "entityType": "tables"
+    },
+    {
+      "name": "invoicing_export_profiles",
+      "entityType": "tables"
+    },
+    {
+      "name": "invoicing_export_runs",
       "entityType": "tables"
     },
     {
@@ -8482,6 +8497,56 @@
       "entityType": "columns"
     },
     {
+      "table": "core_age_markers",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "turns_18_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "recorded_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "recorded_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_audit",
       "name": "id",
       "type": "text",
@@ -13116,6 +13181,16 @@
       "name": "label",
       "type": "text",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_term_groups",
+      "name": "slug",
+      "type": "text",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -18144,6 +18219,376 @@
     {
       "table": "front_of_house_timings",
       "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "profile_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "posting_kind",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "code_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "updated_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "format",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "granularity",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "columns",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "date_format",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "signs",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "split_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "total_line",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'none'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "total_label",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "tax_map",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "kind_labels",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "unmapped_code",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'UNMAPPED'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "period_rule",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "archived_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "profile_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "from_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "to_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "rows",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "unmapped_rows",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "closed",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "map_version",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "sha256",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "file_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "created_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -24574,6 +25019,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_age_markers",
+      "name": "core_age_markers_turns",
+      "columns": [
+        {
+          "value": "turns_18_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_audit",
       "name": "core_audit_record",
       "columns": [
@@ -27023,6 +27482,60 @@
         }
       ],
       "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "invoicing_export_codes_account",
+      "columns": [
+        {
+          "value": "profile_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "coalesce(\"posting_kind\", '')",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_name",
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "invoicing_export_runs_profile",
+      "columns": [
+        {
+          "value": "profile_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -31080,6 +31593,66 @@
       "entityType": "fks"
     },
     {
+      "table": "invoicing_export_codes",
+      "name": "fk_invoicing_export_codes_profile_id_invoicing_export_profiles_id_fk",
+      "columns": [
+        "profile_id"
+      ],
+      "tableTo": "invoicing_export_profiles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "fk_invoicing_export_codes_account_id_finance_accounts_id_fk",
+      "columns": [
+        "account_id"
+      ],
+      "tableTo": "finance_accounts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "fk_invoicing_export_runs_profile_id_invoicing_export_profiles_id_fk",
+      "columns": [
+        "profile_id"
+      ],
+      "tableTo": "invoicing_export_profiles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "fk_invoicing_export_runs_file_id_core_files_id_fk",
+      "columns": [
+        "file_id"
+      ],
+      "tableTo": "core_files",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "membership_fees_charges",
       "name": "fk_membership_fees_charges_membership_id_membership_memberships_id_fk",
       "columns": [
@@ -31890,6 +32463,15 @@
         "table_name",
         "column_name",
         "row_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "core_age_markers_pk",
+      "columns": [
+        "account_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -33414,6 +33996,33 @@
       "entityType": "pks"
     },
     {
+      "table": "invoicing_export_codes",
+      "name": "invoicing_export_codes_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "invoicing_export_runs_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "membership_fees_charges",
       "name": "membership_fees_charges_pk",
       "columns": [
@@ -34596,6 +35205,12 @@
       "entityType": "checks"
     },
     {
+      "table": "core_age_markers",
+      "name": "core_age_markers_date",
+      "value": "\"turns_18_on\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "entityType": "checks"
+    },
+    {
       "table": "core_closures",
       "name": "core_closures_kind",
       "value": "\"kind\" IN ('closure', 'public_holiday')",
@@ -35559,6 +36174,72 @@
       "table": "front_of_house_timings",
       "name": "front_of_house_timings_kind_check",
       "value": "\"kind\" IN ('house_open', 'curtain_up', 'interval_start', 'interval_end', 'curtain_down', 'house_clear')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "invoicing_export_codes_code",
+      "value": "\"code\" IS NULL OR length(\"code\") BETWEEN 1 AND 50",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "invoicing_export_codes_name",
+      "value": "length(\"code_name\") <= 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_format",
+      "value": "\"format\" IN ('journal', 'xero', 'quickbooks', 'sage', 'freeagent', 'custom')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_granularity",
+      "value": "\"granularity\" IN ('entry', 'daily')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_date_format",
+      "value": "\"date_format\" IN ('iso', 'dmy', 'mdy')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_signs",
+      "value": "\"signs\" IN ('split', 'signed', 'credit')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_split_by",
+      "value": "\"split_by\" IN ('none', 'production', 'source-module')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_period_rule",
+      "value": "\"period_rule\" IN ('custom', 'period', 'finance-year', 'season')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_unmapped",
+      "value": "length(\"unmapped_code\") BETWEEN 1 AND 20",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "invoicing_export_runs_order",
+      "value": "\"to_on\" >= \"from_on\"",
       "entityType": "checks"
     },
     {
