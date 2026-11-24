@@ -1,7 +1,7 @@
 // My availability (S1): the days in view, painting strokes as entries or into the pattern, and the
 // person's entries and requests. Asks once per visit whether painting a pattern day means just that day.
 import { today as todayIn } from '@internationalized/date'
-import { addDays, clockOf, DAY_MINUTES, mondayOf, type Day } from '../../shared/grid'
+import { addDays, clockOf, DAY_MINUTES, mondayOf, type Commitment, type Day } from '../../shared/grid'
 import type { Level, Unmarked } from '../../shared/levels'
 
 export type Tool = Level | 'clear'
@@ -17,6 +17,8 @@ export interface Mine {
   patterns: Pattern[]
   exceptions: Entry[]
   days: Day[]
+  /** A5: what holds the person elsewhere, by date; shown over the grid, never painted. */
+  commitments: Record<string, Commitment[]>
   requests: AskedRequest[]
 }
 interface Stroke { date: string, start: number, end: number }

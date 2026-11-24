@@ -83,6 +83,9 @@ review finds a new pattern to avoid, add it to `scripts/checks/` with a message 
 | `bun run typecheck` | Nuxt and test types | 85 s |
 | `bun run check:conformance` | The repo's own rules | 8 s |
 | `bun run check` | lint, typecheck and conformance | 2 to 3 min |
+| `bun run metrics` | Import cycles, duplication, type coverage and ignore comments against `metrics.json` | 2 min |
+| `bun run lint:prune` | Shrink `eslint-suppressions.json` after fixing a listed place | 45 s |
+| `bun run check:unused` | Knip: files and dependencies nothing uses | 20 s |
 | `bun run test:unit` | Unit tests (Node) | 20 s |
 | `bun run test:integration` | Integration tests in workerd with a local D1 | 9 min |
 | `bun run test:browser` | Build, then Playwright with axe | 5+ min |
