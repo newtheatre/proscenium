@@ -5,9 +5,9 @@ import { getRouterParam } from 'h3'
 import { z } from 'zod'
 import { can, defineRoute, refuse, requireAbility } from '#kit'
 import { getVersion, requireForm } from '../../../../../forms'
-import { getResponse, readAnswers, storedFigures } from '../../../../../responses'
+import { getResponse, markingOf, readAnswers, storedFigures } from '../../../../../responses'
 import type { Definition } from '../../../../../../shared/engine'
-import { hasStages, isDecision, questionsOf, stageOf } from '../../../../../../shared/engine'
+import { hasStages, isDecision, publicDefinition, questionsOf, stageOf } from '../../../../../../shared/engine'
 import { changedIn, historyOf, movesFor, stageIn } from '../../../../../stages'
 import { refuseConflicted, roundView } from '../../../../../review'
 import { runsOf } from '../../../../../actions'
@@ -38,8 +38,10 @@ export default defineRoute({ ability: 'forms.response.read', record: event => ['
   const round = staged ? await roundView(definition, response.id, chair ? 'chair' : 'reader') : null
   return {
     response: { id: response.id, reference: response.reference, version: version.number, submittedAt: response.submittedAt, personId: response.personId, respondentEmail: response.respondentEmail },
-    definition,
+    definition: publicDefinition(definition),
     answers,
+    // How the revision shown was marked, question by question (FB-513). The correct answers themselves stay on the server.
+    marking: await markingOf(response, definition, revision),
     restricted: answers.some(a => a.restricted),
     // What the calculations came to when it was sent, as the server worked them out. They belong to
     // the latest revision, so an earlier one shows none.
