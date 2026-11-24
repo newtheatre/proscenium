@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "5ad36428-6381-4f41-97bb-c464ea0a5d7d",
+  "id": "e0e3daf9-2b7a-40df-bbb9-846200ee7777",
   "prevIds": [
-    "1ab3bd18-4373-4028-880d-0ebd7266b13e"
+    "a50726b3-ab41-40bd-b01a-af01474571b6"
   ],
   "ddl": [
     {
@@ -24,6 +24,14 @@
     },
     {
       "name": "availability_finds",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_meeting_invitees",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_meetings",
       "entityType": "tables"
     },
     {
@@ -1380,6 +1388,216 @@
     },
     {
       "table": "availability_finds",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "meeting_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "response",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'pending'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "responded_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "ends_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "place",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "space_booking_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "context_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "notes",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "arranged_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "find_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'arranged'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "cancelled_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
       "name": "updated_at",
       "type": "integer",
       "notNull": true,
@@ -25223,6 +25441,74 @@
       "entityType": "indexes"
     },
     {
+      "table": "availability_meeting_invitees",
+      "name": "availability_meeting_invitees_once",
+      "columns": [
+        {
+          "value": "meeting_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "availability_meeting_invitees_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "response",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_time",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_arranged_by",
+      "columns": [
+        {
+          "value": "arranged_by",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "availability_pattern_lines",
       "name": "availability_pattern_lines_pattern",
       "columns": [
@@ -31279,6 +31565,36 @@
       "entityType": "fks"
     },
     {
+      "table": "availability_meeting_invitees",
+      "name": "fk_availability_meeting_invitees_meeting_id_availability_meetings_id_fk",
+      "columns": [
+        "meeting_id"
+      ],
+      "tableTo": "availability_meetings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "fk_availability_meetings_find_id_availability_finds_id_fk",
+      "columns": [
+        "find_id"
+      ],
+      "tableTo": "availability_finds",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "availability_pattern_lines",
       "name": "fk_availability_pattern_lines_pattern_id_availability_patterns_id_fk",
       "columns": [
@@ -35942,6 +36258,24 @@
       "entityType": "pks"
     },
     {
+      "table": "availability_meeting_invitees",
+      "name": "availability_meeting_invitees_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "availability_pattern_lines",
       "name": "availability_pattern_lines_pk",
       "columns": [
@@ -37703,6 +38037,48 @@
       "table": "availability_finds",
       "name": "availability_finds_state_values",
       "value": "\"state\" IN ('polling', 'decided', 'abandoned')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "availability_meeting_invitees_response",
+      "value": "\"response\" IN ('pending', 'going', 'not-going')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_title",
+      "value": "length(\"title\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_length",
+      "value": "\"ends_at\" > \"starts_at\" AND \"ends_at\" - \"starts_at\" <= 86400000",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_place",
+      "value": "\"place\" IS NULL OR length(\"place\") <= 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_notes",
+      "value": "\"notes\" IS NULL OR length(\"notes\") <= 2000",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_reason",
+      "value": "\"cancelled_reason\" IS NULL OR length(\"cancelled_reason\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_state_values",
+      "value": "\"state\" IN ('arranged', 'cancelled')",
       "entityType": "checks"
     },
     {

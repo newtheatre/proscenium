@@ -7,6 +7,7 @@ import type { ShownLevel } from '../../shared/levels'
 export interface FindOptions {
   today: string
   grid: { step: number, dayStarts: string, dayEnds: string }
+  arrange: boolean
   groups: { id: string, label: string, hint?: string }[]
   venues: { id: string, name: string, spaces: { id: string, name: string }[] }[]
 }

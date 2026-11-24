@@ -1,10 +1,10 @@
 // Availability: a person's own word on when they are free (spec part 2). The gate's six tables:
 // profiles, weekly patterns and their lines, dated exceptions, and requests with the people asked.
-// Polls add a find, its people, slots and votes; meetings and calendar imports add theirs later. Times of day are wall clock.
+// Polls add a find, its people, slots and votes; meetings their invitees; calendar imports come later. Times of day are wall clock.
 import { integer, text, check, index, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { col, defineTable } from '#kit/db'
-import { ASKED_STATES, LEVELS, POLL_STATES, REQUEST_STATES, UNMARKED, VOTES } from '../../shared/levels'
+import { ASKED_STATES, LEVELS, MEETING_STATES, POLL_STATES, REQUEST_STATES, RESPONSES, UNMARKED, VOTES } from '../../shared/levels'
 
 const inList = (values: readonly string[]) => sql.raw(values.map(v => `'${v}'`).join(', '))
 const clock = (c: unknown) => sql`(${c} GLOB '[0-2][0-9]:[0-5][0-9]' AND ${c} <= '24:00')`
@@ -241,4 +241,58 @@ export const findVotes = defineTable('availability_find_votes', {
   ],
 })
 
-export const tables = { profiles, patterns, patternLines, exceptions, requests, requestPeople, finds, findPeople, findSlots, findVotes }
+/** An arranged meeting (M1 to M6). Past is derived from `ends_at`. */
+export const meetings = defineTable('availability_meetings', {
+  id: col.id(),
+  title: col.internal(text('title').notNull()),
+  startsAt: col.timestamp('starts_at').notNull(),
+  endsAt: col.timestamp('ends_at').notNull(),
+  place: col.internal(text('place')),
+  spaceBookingRef: col.internal(text('space_booking_ref')),
+  contextRef: col.internal(text('context_ref')),
+  // The agenda, internal as a request's message is: the screen says not to name anyone in it.
+  notes: col.internal(text('notes')),
+  arrangedBy: col.account('arranged_by', { role: 'actor' }),
+  findId: col.ref('availability_finds', { nullable: true }),
+  state: col.internal(text('state', { enum: MEETING_STATES }).notNull().default('arranged')),
+  cancelledReason: col.internal(text('cancelled_reason')),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'avmt',
+  realm: 'members',
+  subject: 'none',
+  retention: 'availability.retention.history',
+  extra: t => [
+    index('availability_meetings_time').on(t.state, t.startsAt),
+    index('availability_meetings_arranged_by').on(t.arrangedBy),
+    check('availability_meetings_title', sql`length(${t.title}) BETWEEN 1 AND 80`),
+    check('availability_meetings_length', sql`${t.endsAt} > ${t.startsAt} AND ${t.endsAt} - ${t.startsAt} <= 86400000`),
+    check('availability_meetings_place', sql`${t.place} IS NULL OR length(${t.place}) <= 120`),
+    check('availability_meetings_notes', sql`${t.notes} IS NULL OR length(${t.notes}) <= 2000`),
+    check('availability_meetings_reason', sql`${t.cancelledReason} IS NULL OR length(${t.cancelledReason}) <= 200`),
+    check('availability_meetings_state_values', sql`${t.state} IN (${inList(MEETING_STATES)})`),
+  ],
+})
+
+/** One person invited, and their answer. Past meetings keep the row so "7 invited" stays true. */
+export const meetingInvitees = defineTable('availability_meeting_invitees', {
+  id: col.id(),
+  meetingId: col.ref('availability_meetings'),
+  accountId: col.account('account_id', { role: 'subject' }),
+  response: col.internal(text('response', { enum: RESPONSES }).notNull().default('pending')),
+  respondedAt: col.timestamp('responded_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'avmi',
+  realm: 'members',
+  onErasure: 'keep-row',
+  extra: t => [
+    uniqueIndex('availability_meeting_invitees_once').on(t.meetingId, t.accountId),
+    index('availability_meeting_invitees_account').on(t.accountId, t.response),
+    check('availability_meeting_invitees_response', sql`${t.response} IN (${inList(RESPONSES)})`),
+  ],
+})
+
+export const tables = { profiles, patterns, patternLines, exceptions, requests, requestPeople, finds, findPeople, findSlots, findVotes, meetings, meetingInvitees }

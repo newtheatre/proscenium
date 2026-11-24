@@ -33,6 +33,7 @@ export default defineModule({
   records: defineRecords('availability', {
     request: { table: 'availability_requests' },
     find: { table: 'availability_finds' },
+    meeting: { table: 'availability_meetings' },
   }),
 
   abilities: defineAbilities('availability', {
@@ -42,6 +43,8 @@ export default defineModule({
     // Find a time for groups one plans for; the group check does the real work (F1).
     'find.use': ability({}),
     'request.send': ability({}),
+    // M1: arrange, move and cancel meetings for people one plans for.
+    'meeting.arrange': ability({}),
     // A8: busy or maybe for a member of a group one plans for; the group check limits it.
     'entry.on-behalf': ability({}),
     'settings.manage': ability({ risk: 'privileged' }),
@@ -69,7 +72,7 @@ export default defineModule({
     ],
     // Stated busy time, so other modules warn about it (part 4).
     'core.person-busy': [{ id: 'availability' }],
-    'core.record-resolver': [{ id: 'availability.request', file: 'request' }, { id: 'availability.find', file: 'find' }],
+    'core.record-resolver': [{ id: 'availability.request', file: 'request' }, { id: 'availability.find', file: 'find' }, { id: 'availability.meeting', file: 'meeting' }],
     'core.notification-type': [{
       id: 'availability.request-opened',
       category: 'transactional' as const,
@@ -168,6 +171,62 @@ export default defineModule({
           action: 'See the answers',
         },
       },
+    }, {
+      id: 'availability.meeting-invited',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/meetings/{{ meeting }}',
+      variables: { title: 'text' as const, when: 'text' as const, organiser: 'text' as const, meeting: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: '{{ title }}: {{ when }}',
+          body: '{{ organiser }} has arranged **{{ title }}** for {{ when }}. Please say whether you are going.',
+          action: 'Answer',
+        },
+      },
+    }, {
+      id: 'availability.meeting-moved',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/meetings/{{ meeting }}',
+      variables: { title: 'text' as const, when: 'text' as const, meeting: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'New time for {{ title }}: {{ when }}',
+          body: '**{{ title }}** has moved to {{ when }}. Please say again whether you are going.',
+          action: 'Answer',
+        },
+      },
+    }, {
+      id: 'availability.meeting-changed',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/meetings/{{ meeting }}',
+      variables: { title: 'text' as const, when: 'text' as const, meeting: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: '{{ title }} has changed',
+          body: 'The details of **{{ title }}**, {{ when }}, have changed.',
+          action: 'See the meeting',
+        },
+      },
+    }, {
+      id: 'availability.meeting-cancelled',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/meetings/{{ meeting }}',
+      variables: { title: 'text' as const, when: 'text' as const, meeting: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Cancelled: {{ title }}',
+          body: '**{{ title }}**, {{ when }}, has been cancelled.',
+          action: 'See the meeting',
+        },
+      },
     }],
   },
 
@@ -177,6 +236,9 @@ export default defineModule({
       'availability.entry.updated': event({ version: 1, payload: z.object({ accountId: z.string(), from: code(), to: code() }), internal: true }),
       'availability.request.opened': event({ version: 1, payload: z.object({ requestId: z.string() }), internal: true }),
       'availability.request.closed': event({ version: 1, payload: z.object({ requestId: z.string() }), internal: true }),
+      'availability.meeting.arranged': event({ version: 1, payload: z.object({ meetingId: z.string(), from: z.number(), to: z.number() }), internal: true }),
+      'availability.meeting.moved': event({ version: 1, payload: z.object({ meetingId: z.string(), from: z.number(), to: z.number() }), internal: true }),
+      'availability.meeting.cancelled': event({ version: 1, payload: z.object({ meetingId: z.string(), from: z.number(), to: z.number() }), internal: true }),
       'availability.poll.decided': event({ version: 1, payload: z.object({ findId: z.string(), from: z.number(), to: z.number() }), internal: true }),
     },
   },
