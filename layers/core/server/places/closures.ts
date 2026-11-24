@@ -4,7 +4,7 @@
 // a show that ends at 00:30 belongs to the evening it started, as everywhere else.
 // Listing the performances a new closure covers, as a warning, arrives with the programme slice.
 import { sql, type SQL } from 'drizzle-orm'
-import { all, first, newId, nowMs, refuse, TIME_ZONE_REMEDY } from '#kit'
+import { all, first, newId, nowMs, refuse, TIME_ZONE_REMEDY, useDb } from '#kit'
 import type { UnitView } from '#kit'
 import { instantOfLocal } from '#kit/clock'
 import { dayBounds, dayRule } from '../calendar'
@@ -83,6 +83,21 @@ export function assertNoBlockingClosure(spaceId: string | SQL, from: number | SQ
 export function assertNoVenueClosure(venueId: string | null | SQL, from: number | SQL, to: number | SQL): SQL {
   return sql`NOT EXISTS (SELECT 1 FROM core_closures c WHERE c.blocks_performances = 1 AND c.starts_at < ${to} AND c.ends_at > ${from}
     AND (c.venue_id IS NULL OR (c.space_id IS NULL AND c.venue_id = ${venueId})))`
+}
+
+/**
+ * The active spaces one closure covers, as a statement fragment for a set-wise write: its own space,
+ * every space of its venue, or every space when it is the whole theatre's. Worked out when the
+ * statement runs, never from ids read beforehand.
+ */
+export function closureSpaces(closureId: string | SQL): SQL {
+  return sql`SELECT s.id FROM core_spaces s JOIN core_closures c ON c.id = ${closureId}
+    WHERE s.state = 'active' AND (c.venue_id IS NULL OR (c.space_id IS NULL AND s.venue_id = c.venue_id) OR s.id = c.space_id)`
+}
+
+/** The same spaces as a read, for showing. */
+export async function closureSpaceIds(closureId: string): Promise<string[]> {
+  return (await useDb().all<{ id: string }>(closureSpaces(closureId))).map(r => r.id)
 }
 
 export async function createClosure(unit: UnitView, input: ClosureInput, actorId: string | null): Promise<string> {

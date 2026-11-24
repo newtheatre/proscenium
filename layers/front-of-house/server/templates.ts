@@ -6,6 +6,7 @@ import { all, first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { getPerformance } from '#modules/core'
 import { rotaTemplateLines, shifts } from './db/schema'
 import { listDuties, shiftTimes } from './shifts'
+import { joinSeasonCall } from './crew-calls'
 
 const MINUTE = 60_000 // not-policy: unit conversion
 
@@ -142,7 +143,7 @@ export async function applyTemplate(unit: UnitView, templateId: string, performa
     for (const line of fresh) {
       const duty = duties.get(line.dutyId)!
       const times = await shiftTimes({ callAt: performance.startsAt - duty.callBeforeMinutes * MINUTE, endsAt: performance.endsAt + duty.stayAfterMinutes * MINUTE, signUp: true })
-      rows.push({ performanceId, venueId: performance.venueId, dutyId: duty.id, places: line.places, ...times, state: 'draft', createdAt: at, updatedAt: at })
+      rows.push({ performanceId, venueId: performance.venueId, spaceId: performance.spaceId, dutyId: duty.id, places: line.places, ...times, state: 'draft', createdAt: at, updatedAt: at })
     }
     result.added.push({ performanceId, shiftIds: Array.from({ length: rows.length - start }, () => '') })
   }
@@ -150,6 +151,7 @@ export async function applyTemplate(unit: UnitView, templateId: string, performa
   // A second apply racing this one meets the unique rule on performance and duty, and its unit fails whole.
   const ids = unit.insertSet(shifts, rows)
   unit.expect(rows.length)
+  joinSeasonCall(unit, ids)
   let next = 0
   for (const added of result.added) added.shiftIds = added.shiftIds.map(() => ids[next++]!)
   unit.audit(ids.map(id => ({ action: 'create', record: ['front-of-house.shift', id] as const, detail: { template: templateId } })))

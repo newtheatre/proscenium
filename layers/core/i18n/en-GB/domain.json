@@ -1,5 +1,6 @@
 {
   "core.units.megabytes": "MB",
+  "core.person-busy.performance": "On a performance",
   "core.settings.organisation.short-name.label": "Short name",
   "core.settings.organisation.short-name.help": "Used where space is tight, such as text messages and the passkey prompt.",
   "core.settings.organisation.week-start.label": "First day of the week",

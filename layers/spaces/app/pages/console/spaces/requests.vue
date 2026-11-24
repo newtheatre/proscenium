@@ -22,6 +22,8 @@ interface Row {
   asked: boolean
   urgent: boolean
   seriesId: string | null
+  replaces: boolean
+  bumps: { title: string, bookedForName: string, startsAt: number, endsAt: number }[]
   clashes: number
   own: boolean
   record: { noShows: number, lateCancels: number }
@@ -60,12 +62,12 @@ const recordLine = (r: Row) => r.record.noShows || r.record.lateCancels
 
 const deciding = ref<{ row: Shown, verb: 'confirm' | 'decline' } | null>(null)
 const open = computed({ get: () => !!deciding.value, set: (v: boolean) => { if (!v) deciding.value = null } })
-const answer = reactive({ note: '', reference: '', whole: true })
+const answer = reactive({ note: '', reference: '', whole: true, overrideReason: '' })
 const wholeSeries = computed(() => !!deciding.value?.row.seriesId && !deciding.value.row.external && answer.whole)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const formEl = useFormRef('formEl')
 function start(row: Shown, verb: 'confirm' | 'decline') {
-  Object.assign(answer, { note: '', reference: '', whole: true })
+  Object.assign(answer, { note: '', reference: '', whole: true, overrideReason: '' })
   refusal.value = null
   deciding.value = { row, verb }
 }
@@ -75,12 +77,14 @@ const validate = () => {
   if (d.verb === 'decline') return needs({ note: answer.note })
   return d.row.external ? needs({ reference: answer.reference }) : []
 }
+// B3: a booking in the way has come inside the notice; a holder of booking.override may give a reason.
+const askOverride = computed(() => refusal.value?.code === 'spaces.bump.notice' || answer.overrideReason.length > 0)
 async function send() {
   const d = deciding.value
   if (!d) return
   refusal.value = null
   try {
-    const body = d.verb === 'confirm' ? { note: answer.note.trim() || null, reference: answer.reference.trim() || null } : { note: answer.note.trim() }
+    const body = d.verb === 'confirm' ? { note: answer.note.trim() || null, reference: answer.reference.trim() || null, overrideReason: answer.overrideReason.trim() || null } : { note: answer.note.trim() }
     if (wholeSeries.value) await $api(`/api/spaces/series/${d.row.seriesId}/${d.verb}`, { method: 'POST', body: { note: body.note } })
     else await $api(`/api/spaces/bookings/${d.row.id}/${d.verb}`, { method: 'POST', body })
     toast.add({ title: t(d.verb === 'confirm' ? 'spaces.requests.confirmed' : 'spaces.requests.declined', { name: d.row.bookedForName }), color: 'success' })
@@ -155,6 +159,18 @@ async function markAsked(row: Row) {
                     :label="r.asked ? t('spaces.requests.asked') : t('spaces.requests.external')"
                   />
                   <UBadge
+                    v-if="r.replaces"
+                    color="neutral"
+                    variant="subtle"
+                    :label="t('spaces.requests.replaces')"
+                  />
+                  <UBadge
+                    v-if="r.bumps.length"
+                    color="warning"
+                    variant="subtle"
+                    :label="t('spaces.requests.bumps', { count: r.bumps.length })"
+                  />
+                  <UBadge
                     v-if="r.seriesId"
                     color="neutral"
                     variant="subtle"
@@ -226,6 +242,25 @@ async function markAsked(row: Row) {
           novalidate
           @submit="send"
         >
+          <UAlert
+            v-if="deciding?.verb === 'confirm' && deciding.row.bumps.length"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            :title="t('spaces.requests.bumps-title', { count: deciding.row.bumps.length })"
+            :description="t('spaces.requests.bumps-help')"
+          >
+            <template #actions>
+              <ul class="list-disc pl-5 text-sm">
+                <li
+                  v-for="(b, i) in deciding.row.bumps"
+                  :key="i"
+                >
+                  {{ t('spaces.requests.bumps-line', { title: b.title, name: b.bookedForName, when: dates.range(b.startsAt, b.endsAt, 'dateTime') }) }}
+                </li>
+              </ul>
+            </template>
+          </UAlert>
           <UFormField
             v-if="deciding?.verb === 'confirm' && deciding.row.external"
             name="reference"
@@ -254,6 +289,18 @@ async function markAsked(row: Row) {
               v-model="answer.note"
               :rows="3"
               :maxlength="500"
+            />
+          </UFormField>
+          <UFormField
+            v-if="deciding?.verb === 'confirm' && askOverride"
+            name="overrideReason"
+            :label="t('spaces.book.override')"
+            :help="t('spaces.requests.override-help')"
+          >
+            <UTextarea
+              v-model="answer.overrideReason"
+              :rows="2"
+              :maxlength="300"
             />
           </UFormField>
           <RefusalNotice :refusal="refusal" />
