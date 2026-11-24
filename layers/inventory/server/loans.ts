@@ -16,6 +16,7 @@ export interface Loan {
   dueBackOn: string
   dueBackAt: number
   responsibleAccountId: string | null
+  productionId: string | null
 }
 
 export interface Line { id: string, loanId: string, itemId: string | null, quantity: number, state: LineState }
@@ -29,7 +30,7 @@ export async function windowFor(startsAt: number, dueBackOn: string): Promise<Wi
 
 export async function getLoan(id: string): Promise<Loan | null> {
   const [row] = await useDb().all<Loan>(sql`SELECT id, department_id AS departmentId, kind, state, starts_at AS startsAt, due_back_on AS dueBackOn,
-    due_back_at AS dueBackAt, responsible_account_id AS responsibleAccountId FROM inventory_loans WHERE id = ${id}`)
+    due_back_at AS dueBackAt, responsible_account_id AS responsibleAccountId, production_id AS productionId FROM inventory_loans WHERE id = ${id}`)
   return row ?? null
 }
 
@@ -48,6 +49,7 @@ export interface NewLoan {
   purpose?: string | null
   startsAt: number
   dueBackOn: string
+  dueBackSet?: 'by-person' | 'from-production'
   requestedBy: string | null
 }
 
@@ -55,6 +57,11 @@ export interface NewLoan {
 const lendsSql = (kind: LoanKind): SQL => kind === 'production'
   ? sql`1`
   : kind === 'member' ? sql`d.lends_to IN ('members', 'anyone')` : sql`d.lends_to = 'anyone'`
+
+// L2: a production has one open pull list or loan per department.
+const ONE_OPEN = (productionId: string) => sql` AND NOT EXISTS (SELECT 1 FROM inventory_loans x WHERE x.production_id = ${productionId}
+  AND x.department_id = d.id AND x.state IN ('draft', 'requested', 'approved', 'out'))`
+export const ALREADY_LISTED = { code: 'inventory.pull-list.exists', reason: 'This production already has a pull list for this department.', remedy: 'Add to the one it has.' }
 
 /** Makes a draft pull list or a request. The department must be active and lend to this kind of borrower (L3). */
 export async function insertLoan(unit: UnitView, input: NewLoan, { quiet = false } = {}): Promise<string> {
@@ -64,12 +71,15 @@ export async function insertLoan(unit: UnitView, input: NewLoan, { quiet = false
   unit.add(sql`INSERT INTO inventory_loans (id, department_id, kind, state, production_id, responsible_account_id, borrower_name, borrower_email, purpose,
       starts_at, due_back_on, due_back_at, due_back_set, requested_by, created_at, updated_at)
     SELECT ${id}, d.id, ${input.kind}, ${input.state}, ${input.productionId ?? null}, ${input.responsibleAccountId}, ${input.borrowerName ?? null}, ${input.borrowerEmail ?? null}, ${input.purpose ?? null},
-      ${input.startsAt}, ${input.dueBackOn}, ${w.to}, 'by-person', ${input.requestedBy}, ${at}, ${at}
-    FROM inventory_departments d WHERE d.id = ${input.departmentId} AND d.state = 'active' AND ${lendsSql(input.kind)}`)
-    .expect(1, { code: 'inventory.loan.not-lent', reason: 'This department does not lend to this borrower.', remedy: 'Ask the department.' })
+      ${input.startsAt}, ${input.dueBackOn}, ${w.to}, ${input.dueBackSet ?? 'by-person'}, ${input.requestedBy}, ${at}, ${at}
+    FROM inventory_departments d WHERE d.id = ${input.departmentId} AND d.state = 'active' AND ${lendsSql(input.kind)}${input.productionId ? ONE_OPEN(input.productionId) : sql``}`)
+    .expect(1, input.productionId ? ALREADY_LISTED : { code: 'inventory.loan.not-lent', reason: 'This department does not lend to this borrower.', remedy: 'Ask the department.' })
   if (input.state === 'requested' && !quiet) unit.announce('inventory.loan.requested', { loanId: id, departmentId: input.departmentId }, { record: ['inventory.loan', id] })
   return id
 }
+
+// Lines keep the order they were added in.
+const NEXT_SORT = sql`(SELECT coalesce(max(x.sort) + 1, 0) FROM inventory_loan_lines x WHERE x.loan_id = o.id)` // not-policy: counting on from the last
 
 /**
  * Adds a line while the loan is a draft or a request: in words (wanted), or naming an item of the
@@ -80,12 +90,12 @@ export function addLine(unit: UnitView, loan: Loan, line: { itemId?: string | nu
   const at = nowMs()
   const quantity = line.quantity ?? 1
   if (!line.itemId) {
-    unit.add(sql`INSERT INTO inventory_loan_lines (id, loan_id, wanted, quantity, state, created_at, updated_at)
-      SELECT ${id}, o.id, ${line.wanted ?? null}, ${quantity}, 'wanted', ${at}, ${at} FROM inventory_loans o WHERE o.id = ${loan.id} AND o.state IN ('draft', 'requested')`).expect(1, MOVED)
+    unit.add(sql`INSERT INTO inventory_loan_lines (id, loan_id, wanted, quantity, state, sort, created_at, updated_at)
+      SELECT ${id}, o.id, ${line.wanted ?? null}, ${quantity}, 'wanted', ${NEXT_SORT}, ${at}, ${at} FROM inventory_loans o WHERE o.id = ${loan.id} AND o.state IN ('draft', 'requested')`).expect(1, MOVED)
     return id
   }
-  unit.add(sql`INSERT INTO inventory_loan_lines (id, loan_id, item_id, wanted, quantity, state, created_at, updated_at)
-    SELECT ${id}, o.id, i.id, ${line.wanted ?? null}, ${quantity}, 'listed', ${at}, ${at}
+  unit.add(sql`INSERT INTO inventory_loan_lines (id, loan_id, item_id, wanted, quantity, state, sort, created_at, updated_at)
+    SELECT ${id}, o.id, i.id, ${line.wanted ?? null}, ${quantity}, 'listed', ${NEXT_SORT}, ${at}, ${at}
     FROM inventory_loans o JOIN inventory_items i ON i.id = ${line.itemId} JOIN inventory_categories c ON c.id = i.category_id
     WHERE o.id = ${loan.id} AND o.state IN ('draft', 'requested') AND c.department_id = o.department_id AND i.lendable = 1
       AND (i.tracking = 'counted' OR ${quantity} = 1)`)

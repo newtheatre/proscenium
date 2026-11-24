@@ -19,9 +19,9 @@ const toRow = (r: Row): LoanRow => ({
   startsAt: r.starts_at, dueBackOn: r.due_back_on, dueBackAt: r.due_back_at, lines: r.lines,
 })
 
-// Every loan of these departments that is not a draft pull list, newest window first.
+// Every loan of these departments, draft pull lists too so the department can start finding early (L5), newest window first.
 export async function listLoans(departmentIds: string[]): Promise<LoanRow[]> {
-  const rows = await all<Row>(`${LOAN_SELECT} WHERE o.department_id IN (SELECT value FROM json_each(?)) AND o.state <> 'draft' ORDER BY o.starts_at DESC, o.id`, JSON.stringify(departmentIds))
+  const rows = await all<Row>(`${LOAN_SELECT} WHERE o.department_id IN (SELECT value FROM json_each(?)) ORDER BY o.starts_at DESC, o.id`, JSON.stringify(departmentIds))
   return rows.map(toRow)
 }
 

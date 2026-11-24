@@ -52,6 +52,7 @@ export default defineModule({
     'item.edit': ability({ on: 'inventory.department', implies: ['item.view'] }),
     'loan.view': ability({ on: 'inventory.loan', risk: 'privileged', fresh: false, audit: 'read', implies: ['item.view'] }),
     'loan.approve': ability({ on: 'inventory.loan', implies: ['loan.view'] }),
+    'pull-list.edit': ability({ on: 'core.production' }),
   }),
 
   tables,
@@ -70,6 +71,9 @@ export default defineModule({
       { id: 'inventory.departments', required: true, to: '/admin/modules/inventory/departments', order: 80 },
       { id: 'inventory.locations', required: true, to: '/admin/modules/inventory/locations', order: 81 },
     ],
+    // A production's pull lists and loans (S15), agreed with Productions.
+    'core.record-tab': [{ id: 'inventory.production', record: 'core.production', ability: ['inventory.pull-list.edit', 'inventory.loan.view'], component: 'InventoryProductionKit', order: 30 }],
+    'core.record-fact': [{ id: 'inventory.production', record: 'core.production', ability: ['inventory.pull-list.edit', 'inventory.loan.view'], component: 'InventoryProductionKitFact', order: 30 }],
     'core.vocabulary': [{ id: 'inventory.tag', label: 'Kit tags', description: 'Free tags for finding kit, such as a period, a colour or a size.', ordering: 'alphabetical' as const, terms: [] }],
     'core.record-resolver': [
       { id: 'inventory.department', file: 'department' },

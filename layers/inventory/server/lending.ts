@@ -8,7 +8,7 @@ import { getLoan, insertLoan, moveLoan, promiseLine, windowFor, type Loan } from
 import { whyNotFree } from './promise'
 
 // The loan may run no longer than inventory.loans.max-length.
-async function checkLength(startsOn: string, dueBackOn: string): Promise<void> {
+export async function checkLength(startsOn: string, dueBackOn: string): Promise<void> {
   const max = Math.round((await useSetting('inventory.loans.max-length') as number) / 86_400) // not-policy: seconds in a day
   const row = await first<{ days: number }>('SELECT julianday(?) - julianday(?) AS days', dueBackOn, startsOn)
   if ((row?.days ?? 0) > max) refuse('inventory.loan.too-long', `A loan may run for at most ${max} days.`, { status: 422, detail: { max: String(max) } })
@@ -35,7 +35,7 @@ export async function lend(unit: UnitView, input: LendInput, actorId: string | n
     borrowerName: input.kind === 'outside' ? input.borrowerName : null, borrowerEmail: input.kind === 'outside' ? input.borrowerEmail : null,
     purpose: input.purpose, startsAt, dueBackOn: input.dueBackOn, requestedBy: actorId,
   }, { quiet: true })
-  const loan: Loan = { id, departmentId: input.departmentId, kind: input.kind, state: 'requested', startsAt, dueBackOn: input.dueBackOn, dueBackAt: w.to, responsibleAccountId: null }
+  const loan: Loan = { id, departmentId: input.departmentId, kind: input.kind, state: 'requested', startsAt, dueBackOn: input.dueBackOn, dueBackAt: w.to, responsibleAccountId: null, productionId: null }
   // L4: a holder of loan.approve lending makes the loan Approved in the same unit.
   moveLoan(unit, loan, { to: 'approved', actor: actorId, set: sql`decided_by = ${actorId}, decided_at = ${nowMs()}` })
   for (const [sort, itemId] of itemIds.entries()) {

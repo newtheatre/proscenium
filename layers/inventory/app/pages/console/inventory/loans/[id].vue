@@ -11,18 +11,19 @@ const route = useRoute()
 const id = computed(() => String(route.params.id))
 const { data, status, error, refresh } = await useAPI<{ loan: LoanDetail }>(() => `/api/inventory/loans/${encodeURIComponent(id.value)}`, { key: `inventory:loan:${id.value}` })
 const loan = computed(() => data.value?.loan)
-const { refusal, approve, decline, cancel, addLine, removeLine, open, primary } = useLoanPage(loan, refresh)
+const { refusal, decline, cancel, addLine, removeLine, open, primary, matchable } = useLoanPage(loan, refresh)
 const declining = ref(false)
+const matching = ref<LoanLine | null>(null)
 const note = ref('')
 const wanted = ref('')
 
 const TONE = { draft: 'neutral', requested: 'warning', approved: 'info', out: 'info', returned: 'success', declined: 'neutral', cancelled: 'neutral' } as const
 const actions = computed((): DropdownMenuItem[][] => {
   const l = loan.value
-  if (!l?.can.approve) return []
+  if (!l) return []
   return [
-    l.state === 'requested' ? [{ label: t('inventory.loan.decline'), icon: 'i-lucide-x', onSelect: () => { declining.value = true } }] : [],
-    ['draft', 'requested', 'approved'].includes(l.state) ? [{ label: t('inventory.loan.cancel'), icon: 'i-lucide-ban', color: 'error' as const, onSelect: () => { void cancel() } }] : [],
+    l.can.approve && l.state === 'requested' ? [{ label: t('inventory.loan.decline'), icon: 'i-lucide-x', onSelect: () => { declining.value = true } }] : [],
+    l.can.cancel && ['draft', 'requested', 'approved'].includes(l.state) ? [{ label: t('inventory.loan.cancel'), icon: 'i-lucide-ban', color: 'error' as const, onSelect: () => { void cancel() } }] : [],
   ].filter(g => g.length)
 })
 const summary = computed(() => {
@@ -31,7 +32,7 @@ const summary = computed(() => {
   return [
     { label: t('inventory.item.department'), value: l.department },
     { label: t('inventory.loan.window'), value: range(l.startsAt, l.dueBackOn) },
-    { label: t('inventory.loan.kind'), value: t(`inventory.loan-kinds.${l.kind}`) },
+    { label: t('inventory.loan.kind'), value: t(`inventory.loan-kinds.${l.kind}`), to: l.productionId ? `/console/programme/productions/${l.productionId}?tab=inventory.production` : undefined },
     { label: t('inventory.loan.lines'), value: String(l.lines) },
   ]
 })
@@ -41,6 +42,10 @@ const freeBadge = (line: LoanLine) => !line.free
     ? { tone: 'success' as const, label: t('inventory.loan.free') }
     : { tone: 'danger' as const, label: t(`inventory.loan.unfree.${line.free.reason}`) }
 const lineName = (line: LoanLine) => line.tag ? `${line.tag} · ${line.name}` : (line.wanted ?? '')
+const lineActions = (line: LoanLine) => [
+  ...matchable(line) ? [{ label: t('inventory.loan.match'), icon: 'i-lucide-link', onSelect: () => { matching.value = line } }] : [],
+  ...removable(line) ? [{ label: t('inventory.loan.remove-line'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => { void removeLine(line) } }] : [],
+]
 const removable = (line: LoanLine) => !!loan.value?.can.edit && !line.withLineId && ['wanted', 'listed', 'promised'].includes(line.state) && loan.value.state !== 'out'
 async function sendDecline() {
   if (await decline(note.value)) declining.value = false
@@ -68,7 +73,7 @@ async function addWanted() {
         :record-id="d.loan.id"
         :tabs="[{ id: 'lines', label: t('inventory.loan.lines') }]"
         :trail="[{ label: t('inventory.navigation.loans.label'), to: '/console/inventory/loans' }]"
-        @primary="approve()"
+        @primary="primary?.run()"
       >
         <template #tab-lines>
           <div class="max-w-3xl space-y-4">
@@ -110,11 +115,11 @@ async function addWanted() {
                   :label="freeBadge(line)!.label"
                 />
                 <template
-                  v-if="removable(line)"
+                  v-if="lineActions(line).length"
                   #trailing
                 >
                   <RowActions
-                    :items="[{ label: t('inventory.loan.remove-line'), icon: 'i-lucide-trash-2', color: 'error', onSelect: () => { void removeLine(line) } }]"
+                    :items="lineActions(line)"
                     :label="t('inventory.loan.actions-for', { name: lineName(line) })"
                   />
                 </template>
@@ -148,6 +153,11 @@ async function addWanted() {
           </div>
         </template>
       </PageRecord>
+      <InventoryMatchDialog
+        v-model:line="matching"
+        :loan-id="d.loan.id"
+        @matched="refresh()"
+      />
       <UModal
         v-model:open="declining"
         :title="t('inventory.loan.decline')"
