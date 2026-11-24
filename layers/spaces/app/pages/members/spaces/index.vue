@@ -7,7 +7,7 @@ import { parseDate, today } from '@internationalized/date'
 type View = 'day' | 'week' | 'list'
 interface BoardItem { id: string, title: string, detail?: string, day: string, lastDay?: string, startsAt: number, endsAt: number, column?: string, colour: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8, state: { label: string, edge: 'solid' | 'dashed' | 'double', usual?: boolean }, to?: string }
 interface Bookable { id: string, name: string, kind: 'space' | 'resource', venueName: string | null, colour: string | null, external: boolean, request: boolean, staff: boolean }
-interface Item { kind: 'booking' | 'request' | 'performance' | 'closure' | 'holiday', id: string, bookableId: string | null, startsAt: number, endsAt: number, purpose?: string, title?: string, bookedBy?: string, mine: boolean, day: string, lastDay: string }
+interface Item { kind: 'booking' | 'request' | 'performance' | 'closure' | 'holiday' | 'use', id: string, bookableId: string | null, startsAt: number, endsAt: number, purpose?: string, title?: string, bookedBy?: string, mine: boolean, day: string, lastDay: string }
 
 const route = useRoute()
 const router = useRouter()
@@ -55,11 +55,14 @@ const STATE = computed(() => ({
   performance: { label: t('spaces.calendar.states.performance'), edge: 'double' as const },
   closure: { label: t('spaces.calendar.states.closed'), edge: 'double' as const },
   holiday: { label: t('spaces.calendar.states.holiday'), edge: 'dashed' as const },
+  use: { label: t('spaces.calendar.states.in-use'), edge: 'double' as const },
 }))
 const items = computed<BoardItem[]>(() => (data.value?.items ?? []).map((i) => {
-  const what = i.kind === 'performance' || i.kind === 'closure' || i.kind === 'holiday'
-    ? i.title ?? ''
-    : [i.purpose, i.title].filter(Boolean).join(': ') || t('spaces.calendar.booked')
+  const what = i.kind === 'use'
+    ? i.title ?? t('spaces.calendar.in-use')
+    : i.kind === 'performance' || i.kind === 'closure' || i.kind === 'holiday'
+      ? i.title ?? ''
+      : [i.purpose, i.title].filter(Boolean).join(': ') || t('spaces.calendar.booked')
   return {
     id: `${i.kind}:${i.id}:${i.bookableId ?? ''}`,
     title: what,
@@ -69,7 +72,7 @@ const items = computed<BoardItem[]>(() => (data.value?.items ?? []).map((i) => {
     startsAt: i.startsAt,
     endsAt: i.endsAt,
     column: i.bookableId ?? undefined,
-    colour: i.kind === 'closure' || i.kind === 'holiday' ? 8 : colourOf(i.bookableId),
+    colour: i.kind === 'closure' || i.kind === 'holiday' || i.kind === 'use' ? 8 : colourOf(i.bookableId),
     state: STATE.value[i.kind === 'booking' && i.mine ? 'mine' : i.kind],
     to: i.mine ? `/members/spaces/bookings/${i.id}` : undefined,
   }

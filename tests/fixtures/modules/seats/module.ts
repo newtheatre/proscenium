@@ -18,7 +18,7 @@ export default defineModule({
     'members.look-up': ability({ audit: 'read' }),
     'orders.find': ability({ impliable: true }),
   }),
-  facts: defineFacts('seats', { regular: factDecl() }),
+  facts: defineFacts('seats', { regular: factDecl(), performer: factDecl({ on: 'seats.performance', pin: true }) }),
   tables,
   events: {
     announces: {
@@ -39,6 +39,7 @@ export default defineModule({
   signing: [{ purpose: 'seats.door-code', rotateEvery: '90d', keepFor: '365d' }],
   contributes: {
     'core.requirement': [{ id: 'seats' }],
+    'core.record-resolver': [{ id: 'seats.performance', file: 'performance' }],
     'core.record-tab': [{ id: 'seats.sales', record: 'gallery.production', ability: 'seats.orders.sell', component: 'SeatsSalesTab', order: 20 }],
     // A file the server makes for a performance, readable only through core.file-access.
     'core.file-slot': [{ id: 'seats.door-list', owner: 'seats.performance', ability: 'seats.settings.manage', accepts: ['json'], limit: 'core.files.brand-limit', access: 'record', textClass: 'personal', clean: false, source: 'server' }],
