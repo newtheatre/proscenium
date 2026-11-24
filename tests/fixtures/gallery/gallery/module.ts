@@ -11,7 +11,8 @@ export default defineModule({
   stability: 'experimental',
   switchable: false,
   // The till's browser test sells through a gallery panel when Payments and Finance are on.
-  uses: ['finance', 'payments', 'forms'],
+  // Find a time's browser test plans for a gallery company when Availability is on.
+  uses: ['finance', 'payments', 'forms', 'availability'],
   abilities: defineAbilities('gallery', {
     'sample.view': ability(),
     'sample.manage': ability(),
@@ -35,6 +36,7 @@ export default defineModule({
     'forms.outcome-action': [{ id: 'gallery.note', file: 'note' }],
     'forms.template': [{ id: 'gallery.show-feedback', file: 'show-feedback' }, { id: 'gallery.show-fields', file: 'show-fields' }],
     'payments.desk-basket': [{ id: 'gallery' }],
+    'availability.group': [{ id: 'gallery' }],
     'payments.settlement': [{ id: 'gallery' }],
     'finance.system-account': [{ id: 'income', name: 'Gallery income', kind: 'income' }],
     'core.count': [{ id: 'gallery.drafts', file: 'drafts' }, { id: 'gallery.none', file: 'none' }, { id: 'gallery.stalled', file: 'stalled' }],
