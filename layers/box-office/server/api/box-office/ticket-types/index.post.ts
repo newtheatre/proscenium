@@ -16,6 +16,7 @@ export default defineRoute({
     maxPerHolder: z.number().int().min(1).max(50).optional(), // not-policy: the order cap's own ceiling
     recheckAtEntry: z.boolean().optional(),
     channel: z.enum(['all', 'desk', 'online']).optional(),
+    taxCode: z.string().regex(/^[a-z][a-z0-9-]{0,31}$/).nullable().optional(), // not-policy: a Finance tax code's shape
     sort: z.number().int().min(0).max(999).optional(), // not-policy: an order, not a quantity
   }).strict(),
 }, async (_event, { input, unit }) => ({ ticketTypeId: await createTicketType(unit.view(), input) }))

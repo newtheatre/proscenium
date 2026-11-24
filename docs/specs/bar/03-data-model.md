@@ -124,6 +124,7 @@ Partial unique index on `kind` where `kind = 'desk'` and `active`: one desk outl
 | `category_id` | ref `bar_categories` | not null | internal | keep |  |
 | `name` | text | not null | public | keep | May appear on a public price list page |
 | `age_restricted` | boolean | not null, default false | internal | keep | Triggers the age check |
+| `tax_code` | text | nullable | internal | keep | BAR-60: the Finance tax code its prices include; null follows `finance.tax.default-code`. Offered only while the theatre is registered for VAT |
 | `image_file_id` | ref `core_files` | nullable | internal | keep | Through a file slot |
 | `position` | integer | not null | internal | keep |  |
 | `active` | boolean | not null | internal | keep | A product with bar sales is retired, never deleted |

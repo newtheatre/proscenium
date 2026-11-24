@@ -3,12 +3,14 @@
      viewer may take is offered and asks for confirmation, or offers Undo; the server says which those
      are. Details and addresses are edited here, on the person's own page (ID-46). Opening
      the page is audited. Emergency contacts and access needs stay closed until asked for, and each
-     read is recorded; a section the viewer may not open is absent, not empty. -->
+     read is recorded; a section the viewer may not open is absent, not empty. Staff who may record
+     that someone is under 18 (C-74) see and change it here. -->
 <script setup lang="ts">
 import { z } from 'zod'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { RefusalView } from '../../../utils/refusal'
 import type { GrantOptions } from '../../../components/GiveRoleDialog.vue'
+import type { AgeMarkerValue } from '../../../components/AgeMarker.vue'
 
 definePageMeta({ layout: 'console' })
 
@@ -29,7 +31,8 @@ interface Person {
   liveSessions: number
   standings: { source: string, label?: string }[]
   accessScheme?: { status: 'submitted' | 'more-info' | 'accepted' | 'rejected', submittedAt: number } | null
-  actions: { update: boolean, recover: boolean, disable: boolean, merge: boolean, endSessions: boolean, grants: boolean, erase: boolean, emergencyContacts: boolean, accessNeeds: boolean, accessScheme: boolean }
+  age?: AgeMarkerValue | null
+  actions: { update: boolean, recover: boolean, disable: boolean, merge: boolean, endSessions: boolean, grants: boolean, erase: boolean, emergencyContacts: boolean, accessNeeds: boolean, accessScheme: boolean, age: boolean }
 }
 interface Address { id: string, address: string, verified: boolean, audience: boolean, members: boolean }
 interface Contact { name: string, relationship: string | null, phone: string }
@@ -508,6 +511,14 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
                 </ul>
               </template>
             </PageSection>
+
+            <AgeMarker
+              v-if="p.actions.age"
+              :marker="p.age ?? null"
+              :endpoint="`/api/core/accounts/${encodeURIComponent(p.id)}/age`"
+              side="staff"
+              @saved="refresh()"
+            />
 
             <PageSection
               v-if="p.actions.emergencyContacts"

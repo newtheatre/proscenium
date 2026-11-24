@@ -230,6 +230,11 @@ export const points = {
    */
   'core.space-busy': point({ kind: 'code', contract: 'space-busy' }),
   /**
+   * Whether people are committed elsewhere in a window (C-66): each contributor answers only about
+   * the accounts asked, with a translation key rather than words. Read through the person-busy module.
+   */
+  'core.person-busy': point({ kind: 'code', contract: 'person-busy' }),
+  /**
    * Whether a module can live with a change: allow, or refuse with a reason and optionally a link to
    * its own screen where the matter is settled. Core runs every guard and stops on the first refusal.
    */
@@ -395,6 +400,8 @@ export const contributes = {
     { id: 'core.emails', holds: 'Whether emails we sent you were delivered', why: 'To know that tickets and notices reach you', basis: 'Our legitimate interests in running a reliable service', keptFor: 'While you have an account', order: 50 },
     { id: 'core.audit', holds: 'A record of what staff changed', why: 'To protect you and them, and to put mistakes right', basis: 'Our legitimate interests in running a safe, honest theatre', keptFor: 'For as long as the record it describes', order: 60 },
   ],
+  // Credited people are busy for each timed performance of the production (C-66).
+  'core.person-busy': [{ id: 'core.credits', file: 'credits' }],
   'core.record-resolver': ['performance', 'production', 'season', 'collection', 'venue', 'account'].map(n => ({ id: `core.${n}`, file: n })),
   // What the command palette finds by name (H9): each type through its own list's search.
   'core.search-source': [
@@ -417,6 +424,12 @@ export const contributes = {
   // The vocabularies core ships (part 2, group 3). Labels are the theatre's to change afterwards.
   'core.vocabulary': [
     { id: 'core.production-category', label: 'Production categories', terms: terms(['play', 'Play'], ['musical', 'Musical'], ['comedy', 'Comedy'], ['dance', 'Dance'], ['music', 'Music'], ['workshop', 'Workshop'], ['social', 'Social'], ['other', 'Other']) },
+    // One list of departments for every module (R3-07): a term's kind is its heading, production or
+    // organisation, so Productions' and Budgets' pickers narrow with listTerms(..., { group }).
+    { id: 'core.department', label: 'Departments', description: 'The parts of a production team and of the organisation, used by budgets, production teams and kit.', groups: ['Production', 'Organisation'], terms: [
+      ...terms(['creative', 'Creative'], ['cast', 'Cast'], ['stage-management', 'Stage management'], ['lighting', 'Lighting'], ['sound', 'Sound'], ['video', 'Video'], ['set', 'Set'], ['props', 'Props'], ['costume', 'Costume'], ['hair-and-make-up', 'Hair and make-up'], ['music', 'Music'], ['production', 'Production']).map(t => ({ ...t, group: 'Production' })),
+      ...terms(['technical', 'Technical'], ['publicity', 'Publicity'], ['front-of-house', 'Front of house'], ['bar', 'Bar'], ['social', 'Social'], ['general', 'General']).map(t => ({ ...t, group: 'Organisation' })),
+    ] },
     { id: 'core.credit-section', label: 'Credit sections', terms: terms(['cast', 'Cast'], ['creative-team', 'Creative team'], ['production-team', 'Production team'], ['crew', 'Crew'], ['band', 'Band']) },
     { id: 'core.advisory', label: 'Content warnings', description: 'What a story is about that someone may want to know first: shown on a production\'s page behind a "show" control.', groups: ['Violence and harm', 'Sexual content and abuse', 'Death and loss', 'Mental health', 'Discrimination and hate', 'Language and substances', 'Crime, war and conflict', 'Family and relationships', 'Medical and bodily'], terms: [
       { slug: 'violence', label: 'Violence', description: 'Physical fights, assault or brutality.', group: 'Violence and harm' },

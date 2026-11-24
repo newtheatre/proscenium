@@ -3,7 +3,7 @@
      (FB-404) they change their answers here and send them again; what they sent before stays as
      it was for the theatre to compare. -->
 <script setup lang="ts">
-import type { Answers, Definition } from '../../../../shared/engine'
+import type { Answers, Definition, ShownMarking } from '../../../../shared/engine'
 import type { ShownAnswer } from '../../../components/FormsAnswers.vue'
 
 interface Own {
@@ -15,6 +15,7 @@ interface Own {
   values: Answers | null
   progress: { status: string, kind: string, note: string | null, canChange: boolean } | null
   history: { at: number, status: string, kind: string }[]
+  marking: ShownMarking | null
   rights: { canEdit: boolean, canWithdraw: boolean }
   today: string
 }
@@ -159,6 +160,10 @@ async function withdraw() {
             </li>
           </ol>
         </section>
+        <FormsMarkingResult
+          v-if="own.marking"
+          :marking="own.marking"
+        />
         <FormsAnswers
           :definition="own.definition"
           :answers="own.answers"

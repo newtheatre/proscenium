@@ -93,6 +93,9 @@ export const termGroups = defineTable('core_term_groups', {
   id: col.id(),
   vocabularyKey: col.internal(text('vocabulary_key').notNull().references(() => vocabularies.key, { onDelete: 'restrict' })),
   label: col.public(text('label').notNull()),
+  // A declared heading's stable code, from its label when it was made (R3-07: a term's kind is its
+  // heading's slug, so a picker narrows by it whatever the theatre renames the heading to).
+  slug: col.internal(text('slug')),
   sort: col.internal(integer('sort').notNull().default(0)),
 }, {
   id: 'tgr',

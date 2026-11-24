@@ -2,7 +2,7 @@
      checks; a page's title and where it leads; a group's limits; a text block's words. -->
 <script setup lang="ts">
 import { CHOICE_TYPES, change, earlier, find, keyFrom } from '../../shared/builder/edit'
-import { DATA_CLASSES, PATTERNS, QUESTION_TYPES, RULES_FOR, type Condition, type Content, type Ending, type Group, type Option, type Page, type Question, type QuestionType, type Route, type Rule, type RuleName } from '../../shared/engine'
+import { DATA_CLASSES, MARKING_SHOWS, PATTERNS, QUESTION_TYPES, RULES_FOR, isMarkable, totalPoints, type AnswerKey, type Condition, type Content, type Ending, type Group, type Marking, type Option, type Page, type Question, type QuestionType, type Route, type Rule, type RuleName } from '../../shared/engine'
 
 const { t } = useT()
 const builder = useBuilder()
@@ -132,6 +132,25 @@ function setSource(key: string) {
   })
 }
 const ofPeople = computed(() => builder.sources.value.find(s => s.key === question.value?.source)?.people ?? false)
+// ---- marking (FB-513): only somebody who may mark sees correct answers, and only on a marked form ----
+const inGroup = computed(() => found.value?.kind === 'inner' && found.value.parent.kind === 'group')
+const markable = computed(() => builder.canMark && !!def.value.marking && !!question.value && isMarkable(question.value) && !inGroup.value && question.value.dataClass !== 'special')
+const setAnswer = (answer: AnswerKey | undefined, field?: string) => edit<Question>((q) => {
+  if (answer) q.answer = answer
+  else Reflect.deleteProperty(q, 'answer')
+}, field ? `answer-${field}` : undefined)
+const total = computed(() => totalPoints(def.value))
+const shows = computed(() => MARKING_SHOWS.map(s => ({ value: s, label: t(`forms.screens.marking.show.${s}`) })))
+/** Switching marking off keeps the correct answers in the draft, so switching it back on loses nothing. */
+function setMarking(marking: Marking | undefined, field?: string) {
+  const { marking: _was, ...rest } = def.value
+  builder.apply(marking ? { ...rest, marking } : rest, field ? `form:marking-${field}` : 'form:marking')
+}
+function setPassMark(value: number | null | undefined) {
+  if (!def.value.marking) return
+  const { passMark: _was, ...rest } = def.value.marking
+  setMarking(value === null || value === undefined || Number.isNaN(value) ? rest : { ...rest, passMark: value }, 'pass')
+}
 const condition = (c: Condition | undefined) => c ? formsConditionSentence(c, def.value) : ''
 const text = (v: unknown) => String(v ?? '')
 const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-save', icon: 'i-lucide-cloud-check' }]
@@ -310,6 +329,14 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
           @update:model-value="setQ('visibleWhen', $event)"
         />
       </UFormField>
+
+      <template v-if="markable">
+        <USeparator :label="t('forms.screens.answer-key.title')" />
+        <FormsAnswerKeyEditor
+          :question="question"
+          @update:answer="setAnswer"
+        />
+      </template>
 
       <USeparator :label="t('forms.screens.details.checks')" />
       <div
@@ -665,6 +692,37 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
           @update:model-value="setShown('confirmation', text($event))"
         />
       </UFormField>
+      <template v-if="builder.canMark && !builder.record">
+        <USeparator :label="t('forms.screens.marking.title')" />
+        <USwitch
+          :model-value="!!def.marking"
+          :label="t('forms.screens.marking.on')"
+          :description="t('forms.screens.marking.on-help')"
+          @update:model-value="setMarking($event ? { show: 'score' } : undefined)"
+        />
+        <template v-if="def.marking">
+          <UFormField
+            :label="t('forms.screens.marking.pass-mark')"
+            :help="t('forms.screens.marking.pass-mark-help', { total })"
+            :hint="t('forms.screens.details.optional')"
+          >
+            <FieldNumber
+              :model-value="def.marking.passMark"
+              :min="0"
+              :max="total"
+              :step="1"
+              @update:model-value="setPassMark($event)"
+            />
+          </UFormField>
+          <UFormField :label="t('forms.screens.marking.show-label')">
+            <USelect
+              :model-value="def.marking.show"
+              :items="shows"
+              @update:model-value="setMarking({ ...def.marking!, show: $event as Marking['show'] }, 'show')"
+            />
+          </UFormField>
+        </template>
+      </template>
     </template>
 
     <!-- An ending -->

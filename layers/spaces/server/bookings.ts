@@ -4,6 +4,7 @@
 import { sql, type SQL } from 'drizzle-orm'
 import { all, first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { assertNoVenueClosure, assertSpaceFree, closuresBetween, listPerformances } from '#modules/core'
+import { usesOf } from './uses'
 import { canMove, movesInto, type BookingEventKind, type BookingState, type ClosedReason } from '../shared/states'
 
 export interface Bookable {
@@ -31,16 +32,24 @@ export interface Booking {
   originId: string | null
   title: string
   bumps: boolean
+  /** X3: the Confirmed booking this request would move. */
+  replacesId: string | null
+  notes: string | null
+  attendees: number | null
 }
 
 /** Something in the way of a window (rule C1). A title is given only where the reader may see it (K2). */
 export interface Blocker {
-  kind: 'booking' | 'performance' | 'closure'
+  kind: 'booking' | 'performance' | 'closure' | 'use'
   id: string
+  /** For a use: the module that reported it to core.space-busy (rule C1a). */
+  module?: string
   startsAt: number
   endsAt: number
   tier?: number
   bookedFor?: string
+  /** B1: the booking's purpose lets a higher tier bump it. */
+  canBeBumped?: boolean
 }
 
 export const CLASH = { code: 'spaces.clash', reason: 'Someone else has just taken this time.', remedy: 'Choose another time.' }
@@ -50,7 +59,7 @@ const toBookable = (r: any): Bookable => ({ id: r.id, kind: r.kind, spaceId: r.s
 const toBooking = (r: any): Booking => ({
   id: r.id, bookableId: r.bookable_id, purposeId: r.purpose_id, tier: r.tier, seriesId: r.series_id, startsAt: r.starts_at, endsAt: r.ends_at,
   state: r.state, bookedFor: r.booked_for, requestedBy: r.requested_by, productionId: r.production_id, originType: r.origin_type, originId: r.origin_id,
-  title: r.title, bumps: !!r.bumps,
+  title: r.title, bumps: !!r.bumps, replacesId: r.replaces_id ?? null, notes: r.notes ?? null, attendees: r.attendees ?? null,
 })
 
 export async function getBookable(id: string): Promise<Bookable | null> {
@@ -72,7 +81,7 @@ export async function requireBooking(id: string): Promise<Booking> {
 }
 
 /** No Confirmed booking of this bookable overlaps [from, to). `except` leaves out the booking being moved. */
-export function noOverlap(bookableId: string | SQL, from: number | SQL, to: number | SQL, except: string | null = null): SQL {
+export function noOverlap(bookableId: string | SQL, from: number | SQL, to: number | SQL, except: string | SQL | null = null): SQL {
   return sql`NOT EXISTS (SELECT 1 FROM spaces_bookings o WHERE o.bookable_id = ${bookableId} AND o.state = 'confirmed'
     AND o.starts_at < ${to} AND o.ends_at > ${from} AND o.id IS NOT ${except})`
 }
@@ -82,17 +91,18 @@ export function noOverlap(bookableId: string | SQL, from: number | SQL, to: numb
  * a space no scheduled performance or blocking closure does (core's assertSpaceFree); for a resource,
  * no blocking closure of its home venue or of the whole theatre. On the statement, never in a read.
  */
-export function bookableFree(bookable: Bookable, from: number, to: number, except: string | null = null): SQL {
+export function bookableFree(bookable: Bookable, from: number | SQL, to: number | SQL, except: string | SQL | null = null): SQL {
   const place = bookable.kind === 'space' ? assertSpaceFree(bookable.spaceId!, from, to) : assertNoVenueClosure(bookable.homeVenueId, from, to)
   return sql`(${noOverlap(bookable.id, from, to, except)} AND ${place})`
 }
 
 /** Everything in the way of a window, soonest first (rule C1). A read, for showing and for choosing a refusal. */
 export async function blockersOf(bookable: Bookable, from: number, to: number, except: string | null = null): Promise<Blocker[]> {
-  const found: Blocker[] = (await all<{ id: string, starts_at: number, ends_at: number, tier: number, booked_for: string }>(
-    'SELECT id, starts_at, ends_at, tier, booked_for FROM spaces_bookings WHERE bookable_id = ? AND state = \'confirmed\' AND starts_at < ? AND ends_at > ? AND id IS NOT ? ORDER BY starts_at, id',
+  const found: Blocker[] = (await all<{ id: string, starts_at: number, ends_at: number, tier: number, booked_for: string, can_be_bumped: number }>(
+    `SELECT b.id, b.starts_at, b.ends_at, b.tier, b.booked_for, p.can_be_bumped FROM spaces_bookings b JOIN spaces_purposes p ON p.id = b.purpose_id
+      WHERE b.bookable_id = ? AND b.state = 'confirmed' AND b.starts_at < ? AND b.ends_at > ? AND b.id IS NOT ? ORDER BY b.starts_at, b.id`,
     bookable.id, to, from, except,
-  )).map(r => ({ kind: 'booking', id: r.id, startsAt: r.starts_at, endsAt: r.ends_at, tier: r.tier, bookedFor: r.booked_for }))
+  )).map(r => ({ kind: 'booking', id: r.id, startsAt: r.starts_at, endsAt: r.ends_at, tier: r.tier, bookedFor: r.booked_for, canBeBumped: !!r.can_be_bumped }))
   if (bookable.kind === 'space') {
     for (const p of await listPerformances({ spaceId: bookable.spaceId!, state: 'scheduled', from, to }))
       found.push({ kind: 'performance', id: p.id, startsAt: p.startsAt, endsAt: p.endsAt })
@@ -101,6 +111,7 @@ export async function blockersOf(bookable: Bookable, from: number, to: number, e
     ? await closuresBetween(from, to, { spaceId: bookable.spaceId! })
     : (await closuresBetween(from, to)).filter(c => c.venueId === null || (c.spaceId === null && c.venueId === bookable.homeVenueId))
   for (const c of closures) if (c.kind === 'closure' && c.blocksPerformances) found.push({ kind: 'closure', id: c.id, startsAt: c.startsAt, endsAt: c.endsAt })
+  if (bookable.kind === 'space') for (const u of await usesOf([bookable.spaceId!], from, to, null)) found.push({ kind: 'use', id: u.record.id, startsAt: u.from, endsAt: u.to, module: u.module })
   return found.sort((a, b) => a.startsAt - b.startsAt)
 }
 

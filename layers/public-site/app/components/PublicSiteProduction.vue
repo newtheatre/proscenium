@@ -71,9 +71,13 @@ interface Production {
   /** Absent from an answer cached before venues were added. */
   venues?: VenueSummary[]
   price: PriceSummaryView | null
+  /** Other modules' parts of the page (C-69, C-75) and the base it lives at while one moves it (C-73). */
+  sections?: { id: string, component: string }[]
+  lines?: { text: string, placement: 'under-title' | 'credits' | 'footer' }[]
+  base?: string | null
 }
 
-const props = defineProps<{ slug: string, prefix: 'whats-on' | 'shows' }>()
+const props = defineProps<{ slug: string, prefix: string }>()
 const { t } = useT()
 const { dateTime, dayNamed, span, time } = useDates()
 
@@ -81,11 +85,13 @@ const { data } = await useAPI<Production | { moved: string }>(() => `/api/public
 if (!data.value) throw createError({ statusCode: 404, statusMessage: t('public-site.production.not-found'), fatal: true })
 // An old slug, or a current show under /shows (or a past one under /whats-on), goes to its address.
 // Both redirects are temporary (C-46): a show moves to /shows when it closes, and back if a date is added.
+// While a module moves production pages (C-73), every show lives under its base instead.
 const moved = 'moved' in data.value ? data.value.moved : null
 const here = 'moved' in data.value ? null : data.value
-const prefix = here ? (here.past ? 'shows' : 'whats-on') : props.prefix
+const prefix = here ? (here.base || (here.past ? 'shows' : 'whats-on')) : props.prefix
 if (moved || prefix !== props.prefix) await navigateTo(`/${prefix}/${moved ?? props.slug}`, { replace: true, redirectCode: 302 })
 const production = computed(() => (data.value && !('moved' in data.value) ? data.value : null))
+const creditLines = computed(() => production.value?.lines?.some(l => l.placement === 'credits') ?? false)
 const priceLine = computed(() => production.value?.price ? priceSummary(production.value.price, t) : '')
 
 // What it is, in one line: where, how long, and the company for a visiting show.
@@ -222,6 +228,10 @@ useHead(() => {
           >
             {{ production.subtitle }}
           </p>
+          <PublicSiteBillingLines
+            :lines="production.lines ?? []"
+            placement="under-title"
+          />
           <UBadge
             v-if="production.state === 'cancelled'"
             color="error"
@@ -666,7 +676,7 @@ useHead(() => {
             </section>
 
             <section
-              v-if="credits.length"
+              v-if="credits.length || creditLines"
               aria-labelledby="credits-heading"
               class="space-y-4"
             >
@@ -695,7 +705,16 @@ useHead(() => {
                   </template>
                 </dl>
               </div>
+              <PublicSiteBillingLines
+                :lines="production.lines ?? []"
+                placement="credits"
+              />
             </section>
+
+            <PublicSiteAddedSections
+              :sections="production.sections ?? []"
+              :subject="{ productionId: production.id }"
+            />
 
             <section
               v-if="production.appearances?.length"
@@ -747,6 +766,11 @@ useHead(() => {
                 </li>
               </ul>
             </section>
+
+            <PublicSiteBillingLines
+              :lines="production.lines ?? []"
+              placement="footer"
+            />
           </div>
         </div>
       </UPage>

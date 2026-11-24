@@ -89,8 +89,8 @@ Foundations amended the id format on 16 November: every id is `<prefix>_<26 char
 | `box_office_passes` | `pass` | `finance_periods` | `fpe` |
 | `box_office_pass_redemptions` | `psr` | `finance_period_closes` | `pcl` |
 | `box_office_comp_requests` | `comp` | `finance_tax_codes` | `tax` |
-| `box_office_pass_covers` | `pcv` |  |  |
-| `box_office_waitlist_entries` | `wle` |  |  |
+| `box_office_pass_covers` | `pcv` | `payments_payees` | `ppy` |
+| `box_office_waitlist_entries` | `wle` | `payments_disbursements` | `pdb` |
 
 `payments_intent_parts` has the prefix `pip`. With it, the list above is the final table list for the three modules.
 
@@ -145,6 +145,7 @@ Who a ticket is for: "Full price", "Concession", "Companion". Site-wide, so repo
 | `proof_note` | text | shown to the buyer and the door, such as "Bring student ID" | Public | keep |
 | `needs_paid_ticket` | integer | boolean; a companion ticket needs a paid ticket in the same order | Internal | keep |
 | `active` | integer | boolean | Internal | keep |
+| `tax_code` | text | BO-78: null, or the Finance tax code its prices include; null follows `finance.tax.default-code`. Offered only while the theatre is registered for VAT | Internal | keep |
 | `managed_by` | text | null, or `<module>.<id>` for a type a module declares through `box-office.ticket-type` (part 5); unique when set. Its kind, requirements, `needs_paid_ticket`, `max_per_holder` and `recheck_at_entry` follow the declaration. Companion and complimentary types exist only this way | Internal | keep |
 | `sort` | integer | default 0; the order every list shows types in, the name breaking a tie. Set by dragging rows on the Ticket types screen, saved whole through `PUT /api/box-office/ticket-types/order`; a new type goes last | Internal | keep |
 
@@ -627,6 +628,40 @@ The CHECK on `approved_by` is what makes the self-approve limit real. The reques
 
 The event body is not stored. The handler keeps the id and type, then asks the provider for the current state of the payment, so nothing personal from a provider's payload rests in the database. The table is not append-only: `attempt_id` and `handled_at` are filled in after the row is written, and the task `payments.prune-webhooks` deletes rows older than the retention setting.
 
+### `payments_payees` (plain, sealed, with a keep-for sweep)
+
+Bank details of the people and companies the theatre pays back (Invoices and exports, part 4, P-A1). One row per party.
+
+| Column | Type | Constraints | Class | On erasure |
+| --- | --- | --- | --- | --- |
+| `party_module`, `party_id` | text | not null; **unique together**. `core` and an account id for a person; `companies` and a company id | Internal | keep |
+| `account_id` | text | the person's account, null for a company; moves on a merge | Account | keep the row |
+| `account_name`, `sort_code`, `account_number` | text | sealed with the core key; null once cleared | Personal | clear |
+| `last_digits` | text | the account number's last two digits, for the masked view; null once cleared | Personal | clear |
+| `last_used_on` | text | London date of the last payment to it | Internal | keep |
+| `created_at`, `updated_at` | integer |  | Internal | keep |
+
+Nobody sees the details in full but a holder of `payments.payee.read`, and every such read writes an audit entry naming only the payee's id. Everyone else, the person included, sees the name's first letter and the last two digits. `last_digits` is not in the P-A1 amendment: the masked view needs it without opening the sealed number. A person clears their own details from My account; the task `payments.prune-payees` clears details unused for `payments.payees.keep-for`. Clearing keeps the row so payments already made still name it.
+
+### `payments_disbursements` (append-only)
+
+Money the theatre paid out against an owner module's record, such as a claim or a bill (P-A1). Payments records it after a person has paid it; it never initiates a payment.
+
+| Column | Type | Constraints | Class | On erasure |
+| --- | --- | --- | --- | --- |
+| `method` | text | `bank-transfer`, `cheque`, `theatre-card`, `petty-cash` or `parent-body` | Internal | keep |
+| `amount_minor`, `currency` | integer, text | amount above zero | Internal | keep |
+| `owner_module`, `owner_record` | text | the record paid, such as a claim | Internal | keep |
+| `payee_id` | text | the bank details used, if any | Internal | keep |
+| `paid_on` | text | London date; not after today | Internal | keep |
+| `reference` | text | bank reference or cheque number, at most 40 characters | Internal | keep |
+| `reverses_id` | text | **unique**: the row this reverses, once only | Internal | keep |
+| `posting_id` | text | not null | Internal | keep |
+| `by` | text | who recorded it; null for the system | Account | keep, alias on merge |
+| `created_at` | integer |  | Internal | keep |
+
+Recording one calls the owner's `payments.disbursement` handler, which marks its record paid and returns its debits (the payable cleared), and posts one transfer with the purpose `disbursement`: those debits, and a credit on the method's account. A bank transfer, cheque or the theatre's card pays from `payments.bank`, petty cash from `payments.cash`, and the parent body from `payments.parent-body` (what a students' union holds for the theatre). A mistake is undone by a reversing row, a reversal of the posting and the handler's `reversed`, which marks the record owed again.
+
 ## Finance: the ledger
 
 Double-entry. Every posting is a set of entries that sum to zero in one currency: a positive amount is a debit, a negative amount a credit. Nothing in these tables is personal, which is deliberate: the ledger survives every erasure untouched.
@@ -724,9 +759,14 @@ Closing is a row, not a flag. The newest row for a period says whether it is clo
 | `code` | text | primary key; `none` always exists | Internal | keep |
 | `label` | text |  | Internal | keep |
 | `rate_basis_points` | integer | CHECK >= 0 | Internal | keep |
-| `active` | integer | boolean | Internal | keep |
+| `active` | integer | boolean; a code that is not active is no longer offered, and stays on what uses it | Internal | keep |
+| `in_scope` | integer | boolean; false for `none` and `outside`, which never go on a VAT return | Internal | keep |
 
-The first release ships only `none`. The columns exist so that a VAT-registered theatre can be supported later without a migration of the ledger.
+Rows shipped (amendment F-A2, Invoices and exports part 4): `none` (no tax), `standard` (2000 basis points), `reduced` (500), `zero`, `exempt` and `outside`. A trigger refuses changing a code's code, rate or scope once any entry uses it, and refuses deleting a used code; `none` never changes. A new rate is a new code, and the old one is made inactive. The Tax codes screen (Admin, Modules, Finance) adds and changes codes under `finance.settings.manage`.
+
+An entry's `tax_code` and `tax_minor` describe its net amount: `tax_minor` is the VAT on it, signed like the entry, and the VAT itself is a separate entry on Finance's own accounts `finance.vat-output` (liability) and `finance.vat-input` (asset), written with `for_module` = `finance`. Other modules read tax through `taxTotals(range)` and entry rows through `entryRows(range, { afterId, limit })`, never from these tables.
+
+VAT on sales (FIN-07, stories BO-78 and BAR-60). Till and ticket prices include VAT. An owner's settle, kept or refund entries name the tax code inside them (`OwnerEntry.taxCode`), and Payments splits them through Finance's `splitVat`: each entry becomes its net amount with the VAT as its `tax_minor`, and one entry per code goes on `finance.vat-output` (sales and refunds) or `finance.vat-input` (money paid out). A bar product or ticket type names its code, or follows `finance.tax.default-code`; a pass sold and a cheaper exchange's difference follow the usual code. While `finance.tax.registered` is off no code is recorded at all. Deferred ticket income therefore holds money without its VAT: Box office grosses it up at each code when deciding how much of a refund comes off deferred income, and its own transfers (a cancellation fee kept, an exchange carried to another performance, a ticket's money moved onto a pass) move net amounts, since the VAT was accounted for when the ticket was paid. A stopped code stays on what uses it, so postings accept any known code; only the screens stop offering it.
 
 ## Where the lessons came from
 

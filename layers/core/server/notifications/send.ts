@@ -32,12 +32,6 @@ export interface NotifyAddressOptions {
   record?: RecordRef
 }
 
-export async function notificationType(typeKey: string): Promise<NotificationType> {
-  const found = (await usePoint<NotificationType>('core.notification-type')).find(c => c.value.id === typeKey)
-  if (!found) refuse('core.notifications.unknown-type', `No module declares a message called ${typeKey}.`, { status: 500 })
-  return found.value
-}
-
 export interface Sender { key: string, name: string, email: string, replyTo?: string }
 
 // The sending domain, once it is set and verified. Throws a retryable refusal otherwise (C-32).
