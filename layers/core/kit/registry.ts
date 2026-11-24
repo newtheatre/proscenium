@@ -4,6 +4,7 @@ import { DeclarationError } from './refusal'
 import { DELIVERABLE, snake, type ModuleManifest, type SettingPlace, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl, type SigningDecl } from './manifest'
 import { tableMeta, type TableMeta } from './db'
 import type { ListSource } from './lists'
+import type { Measure } from './measures'
 import type { SettingEntry, SettingRule } from './settings'
 import { impliedAbility, type AbilityDecl, type FactDecl, type RecordDecl } from './abilities'
 import type { ModuleHandlers } from './handlers'
@@ -237,6 +238,7 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
     }
     for (const [key, { decl }] of [...r.facts].filter(([, a]) => a.module === m.id)) {
       if (decl.on && !r.records.has(decl.on)) fail(entry, `facts.${key}.on`, `"${decl.on}" is not a record type`)
+      if (decl.pin && !decl.on) fail(entry, `facts.${key}.pin`, 'only a fact on a record type can be pinned to one record')
       for (const name of decl.defaults ?? []) {
         const ability = r.abilities.get(name)
         if (!ability || (ability.module !== m.id && ability.module !== 'core')) fail(entry, `facts.${key}.defaults`, `"${name}" is not an ability of ${m.id} or core`)
@@ -262,6 +264,8 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
       if (clears && !reachesPerson(meta, r)) fail(entry, `tables.${key}.${clears[0]}`, `erase: 'clear' needs rows that reach a person, and ${meta.name}'s subject does not lead to an account or an email`)
     }
   }
+
+  checkMeasures(r, fail)
 
   // requires may not form a loop.
   const visiting = new Set<string>()
@@ -372,4 +376,34 @@ function placeSettings(r: Registry, entry: ModuleEntry, fail: (entry: ModuleEntr
  */
 function confirmsRetention(entry: SettingEntry): void {
   if (entry.onChange !== 'reason') entry.onChange = 'confirm'
+}
+
+/**
+ * Figures (core.measure): each named under its module, read under a declared ability, broken down
+ * only by shared keys or the module's own, and a ratio only of figures that exist and share its keys.
+ */
+function checkMeasures(r: Registry, fail: (entry: ModuleEntry, field: string, message: string) => never): void {
+  const figures = new Map<string, { entry: ModuleEntry, measure: Measure }>()
+  for (const entry of r.modules.values()) {
+    for (const c of entry.manifest.contributes?.['core.measure'] ?? []) {
+      const where = `contributes.core.measure.${c.id}`
+      const measure = entry.handlers.contributions?.['core.measure']?.[c.file ?? c.id] as Measure | undefined
+      if (!measure) continue
+      if (!c.id.startsWith(`${entry.manifest.id}.`) || c.id.split('.').length !== 2) fail(entry, where, `is named ${entry.manifest.id}.<figure>`)
+      if (!r.abilities.has(measure.ability)) fail(entry, `${where}.ability`, `"${measure.ability}" is not a declared ability`)
+      for (const key of [...measure.by, ...(measure.filters ?? [])]) {
+        if (key.includes('.') && !key.startsWith(`${entry.manifest.id}.`)) fail(entry, `${where}.by`, `"${key}" is another module's key; a figure breaks down by shared keys or its own module's`)
+      }
+      figures.set(c.id, { entry, measure })
+    }
+  }
+  for (const [id, { entry, measure }] of figures) {
+    if (!measure.ratio) continue
+    for (const part of [measure.ratio.of, measure.ratio.over]) {
+      const found = figures.get(part)
+      if (!found) fail(entry, `contributes.core.measure.${id}.ratio`, `"${part}" is not a declared figure`)
+      else if (found.measure.ratio) fail(entry, `contributes.core.measure.${id}.ratio`, `"${part}" is itself a ratio`)
+      else if (measure.by.some(k => !found.measure.by.includes(k))) fail(entry, `contributes.core.measure.${id}.ratio`, `"${part}" does not break down by every key the ratio offers`)
+    }
+  }
 }

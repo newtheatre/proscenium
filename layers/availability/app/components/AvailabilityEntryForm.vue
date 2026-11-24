@@ -1,12 +1,13 @@
 <!-- Add a change (S3): dates, optionally only some weekdays, the whole day or times, a level and a
-     reason the person may share with people who plan for them (A3, A7). -->
+     reason the person may share with people who plan for them (A3, A7). For someone else (A8, `forAccount`)
+     only busy or maybe, and the reason is never shared. -->
 <script setup lang="ts">
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { clockOf, DAY_MINUTES, rowStarts } from '../../shared/grid'
 import { LEVELS } from '../../shared/levels'
 
-const props = defineProps<{ today: string, horizon: string, step: number }>()
+const props = defineProps<{ today: string, horizon: string, step: number, forAccount?: string }>()
 const emit = defineEmits<{ saved: [] }>()
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -35,16 +36,17 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 const times = computed(() => rowStarts(props.step).map(m => ({ label: clockOf(m), value: clockOf(m) })))
 const ends = computed(() => [...rowStarts(props.step).slice(1), DAY_MINUTES].map(m => ({ label: clockOf(m), value: clockOf(m) })))
-const levels = computed(() => LEVELS.map(value => ({ value, label: t(`availability.levels.${value}`) })))
+const levels = computed(() => LEVELS.filter(l => !props.forAccount || l !== 'free').map(value => ({ value, label: t(`availability.levels.${value}`) })))
 const weekdays = computed(() => WEEKDAYS.map(w => ({ value: String(w), label: t(`availability.weekdays.${w}`) })))
 
 async function save(event: FormSubmitEvent<State>) {
   refusal.value = null
   const v = event.data
   try {
-    await $api('/api/availability/exceptions', {
+    await $api(props.forAccount ? '/api/availability/on-behalf' : '/api/availability/exceptions', {
       method: 'POST',
       body: {
+        ...(props.forAccount ? { accountId: props.forAccount } : {}),
         firstDate: v.dates.start,
         lastDate: v.dates.end,
         weekdays: v.someDays ? v.weekdays.map(Number) : null,
@@ -52,7 +54,7 @@ async function save(event: FormSubmitEvent<State>) {
         until: v.wholeDay ? null : v.until,
         level: v.level,
         reason: v.reason.trim() || null,
-        reasonShared: v.reasonShared && !!v.reason.trim(),
+        reasonShared: !props.forAccount && v.reasonShared && !!v.reason.trim(),
       },
     })
     toast.add({ title: t('availability.entry.saved'), color: 'success' })
@@ -142,7 +144,7 @@ async function save(event: FormSubmitEvent<State>) {
     <UFormField
       :label="t('availability.entry.reason')"
       :hint="t('availability.entry.optional')"
-      :help="t('availability.entry.reason-help')"
+      :help="forAccount ? t('availability.behalf.reason-help') : t('availability.entry.reason-help')"
       name="reason"
     >
       <UInput
@@ -150,7 +152,10 @@ async function save(event: FormSubmitEvent<State>) {
         :maxlength="REASON_MAX"
       />
     </UFormField>
-    <UFormField name="reasonShared">
+    <UFormField
+      v-if="!forAccount"
+      name="reasonShared"
+    >
       <UCheckbox
         v-model="state.reasonShared"
         :disabled="!state.reason.trim()"

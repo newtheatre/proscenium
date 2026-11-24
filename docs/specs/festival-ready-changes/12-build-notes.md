@@ -47,6 +47,13 @@ What the build settled that the parts above leave open, and where it differs fro
 - **Not done.** Dropping a menu entry that points at a switched-off module's page is left to the contributor, which only applies while its own module is on.
 - **Tests.** `layers/public-site/tests/integration/site-shape.test.ts`, through the `festive` fixture module.
 
+## FB-514: moves the system makes
+
+- **Where it lives.** `systemMove` in `layers/forms/shared/engine/evaluate.ts`; `followSystemMoves` and `arrive` in `layers/forms/server/stages.ts`, called after a submission (the public route and `addResponse`), a staff move and a resubmission. Checks in `shared/engine/checks.ts`. `docs/specs/form-builder/14-changes-2026-11-24.md` rows 12 to 17 record what was built.
+- **Unit size.** A chain of five fits the unit's fifty statements with room to spare only because the person is told once, at the end of the chain. A form whose system moves open review rounds or queue several actions at each step may come close; if one is ever refused as too large, the remedy is a shorter chain.
+- **The loop warning** is an audit entry (`detail.loop`) on the response; the health check joins it to the form's live version, so publishing a fixed version clears it.
+- **Not done.** Records' own fields (FB-508) never take system moves, since they have no stages.
+
 ## BO-73: door headcount
 
 - **Where it lives.** The counter is `/live/door/<performance>/count`, reached by the Scan and Count tabs at the top of the live door. A performance never put on sale and with no bookings opens on Count (HC1). The server is `layers/box-office/server/headcount.ts`; the arithmetic, shared with the device, is `layers/box-office/shared/headcount.ts`.
