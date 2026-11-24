@@ -10,15 +10,14 @@ const { day } = useDates()
 const route = useRoute()
 const { read, keep } = useKeptCards()
 const venue = computed(() => String(route.params.venue))
-const { data, status, error, refresh } = await useAPI<{ cards: EmergencyCard[] }>('/api/front-of-house/emergency-cards', { key: 'front-of-house:emergency-cards', server: false })
+const { data, status, error, refresh } = await useAPI<{ card: EmergencyCard | null }>(() => `/api/front-of-house/emergency-cards/${encodeURIComponent(venue.value)}`, { key: `front-of-house:emergency-card:${venue.value}`, server: false })
 
-// The device's copy: written whenever the server answers, read when it cannot.
+// The device's copy: this card replaces its old copy whenever the server answers, and is read when it cannot.
 const kept = ref<EmergencyCard[]>([])
 onMounted(() => { kept.value = read() })
-watch(data, (d) => { if (d) keep(d.cards) }, { immediate: true })
+watch(data, (d) => { if (d?.card) keep([...read().filter(c => c.venueId !== d.card!.venueId), d.card]) }, { immediate: true })
 
-const cards = computed(() => data.value?.cards ?? kept.value)
-const card = computed(() => cards.value.find(c => c.venueId === venue.value) ?? null)
+const card = computed(() => data.value ? data.value.card : kept.value.find(c => c.venueId === venue.value) ?? null)
 // Opened from a performance's board, the way back is that board; otherwise front of house tonight.
 const back = computed(() => typeof route.query.performance === 'string' ? `/live/front-of-house/${encodeURIComponent(route.query.performance)}` : '/live/front-of-house')
 const fromDevice = computed(() => !data.value && !!card.value)

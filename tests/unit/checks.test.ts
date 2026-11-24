@@ -244,3 +244,13 @@ describe('freshness overrides', () => {
     expect(freshOverrides('await can(actor, \'x.y.z\')\nconst fresh = { fresh: true }')).toEqual([])
   })
 })
+
+describe('practice coverage (PM-20)', () => {
+  it('names a live page that no scenario route covers, and passes the live home', async () => {
+    const { uncoveredLivePages } = await import('../../scripts/checks/practice')
+    const pages = ['/live', '/live/door', '/live/door/[performance]', '/live/door/[performance]/print', '/live/till', '/live/bar']
+    expect(uncoveredLivePages(pages, ['/live/door', '/live/till'])).toEqual(['/live/bar'])
+    expect(uncoveredLivePages(['/live/tilling'], ['/live/till'])).toEqual(['/live/tilling'])
+    expect(uncoveredLivePages(['/console/bar'], [])).toEqual([])
+  })
+})

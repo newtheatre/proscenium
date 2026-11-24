@@ -38,7 +38,8 @@ export const items = defineTable('lost_property_items', {
 Every column has a data class (`public`, `internal`, `personal`, `freeText`, `special`); a column
 without one fails the build. Ids are `<prefix>_<26 characters>`, sorted by creation time unless
 `random: true`. `appendOnly: true` adds database triggers that refuse updates and deletes, except
-erasure writing its placeholder. A realm is `audience`, `members`, `operational` or `system` (the
+erasure writing its placeholder. `appendOnly: { except: ['state'] }` does the same but lets the named
+columns change: a versioned row whose only moving part is its state (Companies' agreements). A realm is `audience`, `members`, `operational` or `system` (the
 platform's own tables). An account subject column that may be empty needs
 `subject: { account: 'account_id', unlinked: 'staff' }`: staff reach the rows it cannot link by
 search. `col.internal()` and `col.personal()` take `encrypted: true`, sealed with the one core key as
@@ -716,7 +717,8 @@ declares only what the kit needs.
 - **A route's `practice` option.** `'refuse'` refuses a marked request (`core.practice.not-in-practice`):
   signing in and out, passkeys, the authenticator, recovery, data requests and setup say so.
   `'outside'` runs against the real database whether marked or not: the practice routes that start,
-  list and leave sessions.
+  list and leave sessions. `'ticks'` marks a read that may tick a task, such as opening one venue's
+  emergency card: inside a store the scenario's checks run after it as they do after a change.
 - **Nothing leaves.** `externalCall` in practice never calls out: the call handler's `practice`
   answer (`defineCall({ ..., practice })`) is recorded and settled as the provider's would be, or
   `'ask-trainee'` waits for the practice card reader; a handler with none is refused
@@ -725,7 +727,9 @@ declares only what the kit needs.
   session's prefix (`practiceName`). Core's mailer writes to the store's outbox instead of sending.
 - **A table's `practice` option.** `'empty'` (the default), `'copy'` or `'replace'`. A copied table's
   rows come across when a store is made, each column through its erasure rule, special and sealed
-  columns as null, account columns pointing at the store's "Practice staff". The build refuses
+  columns as null, account columns pointing at the store's "Practice staff". A `'replace'` table's
+  rows come across the same way, for the module's sample set to swap for stand-ins (Payments keeps
+  the theatre's cash account and adds the practice card reader). The build refuses
   `copy` on an audience or members table, an append-only table, or one with a required special column.
 - **Contributing.** A scenario is a `core.practice-scenario` entry (the live page it opens, the pages
   it allows, the abilities it acts with, its sample sets and tasks). A sample set is a
@@ -733,7 +737,11 @@ declares only what the kit needs.
   writes fictional records through the module's own services and returns named results such as
   `{ tonight: 'perf_...' }`. A scenario's task checks are one `core.practice-check` file keyed by the
   scenario id, `definePracticeChecks({ taskId: async context => boolean })`, run after each marked
-  change. Core's own sets are `core.people` and `core.tonight`.
+  change and each marked `'ticks'` read; `context.answer` is that request's path and response body,
+  for a task that leaves no row (turning a ticket away, opening a card). A response that ticked a
+  task carries `Proscenium-Practice-Ticked: 1`, and `$api` reads the panel again on seeing it. A task with `when: '<result>'` is set only where a sample set returned
+  that result. Core's own sets are `core.people` and `core.tonight` (tonight's and tomorrow's
+  performances).
 - **In the app.** Live pages are served again under `/practice/live/...` inside the practice frame,
   and `$api` marks every request from a `/practice` page; `docs/kit/interface.md` ("Live mode")
   says how. A scenario's `runnable` tasks run in the store from the panel's "Run now"

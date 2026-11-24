@@ -144,6 +144,45 @@ export default defineModule({
   },
 
   contributes: {
+    // Practice mode (FH-55). In a store the on-shift fact grants nothing, as the theatre's fact mappings
+    // are not copied, so each scenario lists what being on shift tonight gives for real.
+    'core.practice-scenario': [
+      {
+        id: 'front-of-house.night',
+        version: 1,
+        label: 'front-of-house.practice.night',
+        summary: 'front-of-house.practice.night-summary',
+        minutes: 15,
+        needs: ['front-of-house', 'box-office'],
+        samples: ['core.tonight', 'box-office.sold-house', 'front-of-house.on-shift'],
+        start: '/live/front-of-house/{tonight}',
+        routes: ['/live/front-of-house'],
+        abilities: ['front-of-house.assignment.check-in', 'front-of-house.checklist.complete', 'front-of-house.night-report.write', 'front-of-house.night-report.sign-off', 'front-of-house.shift.view'],
+        tasks: [
+          { id: 'check-in', label: 'front-of-house.practice.check-in' },
+          { id: 'opening-checklist', label: 'front-of-house.practice.opening-checklist' },
+          { id: 'night-report', label: 'front-of-house.practice.night-report' },
+        ],
+      },
+      {
+        id: 'front-of-house.incident',
+        version: 1,
+        label: 'front-of-house.practice.incident',
+        summary: 'front-of-house.practice.incident-summary',
+        minutes: 10,
+        needs: ['front-of-house'],
+        samples: ['core.tonight', 'front-of-house.on-shift'],
+        start: '/live/front-of-house/{tonight}',
+        routes: ['/live/front-of-house'],
+        abilities: ['front-of-house.incident.report', 'front-of-house.emergency-card.view', 'front-of-house.shift.view'],
+        tasks: [
+          { id: 'emergency-card', label: 'front-of-house.practice.emergency-card' },
+          { id: 'first-aid', label: 'front-of-house.practice.first-aid' },
+        ],
+      },
+    ],
+    'core.practice-sample': [{ id: 'front-of-house.on-shift', file: 'on-shift' }],
+    'core.practice-check': [{ id: 'front-of-house.night', file: 'night' }, { id: 'front-of-house.incident', file: 'incident' }],
     'core.calendar-feed': [{ id: 'front-of-house.shifts', file: 'shifts', from: ['front_of_house_duties.name', 'front_of_house_shifts.title', 'core_productions.title', 'core_venues.name', 'core_spaces.name'] }],
     // A crew call's sign-up questions, answered once each (FH-49, CC1, CC2).
     'forms.slot': [{ id: 'front-of-house.crew-call', subject: 'front-of-house.crew-call', attach: 'front-of-house.crew-call.manage', label: 'front-of-house.crew-calls.slot', limit: 1 }],

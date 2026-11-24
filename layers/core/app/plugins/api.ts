@@ -16,10 +16,10 @@
 //
 // On a practice page (Practice mode, M1, M5) every request carries the practice mark, on the server
 // render too, so the server answers from the person's practice store. There the confirm-it's-you
-// dialogue is the pretend one, a change refreshes the panel so its tasks tick, and an ended session
-// opens the Ended screen.
+// dialogue is the pretend one, a change (or a read the server says ticked a task) refreshes the panel
+// so its tasks tick, and an ended session opens the Ended screen.
 import type { FetchOptions, ResponseType } from 'ofetch'
-import { isPracticePath } from '../../shared/practice'
+import { isPracticePath, PRACTICE_TICKED_HEADER } from '../../shared/practice'
 import { CONFIRM_REASONS, type ConfirmReason } from '../composables/useConfirmItsYou'
 import { withIdempotencyKey } from '../utils/idempotency'
 import { withPracticeMark } from '../utils/practice'
@@ -55,6 +55,8 @@ export default defineNuxtPlugin(() => {
   const base = globalThis.$fetch
   // Typed loosely inside: the typed fetch compares every route, which is too deep to restate here.
   const send = base as unknown as (request: unknown, options?: unknown) => Promise<unknown>
+  // In practice the answer's headers say whether it ticked a task.
+  const sendRaw = base.raw as unknown as (request: unknown, options?: unknown) => Promise<{ _data?: unknown, headers: Headers }>
   /** A refused request: sent again once the person confirms it is them, or the refusal thrown on. */
   async function recover(error: unknown, request: unknown, options: unknown, practising: boolean): Promise<unknown> {
     const e = error as { statusCode?: number, data?: { code?: string } | null }
@@ -79,9 +81,10 @@ export default defineNuxtPlugin(() => {
     const practising = isPracticePath(router.currentRoute.value.path)
     const options = practising ? withPracticeMark(withIdempotencyKey(given)) : withIdempotencyKey(given)
     try {
-      const answer = await send(request, options)
-      if (practising) practice.changed(path(request), options)
-      return answer
+      if (!practising) return await send(request, options)
+      const response = await sendRaw(request, options)
+      practice.changed(path(request), options, response.headers.has(PRACTICE_TICKED_HEADER))
+      return response._data
     }
     catch (error) {
       return recover(error, request, options, practising)

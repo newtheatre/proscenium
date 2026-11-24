@@ -16,6 +16,18 @@ export const seasonInput = z.object({
 })
 export const seasonPatch = seasonInput.partial()
 
+export const collectionInput = z.object({
+  name: z.string().trim().min(1).max(80), // not-policy: the table's bound on a name
+  slug: z.string().min(1).max(60).regex(SLUG).optional(), // not-policy: a slug's length
+  summary: text(300).optional(), // not-policy: the table's bound
+  description: text(5000).optional(), // not-policy: the table's bound
+  colour: z.string().regex(/^#[0-9a-fA-F]{6}$/), // not-policy: a colour code's shape
+  seasonId: z.string().min(1).nullish(),
+})
+export const collectionPatch = collectionInput.partial()
+export const collectionMembers = z.object({ productionIds: z.array(z.string().min(1)).min(1).max(500) }) // not-policy: a list's ceiling
+export const productionCollections = z.object({ collectionIds: z.array(z.string().min(1)).max(100) }) // not-policy: a list's ceiling
+
 const productionFields = z.object({
   title: z.string().trim().min(1).max(200), // not-policy: the table's bound on a title
   kind: z.enum(['own', 'visiting', 'hire', 'event']),
