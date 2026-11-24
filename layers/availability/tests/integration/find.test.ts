@@ -1,10 +1,12 @@
 // Find a time (AV-11 to AV-13): who is in a find, the grid's levels, best times with must-have people,
-// and rooms taken (T-AV-15 to T-AV-18).
+// commitments elsewhere, Availability's own stated busy time, and rooms taken (T-AV-15 to T-AV-18).
 import { beforeAll, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, newId, setClock, type Actor, type UnitView } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 import { crews } from '../../../../tests/fixtures/modules/crews/server/contributions/availability.group/crews'
+import { crew } from '../../../../tests/fixtures/modules/crewcall/server/contributions/core.person-busy/crewcall'
+import { personsBusy } from '../../../person-busy/server/services'
 import createVenue from '../../../core/server/api/core/venues/index.post'
 import findPost from '../../server/api/availability/find/index.post'
 import options from '../../server/api/availability/find/options.get'
@@ -50,6 +52,7 @@ beforeAll(async () => {
   await setModule('availability', true)
   await setModule('occupancy', true)
   await setModule('crews', true)
+  await setModule('crewcall', true)
   await run(unit => changeSetting(unit, 'core.locale.time-zone', 'Europe/London', { reason: 'test', confirm: true }))
   ;[ana, ben, cat] = [await account('Ana'), await account('Ben'), await account('Cat')]
   planner = await account('Pat')
@@ -101,5 +104,28 @@ describe('rooms (F5, T-AV-18)', () => {
     expect(found.body.best.some((s: { start: number }) => s.start === 1020)).toBe(false)
     const optional = await req(planner, 'POST', '/api/availability/find', ask({ groupIds: ['crews:find'], must: [ana.accountId], spaceIds: [space], roomOptional: true }))
     expect(optional.body.best[0].start).toBe(1020)
+  })
+})
+
+describe('commitments elsewhere (F4, AV-07)', () => {
+  it('counts a firm commitment as busy and a pencil as maybe, naming its kind, and never doubles our own', async () => {
+    crew.calls = [
+      { accountId: ben.accountId!, kind: 'call', from: Date.UTC(2027, 0, 12, 17), to: Date.UTC(2027, 0, 12, 18), firm: true, labelKey: 'crewcall.call', record: null },
+      { accountId: cat.accountId!, kind: 'pencil', from: Date.UTC(2027, 0, 12, 20), to: Date.UTC(2027, 0, 12, 21), firm: false, labelKey: 'crewcall.pencil', record: null },
+    ]
+    const found = await req(planner, 'POST', '/api/availability/find', ask({ groupIds: ['crews:find'] }))
+    expect(found.body.weeks[ben.accountId!][TUESDAY]).toContainEqual({ start: 1020, end: 1080, level: 'busy', commitment: 'crewcall.call' })
+    expect(found.body.weeks[cat.accountId!][TUESDAY]).toContainEqual({ start: 1200, end: 1260, level: 'maybe', commitment: 'crewcall.pencil' })
+    expect(found.body.weeks[ana.accountId!][TUESDAY]).toContainEqual({ start: 1080, end: 1200, level: 'busy' })
+    const withBen = await req(planner, 'POST', '/api/availability/find', ask({ groupIds: ['crews:find'], must: [ben.accountId] }))
+    expect(withBen.body.best.some((s: { start: number }) => s.start === 1020)).toBe(false)
+    crew.calls = []
+  })
+
+  it('reports stated busy time, and nothing maybe, as not firm and without a reason', async () => {
+    const rows = await inContext(() => personsBusy([ana.accountId!, ben.accountId!], Date.UTC(2027, 0, 12), Date.UTC(2027, 0, 13)))
+    expect(rows.filter(r => r.source === 'availability')).toEqual([
+      { accountId: ana.accountId, kind: 'unavailable', from: Date.UTC(2027, 0, 12, 18), to: Date.UTC(2027, 0, 12, 20), firm: false, labelKey: 'availability.unavailable', record: null, source: 'availability' },
+    ])
   })
 })
