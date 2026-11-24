@@ -144,11 +144,9 @@ const resourceForm = useFormRef('resourceForm')
                   :to="space.bookableId && space.state !== 'archived' ? `/admin/modules/spaces/bookables/${space.bookableId}` : undefined"
                   :muted="!space.bookableId || space.state === 'archived'"
                 >
-                  <template
-                    v-if="!space.bookableId"
-                    #trailing
-                  >
+                  <template #trailing>
                     <UButton
+                      v-if="!space.bookableId"
                       color="neutral"
                       variant="outline"
                       size="sm"
@@ -158,12 +156,12 @@ const resourceForm = useFormRef('resourceForm')
                       loading-auto
                       @click="makeBookable(space)"
                     />
+                    <RowActions
+                      v-else
+                      :items="spaceActions(space)"
+                      :label="t('spaces.bookables.actions-for', { name: space.name })"
+                    />
                   </template>
-                  <RowActions
-                    v-else
-                    :items="spaceActions(space)"
-                    :label="t('spaces.bookables.actions-for', { name: space.name })"
-                  />
                 </RecordListItem>
               </RecordList>
             </PageSection>
