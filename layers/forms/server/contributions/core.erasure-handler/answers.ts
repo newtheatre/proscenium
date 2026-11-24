@@ -26,6 +26,6 @@ export default {
       params,
     })
     // A response keyed to an address has no account for the registry to find it by.
-    unit.add({ sql: 'UPDATE forms_responses SET respondent_email = NULL, unique_key = NULL, calculated = NULL, anonymised_at = ?3 WHERE person_id IS NULL AND respondent_email IN (SELECT value FROM json_each(?2))', params: [...params, nowMs()] })
+    unit.add({ sql: 'UPDATE forms_responses SET respondent_email = NULL, unique_key = NULL, calculated = NULL, score = NULL, passed = NULL, anonymised_at = ?3 WHERE person_id IS NULL AND respondent_email IN (SELECT value FROM json_each(?2))', params: [...params, nowMs()] })
   },
 }
