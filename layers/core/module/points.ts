@@ -143,6 +143,8 @@ export const points = {
   // A figure a module answers about its own records, as keys and numbers, read only through
   // readMeasure so core checks the question, the reader and the answer (Reports spec, M1 to M11).
   'core.measure': point({ kind: 'code', contract: 'measure' }),
+  // Figures per person, members-side only, read by Reports alone with every read audited (R3-27).
+  'core.person-measure': point({ kind: 'code', contract: 'person-measure' }),
   // A figure beside each of tonight's performances on the Tonight hub (sold, in, taken at the tills),
   // read for one performance and left out for anyone without its ability there.
   'core.tonight-figure': point({ kind: 'code', contract: 'tonight-figure' }),
@@ -161,6 +163,8 @@ export const points = {
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),
   }),
   'core.health-check': point({ kind: 'code', contract: 'health-check' }),
+  // A season's own public words (C-67), such as a festival's "event" for production.
+  'core.public-wording': point({ kind: 'code', contract: 'public-wording' }),
   // The per-record credentials a record in use lacks, for its module's "Set up" card.
   'core.credential-use': point({ kind: 'code', contract: 'credential-use' }),
   // A role made the first time its module is switched on, so a fresh install has the usual ones. The

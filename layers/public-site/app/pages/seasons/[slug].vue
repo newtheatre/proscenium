@@ -27,6 +27,8 @@ interface Season {
   summary: string | null
   archived: boolean
   productions: Production[]
+  /** The season's own words (C-67). */
+  wording?: Record<string, string> | null
 }
 
 const { t } = useT()
@@ -36,6 +38,7 @@ const slug = computed(() => String(route.params.slug))
 const { data } = await useAPI<Season>(() => `/api/public-site/seasons/${encodeURIComponent(slug.value)}`, { key: `public-site:season:${slug.value}` })
 if (!data.value) throw createError({ statusCode: 404, statusMessage: t('public-site.season.not-found'), fatal: true })
 const season = computed(() => data.value!)
+const { Word } = usePublicWords(() => season.value.wording)
 
 useSeoMeta({
   title: () => season.value.name,
@@ -86,7 +89,7 @@ useHead(() => ({
       v-else
       icon="i-lucide-calendar"
       :title="t('public-site.season.empty')"
-      :description="t('public-site.season.empty-description')"
+      :description="t('public-site.season.empty-description', { Productions: Word('productions') })"
     />
   </PageFrame>
 </template>
