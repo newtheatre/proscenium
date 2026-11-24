@@ -94,3 +94,28 @@ Three scenarios with their sample sets and checks, tested in
 - **The bar till's tab** is not built in Bar yet, so `bar.till` has no tab task when it comes.
 - **Checks may read the change just made** (`context.answer`), and a task may depend on a result
   (`when`), so turning a ticket away and taking cash can be tasks without new tables.
+
+## Slice 3, part 2: the bar (BAR-59)
+
+One scenario and its sample set, tested in `layers/bar/tests/integration/practice.test.ts`.
+
+| Part | As built |
+| --- | --- |
+| `bar.stocked` | Seeded, not copied: made with the bar's own services (`catalogue.ts`, `stock.ts`, `stock-moves.ts`), so it works on a site whose bar has no catalogue yet and the tasks always have the products they name. A bar outlet, "Practice bar", at tonight's space, selling from Standard and taking stock from a "Bar" location there. Spirits and Beer need the age check, Soft drinks and snacks do not. A gin and tonic (25 ml of gin and a tonic water), a pint of lager, a cola and crisps, each with its price and recipe, and a delivery of every item received. Returns `ageCheck` while `bar.age-check.enabled` is on |
+| `bar.till` | Opens `/live/till`, where the bar panel opens on the store's one outlet. Sample sets `core.tonight`, `payments.float` and `bar.stocked`. Abilities `payments.session.open`, `payments.session.view`, `payments.attempt.attest`, `bar.sale.sell` and `bar.opening.manage` |
+| Task: sell a recipe drink | A paid sale has a line whose recipe moved two or more stock items (its `bar_stock_movements` of kind `sale`) |
+| Task: refuse after a failed age check | The register has a refusal naming a product that needs the age check, as the till's prompt sends it. A customer turned away before anything was rung up names no product and does not count. Set only with `ageCheck` |
+| Copied | Nothing of the bar's: its tables stay empty until the sample set runs. The refusal reasons come with core's copy of `core_terms`, and bar income with Finance's accounts |
+
+### Departures from the wording
+
+- **No tab task**: bar tabs are not built in Bar yet (see part 1's departures). The scenario has two
+  tasks, and its version is raised when the tab task comes.
+- **A "recipe drink"** is read as a mixed drink, one whose recipe takes two or more stock items, so
+  selling a pint or a bag of crisps does not tick it.
+- **The bar's selling abilities** are `bar.sale.sell` and `bar.opening.manage` (closing the outlet
+  from the till), with Payments' `payments.session.view` and `payments.attempt.attest` for the
+  till's own session and cash.
+- **The theatre's own catalogue is not used**, even with `core.practice.copy-configuration` on:
+  copying it would mean products, sizes, prices, lists, choices, recipes, stock items, locations and
+  outlets, and the levels would be the real cellar's, so the sample set's small bar stands in.
