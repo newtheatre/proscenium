@@ -62,3 +62,14 @@ Twenty-nine stories. Ids continue after the highest in each spec on `next` (C-59
 2. Stage 3, foundations first: C-68 and C-70, then C-62, C-61, C-60, C-66, C-67; then FB-512+, FB-514, C-63; then FH-48, FH-49, FH-50, FH-52 (busy); BO-73, BO-74; ID-47 alongside, as it touches nothing else.
 3. Stage 4: C-64, C-69, C-71, C-72, C-73, the sheet halves of FH-52 and BO-74.
 4. With Productions' first release: C-75, FH-53. With Reports' first release: FH-54. With Availability's first release: ID-48.
+
+## As built
+
+C-68 (24 November 2026): the services are in `layers/core/server/programme/writes.ts` and exported
+from `#modules/core`; core's own routes call the same functions underneath. Three points the table
+in part 4 does not settle: `schedulePerformances` also refuses with `started` a draft whose start
+has passed; a draft performance for a production made earlier in the same unit takes `made`, its
+production's running time, and is refused `core.performance.not-placed` if neither production nor
+space can take it; and `updateCredit` takes no visibility at all. Per-performance and line-up
+credits, `collectionIds` and `shape` arrive with C-61, C-60 and C-62.
+

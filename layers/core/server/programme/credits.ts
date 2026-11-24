@@ -102,7 +102,11 @@ async function tell(unit: UnitView, productionId: string, creditId: string, acco
 }
 
 export async function addCredit(unit: UnitView, productionId: string, input: CreditInput, origin: string): Promise<string> {
-  const production = await productionOf(productionId)
+  return insertCredit(unit, productionId, await productionOf(productionId), input, origin)
+}
+
+/** A credit on a production read already, or made earlier in this unit (createProduction's credits). */
+export async function insertCredit(unit: UnitView, productionId: string, production: { title: string, state: string }, input: CreditInput, origin: string): Promise<string> {
   if (input.accountId) await checkAccount(input.accountId)
   const id = newId('crd')
   unit.add(sql`INSERT INTO core_production_credits (id, production_id, account_id, credited_name, role, section_term_id, visibility, sort)

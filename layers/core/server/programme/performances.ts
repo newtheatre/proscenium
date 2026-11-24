@@ -192,9 +192,14 @@ export async function theatreDefaults(): Promise<{ runningMinutes: number, doors
   }
 }
 
-export async function performanceDefaults(productionId: string, spaceId: string | null): Promise<PerformanceDefaults> {
-  const production = await first<{ running_minutes: number | null, doors_before_minutes: number | null, interval_count: number, interval_minutes: number | null, capacity: number | null, external_booking_url: string | null }>(
-    'SELECT running_minutes, doors_before_minutes, interval_count, interval_minutes, capacity, external_booking_url FROM core_productions WHERE id = ?', productionId)
+type DefaultsRow = { running_minutes: number | null, doors_before_minutes: number | null, interval_count: number, interval_minutes: number | null, capacity: number | null, external_booking_url: string | null }
+
+/** What a production made earlier in the same unit gives its performances, before it can be read. */
+export interface MadeProduction { runningMinutes?: number | null, doorsBeforeMinutes?: number | null }
+
+export async function performanceDefaults(productionId: string, spaceId: string | null, made?: MadeProduction): Promise<PerformanceDefaults> {
+  const read = await first<DefaultsRow>('SELECT running_minutes, doors_before_minutes, interval_count, interval_minutes, capacity, external_booking_url FROM core_productions WHERE id = ?', productionId)
+  const production: DefaultsRow | undefined = read ?? (made && { running_minutes: made.runningMinutes ?? null, doors_before_minutes: made.doorsBeforeMinutes ?? null, interval_count: await useSetting('core.programme.intervals') as number, interval_minutes: null, capacity: null, external_booking_url: null })
   if (!production) refuse('core.production.not-found', 'There is no such production.', { status: 404 })
   const space = spaceId ? await first<{ doors_before_minutes: number | null, default_capacity: number | null }>('SELECT doors_before_minutes, default_capacity FROM core_spaces WHERE id = ?', spaceId) : null
   const theatre = await theatreDefaults()
@@ -257,6 +262,7 @@ export const spaceFits = (venueId: string, spaceId: string): SQL =>
   sql`EXISTS (SELECT 1 FROM core_spaces WHERE id = ${spaceId} AND venue_id = ${venueId} AND performable = 1 AND state = 'active')`
 
 const SPACE_UNSUITABLE = { code: 'core.performance.space-unsuitable', reason: 'Choose a space in that venue that is in use and can hold performances.' }
+const NOT_PLACED = { code: 'core.performance.not-placed', reason: 'The production or the space cannot take a new performance.' }
 const CHANGED = { code: 'core.performance.changed', reason: 'The space was taken, or the performance changed, just now.', remedy: 'Refresh and try again.' }
 
 /**
@@ -342,11 +348,12 @@ const MINUTE = 60_000 // not-policy: milliseconds in a minute
  * C-03: a new performance, as a draft. The end comes from its running time and doors from its lead,
  * each its own if given, else the production's, the space's or the theatre's (performanceDefaults).
  */
-export async function createPerformance(unit: UnitView, productionId: string, input: PerformanceInput, actorId: string | null): Promise<string> {
+export async function createPerformance(unit: UnitView, productionId: string, input: PerformanceInput, actorId: string | null, made?: MadeProduction): Promise<string> {
   const production = await first<{ state: string }>('SELECT state FROM core_productions WHERE id = ?', productionId)
-  if (!production) refuse('core.production.not-found', 'There is no such production.', { status: 404 })
-  if (production.state === 'cancelled') refuse('core.production.cancelled', 'A cancelled production cannot have new performances.', { status: 409 })
-  const defaults = await performanceDefaults(productionId, input.spaceId)
+  // A production made earlier in the same unit is not there to read yet; the statement checks it.
+  if (!production && !made) refuse('core.production.not-found', 'There is no such production.', { status: 404 })
+  if (production?.state === 'cancelled') refuse('core.production.cancelled', 'A cancelled production cannot have new performances.', { status: 409 })
+  const defaults = await performanceDefaults(productionId, input.spaceId, made)
   const endsAt = input.endsAt ?? input.startsAt + (input.runningMinutes ?? defaults.runningMinutes) * MINUTE
   const doorsAt = input.doorsAt === undefined ? input.startsAt - (input.doorsBeforeMinutes ?? defaults.doorsBeforeMinutes) * MINUTE : input.doorsAt
   checkTimes(input.startsAt, endsAt, doorsAt)
@@ -354,7 +361,7 @@ export async function createPerformance(unit: UnitView, productionId: string, in
   unit.add(sql`INSERT INTO core_performances (id, production_id, venue_id, space_id, starts_at, doors_at, ends_at, operating_day, interval_count, interval_minutes, capacity, label, external_booking_url, state, created_at)
     SELECT ${id}, ${productionId}, ${input.venueId}, ${input.spaceId}, ${input.startsAt}, ${doorsAt}, ${endsAt}, ${await operatingDayOf(input.startsAt)},
       ${input.intervalCount ?? null}, ${input.intervalMinutes ?? null}, ${input.capacity ?? null}, ${input.label ?? null}, ${input.externalBookingUrl ?? null}, 'draft', ${nowMs()}
-    WHERE ${spaceFits(input.venueId, input.spaceId)}`).expect(1, SPACE_UNSUITABLE)
+    WHERE ${spaceFits(input.venueId, input.spaceId)} AND EXISTS (SELECT 1 FROM core_productions WHERE id = ${productionId} AND state <> 'cancelled')`).expect(1, production ? SPACE_UNSUITABLE : NOT_PLACED)
   unit.audit({ action: 'create', record: record(id), detail: { productionId, by: actorId } })
   return id
 }
@@ -365,6 +372,62 @@ export async function schedulePerformance(unit: UnitView, id: string): Promise<{
   if (row.state === 'scheduled') return { warnings: [] }
   if (row.state !== 'draft') refuse('core.performance.not-draft', 'Only a draft performance can be scheduled.', { status: 409 })
   return putOnSchedule(unit, row, false)
+}
+
+export type ScheduleRefusal = 'space-taken' | 'closed' | 'not-draft' | 'started'
+
+/**
+ * C-68: many drafts to scheduled at once, as publishing a plan does. Each is read first: one that is
+ * not a draft, has started, clashes or is closed is reported and left out, and so is one that would
+ * clash with a draft scheduled earlier in the same call. The rest each get their own conditional
+ * update with the space and closure predicates, so a change between the read and the write refuses
+ * the whole unit as core.performance.changed.
+ */
+export async function schedulePerformances(unit: UnitView, ids: readonly string[]): Promise<{ scheduled: string[], refused: { id: string, reason: ScheduleRefusal }[] }> {
+  const wanted = [...new Set(ids)]
+  const rows = new Map((await all<PerformanceRow & { exclusive: number }>(`SELECT p.*, s.exclusive FROM core_performances p JOIN core_spaces s ON s.id = p.space_id
+    WHERE p.id IN (SELECT value FROM json_each(?))`, JSON.stringify(wanted))).map(r => [r.id, r]))
+  const at = nowMs()
+  const gap = await turnaroundMs()
+  const scheduled: (PerformanceRow & { exclusive: number })[] = []
+  const refused: { id: string, reason: ScheduleRefusal }[] = []
+  for (const id of wanted) {
+    const row = rows.get(id)
+    if (!row || row.state !== 'draft') {
+      refused.push({ id, reason: 'not-draft' })
+      continue
+    }
+    if (row.starts_at <= at) {
+      refused.push({ id, reason: 'started' })
+      continue
+    }
+    const why = await whyNotFree(row.space_id, row.starts_at, row.ends_at, row.id)
+    const clashesHere = row.exclusive && scheduled.some(o => o.space_id === row.space_id && o.starts_at < row.ends_at + gap && o.ends_at + gap > row.starts_at)
+    if (why || clashesHere) {
+      refused.push({ id, reason: why?.code === 'core.performance.closed' ? 'closed' : 'space-taken' })
+      continue
+    }
+    unit.add(sql`UPDATE core_performances SET state = 'scheduled'
+      WHERE id = ${row.id} AND state = 'draft' AND starts_at > ${at}
+        AND ${noClash(row.space_id, row.starts_at, row.ends_at, row.id, gap)} AND ${assertNoBlockingClosure(row.space_id, row.starts_at, row.ends_at)}`).expect(1, CHANGED)
+    scheduled.push(row)
+  }
+  if (scheduled.length) {
+    for (const productionId of new Set(scheduled.map(r => r.production_id))) syncProductionDates(unit, productionId)
+    unit.audit(scheduled.map(r => ({ action: 'state' as const, record: record(r.id), detail: { from: 'draft', to: 'scheduled' } })))
+    unit.announce('core.performance.scheduled', scheduled.map(r => ({ payload: { performanceId: r.id, productionId: r.production_id, reinstated: false }, record: record(r.id) })))
+  }
+  return { scheduled: scheduled.map(r => r.id), refused }
+}
+
+/**
+ * C-68: a new space and time. A draft moves freely, to any venue's space; a scheduled one
+ * passes the same guards as a move by hand and announces the same events.
+ */
+export async function movePerformance(unit: UnitView, id: string, to: { spaceId: string, startsAt: number, endsAt: number }, actor: Actor): Promise<{ warnings: string[] }> {
+  const space = await first<{ venue_id: string }>('SELECT venue_id FROM core_spaces WHERE id = ?', to.spaceId)
+  if (!space) refuse(SPACE_UNSUITABLE.code, SPACE_UNSUITABLE.reason, { status: 422 })
+  return updatePerformance(unit, id, { venueId: space.venue_id, spaceId: to.spaceId, startsAt: to.startsAt, endsAt: to.endsAt }, actor)
 }
 
 /** Cancelled back to scheduled, if it has not started: the guards pass again. */
