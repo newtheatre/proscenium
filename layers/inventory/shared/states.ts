@@ -33,6 +33,10 @@ export type CancelReason = typeof CANCEL_REASONS[number]
 export const LINE_STATES = ['wanted', 'listed', 'promised', 'out', 'returned', 'lost', 'cancelled'] as const
 export type LineState = typeof LINE_STATES[number]
 
+// Why a desk lets kit go to someone who does not meet what it needs (K4): codes, so the audit can keep them.
+export const OVERRIDE_REASONS = ['supervised', 'trained-elsewhere', 'contractor', 'other'] as const
+export type OverrideReason = typeof OVERRIDE_REASONS[number]
+
 export const FAULT_STATES = ['open', 'repaired', 'written-off'] as const
 export type FaultState = typeof FAULT_STATES[number]
 export const FAULT_SOURCES = ['report', 'return', 'inspection', 'show-report'] as const

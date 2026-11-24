@@ -53,6 +53,8 @@ export default defineModule({
     'loan.view': ability({ on: 'inventory.loan', risk: 'privileged', fresh: false, audit: 'read', implies: ['item.view'] }),
     'loan.approve': ability({ on: 'inventory.loan', implies: ['loan.view'] }),
     'pull-list.edit': ability({ on: 'core.production' }),
+    'loan.issue': ability({ on: 'inventory.department', implies: ['loan.view'] }),
+    'requirement.override': ability({ on: 'inventory.department', risk: 'privileged', implies: ['loan.issue'] }),
   }),
 
   tables,
@@ -62,6 +64,7 @@ export default defineModule({
     'core.navigation': [
       { id: 'inventory.items', menu: 'console', group: 'inventory', section: 'everyday', to: '/console/inventory', match: '/console/inventory', icon: 'i-lucide-package-search', ability: 'inventory.item.view', order: 10 },
       { id: 'inventory.loans', menu: 'console', group: 'inventory', section: 'everyday', to: '/console/inventory/loans', match: '/console/inventory/loans', icon: 'i-lucide-hand-helping', ability: 'inventory.loan.view', order: 20 },
+      { id: 'inventory.desk', menu: 'console', group: 'inventory', section: 'everyday', to: '/console/inventory/desk', match: '/console/inventory/desk', icon: 'i-lucide-scan-barcode', ability: 'inventory.loan.issue', order: 30 },
       { id: 'inventory.departments', menu: 'admin', group: 'modules', to: '/admin/modules/inventory/departments', icon: 'i-lucide-boxes', ability: 'inventory.setup.manage', order: 80 },
       { id: 'inventory.locations', menu: 'admin', group: 'modules', to: '/admin/modules/inventory/locations', icon: 'i-lucide-warehouse', ability: 'inventory.setup.manage', order: 81 },
       { id: 'inventory.inspection-kinds', menu: 'admin', group: 'modules', to: '/admin/modules/inventory/inspection-kinds', icon: 'i-lucide-clipboard-check', ability: 'inventory.setup.manage', order: 82 },
