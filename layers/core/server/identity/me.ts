@@ -3,7 +3,7 @@ import { all, credential, first, nowMs, useContext, useSetting } from '#kit'
 import { accountById, verifiedAddressesOf } from './accounts'
 import type { CurrentSession } from './sessions'
 import { authenticatorOf } from './authenticator'
-import { managedDomainProvider, offeredProviders } from './providers'
+import { PROVIDERS, managedDomains, offeredProviders } from './providers'
 import { holdsPrivileged } from './privileged'
 
 export { holdsPrivileged } from './privileged'
@@ -12,7 +12,8 @@ export { holdsPrivileged } from './privileged'
 export async function hasOtherWayIn(accountId: string): Promise<boolean> {
   if (await first('SELECT 1 AS one FROM core_federated_identities WHERE account_id = ? LIMIT 1', accountId)) return true
   if (!(await useSetting('core.sign-in.email-link'))) return false
-  const managed = await useSetting('core.sign-in.managed-domains') as string[]
+  const managed: string[] = []
+  for (const provider of Object.values(PROVIDERS)) managed.push(...await useSetting(provider.settings.managed) as string[])
   return (await verifiedAddressesOf(accountId)).some(address => !managed.includes(address.split('@').pop()!))
 }
 
@@ -30,23 +31,21 @@ export async function strongSignInSetUp(accountId: string): Promise<boolean> {
 // only the buttons that fit it. Passkeys are always on. `email` is true only while an emailed code
 // would actually be sent: switched on and the bot check's secret saved. `providers` are the outside
 // providers offered, in order, with the organisations each accepts (none: any account). `managed`
-// names the domains whose people sign in only through a provider, and that provider. `openSignUp`
+// names, for each provider that manages any, the domains whose people sign in only through it. `openSignUp`
 // says whether signing in with a new address makes an account, so the page can say so.
 export interface SignInMethods {
   email: boolean
   providers: { id: string, label: string, domains: string[] }[]
-  managed: { domains: string[], provider: string } | null
+  managed: { domains: string[], provider: string }[]
   openSignUp: boolean
 }
 
 export async function signInMethods(): Promise<SignInMethods> {
   const providers = await offeredProviders()
-  const managedDomains = await useSetting('core.sign-in.managed-domains') as string[]
-  const managedBy = managedDomainProvider()
   return {
     email: !!(await useSetting('core.sign-in.email-link')) && !!(await credential('CORE_TURNSTILE_SECRET_KEY')),
     providers,
-    managed: managedDomains.length && providers.some(p => p.id === managedBy.id) ? { domains: managedDomains, provider: managedBy.id } : null,
+    managed: await managedDomains(),
     openSignUp: !!(await useSetting('core.sign-in.open-sign-up')),
   }
 }

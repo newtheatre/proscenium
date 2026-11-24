@@ -158,5 +158,19 @@
   "core.me.notifications.now-on": "You will get {topic} again",
   "core.me.notifications.now-off": "You will no longer get {topic}",
   "core.notification-topics.credits.label": "New credits",
-  "core.notification-topics.credits.description": "When the theatre credits you on a production."
+  "core.notification-topics.credits.description": "When the theatre credits you on a production.",
+
+  "core.age.title": "Under 18",
+  "core.age.intro-self": "If you are under 18, tell us the day you turn 18. We keep only that day, never your date of birth, and forget it once it comes. It means the bar will not serve you alcohol and the people who run rehearsals and shifts know.",
+  "core.age.intro-staff": "Only the day they turn 18 is kept, never a date of birth, and it is forgotten once it comes. Record it after seeing ID.",
+  "core.age.under-self": "I am under 18",
+  "core.age.under-staff": "Under 18",
+  "core.age.turns-self": "The day you turn 18",
+  "core.age.turns-staff": "The day they turn 18",
+  "core.age.turns-help": "Day, month and year.",
+  "core.age.turns-missing": "Give the day, or untick the box.",
+  "core.age.save": "Save",
+  "core.age.saved": "Saved. We will forget it the day you turn 18.",
+  "core.age.cleared": "Removed",
+  "core.age.recorded-by-staff": "The theatre recorded that you turn 18 on {day}, after seeing ID. Ask them if it is wrong."
 }
