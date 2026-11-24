@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ef92d429-2a52-4dee-827a-561a55a672a7",
+  "id": "dfd5ecd0-3ad4-405c-ac54-b9239c1320be",
   "prevIds": [
-    "7e019a45-0f91-4a78-93c1-035d8a9515b6"
+    "76c0746f-e613-4c76-a427-8e6102dc74cc"
   ],
   "ddl": [
     {
@@ -336,6 +336,18 @@
     },
     {
       "name": "core_closures",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_collection_productions",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_collection_slugs",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_collections",
       "entityType": "tables"
     },
     {
@@ -9866,6 +9878,176 @@
     },
     {
       "table": "core_closures",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_productions",
+      "name": "collection_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_productions",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_productions",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_slugs",
+      "name": "slug",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_slugs",
+      "name": "collection_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_slugs",
+      "name": "retired_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "summary",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "colour",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "season_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -28575,6 +28757,48 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_collection_productions",
+      "name": "core_collection_productions_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_slug",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_data_requests",
       "name": "core_data_requests_account",
       "columns": [
@@ -34415,6 +34639,66 @@
       "entityType": "fks"
     },
     {
+      "table": "core_collection_productions",
+      "name": "fk_core_collection_productions_collection_id_core_collections_id_fk",
+      "columns": [
+        "collection_id"
+      ],
+      "tableTo": "core_collections",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_collection_productions",
+      "name": "fk_core_collection_productions_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_collection_slugs",
+      "name": "fk_core_collection_slugs_collection_id_core_collections_id_fk",
+      "columns": [
+        "collection_id"
+      ],
+      "tableTo": "core_collections",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_collections",
+      "name": "fk_core_collections_season_id_core_seasons_id_fk",
+      "columns": [
+        "season_id"
+      ],
+      "tableTo": "core_seasons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_data_request_checks",
       "name": "fk_core_data_request_checks_request_id_core_data_requests_id_fk",
       "columns": [
@@ -37302,6 +37586,16 @@
       "entityType": "pks"
     },
     {
+      "table": "core_collection_productions",
+      "name": "core_collection_productions_pk",
+      "columns": [
+        "collection_id",
+        "production_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_credentials",
       "name": "core_credentials_pk",
       "columns": [
@@ -38233,6 +38527,24 @@
     {
       "table": "core_closures",
       "name": "core_closures_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_collection_slugs",
+      "name": "core_collection_slugs_pk",
+      "columns": [
+        "slug"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_pk",
       "columns": [
         "id"
       ],
@@ -40430,6 +40742,36 @@
       "table": "core_closures",
       "name": "core_closures_title",
       "value": "length(\"title\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_state",
+      "value": "\"state\" IN ('draft', 'published', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_summary_length",
+      "value": "\"summary\" IS NULL OR length(\"summary\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_description_length",
+      "value": "\"description\" IS NULL OR length(\"description\") <= 5000",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_colour",
+      "value": "\"colour\" GLOB '#[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'",
       "entityType": "checks"
     },
     {
