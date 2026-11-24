@@ -1,11 +1,35 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ce3f4bd5-fbb6-41db-8b21-2381cc008bcb",
+  "id": "cfdc4858-b053-4f37-aac2-038ef3ce6ed8",
   "prevIds": [
-    "28015892-8691-4971-b5c1-5a63aba2324d"
+    "4416b1f5-6290-4143-99c2-b108a2d828ce"
   ],
   "ddl": [
+    {
+      "name": "availability_exceptions",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_pattern_lines",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_patterns",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_profiles",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_request_people",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_requests",
+      "entityType": "tables"
+    },
     {
       "name": "awards_awards",
       "entityType": "tables"
@@ -284,6 +308,10 @@
     },
     {
       "name": "core_accounts",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_age_markers",
       "entityType": "tables"
     },
     {
@@ -635,11 +663,19 @@
       "entityType": "tables"
     },
     {
+      "name": "front_of_house_crew_calls",
+      "entityType": "tables"
+    },
+    {
       "name": "front_of_house_duties",
       "entityType": "tables"
     },
     {
       "name": "front_of_house_emergency_cards",
+      "entityType": "tables"
+    },
+    {
+      "name": "front_of_house_handouts",
       "entityType": "tables"
     },
     {
@@ -675,11 +711,27 @@
       "entityType": "tables"
     },
     {
+      "name": "front_of_house_shift_batches",
+      "entityType": "tables"
+    },
+    {
       "name": "front_of_house_shifts",
       "entityType": "tables"
     },
     {
       "name": "front_of_house_timings",
+      "entityType": "tables"
+    },
+    {
+      "name": "invoicing_export_codes",
+      "entityType": "tables"
+    },
+    {
+      "name": "invoicing_export_profiles",
+      "entityType": "tables"
+    },
+    {
+      "name": "invoicing_export_runs",
       "entityType": "tables"
     },
     {
@@ -809,6 +861,586 @@
     {
       "name": "spaces_purposes",
       "entityType": "tables"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "first_date",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "last_date",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "weekdays",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "from_local",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "until_local",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "level",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "reason_shared",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "entered_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "request_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "pattern_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "weekday",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "from_local",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "until_local",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "level",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "label",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "starts_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "ends_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "unmarked_means",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "changed_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "checked_to",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "request_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'asked'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "answered_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "reminders_sent",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "message",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "from_date",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "to_date",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "due_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "group_refs",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "account_refs",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "source_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "opened_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'open'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "reminded_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "closed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
     },
     {
       "table": "awards_awards",
@@ -2537,6 +3169,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -6902,6 +7544,16 @@
     },
     {
       "table": "box_office_ticket_types",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
       "name": "managed_by",
       "type": "text",
       "notNull": false,
@@ -8505,6 +9157,56 @@
       "name": "anonymised_at",
       "type": "integer",
       "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "turns_18_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "recorded_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "recorded_at",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -13152,21 +13854,21 @@
     },
     {
       "table": "core_term_groups",
-      "name": "sort",
-      "type": "integer",
-      "notNull": true,
+      "name": "slug",
+      "type": "text",
+      "notNull": false,
       "autoincrement": false,
-      "default": "0",
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
     {
       "table": "core_term_groups",
-      "name": "key",
-      "type": "text",
-      "notNull": false,
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
-      "default": null,
+      "default": "0",
       "generated": null,
       "entityType": "columns"
     },
@@ -16561,6 +17263,136 @@
       "entityType": "columns"
     },
     {
+      "table": "front_of_house_crew_calls",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "season_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "starts_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "ends_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "question_roles",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "tshirt_min_shifts",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "meal_min_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "meals_on_request",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "created_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "front_of_house_duties",
       "name": "id",
       "type": "text",
@@ -16733,6 +17565,96 @@
     {
       "table": "front_of_house_emergency_cards",
       "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "crew_call_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "item",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "day",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "size",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "reverses_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "handed_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "created_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -17561,6 +18483,146 @@
       "entityType": "columns"
     },
     {
+      "table": "front_of_house_shift_batches",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "crew_call_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "template_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "venue_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "days",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "call_time",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "end_time",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "made",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'made'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "created_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "front_of_house_shifts",
       "name": "id",
       "type": "text",
@@ -17712,6 +18774,36 @@
     },
     {
       "table": "front_of_house_shifts",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shifts",
+      "name": "crew_call_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shifts",
+      "name": "batch_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_shifts",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -17793,6 +18885,376 @@
     {
       "table": "front_of_house_timings",
       "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "profile_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "posting_kind",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "code_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "updated_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "format",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "granularity",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "columns",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "date_format",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "signs",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "split_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "total_line",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'none'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "total_label",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "tax_map",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "kind_labels",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "unmapped_code",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'UNMAPPED'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "period_rule",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "archived_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "profile_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "from_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "to_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "rows",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "unmapped_rows",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "closed",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "map_version",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "sha256",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "file_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "created_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -21821,6 +23283,132 @@
       "entityType": "columns"
     },
     {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "last_date",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "availability_pattern_lines_pattern",
+      "columns": [
+        {
+          "value": "pattern_id",
+          "isExpression": false
+        },
+        {
+          "value": "weekday",
+          "isExpression": false
+        },
+        {
+          "value": "from_local",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "availability_patterns_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "availability_request_people_once",
+      "columns": [
+        {
+          "value": "request_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "availability_request_people_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_source",
+      "columns": [
+        {
+          "value": "source_ref",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "source_ref IS NOT NULL AND state = 'open'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "due_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "awards_awards",
       "name": "awards_awards_type",
       "columns": [
@@ -23897,6 +25485,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_age_markers",
+      "name": "core_age_markers_turns",
+      "columns": [
+        {
+          "value": "turns_18_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_audit",
       "name": "core_audit_record",
       "columns": [
@@ -25008,24 +26610,6 @@
     },
     {
       "table": "core_term_groups",
-      "name": "core_term_groups_key",
-      "columns": [
-        {
-          "value": "vocabulary_key",
-          "isExpression": false
-        },
-        {
-          "value": "key",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "\"core_term_groups\".\"key\" IS NOT NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_term_groups",
       "name": "core_term_groups_order",
       "columns": [
         {
@@ -25949,6 +27533,38 @@
       "entityType": "indexes"
     },
     {
+      "table": "front_of_house_crew_calls",
+      "name": "front_of_house_crew_calls_name",
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "state <> 'archived'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "front_of_house_crew_calls_season",
+      "columns": [
+        {
+          "value": "season_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "front_of_house_duties",
       "name": "front_of_house_duties_name",
       "columns": [
@@ -25973,6 +27589,46 @@
       ],
       "isUnique": true,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "front_of_house_handouts_call",
+      "columns": [
+        {
+          "value": "crew_call_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "item",
+          "isExpression": false
+        },
+        {
+          "value": "day",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "front_of_house_handouts_reverses",
+      "columns": [
+        {
+          "value": "reverses_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "reverses_id IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -26179,6 +27835,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "front_of_house_shift_batches",
+      "name": "front_of_house_shift_batches_call",
+      "columns": [
+        {
+          "value": "crew_call_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "front_of_house_shifts",
       "name": "front_of_house_shifts_duty",
       "columns": [
@@ -26215,6 +27885,56 @@
       "entityType": "indexes"
     },
     {
+      "table": "front_of_house_shifts",
+      "name": "front_of_house_shifts_crew_call",
+      "columns": [
+        {
+          "value": "crew_call_id",
+          "isExpression": false
+        },
+        {
+          "value": "call_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "front_of_house_shifts",
+      "name": "front_of_house_shifts_batch",
+      "columns": [
+        {
+          "value": "batch_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "front_of_house_shifts",
+      "name": "front_of_house_shifts_calendar",
+      "columns": [
+        {
+          "value": "call_at",
+          "isExpression": false
+        },
+        {
+          "value": "venue_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "front_of_house_timings",
       "name": "front_of_house_timings_kind",
       "columns": [
@@ -26228,6 +27948,60 @@
         }
       ],
       "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "invoicing_export_codes_account",
+      "columns": [
+        {
+          "value": "profile_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "coalesce(\"posting_kind\", '')",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_name",
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "invoicing_export_runs_profile",
+      "columns": [
+        {
+          "value": "profile_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -27233,6 +29007,51 @@
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "fk_availability_exceptions_request_id_availability_requests_id_fk",
+      "columns": [
+        "request_id"
+      ],
+      "tableTo": "availability_requests",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "fk_availability_pattern_lines_pattern_id_availability_patterns_id_fk",
+      "columns": [
+        "pattern_id"
+      ],
+      "tableTo": "availability_patterns",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "fk_availability_request_people_request_id_availability_requests_id_fk",
+      "columns": [
+        "request_id"
+      ],
+      "tableTo": "availability_requests",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
     },
     {
       "table": "awards_awards",
@@ -30091,6 +31910,36 @@
       "entityType": "fks"
     },
     {
+      "table": "front_of_house_handouts",
+      "name": "fk_front_of_house_handouts_crew_call_id_front_of_house_crew_calls_id_fk",
+      "columns": [
+        "crew_call_id"
+      ],
+      "tableTo": "front_of_house_crew_calls",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "fk_front_of_house_handouts_reverses_id_front_of_house_handouts_id_fk",
+      "columns": [
+        "reverses_id"
+      ],
+      "tableTo": "front_of_house_handouts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "front_of_house_incident_actions",
       "name": "fk_front_of_house_incident_actions_incident_id_front_of_house_incidents_id_fk",
       "columns": [
@@ -30196,12 +32045,132 @@
       "entityType": "fks"
     },
     {
+      "table": "front_of_house_shift_batches",
+      "name": "fk_front_of_house_shift_batches_crew_call_id_front_of_house_crew_calls_id_fk",
+      "columns": [
+        "crew_call_id"
+      ],
+      "tableTo": "front_of_house_crew_calls",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "fk_front_of_house_shift_batches_template_id_front_of_house_rota_templates_id_fk",
+      "columns": [
+        "template_id"
+      ],
+      "tableTo": "front_of_house_rota_templates",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "front_of_house_shifts",
       "name": "fk_front_of_house_shifts_duty_id_front_of_house_duties_id_fk",
       "columns": [
         "duty_id"
       ],
       "tableTo": "front_of_house_duties",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "front_of_house_shifts",
+      "name": "fk_front_of_house_shifts_crew_call_id_front_of_house_crew_calls_id_fk",
+      "columns": [
+        "crew_call_id"
+      ],
+      "tableTo": "front_of_house_crew_calls",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "front_of_house_shifts",
+      "name": "fk_front_of_house_shifts_batch_id_front_of_house_shift_batches_id_fk",
+      "columns": [
+        "batch_id"
+      ],
+      "tableTo": "front_of_house_shift_batches",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "fk_invoicing_export_codes_profile_id_invoicing_export_profiles_id_fk",
+      "columns": [
+        "profile_id"
+      ],
+      "tableTo": "invoicing_export_profiles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "fk_invoicing_export_codes_account_id_finance_accounts_id_fk",
+      "columns": [
+        "account_id"
+      ],
+      "tableTo": "finance_accounts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "fk_invoicing_export_runs_profile_id_invoicing_export_profiles_id_fk",
+      "columns": [
+        "profile_id"
+      ],
+      "tableTo": "invoicing_export_profiles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "fk_invoicing_export_runs_file_id_core_files_id_fk",
+      "columns": [
+        "file_id"
+      ],
+      "tableTo": "core_files",
       "columnsTo": [
         "id"
       ],
@@ -30886,6 +32855,15 @@
       "entityType": "fks"
     },
     {
+      "table": "availability_profiles",
+      "name": "availability_profiles_pk",
+      "columns": [
+        "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "bar_stock_levels",
       "name": "bar_stock_levels_pk",
       "columns": [
@@ -30942,6 +32920,15 @@
         "table_name",
         "column_name",
         "row_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "core_age_markers_pk",
+      "columns": [
+        "account_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -31164,6 +33151,51 @@
         "bookable_id",
         "weekday",
         "opens_at"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "availability_pattern_lines_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "availability_patterns_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "availability_request_people_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_pk",
+      "columns": [
+        "id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -32330,6 +34362,15 @@
       "entityType": "pks"
     },
     {
+      "table": "front_of_house_crew_calls",
+      "name": "front_of_house_crew_calls_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "front_of_house_duties",
       "name": "front_of_house_duties_pk",
       "columns": [
@@ -32341,6 +34382,15 @@
     {
       "table": "front_of_house_emergency_cards",
       "name": "front_of_house_emergency_cards_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "front_of_house_handouts_pk",
       "columns": [
         "id"
       ],
@@ -32411,6 +34461,15 @@
       "entityType": "pks"
     },
     {
+      "table": "front_of_house_shift_batches",
+      "name": "front_of_house_shift_batches_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "front_of_house_shifts",
       "name": "front_of_house_shifts_pk",
       "columns": [
@@ -32422,6 +34481,33 @@
     {
       "table": "front_of_house_timings",
       "name": "front_of_house_timings_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "invoicing_export_codes_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "invoicing_export_runs_pk",
       "columns": [
         "id"
       ],
@@ -32715,6 +34801,96 @@
       ],
       "nameExplicit": false,
       "entityType": "uniques"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_dates",
+      "value": "\"last_date\" >= \"first_date\" AND julianday(\"last_date\") - julianday(\"first_date\") <= 366",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_times",
+      "value": "(\"from_local\" IS NULL AND \"until_local\" IS NULL) OR ((\"from_local\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"from_local\" <= '24:00') AND (\"until_local\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"until_local\" <= '24:00') AND \"until_local\" > \"from_local\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_level",
+      "value": "\"level\" IN ('free', 'maybe', 'busy')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_reason",
+      "value": "\"reason\" IS NULL OR length(\"reason\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "availability_pattern_lines_weekday",
+      "value": "\"weekday\" BETWEEN 1 AND 7",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "availability_pattern_lines_times",
+      "value": "(\"from_local\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"from_local\" <= '24:00') AND (\"until_local\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"until_local\" <= '24:00') AND \"until_local\" > \"from_local\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "availability_pattern_lines_level",
+      "value": "\"level\" IN ('free', 'maybe', 'busy')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "availability_patterns_label",
+      "value": "length(\"label\") BETWEEN 1 AND 40",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "availability_patterns_dates",
+      "value": "\"ends_on\" IS NULL OR \"ends_on\" >= \"starts_on\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "availability_profiles_unmarked",
+      "value": "\"unmarked_means\" IS NULL OR \"unmarked_means\" IN ('unknown', 'free')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "availability_request_people_state",
+      "value": "\"state\" IN ('asked', 'answered', 'lapsed', 'withdrawn')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_title",
+      "value": "length(\"title\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_message",
+      "value": "\"message\" IS NULL OR length(\"message\") <= 1000",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_dates",
+      "value": "\"to_date\" >= \"from_date\" AND julianday(\"to_date\") - julianday(\"from_date\") <= 366",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_state_values",
+      "value": "\"state\" IN ('open', 'closed')",
+      "entityType": "checks"
     },
     {
       "table": "awards_awards",
@@ -33623,6 +35799,12 @@
       "entityType": "checks"
     },
     {
+      "table": "core_age_markers",
+      "name": "core_age_markers_date",
+      "value": "\"turns_18_on\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
+      "entityType": "checks"
+    },
+    {
       "table": "core_closures",
       "name": "core_closures_kind",
       "value": "\"kind\" IN ('closure', 'public_holiday')",
@@ -34283,6 +36465,36 @@
       "entityType": "checks"
     },
     {
+      "table": "front_of_house_crew_calls",
+      "name": "front_of_house_crew_calls_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "front_of_house_crew_calls_dates",
+      "value": "\"ends_on\" >= \"starts_on\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "front_of_house_crew_calls_tshirt",
+      "value": "\"tshirt_min_shifts\" IS NULL OR \"tshirt_min_shifts\" BETWEEN 1 AND 50",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "front_of_house_crew_calls_meal",
+      "value": "\"meal_min_minutes\" IS NULL OR \"meal_min_minutes\" BETWEEN 30 AND 720",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_crew_calls",
+      "name": "front_of_house_crew_calls_state",
+      "value": "\"state\" IN ('draft', 'open', 'closed', 'archived')",
+      "entityType": "checks"
+    },
+    {
       "table": "front_of_house_duties",
       "name": "front_of_house_duties_name_length",
       "value": "length(\"name\") BETWEEN 1 AND 60",
@@ -34310,6 +36522,24 @@
       "table": "front_of_house_emergency_cards",
       "name": "front_of_house_emergency_cards_body",
       "value": "length(\"body\") BETWEEN 1 AND 8000",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "front_of_house_handouts_item",
+      "value": "\"item\" IN ('tshirt', 'meal')",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "front_of_house_handouts_day",
+      "value": "(\"item\" = 'meal') = (\"day\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_handouts",
+      "name": "front_of_house_handouts_size",
+      "value": "\"size\" IS NULL OR length(\"size\") <= 20",
       "entityType": "checks"
     },
     {
@@ -34469,6 +36699,36 @@
       "entityType": "checks"
     },
     {
+      "table": "front_of_house_shift_batches",
+      "name": "front_of_house_shift_batches_title",
+      "value": "length(\"title\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "front_of_house_shift_batches_days",
+      "value": "json_array_length(\"days\") BETWEEN 1 AND 31",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "front_of_house_shift_batches_times",
+      "value": "\"call_time\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"end_time\" GLOB '[0-2][0-9]:[0-5][0-9]'",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "front_of_house_shift_batches_made",
+      "value": "\"made\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_shift_batches",
+      "name": "front_of_house_shift_batches_state",
+      "value": "\"state\" IN ('made', 'removed')",
+      "entityType": "checks"
+    },
+    {
       "table": "front_of_house_shifts",
       "name": "front_of_house_shifts_title",
       "value": "(\"performance_id\" IS NOT NULL OR \"title\" IS NOT NULL) AND (\"title\" IS NULL OR length(\"title\") <= 80)",
@@ -34508,6 +36768,72 @@
       "table": "front_of_house_timings",
       "name": "front_of_house_timings_kind_check",
       "value": "\"kind\" IN ('house_open', 'curtain_up', 'interval_start', 'interval_end', 'curtain_down', 'house_clear')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "invoicing_export_codes_code",
+      "value": "\"code\" IS NULL OR length(\"code\") BETWEEN 1 AND 50",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_codes",
+      "name": "invoicing_export_codes_name",
+      "value": "length(\"code_name\") <= 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_format",
+      "value": "\"format\" IN ('journal', 'xero', 'quickbooks', 'sage', 'freeagent', 'custom')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_granularity",
+      "value": "\"granularity\" IN ('entry', 'daily')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_date_format",
+      "value": "\"date_format\" IN ('iso', 'dmy', 'mdy')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_signs",
+      "value": "\"signs\" IN ('split', 'signed', 'credit')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_split_by",
+      "value": "\"split_by\" IN ('none', 'production', 'source-module')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_period_rule",
+      "value": "\"period_rule\" IN ('custom', 'period', 'finance-year', 'season')",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_profiles",
+      "name": "invoicing_export_profiles_unmapped",
+      "value": "length(\"unmapped_code\") BETWEEN 1 AND 20",
+      "entityType": "checks"
+    },
+    {
+      "table": "invoicing_export_runs",
+      "name": "invoicing_export_runs_order",
+      "value": "\"to_on\" >= \"from_on\"",
       "entityType": "checks"
     },
     {
