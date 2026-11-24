@@ -124,6 +124,8 @@ export default defineModule({
       { id: 'training.sessions', side: 'members' as const, order: 71 },
     ],
     'core.space-busy': [{ id: 'training' }],
+    // Two places on one session after an account merge: the stronger is kept.
+    'core.merge-handler': [{ id: 'training.places', file: 'places' }],
     'core.notification-type': [{
       id: 'training.record-awarded',
       category: 'optional' as const,
