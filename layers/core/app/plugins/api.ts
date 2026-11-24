@@ -13,11 +13,19 @@
 // so a route that requires one (`idempotent: true`) works from any screen without each screen
 // remembering to send it. The key is made once per call and sent again with the retry after
 // confirming, so a write that did reach the server is replayed rather than done twice.
+//
+// On a practice page (Practice mode, M1, M5) every request carries the practice mark, on the server
+// render too, so the server answers from the person's practice store. There the confirm-it's-you
+// dialogue is the pretend one, a change refreshes the panel so its tasks tick, and an ended session
+// opens the Ended screen.
 import type { FetchOptions, ResponseType } from 'ofetch'
+import { isPracticePath } from '../../shared/practice'
 import { CONFIRM_REASONS, type ConfirmReason } from '../composables/useConfirmItsYou'
 import { withIdempotencyKey } from '../utils/idempotency'
+import { withPracticeMark } from '../utils/practice'
 
 const OWN = '/api/core/me/reassert'
+const path = (request: unknown) => typeof request === 'string' ? request : ''
 
 type Fetch = typeof globalThis.$fetch
 
@@ -34,30 +42,43 @@ export interface Api {
 }
 
 export default defineNuxtPlugin(() => {
-  if (import.meta.server) return { provide: { api: useRequestFetch() as unknown as Api } }
+  if (import.meta.server) {
+    const fetch = useRequestFetch() as unknown as Api
+    if (!isPracticePath(useRequestURL().pathname)) return { provide: { api: fetch } }
+    const marked = ((request: string, options?: FetchOptions<ResponseType>) => fetch(request, withPracticeMark(options))) as Api
+    return { provide: { api: Object.assign(marked, { raw: fetch.raw, create: fetch.create }) } }
+  }
 
   const { confirmItsYou } = useConfirmItsYou()
+  const practice = usePracticeSignals()
+  const router = useRouter()
   const base = globalThis.$fetch
   // Typed loosely inside: the typed fetch compares every route, which is too deep to restate here.
   const send = base as unknown as (request: unknown, options?: unknown) => Promise<unknown>
   const api = (async (request: unknown, given?: unknown) => {
-    const options = withIdempotencyKey(given)
+    const practising = isPracticePath(router.currentRoute.value.path)
+    const options = practising ? withPracticeMark(withIdempotencyKey(given)) : withIdempotencyKey(given)
     try {
-      return await send(request, options)
+      const answer = await send(request, options)
+      if (practising) practice.changed(path(request), options)
+      return answer
     }
     catch (error) {
       const e = error as { statusCode?: number, data?: { code?: string } | null }
       const code = e?.data?.code
-      const path = typeof request === 'string' ? request : ''
+      if (practising && code === 'core.practice.ended') {
+        practice.ended()
+        throw error
+      }
       // Two-step sign-in not set up: an act says so over the page and is not sent again. A load only
       // shows the refusal where its data would be, with the same way to set it up.
-      if (e?.statusCode === 403 && code === TWO_STEP_NOT_SET_UP && !path.startsWith(OWN)) {
+      if (e?.statusCode === 403 && code === TWO_STEP_NOT_SET_UP && !path(request).startsWith(OWN)) {
         const method = String((options as { method?: string } | undefined)?.method ?? 'GET').toUpperCase()
         if (method !== 'GET' && method !== 'HEAD') await confirmItsYou(TWO_STEP_NOT_SET_UP)
         throw error
       }
-      if (e?.statusCode !== 403 || !code || !CONFIRM_REASONS.includes(code) || path.startsWith(OWN)) throw error
-      if (!(await confirmItsYou(code as ConfirmReason))) throw error
+      if (e?.statusCode !== 403 || !code || !CONFIRM_REASONS.includes(code) || path(request).startsWith(OWN)) throw error
+      if (!(await (practising ? practice.confirm() : confirmItsYou(code as ConfirmReason)))) throw error
       return send(request, options)
     }
   }) as unknown as Api

@@ -710,6 +710,10 @@ declares only what the kit needs.
   `{ tonight: 'perf_...' }`. A scenario's task checks are one `core.practice-check` file keyed by the
   scenario id, `definePracticeChecks({ taskId: async context => boolean })`, run after each marked
   change. Core's own sets are `core.people` and `core.tonight`.
+- **In the app.** Live pages are served again under `/practice/live/...` inside the practice frame,
+  and `$api` marks every request from a `/practice` page; `docs/kit/interface.md` ("Live mode")
+  says how. A scenario's `runnable` tasks run in the store from the panel's "Run now"
+  (`POST /api/core/practice/run`); nothing runs a store's tasks on a timer.
 - **Ending.** `endPractice(accountId, reason)` (core's `server/practice/session.ts`) deletes a store,
   its files and its cache keys; erasure and merges call it. A store's alarm ends it when idle or at
   the end of the show night.

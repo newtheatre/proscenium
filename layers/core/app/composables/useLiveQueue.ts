@@ -9,6 +9,7 @@
 // The device copy is browser storage: it survives a reload, but not clearing the site's data or a
 // private window, where the queue works for the life of the page.
 import { useOnline } from '@vueuse/core'
+import { isPracticePath, practiceKey } from '../../shared/practice'
 
 interface Kept<T> { items: T[], sending: T[] | null }
 
@@ -38,8 +39,10 @@ function write<T>(key: string, kept: Kept<T>) {
   }
 }
 
-export function useLiveQueue<T, R = unknown>(key: string, send: (items: T[]) => Promise<R>, options: { onSent?: (items: T[], answer: R) => void } = {}) {
+export function useLiveQueue<T, R = unknown>(name: string, send: (items: T[]) => Promise<R>, options: { onSent?: (items: T[], answer: R) => void } = {}) {
   const online = useOnline()
+  // A practice tab's writes wait apart and are sent only from a practice page, so with the mark (O5).
+  const key = practiceKey(name, isPracticePath(useRoute().path))
   const waiting = useState<Record<string, number>>('core:live-queue', () => ({}))
   const kept = ref(import.meta.client ? read<T>(key) : { items: [], sending: null }) as Ref<Kept<T>>
   const sending = ref(false)

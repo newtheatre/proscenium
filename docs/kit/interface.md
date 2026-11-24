@@ -583,6 +583,17 @@ a layout, not a shell, and it has no navigation of its own.
   shows the title, the context, whether the device is online and the way out: an arrow back to the
   Tonight hub at the start from a screen, and on the hub a worded ghost "Leave" button (named "Leave
   live mode") at the end, after the connection state, back to the console, members' area or My account.
+- **Practice** (Practice mode, PM-S3). Every live page is also served under `/practice/live/...`,
+  the same page in a frame that `app.vue` draws round every `/practice` page: a banner, "Practice ·
+  not real", that cannot be dismissed or scrolled away, a 4-pixel border in the warning colour round
+  the whole viewport, a title starting "Practice ·", and "Practice: not valid" on printed pages. A
+  sticky strip sits under the banner through `--practice-banner`. On a practice page `$api` sends the
+  practice mark (`PRACTICE_HEADER` in `shared/practice.ts`), on the server render too, so a live page
+  needs nothing of its own; its links to `/live/...` open in the frame, and a page outside the
+  scenario's `routes` is not opened (PM-S5). `useLiveData`, `useLiveQueue` and `useRealtime` keep a
+  practice tab's copies, waiting writes and rooms apart from the real ones. A live screen a scenario
+  covers offers "Practise this screen" in its strip, and the Tonight hub a "Practise" button, to
+  someone a course opens it to.
 - **The till** (`/live/till`, Payments) is the combined till for show nights: every
   `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment.
   `?only=box-office` (a comma list of modules) narrows it to those panels, which is how the
