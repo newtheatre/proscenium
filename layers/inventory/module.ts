@@ -48,6 +48,8 @@ export default defineModule({
   abilities: defineAbilities('inventory', {
     'settings.manage': ability({ risk: 'privileged' }),
     'setup.manage': ability({ risk: 'privileged' }),
+    'item.view': ability({ on: 'inventory.department' }),
+    'item.edit': ability({ on: 'inventory.department', implies: ['item.view'] }),
   }),
 
   tables,
@@ -55,6 +57,7 @@ export default defineModule({
   contributes: {
     // Set-up screens are Admin tabs of the module (S10); tags are its Lists tab.
     'core.navigation': [
+      { id: 'inventory.items', menu: 'console', group: 'inventory', section: 'everyday', to: '/console/inventory', match: '/console/inventory', icon: 'i-lucide-package-search', ability: 'inventory.item.view', order: 10 },
       { id: 'inventory.departments', menu: 'admin', group: 'modules', to: '/admin/modules/inventory/departments', icon: 'i-lucide-boxes', ability: 'inventory.setup.manage', order: 80 },
       { id: 'inventory.locations', menu: 'admin', group: 'modules', to: '/admin/modules/inventory/locations', icon: 'i-lucide-warehouse', ability: 'inventory.setup.manage', order: 81 },
       { id: 'inventory.inspection-kinds', menu: 'admin', group: 'modules', to: '/admin/modules/inventory/inspection-kinds', icon: 'i-lucide-clipboard-check', ability: 'inventory.setup.manage', order: 82 },
@@ -70,6 +73,7 @@ export default defineModule({
       { id: 'inventory.category', file: 'category' },
       { id: 'inventory.location', file: 'location' },
       { id: 'inventory.inspection-kind', file: 'inspection-kind' },
+      { id: 'inventory.item', file: 'item' },
     ],
   },
 

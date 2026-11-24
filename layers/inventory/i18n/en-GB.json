@@ -131,5 +131,8 @@
   "inventory.kinds.starting.description": "Proposed intervals; change any of them afterwards.",
   "inventory.kinds.starting.use": "Use these inspection kinds",
   "inventory.kinds.started.one": "{count} inspection kind added",
-  "inventory.kinds.started.other": "{count} inspection kinds added"
+  "inventory.kinds.started.other": "{count} inspection kinds added",
+  "inventory.navigation.items.label": "Items",
+  "inventory.abilities.item.view.label": "See a department's kit, its history, inspections and faults",
+  "inventory.abilities.item.edit.label": "Add, change and move a department's kit"
 }

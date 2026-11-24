@@ -96,6 +96,7 @@ export default defineModule({
       // Venues and spaces on their own for now, with room for the building's management to join them.
       { id: 'venues', icon: 'i-lucide-building' },
       { id: 'spaces', icon: 'i-lucide-building-2' },
+      { id: 'inventory', icon: 'i-lucide-package' },
       { id: 'training', icon: 'i-lucide-graduation-cap' },
       { id: 'membership', icon: 'i-lucide-id-card' },
       { id: 'people', icon: 'i-lucide-users' },
