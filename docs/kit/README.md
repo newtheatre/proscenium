@@ -725,7 +725,9 @@ declares only what the kit needs.
   session's prefix (`practiceName`). Core's mailer writes to the store's outbox instead of sending.
 - **A table's `practice` option.** `'empty'` (the default), `'copy'` or `'replace'`. A copied table's
   rows come across when a store is made, each column through its erasure rule, special and sealed
-  columns as null, account columns pointing at the store's "Practice staff". The build refuses
+  columns as null, account columns pointing at the store's "Practice staff". A `'replace'` table's
+  rows come across the same way, for the module's sample set to swap for stand-ins (Payments keeps
+  the theatre's cash account and adds the practice card reader). The build refuses
   `copy` on an audience or members table, an append-only table, or one with a required special column.
 - **Contributing.** A scenario is a `core.practice-scenario` entry (the live page it opens, the pages
   it allows, the abilities it acts with, its sample sets and tasks). A sample set is a
@@ -733,7 +735,10 @@ declares only what the kit needs.
   writes fictional records through the module's own services and returns named results such as
   `{ tonight: 'perf_...' }`. A scenario's task checks are one `core.practice-check` file keyed by the
   scenario id, `definePracticeChecks({ taskId: async context => boolean })`, run after each marked
-  change. Core's own sets are `core.people` and `core.tonight`.
+  change; `context.answer` is that change's path and response body, for a task that leaves no row
+  (turning a ticket away). A task with `when: '<result>'` is set only where a sample set returned
+  that result. Core's own sets are `core.people` and `core.tonight` (tonight's and tomorrow's
+  performances).
 - **In the app.** Live pages are served again under `/practice/live/...` inside the practice frame,
   and `$api` marks every request from a `/practice` page; `docs/kit/interface.md` ("Live mode")
   says how. A scenario's `runnable` tasks run in the store from the panel's "Run now"

@@ -115,6 +115,7 @@ export const ticketTypes = defineTable('box_office_ticket_types', {
   updatedAt: col.updatedAt(),
 }, {
   id: 'tty',
+  practice: 'copy',
   realm: 'operational',
   subject: 'none',
   extra: t => [
@@ -200,6 +201,7 @@ export const seatingLayouts = defineTable('box_office_seating_layouts', {
   updatedAt: col.updatedAt(),
 }, {
   id: 'lay',
+  practice: 'copy',
   realm: 'operational',
   subject: 'none',
   extra: t => [
@@ -289,6 +291,7 @@ export const passTypes = defineTable('box_office_pass_types', {
   updatedAt: col.updatedAt(),
 }, {
   id: 'pty',
+  practice: 'copy',
   realm: 'operational',
   subject: 'none',
   extra: t => [
@@ -337,6 +340,7 @@ export const passPrices = defineTable('box_office_pass_prices', {
   updatedAt: col.updatedAt(),
 }, {
   id: 'ppr',
+  practice: 'copy',
   realm: 'operational',
   subject: 'none',
   extra: t => [

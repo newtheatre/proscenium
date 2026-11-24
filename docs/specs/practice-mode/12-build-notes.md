@@ -61,3 +61,36 @@ The screens PM-S1 to PM-S9 in core's app, with the browser test `tests/e2e/pract
   list, not a switch on each scenario.
 - **Printing** carries "Practice: not valid" at the head of the first page. Signing practice codes
   with the store's keys (PM-11) comes with the door's scenario (PM-20).
+
+## Slice 3, part 1: the door, the till and a desk sale (BO-77, PAY-10, C-76)
+
+Three scenarios with their sample sets and checks, tested in
+`layers/box-office/tests/integration/practice.test.ts`.
+
+| Part | As built |
+| --- | --- |
+| `core.tonight` | Also makes tomorrow's performance at the same time (`tomorrow`), for the ticket the door turns away |
+| `box-office.sold-house` | A band, the theatre's own full-price ticket type (or a "Full price" one), a price, sales for both nights and 40 seats at most. 60% of tonight is booked through the import service as bookings made elsewhere: four reservations unpaid, one seat taken by a practice pass, the rest paid. Tomorrow has one paid booking whose code is `TMRW2345`. Sales open only where the store has a way to pay |
+| `box-office.door-scan` | Opens `/live/door/{tonight}`. Tasks: admit five tickets, find a booking by name and let them in, turn away tomorrow's booking, release the unpaid no-shows |
+| `box-office.desk-sale` | Opens `/live/till`. Tasks: sell two tickets paid for (by card), reserve one to pay later |
+| `payments.float` | The practice card reader account (provider `practice-reader`, `practiceOnly`, never offered to a real site), its card clearing account, the till's place at tonight's space and a £50 float where the theatre set none. Returns `cash` when the theatre's own cash account came across |
+| `payments.till` | Opens `/live/till`. Tasks: a card declined then one taken, cash with change (only with `cash`), the till closed with the right count |
+| The practice card reader | `payments.start-payment` answers `'ask-trainee'` in practice; the trainee's answer on the card reader is recorded as the reader's (`applyAnswer`), so the till carries on as it would for real |
+| Practice codes | A store starts with no signing keys, so tickets it issues are signed with keys it makes itself (PM-11): the real door answers "bad signature" to one |
+| Copied | Box office's ticket types, seating layouts, pass types and pass prices; Finance's accounts; Payments' provider accounts (`replace`) |
+
+### Departures from the wording
+
+- **Two bookings with access needs** are not in `box-office.sold-house` yet: an accepted access
+  profile is Identity's to write and has no service a sample set can call. The door's Needs panel is
+  empty in practice until it has one.
+- **Bands and tax codes are not copied.** A band belongs to a production, and productions are not
+  copied; the sample set makes its own. Finance's tax codes are seeded by its migrations, so a copy
+  would repeat them.
+- **"Find a booking by surname"** is "find a booking by name and let them in", ticked by the door's
+  own answer to an admission from its list, since searching the list writes nothing.
+- **The desk sale's member ticket** waits for a Membership sample set: practice people have no
+  memberships for a member price to check.
+- **The bar till's tab** is not built in Bar yet, so `bar.till` has no tab task when it comes.
+- **Checks may read the change just made** (`context.answer`), and a task may depend on a result
+  (`when`), so turning a ticket away and taking cash can be tasks without new tables.
