@@ -1,5 +1,5 @@
 // The configuration copy (Practice mode, part 2, "The copy declaration"): every table a module marks
-// `practice: 'copy'`, read through the kit's declarations as erasure and export read, each column
+// `practice: 'copy'` or `'replace'`, read through the kit's declarations as erasure and export read, each column
 // passed through its own erasure rule, account columns pointed at the store's Practice staff.
 import { getTableConfig } from 'drizzle-orm/sqlite-core'
 import { all, useSetting } from '#kit'
@@ -9,7 +9,7 @@ import type { Statement } from '#kit/database'
 
 /** The tables to copy, each after the tables it references, so every reference finds its row. */
 function copiedTables(): { meta: TableMeta, table: unknown }[] {
-  const copied = [...useRegistry().tables.values()].filter(t => t.meta.options.practice === 'copy')
+  const copied = [...useRegistry().tables.values()].filter(t => t.meta.options.practice === 'copy' || t.meta.options.practice === 'replace')
   const byName = new Map(copied.map(t => [t.meta.name, t]))
   const ordered: typeof copied = []
   const visit = (t: typeof copied[number], seen: Set<string>) => {

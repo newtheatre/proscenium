@@ -42,9 +42,10 @@ describe('a copied value (T-PM-07)', () => {
 })
 
 describe('a route\'s practice option', () => {
-  it('is refuse or outside', () => {
+  it('is refuse, outside or ticks', () => {
     expect(() => checkRouteDeclaration({ ability: 'signed-in', rateLimit: 'default', practice: 'refuse' })).not.toThrow()
-    expect(() => checkRouteDeclaration({ ability: 'signed-in', rateLimit: 'default', practice: 'swap' as never })).toThrow(/'refuse' or 'outside'/)
+    expect(() => checkRouteDeclaration({ ability: 'signed-in', rateLimit: 'default', practice: 'ticks' })).not.toThrow()
+    expect(() => checkRouteDeclaration({ ability: 'signed-in', rateLimit: 'default', practice: 'swap' as never })).toThrow(/'refuse', 'outside' or 'ticks'/)
   })
 })
 

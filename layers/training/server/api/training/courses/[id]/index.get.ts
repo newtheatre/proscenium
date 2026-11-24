@@ -1,7 +1,8 @@
 // One course: what describes it, its versions, the steps of the live version and of any version in
-// preparation, and its trainers.
+// preparation, its trainers, and for a manager the figures over K2's tabs.
 import { getRouterParam } from 'h3'
 import { can, defineRoute, refuse } from '#kit'
+import { courseOverview } from '../../../../console'
 import { courseOrRefuse, preparing, stepsOf, trainersOf, versionsOf } from '../../../../courses'
 
 export default defineRoute({
@@ -19,6 +20,7 @@ export default defineRoute({
     preparing: next ? { version: next, steps: await stepsOf(next.id) } : null,
     versions: manages ? await versionsOf(course.id) : [],
     trainers: await trainersOf(course.id),
+    overview: manages ? await courseOverview(course.id) : null,
     actions: {
       manage: manages,
       signOff: (await can(actor, 'training.sign-off.record', record)).allowed,

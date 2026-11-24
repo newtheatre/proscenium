@@ -34,7 +34,7 @@ Defaults are proposals for the workshops; none is NNT policy until confirmed (pa
 | `companies.engagement.view` | `companies.engagement` | normal |  | `company.view` | See an engagement in full: calls, people, guests, agreement terms | `administrator`, `technical-manager`, `box-office-manager` |
 | `companies.engagement.manage` | `companies.engagement` | normal |  | `engagement.view` | Open, change, confirm and cancel engagements; calls, people, tech notes | `administrator`; `technical-manager` for calls only, by a grant scoped to a venue |
 | `companies.agreement.manage` | `companies.engagement` | normal |  | `engagement.view` | Draft, send, supersede and withdraw agreements | `administrator` |
-| `companies.agreement.record` | `companies.engagement` | normal | refuses | `agreement.manage` | Record an answer given on paper, with the file | `administrator` |
+| `companies.agreement.record` | `companies.agreement` | normal | refuses | `agreement.manage` | Record an answer given on paper, with the file | `administrator` |
 | `companies.allocation.manage` | `companies.engagement` | normal |  | `engagement.view` | Change places for one performance; name guests for a contact | `administrator`, `box-office-manager` |
 | `companies.settlement.view` | `companies.engagement` | normal |  | `engagement.view` | See settlements and their figures | `administrator`, `finance-officer` |
 | `companies.settlement.prepare` | `companies.engagement` | normal |  | `settlement.view`; `finance.ledger.view` on the production | Make, change and propose settlement drafts; answer queries | `finance-officer` |
@@ -48,6 +48,8 @@ Defaults are proposals for the workshops; none is NNT policy until confirmed (pa
 | `companies.settlement.answer` | `companies.engagement` | normal |  | `engagement.view-own` | Agree or query a proposed settlement | Fact `companies.contact-of` |
 
 "Owner: refuses" means the holder cannot act on a record they made: `agreement.record` cannot record an answer to an agreement they sent, and `settlement.approve` cannot approve a settlement they prepared, checked on the statement. Owners are exempt from the own-record rule by Matt's ruling of 23 November 2026, except `settlement.approve`, where a second pair of eyes is the point (part 9, Q7).
+
+Abilities are declared in the manifest as the routes that need them land, so the conformance check (nothing declared that nothing requires) holds at every step; the gate declares `company.view`, `company.manage`, `contact.manage`, `engagement.view`, `engagement.manage`, `engagement.view-own` and `settings.manage`. `agreement.record` acts on the agreement, not the engagement, because the owner rule needs the version's `created_by`.
 
 ## Preset mappings
 

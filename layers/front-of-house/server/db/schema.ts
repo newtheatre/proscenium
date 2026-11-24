@@ -31,6 +31,7 @@ export const duties = defineTable('front_of_house_duties', {
   updatedAt: col.updatedAt(),
 }, {
   id: 'dty',
+  practice: 'copy',
   realm: 'operational',
   subject: 'none',
   extra: t => [
@@ -305,6 +306,7 @@ export const checklists = defineTable('front_of_house_checklists', {
   updatedAt: col.updatedAt(),
 }, {
   id: 'ckl',
+  practice: 'copy',
   realm: 'operational',
   subject: 'none',
   extra: t => [
@@ -328,6 +330,7 @@ export const checklistItems = defineTable('front_of_house_checklist_items', {
   updatedAt: col.updatedAt(),
 }, {
   id: 'cki',
+  practice: 'copy',
   realm: 'operational',
   subject: 'none',
   extra: t => [
@@ -404,6 +407,7 @@ export const emergencyCards = defineTable('front_of_house_emergency_cards', {
   updatedAt: col.updatedAt(),
 }, {
   id: 'emg',
+  practice: 'copy',
   realm: 'operational',
   subject: 'none',
   extra: t => [
