@@ -39,7 +39,7 @@ test.describe.configure({ mode: 'serial' })
 
 test('inspection kinds start from the usual four, and a new one is added from the form', async ({ page }) => {
   await visit(page, '/admin/modules/inventory/inspection-kinds')
-  await expect(page.getByRole('heading', { name: 'Inspection kinds', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Inspection kinds', level: 2 })).toBeVisible()
   const use = page.getByRole('button', { name: 'Use these inspection kinds' })
   if (await use.isVisible()) {
     await noViolations(page)
@@ -82,7 +82,7 @@ test('departments start from the usual four, and a category takes its inspection
 
 test('a store is added, then a rail inside it, shown beneath it', async ({ page }) => {
   await visit(page, '/admin/modules/inventory/locations')
-  await expect(page.getByRole('heading', { name: 'Stores', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Stores', level: 2 })).toBeVisible()
   await page.getByRole('button', { name: 'Add location' }).click()
   let dialog = page.getByRole('dialog')
   await dialog.getByLabel('Name').fill(`Costume store ${stamp}`)
