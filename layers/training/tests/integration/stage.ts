@@ -24,6 +24,15 @@ import voidSignOff from '../../server/api/training/sign-offs/[id]/void.post'
 import revoke from '../../server/api/training/records/[id]/revoke.post'
 import myRecords from '../../server/api/training/me/records.get'
 import personRecords from '../../server/api/training/people/[id]/records.get'
+import listCompetencies from '../../server/api/training/competencies/index.get'
+import createCompetency from '../../server/api/training/competencies/index.post'
+import getCompetency from '../../server/api/training/competencies/[id]/index.get'
+import patchCompetency from '../../server/api/training/competencies/[id]/index.patch'
+import putRoutes from '../../server/api/training/competencies/[id]/routes.put'
+import activate from '../../server/api/training/competencies/[id]/activate.post'
+import retireCompetency from '../../server/api/training/competencies/[id]/retire.post'
+import myCompetencies from '../../server/api/training/me/competencies.get'
+import myCompetency from '../../server/api/training/me/competencies/[slug].get'
 
 export const training = server({
   'GET /api/training/courses': listCourses,
@@ -46,6 +55,15 @@ export const training = server({
   'POST /api/training/records/:id/revoke': revoke,
   'GET /api/training/me/records': myRecords,
   'GET /api/training/people/:id/records': personRecords,
+  'GET /api/training/competencies': listCompetencies,
+  'POST /api/training/competencies': createCompetency,
+  'GET /api/training/competencies/:id': getCompetency,
+  'PATCH /api/training/competencies/:id': patchCompetency,
+  'PUT /api/training/competencies/:id/routes': putRoutes,
+  'POST /api/training/competencies/:id/activate': activate,
+  'POST /api/training/competencies/:id/retire': retireCompetency,
+  'GET /api/training/me/competencies': myCompetencies,
+  'GET /api/training/me/competencies/:slug': myCompetency,
 })
 
 /** 24 November 2026, 10:00 in London. */
@@ -78,7 +96,7 @@ export async function someone(abilities: string[] = [], name = 'Sam Learner'): P
   return who
 }
 
-export const MANAGER = ['training.course.manage', 'training.course.view', 'training.record.view', 'training.sign-off.record', 'training.record.award', 'training.record.revoke']
+export const MANAGER = ['training.competency.manage', 'training.course.manage', 'training.course.view', 'training.record.view', 'training.sign-off.record', 'training.record.award', 'training.record.revoke']
 
 let n = 0
 /** A course published with the steps given (by default one practical step), valid for a year. */

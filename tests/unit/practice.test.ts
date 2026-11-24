@@ -1,10 +1,11 @@
 // Practice mode's declarations (T-PM-07, T-PM-08): what a practice store may copy of a table, and how
-// each column's value arrives there.
+// each column's value arrives there. Then the frame's addresses (T-PM-13, T-PM-16).
 import { describe, expect, it } from 'vitest'
 import { integer, text } from 'drizzle-orm/sqlite-core'
 import { col, defineTable, ERASED, columnMeta } from '#kit/db'
 import { checkRouteDeclaration } from '#kit/route'
 import { copiedValue } from '../../layers/core/server/practice/copy'
+import { isPracticePath, liveOf, practiceKey, practiceOf, withinScenario } from '../../layers/core/shared/practice'
 
 describe('the practice option on a table (T-PM-08)', () => {
   it('copies the theatre\'s setup', () => {
@@ -44,5 +45,37 @@ describe('a route\'s practice option', () => {
   it('is refuse or outside', () => {
     expect(() => checkRouteDeclaration({ ability: 'signed-in', rateLimit: 'default', practice: 'refuse' })).not.toThrow()
     expect(() => checkRouteDeclaration({ ability: 'signed-in', rateLimit: 'default', practice: 'swap' as never })).toThrow(/'refuse' or 'outside'/)
+  })
+})
+
+describe('practice addresses (T-PM-13, T-PM-16)', () => {
+  it('knows a practice page from a live one', () => {
+    expect(isPracticePath('/practice')).toBe(true)
+    expect(isPracticePath('/practice/box-office.door?from=/members')).toBe(true)
+    expect(isPracticePath('/practice/live/door/prf_1')).toBe(true)
+    expect(isPracticePath('/practices')).toBe(false)
+    expect(isPracticePath('/live/door')).toBe(false)
+  })
+
+  it('maps a live page into the frame and back', () => {
+    expect(practiceOf('/live/door/prf_1?scan=1')).toBe('/practice/live/door/prf_1?scan=1')
+    expect(practiceOf('/live')).toBe('/practice/live')
+    expect(practiceOf('/console/programme')).toBeNull()
+    expect(practiceOf('/lively')).toBeNull()
+    expect(liveOf('/practice/live/door/prf_1?scan=1')).toBe('/live/door/prf_1')
+    expect(liveOf('/practice/box-office.door')).toBeNull()
+  })
+
+  it('fences navigation to the scenario\'s routes and the Tonight hub', () => {
+    expect(withinScenario('/live/door/prf_1', ['/live/door'])).toBe(true)
+    expect(withinScenario('/live/door', ['/live/door/'])).toBe(true)
+    expect(withinScenario('/live', ['/live/door'])).toBe(true)
+    expect(withinScenario('/live/doorway', ['/live/door'])).toBe(false)
+    expect(withinScenario('/live/till', ['/live/door'])).toBe(false)
+  })
+
+  it('keeps device copies apart', () => {
+    expect(practiceKey('door:prf_1', true)).toBe('practice:door:prf_1')
+    expect(practiceKey('door:prf_1', false)).toBe('door:prf_1')
   })
 })
