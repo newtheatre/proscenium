@@ -1,0 +1,42 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignoreDependencies": [
+    "@iconify-json/lucide",
+    "drizzle-kit",
+    "ofetch",
+    "nitropack"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".": {
+      "entry": [
+        "layers/*/module.ts",
+        "layers/*/nuxt.config.ts",
+        "layers/*/modules/*.ts",
+        "layers/*/server/{api,routes,middleware,plugins,listeners,jobs,tasks,calls,contributions,points,policies,lists,facts}/**/*.ts",
+        "layers/*/server/services.ts",
+        "layers/core/server/entry.ts",
+        "layers/*/app/**/*.vue",
+        "layers/*/app/{composables,utils,plugins,middleware}/**/*.ts",
+        "layers/*/app/app.config.ts",
+        "layers/*/shared/**/*.ts",
+        "layers/*/server/db/schema.ts",
+        "layers/core/aliases.ts",
+        "scripts/*.ts",
+        "tests/**/*.ts",
+        "layers/*/tests/**/*.ts",
+        "content.config.ts",
+        "*.config.{ts,mjs}"
+      ],
+      "project": [
+        "layers/**/*.{ts,vue}",
+        "scripts/**/*.ts",
+        "tests/**/*.ts"
+      ],
+      "ignore": [
+        "tests/fixtures/**"
+      ]
+    },
+    "site": {}
+  }
+}
