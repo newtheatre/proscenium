@@ -2,7 +2,7 @@
 
 2026-11-23 · Matthew Adcock
 
-Inventory is a new switchable module, `inventory`, that keeps a theatre's props, costume, set and technical kit: what it owns, where each thing is, who has borrowed it, whether it is safe to use, and when it leaves for good. It requires only core and is third-round spec 11 of 15. Story ids start at INV-01; id prefixes start `k`. Nothing in it is built.
+Inventory is a new switchable module, `inventory`, that keeps a theatre's props, costume, set and technical kit: what it owns, where each thing is, who has borrowed it, whether it is safe to use, and when it leaves for good. It requires only core and is third-round spec 11 of 15. Story ids start at INV-01; id prefixes start `k`. The gate is built; part 12 says how.
 
 ## The design in eight sentences
 

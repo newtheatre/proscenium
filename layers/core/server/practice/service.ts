@@ -5,7 +5,7 @@ import { bundleHash } from '#kit/migrations'
 import { answerPracticeCall } from '#kit/external'
 import { newId } from '#kit/ids'
 import { useRegistry } from '#kit/registry'
-import { checking, mayPractise, scenario, scenarios, unavailable, type PracticeScenario, type Unavailable } from './scenarios'
+import { checking, mayPractise, scenario, scenarios, tasksFor, unavailable, type PracticeScenario, type Unavailable } from './scenarios'
 import { lastEnded, readSession, startPractice, type SessionRow, type StartOptions } from './session'
 
 export interface ScenarioCard {
@@ -69,7 +69,7 @@ export async function panel() {
     startedAt: row.started_at,
     endsAt: row.ends_at,
     idleEnd: await useSetting('core.practice.idle-end') as number,
-    tasks: (s.tasks ?? []).map(task => ({ id: task.id, label: task.label, passedAt: passed.get(task.id) ?? null })),
+    tasks: tasksFor(s, JSON.parse(row.results)).map(task => ({ id: task.id, label: task.label, passedAt: passed.get(task.id) ?? null })),
     outbox: outbox.map(m => ({ id: m.id, typeKey: m.type_key, to: m.to_label, subject: m.subject, at: m.at })),
     waiting: waiting.map(w => ({ attemptId: w.attempt_id, call: w.call, reference: w.reference, outcomes: s.outcomes?.[w.call] ?? ['approved', 'declined', 'removed', 'no-answer'] })),
     updated: row.bundle_hash !== await bundleHash(),

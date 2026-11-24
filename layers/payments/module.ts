@@ -156,7 +156,27 @@ export default defineModule({
       // What a parent body, such as a students' union, holds for the theatre and pays out on its behalf.
       { id: 'parent-body', name: 'Held by the parent body', kind: 'asset' },
     ],
-    'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }, { id: 'other' }, { id: 'stripe' }, { id: 'sumup' }, { id: 'sumup-handoff' }],
+    'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }, { id: 'other' }, { id: 'stripe' }, { id: 'sumup' }, { id: 'sumup-handoff' }, { id: 'practice-reader' }],
+    // Practice mode (PAY-10): the till, with a float and the practice card reader. Tickets are what it sells.
+    'core.practice-scenario': [{
+      id: 'payments.till',
+      version: 1,
+      label: 'payments.practice.till',
+      summary: 'payments.practice.till-summary',
+      minutes: 10,
+      needs: ['payments', 'box-office'],
+      samples: ['core.tonight', 'payments.float', 'box-office.sold-house'],
+      start: '/live/till',
+      routes: ['/live/till'],
+      abilities: ['payments.session.open', 'payments.session.view', 'payments.attempt.attest', 'box-office.order.sell', 'box-office.order.take-payment'],
+      tasks: [
+        { id: 'declined-then-good', label: 'payments.practice.declined-then-good' },
+        { id: 'cash-change', label: 'payments.practice.cash-change', when: 'cash' },
+        { id: 'close-right', label: 'payments.practice.close-right' },
+      ],
+    }],
+    'core.practice-sample': [{ id: 'payments.float', file: 'float' }],
+    'core.practice-check': [{ id: 'payments.till', file: 'till' }],
     // Payments' own part: guided setup's test payment.
     'payments.settlement': [{ id: 'payments' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],

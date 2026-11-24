@@ -1,6 +1,6 @@
 // The core domain's tables (workstream 3, part 2): stored files, who mail comes from, the
 // vocabularies every module shares, and notifications. The rest arrive with the later slices.
-import { check, integer, real, text, index, primaryKey, uniqueIndex, foreignKey } from 'drizzle-orm/sqlite-core'
+import { check, integer, real, text, index, primaryKey, uniqueIndex, foreignKey, type AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { defineTable, col } from '#kit/db'
 
@@ -366,6 +366,58 @@ export const productions = defineTable('core_productions', {
   ],
 })
 
+/**
+ * A collection (C-60): a strand of productions with its own page, such as a festival's or "Studio
+ * shorts". Bound to a season, only that season's productions may join (CL1).
+ */
+export const collections = defineTable('core_collections', {
+  id: col.id(),
+  slug: col.public(text('slug').notNull()),
+  name: col.public(text('name').notNull()),
+  summary: col.public(text('summary')),
+  description: col.public(text('description')),
+  colour: col.public(text('colour').notNull()),
+  seasonId: col.internal(text('season_id').references(() => seasons.id, { onDelete: 'set null' })),
+  state: col.internal(text('state').notNull().default('draft')),
+  sort: col.internal(integer('sort').notNull().default(0)),
+  createdBy: col.account('created_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'cln',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('core_collections_slug').on(t.slug),
+    uniqueIndex('core_collections_name').on(sql`lower(${t.name})`),
+    check('core_collections_state', sql`${t.state} IN ('draft', 'published', 'archived')`),
+    check('core_collections_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
+    check('core_collections_summary_length', sql`${t.summary} IS NULL OR length(${t.summary}) <= 300`),
+    check('core_collections_description_length', sql`${t.description} IS NULL OR length(${t.description}) <= 5000`),
+    check('core_collections_colour', sql`${t.colour} GLOB '#[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'`),
+  ],
+})
+
+/** The productions in a collection, in the collection page's order. */
+export const collectionProductions = defineTable('core_collection_productions', {
+  collectionId: col.internal(text('collection_id').notNull().references(() => collections.id, { onDelete: 'cascade' })),
+  productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'cascade' })),
+  sort: col.internal(integer('sort').notNull().default(0)),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    primaryKey({ columns: [t.collectionId, t.productionId] }),
+    index('core_collection_productions_production').on(t.productionId),
+  ],
+})
+
+/** Every slug a published collection has had, as for productions. */
+export const collectionSlugs = defineTable('core_collection_slugs', {
+  slug: col.public(text('slug').primaryKey()),
+  collectionId: col.internal(text('collection_id').notNull().references(() => collections.id, { onDelete: 'cascade' })),
+  retiredAt: col.internal(integer('retired_at').notNull()),
+}, { realm: 'operational', subject: 'none', appendOnly: true })
+
 /** Every slug a published production has had, so an old link redirects for ever. */
 export const productionSlugs = defineTable('core_production_slugs', {
   slug: col.public(text('slug').primaryKey()),
@@ -434,6 +486,10 @@ export const productionCredits = defineTable('core_production_credits', {
   sectionTermId: col.ref('core_terms'),
   visibility: col.internal(text('visibility').notNull().default('public')),
   sort: col.internal(integer('sort').notNull().default(0)),
+  // Set: the credit is for that performance only, one of its own production's (LU4). Null: every one.
+  performanceId: col.internal(text('performance_id').references((): AnySQLiteColumn => performances.id, { onDelete: 'cascade' })),
+  // Set: the person is in that line-up item, whose performance is performance_id (LU4).
+  lineUpId: col.internal(text('line_up_id').references((): AnySQLiteColumn => performanceLineUps.id, { onDelete: 'cascade' })),
 }, {
   id: 'crd',
   realm: 'members',
@@ -441,9 +497,42 @@ export const productionCredits = defineTable('core_production_credits', {
   extra: t => [
     index('core_production_credits_order').on(t.productionId, t.sectionTermId, t.sort),
     index('core_production_credits_account').on(t.accountId),
+    index('core_production_credits_performance').on(t.performanceId).where(sql`${t.performanceId} IS NOT NULL`),
     check('core_production_credits_visibility', sql`${t.visibility} IN ('public', 'members', 'hidden')`),
     check('core_production_credits_name', sql`length(${t.creditedName}) BETWEEN 1 AND 120`),
     check('core_production_credits_role', sql`length(${t.role}) BETWEEN 1 AND 120`),
+  ],
+})
+
+/**
+ * One item in a performance's line-up (C-61): an act with a production of its own, or just a name,
+ * in order, with an optional set time inside the performance (LU1) and a length. An item not yet
+ * announced shows nowhere public (LU3).
+ */
+export const performanceLineUps = defineTable('core_performance_line_ups', {
+  id: col.id(),
+  performanceId: col.internal(text('performance_id').notNull().references((): AnySQLiteColumn => performances.id, { onDelete: 'cascade' })),
+  productionId: col.internal(text('production_id').references(() => productions.id, { onDelete: 'set null' })),
+  name: col.public(text('name').notNull()),
+  note: col.public(text('note')),
+  startsAt: col.public(integer('starts_at')),
+  minutes: col.public(integer('minutes')),
+  announced: col.internal(integer('announced', { mode: 'boolean' }).notNull().default(true)),
+  sort: col.internal(integer('sort').notNull()),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'lup',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('core_performance_line_ups_order').on(t.performanceId, t.sort),
+    index('core_performance_line_ups_production').on(t.productionId),
+    // LU2: a production appears at most once in one performance's line-up.
+    uniqueIndex('core_performance_line_ups_once').on(t.performanceId, t.productionId).where(sql`${t.productionId} IS NOT NULL`),
+    check('core_performance_line_ups_name', sql`length(${t.name}) BETWEEN 1 AND 120`),
+    check('core_performance_line_ups_note', sql`${t.note} IS NULL OR length(${t.note}) <= 200`),
+    check('core_performance_line_ups_minutes', sql`${t.minutes} IS NULL OR ${t.minutes} BETWEEN 1 AND 600`),
   ],
 })
 
@@ -823,4 +912,4 @@ export const policyVersions = defineTable('core_policy_versions', {
   ],
 })
 
-export const tables = { policyVersions, webhooks, webhookDeliveries, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionEffects, termGroups, productionCredits, runPresets, performanceRuns, performances, performanceAccess, performanceEffectExceptions, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }
+export const tables = { policyVersions, webhooks, webhookDeliveries, performanceLineUps, collections, collectionProductions, collectionSlugs, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionEffects, termGroups, productionCredits, runPresets, performanceRuns, performances, performanceAccess, performanceEffectExceptions, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }

@@ -33,6 +33,43 @@ import activate from '../../server/api/training/competencies/[id]/activate.post'
 import retireCompetency from '../../server/api/training/competencies/[id]/retire.post'
 import myCompetencies from '../../server/api/training/me/competencies.get'
 import myCompetency from '../../server/api/training/me/competencies/[slug].get'
+import createSession from '../../server/api/training/courses/[id]/sessions.post'
+import listSessions from '../../server/api/training/sessions/index.get'
+import getSession from '../../server/api/training/sessions/[id]/index.get'
+import patchSession from '../../server/api/training/sessions/[id]/index.patch'
+import publishSession from '../../server/api/training/sessions/[id]/publish.post'
+import cancelSession from '../../server/api/training/sessions/[id]/cancel.post'
+import bookPlace from '../../server/api/training/sessions/[id]/places.post'
+import markAttendance from '../../server/api/training/sessions/[id]/attendance.put'
+import walkIn from '../../server/api/training/sessions/[id]/walk-ins.post'
+import closeSession from '../../server/api/training/sessions/[id]/close.post'
+import cancelPlace from '../../server/api/training/places/[id]/cancel.post'
+import myPlaces from '../../server/api/training/me/places.get'
+import putSections from '../../server/api/training/courses/[id]/steps/[step]/sections.put'
+import getLesson from '../../server/api/training/courses/[id]/steps/[step]/lesson.get'
+import reached from '../../server/api/training/courses/[id]/steps/[step]/sections/[section]/reached.post'
+import getQuiz from '../../server/api/training/courses/[id]/steps/[step]/quiz.get'
+import sendQuiz from '../../server/api/training/courses/[id]/steps/[step]/quiz.post'
+import allowance from '../../server/api/training/courses/[id]/steps/[step]/allowances.post'
+import readActivity from '../../server/api/training/courses/[id]/activity.post'
+import stepSources from '../../server/api/training/step-sources.get'
+import evidenceFile from '../../server/api/training/courses/[id]/steps/[step]/evidence-file.post'
+import submitEvidence from '../../server/api/training/courses/[id]/evidence/index.post'
+import seen from '../../server/api/training/courses/[id]/evidence/seen.post'
+import evidenceQueue from '../../server/api/training/evidence/index.get'
+import getEvidence from '../../server/api/training/evidence/[id]/index.get'
+import verifyEvidence from '../../server/api/training/evidence/[id]/verify.post'
+import rejectEvidence from '../../server/api/training/evidence/[id]/reject.post'
+import withdrawEvidence from '../../server/api/training/evidence/[id]/withdraw.post'
+import myEvidence from '../../server/api/training/me/evidence.get'
+import catalogue from '../../server/api/training/catalogue.get'
+import myTraining from '../../server/api/training/me/index.get'
+import myCourse from '../../server/api/training/me/courses/[slug].get'
+import teaching from '../../server/api/training/teaching/index.get'
+import teachingPeople from '../../server/api/training/teaching/people.get'
+import teachingProgress from '../../server/api/training/teaching/progress.get'
+import consoleCourses from '../../server/api/training/console/courses.get'
+import consolePeople from '../../server/api/training/console/people.get'
 
 export const training = server({
   'GET /api/training/courses': listCourses,
@@ -64,6 +101,43 @@ export const training = server({
   'POST /api/training/competencies/:id/retire': retireCompetency,
   'GET /api/training/me/competencies': myCompetencies,
   'GET /api/training/me/competencies/:slug': myCompetency,
+  'POST /api/training/courses/:id/sessions': createSession,
+  'GET /api/training/sessions': listSessions,
+  'GET /api/training/sessions/:id': getSession,
+  'PATCH /api/training/sessions/:id': patchSession,
+  'POST /api/training/sessions/:id/publish': publishSession,
+  'POST /api/training/sessions/:id/cancel': cancelSession,
+  'POST /api/training/sessions/:id/places': bookPlace,
+  'PUT /api/training/sessions/:id/attendance': markAttendance,
+  'POST /api/training/sessions/:id/walk-ins': walkIn,
+  'POST /api/training/sessions/:id/close': closeSession,
+  'POST /api/training/places/:id/cancel': cancelPlace,
+  'GET /api/training/me/places': myPlaces,
+  'PUT /api/training/courses/:id/steps/:step/sections': putSections,
+  'GET /api/training/courses/:id/steps/:step/lesson': getLesson,
+  'POST /api/training/courses/:id/steps/:step/sections/:section/reached': reached,
+  'GET /api/training/courses/:id/steps/:step/quiz': getQuiz,
+  'POST /api/training/courses/:id/steps/:step/quiz': sendQuiz,
+  'POST /api/training/courses/:id/steps/:step/allowances': allowance,
+  'POST /api/training/courses/:id/activity': readActivity,
+  'GET /api/training/step-sources': stepSources,
+  'POST /api/training/courses/:id/steps/:step/evidence-file': evidenceFile,
+  'POST /api/training/courses/:id/evidence': submitEvidence,
+  'POST /api/training/courses/:id/evidence/seen': seen,
+  'GET /api/training/evidence': evidenceQueue,
+  'GET /api/training/evidence/:id': getEvidence,
+  'POST /api/training/evidence/:id/verify': verifyEvidence,
+  'POST /api/training/evidence/:id/reject': rejectEvidence,
+  'POST /api/training/evidence/:id/withdraw': withdrawEvidence,
+  'GET /api/training/me/evidence': myEvidence,
+  'GET /api/training/catalogue': catalogue,
+  'GET /api/training/me': myTraining,
+  'GET /api/training/me/courses/:slug': myCourse,
+  'GET /api/training/teaching': teaching,
+  'GET /api/training/teaching/people': teachingPeople,
+  'GET /api/training/teaching/progress': teachingProgress,
+  'GET /api/training/console/courses': consoleCourses,
+  'GET /api/training/console/people': consolePeople,
 })
 
 /** 24 November 2026, 10:00 in London. */
@@ -74,6 +148,7 @@ export async function ready(): Promise<void> {
   setClock(NOV_24)
   resetRateLimits()
   await setModule('forms', true)
+  await setModule('occupancy', true)
   await setModule('training', true)
   await inContext(async () => {
     const unit = createUnit()
@@ -82,9 +157,11 @@ export async function ready(): Promise<void> {
   })
 }
 
-export interface Answer<T = any> { status: number, body: T }
+// A body read as an object of loosely typed fields, so a test reads it without a cast.
+export type Body = Record<string, any>
+export interface Answer<T = Body> { status: number, body: T }
 
-export async function req<T = any>(actor: Actor, method: string, path: string, body?: unknown): Promise<Answer<T>> {
+export async function req<T = Body>(actor: Actor, method: string, path: string, body?: unknown): Promise<Answer<T>> {
   const response = await call(training, method, path, { actor, body, headers: { 'idempotency-key': newId('req') } })
   return { status: response.status, body: await response.json() as T }
 }
@@ -96,7 +173,7 @@ export async function someone(abilities: string[] = [], name = 'Sam Learner'): P
   return who
 }
 
-export const MANAGER = ['training.competency.manage', 'training.course.manage', 'training.course.view', 'training.record.view', 'training.sign-off.record', 'training.record.award', 'training.record.revoke']
+export const MANAGER = ['training.competency.manage', 'training.session.manage', 'training.session.run', 'training.place.manage', 'training.place.book', 'training.course.manage', 'training.course.view', 'training.record.view', 'training.sign-off.record', 'training.record.award', 'training.record.revoke']
 
 let n = 0
 /** A course published with the steps given (by default one practical step), valid for a year. */
