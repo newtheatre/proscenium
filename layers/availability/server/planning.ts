@@ -26,6 +26,13 @@ export async function plannedGroups(viewerId: string): Promise<{ id: string, lab
   return out
 }
 
+/** The person's groups from every contribution, with who plans for each (S6). */
+export async function groupsOf(accountId: string): Promise<{ id: string, label: string, plannedBy: string | null }[]> {
+  const out = []
+  for (const kind of await groupKinds()) out.push(...(await kind.groupsOf(accountId)).map(g => ({ id: g.id, label: g.label, plannedBy: g.plannedBy ?? null })))
+  return out
+}
+
 /** Of `accountIds`, those in a group the viewer plans for. One check per group, each a subquery. */
 async function throughGroups(viewerId: string, accountIds: string[]): Promise<Set<string>> {
   const found = new Set<string>()

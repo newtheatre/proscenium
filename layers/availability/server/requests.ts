@@ -129,6 +129,16 @@ export async function sweepRequests(unit: UnitView): Promise<void> {
   unit.add(sql`UPDATE availability_request_people SET state = 'lapsed', updated_at = ${at}
     WHERE state = 'asked' AND request_id IN (SELECT id FROM availability_requests WHERE state = 'open' AND due_on < ${today})`)
   unit.add(sql`UPDATE availability_requests SET state = 'closed', closed_at = ${at}, updated_at = ${at} WHERE state = 'open' AND to_date < ${today}`)
+  await sweepOldRequests(unit)
+}
+
+/** Retention: a request closed longer ago than `retention.history` goes, with its people; entries keep their days. */
+async function sweepOldRequests(unit: UnitView): Promise<void> {
+  const keep = (await useSetting('availability.retention.history') as number) * 1000 // not-policy: settings are seconds
+  const old = sql`SELECT id FROM availability_requests WHERE state = 'closed' AND closed_at < ${nowMs() - keep}`
+  unit.add(sql`UPDATE availability_exceptions SET request_id = NULL WHERE request_id IN (${old})`)
+  unit.add(sql`DELETE FROM availability_request_people WHERE request_id IN (${old})`)
+  unit.add(sql`DELETE FROM availability_requests WHERE id IN (${old})`)
 }
 
 /**
@@ -224,6 +234,8 @@ export interface RequestView {
   /** The viewer's own state when asked. */
   mine: AskedState | null
   organiser: boolean
+  /** The organiser may add busy or maybe for the people asked (A8). */
+  onBehalf: boolean
   counts: Record<AskedState, number>
   /** Each person and their state, for the organiser only. */
   people?: { accountId: string, name: string, state: AskedState, answeredAt: number | null }[]
@@ -244,6 +256,7 @@ export async function requestView(id: string, viewer: Actor): Promise<RequestVie
     request: { id: r.id, title: r.title, message: r.message, from: r.from_date, to: r.to_date, dueOn: r.due_on, open: r.state === 'open', module: !!r.source_ref, remindedAt: r.reminded_at },
     mine,
     organiser,
+    onBehalf: organiser && (await can(viewer, 'availability.entry.on-behalf')).allowed,
     counts,
     ...(organiser ? { people: rows.map(p => ({ accountId: p.account_id, name: p.anonymised_at ? '' : p.name ?? '', state: p.state, answeredAt: p.answered_at })) } : {}),
   }

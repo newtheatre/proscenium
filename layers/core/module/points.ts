@@ -140,6 +140,9 @@ export const points = {
   // A registered count, shown beside a menu entry or on a card. A module registers its own; another
   // module's is named by it. The contribution says how to count for the person asking.
   'core.count': point({ kind: 'code', contract: 'count' }),
+  // A figure a module answers about its own records, as keys and numbers, read only through
+  // readMeasure so core checks the question, the reader and the answer (Reports spec, M1 to M11).
+  'core.measure': point({ kind: 'code', contract: 'measure' }),
   // A figure beside each of tonight's performances on the Tonight hub (sold, in, taken at the tills),
   // read for one performance and left out for anyone without its ability there.
   'core.tonight-figure': point({ kind: 'code', contract: 'tonight-figure' }),
