@@ -210,12 +210,26 @@ Any module may import core's services without listing core: `import { notifyAddr
   training session, a pencil) contributes to `core.space-busy` a file whose `busy({ spaceIds, from,
   to }, actor)` answers `{ spaceId, kind, from, to, yields, record, label }` items, the label null
   where the reader may not see it (contract in `layers/core/server/points/space-busy.ts`).
+- Busy elsewhere (C-66): `personBusy(accountId, from, to)` and `personsBusy(accountIds, from, to)`
+  from the support module `person-busy` (require it, import `#modules/person-busy`) merge every
+  `core.person-busy` contribution overlapping `[from, to)` into `{ accountId, kind, from, to, firm,
+  labelKey, record, source }` rows, sorted by person then time; `source` is the contributing module's
+  id, so a caller leaves out its own. Advisory: it warns and decides no write. A module that holds
+  people (a shift, a rehearsal call, a stated busy time) contributes a file whose `busy({ accountIds,
+  from, to })` answers `PersonBusyItem`s about those accounts only, with a translation key and never
+  words (contract in `layers/core/server/points/person-busy.ts`). Core calls it with at most 90
+  accounts at a time, drops and logs any row about someone not asked, leaves out a contributor that
+  throws, and refuses a window over 400 days. Core's own entry makes a credited person busy for each
+  scheduled (firm) or draft performance of the production, from doors or the start to the end.
 - `getBrand()`: the theatre's name, logos and colour tokens for light and dark.
 - Vocabularies, the shared lists of options such as production categories and advisories. Declare
   yours, with its starting terms, as a contribution to `core.vocabulary` (`id` is
   `<module>.<name>`); it is made the first time the module is on and from then on its terms are the
   theatre's. A record stores the term's id in a `col.ref('core_terms')` column, never the label.
-  `listTerms(key, { includeRetired? })` gives a picker's options in order; `getTerm(id)` gives a
+  `listTerms(key, { includeRetired?, group? })` gives a picker's options in order; `group` narrows
+  to the terms under one declared heading by its slug (made from the declared label, and kept when
+  the theatre renames the heading), which is how `core.department`'s kinds, `production` and
+  `organisation`, are read (R3-07); `getTerm(id)` gives a
   label for any term, retired or merged ones too; `assertTerm(id, key)` is the predicate to put on
   your own insert or update, then `.expect(1)`, so a retired term or one from another vocabulary
   is refused. Staff edit a module's terms on the Lists tab of its page in Admin
@@ -665,6 +679,15 @@ markup only where Nuxt UI has nothing suitable. The core layer registers the mod
 (`layers/core/app/assets/css/main.css`) and the shared component defaults (`app.config.ts`).
 Icons are bundled at build time, so nothing is fetched from Iconify while the Worker runs.
 Shells, page types and the navigation declaration are in [interface.md](interface.md).
+
+## Practice stores
+
+`PracticeStore` (`#kit/practice/store`) is a SQLite-backed Durable Object, one per person, made from
+the same migration bundle as D1. `storeDatabase(stub)` (`#kit/practice/database`) wraps its stub as
+a D1Database: `prepare`, `bind`, `run`, `all`, `first`, `raw` and `batch` behave as D1's, `batch`
+commits whole or not at all, and results carry D1's `meta`, `changes` included. Run the kit against
+a store by putting it in the context's env as `DB`. `destroy()` deletes everything the store holds.
+Proof P-PM-1 is in `tests/integration/practice-store.test.ts`.
 
 ## Testing
 
