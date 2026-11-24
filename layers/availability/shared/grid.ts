@@ -4,7 +4,8 @@ import { minutesOf, type Level, type ShownLevel } from './levels'
 
 export const DAY_MINUTES = 1440 // not-policy: minutes in a day
 
-export interface Piece { start: number, end: number, level: ShownLevel, reason?: string }
+/** `commitment` is the translation key of what holds the person elsewhere (F4), never a name. */
+export interface Piece { start: number, end: number, level: ShownLevel, reason?: string, commitment?: string }
 export interface Day { date: string, pieces: Piece[] }
 
 /** "HH:MM" for minutes past midnight, "24:00" at the end of the day. */
