@@ -9,6 +9,6 @@ export default {
       'SELECT b.kind, b.name, b.space_id, s.name AS space, v.name AS venue FROM spaces_bookables b LEFT JOIN core_spaces s ON s.id = b.space_id LEFT JOIN core_venues v ON v.id = s.venue_id WHERE b.id = ?', id)
     if (!row) return null
     const title = row.kind === 'space' ? placeOf(row.space ?? '', row.venue ?? '') : row.name ?? ''
-    return { title, to: `/console/spaces/bookables/${id}`, ...(row.space_id ? { parent: { type: 'core.space', id: row.space_id } } : {}) }
+    return { title, to: `/admin/modules/spaces/bookables/${id}`, ...(row.space_id ? { parent: { type: 'core.space', id: row.space_id } } : {}) }
   },
 }

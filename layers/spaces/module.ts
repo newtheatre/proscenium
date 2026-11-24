@@ -50,12 +50,24 @@ export default defineModule({
 
   abilities: defineAbilities('spaces', {
     // Each ability is declared with the first route that needs it (spec part 6).
+    'bookable.manage': ability({ on: 'spaces.bookable' }),
+    'purpose.manage': ability({}),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
   tables,
 
   contributes: {
+    // Set-up screens are Admin tabs of the module, reached from the console through the cog.
+    'core.navigation': [
+      { id: 'spaces.bookables', menu: 'admin', group: 'modules', to: '/admin/modules/spaces/bookables', icon: 'i-lucide-door-open', ability: 'spaces.bookable.manage', order: 60 },
+      { id: 'spaces.purposes', menu: 'admin', group: 'modules', to: '/admin/modules/spaces/purposes', icon: 'i-lucide-list-ordered', ability: 'spaces.purpose.manage', order: 70 },
+    ],
+    // Nothing can be booked until a room is bookable and there is something to book it for.
+    'core.setup-step': [
+      { id: 'spaces.bookables', required: true, to: '/admin/modules/spaces/bookables', order: 70 },
+      { id: 'spaces.purposes', required: true, to: '/admin/modules/spaces/purposes', order: 71 },
+    ],
     'core.record-resolver': [
       { id: 'spaces.bookable', file: 'bookable' },
       { id: 'spaces.booking', file: 'booking' },
@@ -80,6 +92,11 @@ export default defineModule({
       'spaces.bookable.created': event({ version: 1, payload: z.object({ bookableId: z.string() }), internal: true }),
       'spaces.bookable.paused': event({ version: 1, payload: z.object({ bookableId: z.string() }), internal: true }),
       'spaces.bookable.archived': event({ version: 1, payload: z.object({ bookableId: z.string() }), internal: true }),
+    },
+    listens: {
+      'core.space.managed-changed': 'follow-managed',
+      'core.space.archived': 'follow-archived',
+      'core.venue.archived': 'follow-archived',
     },
   },
 
