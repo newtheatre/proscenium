@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm'
 import { refuse, theatreTimeZone, useDb, useSetting, type Actor } from '#kit'
 import { instantOfLocal, localDateOf, localParts, nowMs } from '#kit/clock'
 import { occupancy } from '#modules/occupancy'
-import { addDays } from '../shared/grid'
+import { addDays, type Commitment } from '../shared/grid'
 import { bestTimes, overlay, type Slot, type Span, type Week } from '../shared/find'
 import { minutesOf, type Unmarked } from '../shared/levels'
 import { resolveDay } from './levels'
@@ -74,13 +74,15 @@ async function takenTimes(spaceIds: string[], dates: string[], zone: string, vie
 
 /** F4: commitments over each person's days, firm as busy and tentative as maybe. */
 async function addCommitments(weeks: Record<string, Week>, ids: string[], dates: string[], zone: string): Promise<void> {
-  for (const [accountId, days] of Object.entries(await commitmentsOf(ids, dates, zone))) {
-    const week = weeks[accountId]
-    if (!week) continue
-    for (const [date, held] of Object.entries(days)) {
-      for (const h of held) if (week[date]) week[date] = overlay(week[date]!, h, h.firm ? 'busy' : 'maybe', h.labelKey)
-    }
+  const all = await commitmentsOf(ids, dates, zone)
+  for (const [accountId, days] of Object.entries(all)) {
+    for (const [date, held] of Object.entries(days)) addHeld(weeks[accountId], date, held)
   }
+}
+
+function addHeld(week: Week | undefined, date: string, held: Commitment[]): void {
+  if (!week?.[date]) return
+  for (const h of held) week[date] = overlay(week[date]!, h, h.firm ? 'busy' : 'maybe', h.labelKey)
 }
 
 export async function findTime(viewer: Actor, input: FindInput): Promise<FindResult> {
