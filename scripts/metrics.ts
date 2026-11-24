@@ -41,7 +41,7 @@ async function typeCoverage(project: string): Promise<number> {
 }
 
 async function ignoreComments(): Promise<number> {
-  const text = await $`git grep -nE ${'@ts-ignore|@ts-expect-error|@ts-nocheck|eslint-disable'} -- ${'layers'} ${'scripts'} ${'site'} ${':!**/tests/**'}`.quiet().nothrow().text()
+  const text = await $`git grep -nE ${'@ts-ignore|@ts-expect-error|@ts-nocheck|eslint-disable'} -- ${'layers'} ${'scripts'} ${'site'} ${':!**/tests/**'} ${':!scripts/metrics.ts'}`.quiet().nothrow().text()
   return text.split('\n').filter(Boolean).length
 }
 
