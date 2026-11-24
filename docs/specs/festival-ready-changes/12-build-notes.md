@@ -25,6 +25,16 @@ What the build settled that the parts above leave open, and where it differs fro
 - **Retention.** Handouts are append-only. The daily sweep clears the size once the call's last day is older than `front-of-house.retention.assignments`; the rows stay.
 - **Not done.** The `leading-shift` fact does not bring `handout.record`, because the fact sits on a performance and the ability on a crew call; the Front of house manager preset has it. There is no `welfare-lead` preset yet to give `view-needs` to.
 
+## FH-48: the rota grid and batches
+
+- **Where it lives.** `layers/front-of-house/server/grid.ts`; the screen is `/console/front-of-house/grid` (Rota grid, under Front of house, for `shift.view`; changes need `shift.manage`).
+- **Show nights.** The grid's days are show nights (0014): a shift called at 01:00 sits in the night before. A night's performance shifts are only counted on the venue's own line, linking to the rota, since they are planned there.
+- **Picking cells.** Each venue has its own line, so a venue with no shifts yet can still be picked. "Apply a template" makes one batch for each venue picked, on the nights picked in it; "Add shifts" makes one shift in each picked duty cell. The spec's "Add a shift here" on an empty cell is this with one cell picked.
+- **Batches.** `front_of_house_shift_batches` keeps the template, venue, space, title, nights and the local call and end times. Times are wall-clock times in the theatre's zone, so a batch across the clock change keeps 18:00 on both sides; an end at or before the call is the next morning. Every shift in a batch is a draft carrying `batch_id`; a template line whose duty is archived is skipped.
+- **Removing a batch.** One statement cancels the batch's shifts with no places taken, judged on the row, so a sign-up racing the removal keeps its shift. Shifts with people on them stay and are listed back for a manager to deal with one by one. A removed batch leaves the Batches list.
+- **Copy to other days.** A shift not tied to a performance copies to other nights at the same local times, as drafts outside any batch. A performance's shift refuses `front-of-house.copy.performance`.
+- **Not done.** The Availability soft use (maybe, busy, unknown in the grid and the assign dialog) waits for Availability's first release: no `availability.levels` exists yet.
+
 ## FB-514: moves the system makes
 
 - **Where it lives.** `systemMove` in `layers/forms/shared/engine/evaluate.ts`; `followSystemMoves` and `arrive` in `layers/forms/server/stages.ts`, called after a submission (the public route and `addResponse`), a staff move and a resubmission. Checks in `shared/engine/checks.ts`. `docs/specs/form-builder/14-changes-2026-11-24.md` rows 12 to 17 record what was built.
