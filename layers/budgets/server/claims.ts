@@ -32,6 +32,7 @@ export interface Claim {
   declaredAt: number | null
   submittedAt: number | null
   decidedAt: number | null
+  firstApprovedBy: string | null
   expensePostingId: string | null
   version: number
   createdAt: number
@@ -59,9 +60,9 @@ export interface Item {
   receipts: Receipt[]
 }
 
-const COLUMNS = `c.id, c.number, c.claimant_id AS claimantId, c.request_id AS requestId, c.title, c.state, c.currency,
+export const COLUMNS = `c.id, c.number, c.claimant_id AS claimantId, c.request_id AS requestId, c.title, c.state, c.currency,
   c.total_minor AS totalMinor, c.approved_minor AS approvedMinor, c.paid_minor AS paidMinor, c.pay_route AS payRoute,
-  c.declared_at AS declaredAt, c.submitted_at AS submittedAt, c.decided_at AS decidedAt,
+  c.declared_at AS declaredAt, c.submitted_at AS submittedAt, c.decided_at AS decidedAt, c.first_approved_by AS firstApprovedBy,
   c.expense_posting_id AS expensePostingId, c.version, c.created_at AS createdAt`
 
 export async function getClaim(id: string | undefined): Promise<Claim | null> {
@@ -132,24 +133,37 @@ async function checkRequest(actor: Actor, requestId: string | null | undefined):
   if (!ok) refuse('budgets.claim.request', 'Link a request of yours that has been approved.', { status: 422, fields: { requestId: 'budgets.claim.request' } })
 }
 
-/** Starts a claim as a draft (BC-19). It is numbered when first submitted. */
-export async function createClaim(unit: UnitView, actor: Actor, input: { title: string, requestId?: string | null }): Promise<string> {
+/** The routes a claim may be paid by (budgets.claims.routes), and the one a new claim starts with. */
+export async function payRoutes(): Promise<{ offered: string[], preset: string }> {
+  const offered = await useSetting('budgets.claims.routes') as string[]
+  const preset = await useSetting('budgets.claims.default-route') as string
+  return { offered, preset: offered.includes(preset) ? preset : offered[0]! }
+}
+
+async function checkRoute(route: string | undefined): Promise<void> {
+  if (route !== undefined && !(await payRoutes()).offered.includes(route)) refuse('budgets.claim.route', 'Choose one of the ways this theatre pays claims.', { status: 422, fields: { payRoute: 'budgets.claim.route' } })
+}
+
+/** Starts a claim as a draft (BC-19), paid by the default route unless the claimant chose another. It is numbered when first submitted. */
+export async function createClaim(unit: UnitView, actor: Actor, input: { title: string, requestId?: string | null, payRoute?: string }): Promise<string> {
   await checkRequest(actor, input.requestId)
+  await checkRoute(input.payRoute)
   const id = newId('ecl')
   unit.add({
-    sql: "INSERT INTO budgets_claims (id, claimant_id, request_id, title, state, currency, pay_route, created_at, updated_at) VALUES (?, ?, ?, ?, 'draft', ?, 'bank-transfer', ?, ?)",
-    params: [id, actor.accountId ?? null, input.requestId ?? null, input.title, await theatreCurrency(), nowMs(), nowMs()],
+    sql: "INSERT INTO budgets_claims (id, claimant_id, request_id, title, state, currency, pay_route, created_at, updated_at) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?)",
+    params: [id, actor.accountId ?? null, input.requestId ?? null, input.title, await theatreCurrency(), input.payRoute ?? (await payRoutes()).preset, nowMs(), nowMs()],
   })
   unit.audit({ action: 'create', record: ['budgets.claim', id] })
   return id
 }
 
-export async function updateClaim(unit: UnitView, actor: Actor, claim: Claim, input: { title: string, requestId?: string | null }): Promise<void> {
+export async function updateClaim(unit: UnitView, actor: Actor, claim: Claim, input: { title: string, requestId?: string | null, payRoute?: string }): Promise<void> {
   await requireOwnEditable(actor, claim)
   await checkRequest(actor, input.requestId)
+  if (input.payRoute !== claim.payRoute) await checkRoute(input.payRoute)
   unit.add({
-    sql: "UPDATE budgets_claims SET title = ?, request_id = ?, updated_at = ? WHERE id = ? AND state IN ('draft', 'returned') AND version = ?",
-    params: [input.title, input.requestId ?? null, nowMs(), claim.id, claim.version],
+    sql: "UPDATE budgets_claims SET title = ?, request_id = ?, pay_route = ?, updated_at = ? WHERE id = ? AND state IN ('draft', 'returned') AND version = ?",
+    params: [input.title, input.requestId ?? null, input.payRoute ?? claim.payRoute, nowMs(), claim.id, claim.version],
   }).expect(1, changed())
   unit.audit({ action: 'update', record: ['budgets.claim', claim.id] })
 }
@@ -342,12 +356,12 @@ export async function withdraw(unit: UnitView, actor: Actor, claim: Claim): Prom
   unit.audit({ action: 'state', record: ['budgets.claim', claim.id], detail: { from: claim.state, to: 'withdrawn' } })
 }
 
-export interface ClaimEvent { action: string, by: string | null, at: number, amountMinor?: number | null, note?: string | null, postingId?: string | null }
+export interface ClaimEvent { action: string, by: string | null, at: number, amountMinor?: number | null, note?: string | null, postingId?: string | null, disbursementId?: string | null }
 
 export function logEvent(unit: UnitView, claimId: string, event: ClaimEvent): void {
   unit.add({
-    sql: 'INSERT INTO budgets_claim_events (id, claim_id, action, by, at, amount_minor, note, posting_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    params: [newId('ece'), claimId, event.action, event.by, event.at, event.amountMinor ?? null, event.note ?? null, event.postingId ?? null],
+    sql: 'INSERT INTO budgets_claim_events (id, claim_id, action, by, at, amount_minor, note, posting_id, disbursement_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    params: [newId('ece'), claimId, event.action, event.by, event.at, event.amountMinor ?? null, event.note ?? null, event.postingId ?? null, event.disbursementId ?? null],
   })
 }
 

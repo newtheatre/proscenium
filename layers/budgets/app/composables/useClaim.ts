@@ -1,6 +1,7 @@
 // A claim as its pages read it, and what both the claimant's page and the review page do with it.
 import type { ClaimState } from './useBudgetText'
 
+export type PayRoute = 'bank-transfer' | 'parent-body' | 'cash' | 'cheque'
 export interface ClaimReceipt { id: string, name: string | null, state: string, mediaType: string }
 export interface ClaimItem {
   id: string
@@ -21,11 +22,11 @@ export interface ClaimItem {
 }
 export interface ClaimEvent { action: string, by: string | null, byName: string | null, at: number, amountMinor?: number | null, note?: string | null }
 export interface ClaimView {
-  claim: { id: string, number: string | null, title: string, state: ClaimState, currency: string, totalMinor: number, approvedMinor: number | null, paidMinor: number, requestId: string | null, submittedAt: number | null, version: number, claimant: string | null }
+  claim: { id: string, number: string | null, title: string, state: ClaimState, currency: string, totalMinor: number, approvedMinor: number | null, paidMinor: number, requestId: string | null, payRoute: PayRoute, submittedAt: number | null, version: number, claimant: string | null }
   items: ClaimItem[]
   events: ClaimEvent[]
   mine: boolean
-  review: { yours: string[], overMinor: number, marks: { lateItems: string[], notAskedFirst: boolean }, any: boolean } | null
+  review: { yours: string[], overMinor: number, marks: { lateItems: string[], notAskedFirst: boolean }, any: boolean, awaitingSecond: boolean, mayApproveSecond: boolean } | null
   canVoid: boolean
 }
 

@@ -48,10 +48,10 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     abilities: [
       'finance.ledger.view', 'finance.ledger.export', 'finance.posting.correct', 'finance.account.manage', 'finance.period.close',
       'box-office.report.view', 'box-office.report.export',
-      'payments.attempt.reconcile', 'payments.refund.approve', 'payments.session.view',
+      'payments.attempt.reconcile', 'payments.refund.approve', 'payments.session.view', 'payments.disbursement.record', 'payments.payee.read',
       'membership-fees.charge.view', 'membership-fees.charge.waive',
       'bar.sale.view',
-      'budgets.budget.view', 'budgets.budget.manage', 'budgets.budget.approve', 'budgets.budget.hold', 'budgets.category.manage', 'budgets.settings.manage', 'budgets.claim.approve-any',
+      'budgets.budget.view', 'budgets.budget.manage', 'budgets.budget.approve', 'budgets.budget.hold', 'budgets.category.manage', 'budgets.settings.manage', 'budgets.claim.approve-any', 'budgets.claim.pay',
     ],
   },
 ]

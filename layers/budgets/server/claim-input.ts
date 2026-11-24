@@ -6,6 +6,7 @@ const id = z.string().max(40) // not-policy: ids are short
 export const claimFields = z.object({
   title: z.string().trim().min(1).max(80), // not-policy: the column's bound
   requestId: id.nullable().optional(),
+  payRoute: z.enum(['bank-transfer', 'parent-body', 'cash', 'cheque']).optional(),
 }).strict()
 
 export const itemFields = z.object({
@@ -31,5 +32,5 @@ export const approval = z.object({
     categoryId: id.nullable().optional(),
     approvedMinor: z.number().int().min(0).max(100_000_000), // not-policy: a sanity bound
     partReason: z.string().trim().min(1).max(300).nullable().optional(), // not-policy: the column's bound
-  }).strict()).min(1).max(200), // not-policy: a sanity bound on one claim's items
+  }).strict()).max(200), // not-policy: a sanity bound on one claim's items; none for a second approval
 }).strict()

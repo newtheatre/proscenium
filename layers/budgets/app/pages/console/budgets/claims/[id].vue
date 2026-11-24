@@ -1,7 +1,8 @@
-<!-- Reviewing a claim (BC-21 to BC-25, wireframe C): each item beside its receipts, its line and
+<!-- Reviewing a claim (BC-21 to BC-26, wireframe C): each item beside its receipts, its line and
      category confirmed and the amount approved, less with a reason. Over budget the button says by how
-     much and only the treasurer has it; a holder sees who it needs. Sending back and declining ask for
-     a note the claimant reads; the treasurer voids an approved, unpaid claim with one. -->
+     much and only the treasurer has it; a holder sees who it needs. Above the second-approval amount
+     the treasurer, someone else, approves again. Sending back and declining ask for a note the
+     claimant reads; the treasurer voids an approved, unpaid claim with one. -->
 <script setup lang="ts">
 import type { ClaimItem } from '../../../../composables/useClaim'
 
@@ -19,6 +20,10 @@ const { data: choices } = await useAPI<{ lines: OfferedLine[], categories: Categ
 
 const yours = computed(() => new Set(data.value?.review?.yours ?? []))
 const deciding = computed(() => data.value?.claim.state === 'submitted' && yours.value.size > 0)
+// C4: every item is decided and the treasurer, not the first approver, approves the claim again.
+const second = computed(() => !!data.value?.review?.mayApproveSecond)
+const awaitingSecond = computed(() => !!data.value?.review?.awaitingSecond)
+const mayDecide = computed(() => deciding.value || second.value)
 const decisions = reactive<Record<string, { lineId?: string, categoryId?: string, approvedMinor: number | null, partReason: string }>>({})
 watch(data, (now) => {
   for (const i of now?.items ?? []) if (yours.value.has(i.id)) decisions[i.id] = { lineId: i.lineId ?? undefined, categoryId: i.categoryId ?? undefined, approvedMinor: i.amountMinor, partReason: '' }
@@ -34,10 +39,11 @@ function describe(i: ClaimItem) {
   return [i.description, i.supplier, day(i.spentOn), i.lineName ? `${i.budgetName}: ${i.lineName}` : null, i.noReceiptReason ? t('budgets.screens.claims.no-receipt-because', { reason: i.noReceiptReason }) : null].filter(Boolean).join(' · ')
 }
 async function approve() {
+  if (second.value) return act('/approve', { version: data.value!.claim.version, items: [] }, 'budgets.screens.claims.approved')
   const items = Object.entries(decisions).map(([itemId, d]) => ({ id: itemId, lineId: d.lineId, categoryId: d.categoryId ?? null, approvedMinor: d.approvedMinor ?? 0, partReason: d.partReason.trim() || null }))
   await act('/approve', { version: data.value!.claim.version, items }, 'budgets.screens.claims.approved')
 }
-const approveLabel = computed(() => over.value ? t('budgets.screens.approvals.approve-over', { amount: money(over.value) }) : t('budgets.screens.approvals.approve'))
+const approveLabel = computed(() => second.value ? t('budgets.screens.claims.approve-second') : over.value ? t('budgets.screens.approvals.approve-over', { amount: money(over.value) }) : t('budgets.screens.approvals.approve'))
 
 // Sending back, declining and voiding, each with a note.
 const noting = ref<NoteKind | null>(null)
@@ -51,11 +57,11 @@ async function sendNote() {
   if (await act(`/${kind}`, { version: data.value!.claim.version, note: note.value.trim() }, `budgets.screens.claims.done-${kind}`)) noting.value = null
 }
 const actions = computed(() => [
-  ...(deciding.value && mayApprove.value ? [{ label: approveLabel.value, icon: 'i-lucide-check', onSelect: approve }] : []),
-  ...(deciding.value ? [{ label: t('budgets.screens.claims.return'), icon: 'i-lucide-undo-2', onSelect: () => openNote('return') }] : []),
+  ...((deciding.value && mayApprove.value) || second.value ? [{ label: approveLabel.value, icon: 'i-lucide-check', onSelect: approve }] : []),
+  ...(mayDecide.value ? [{ label: t('budgets.screens.claims.return'), icon: 'i-lucide-undo-2', onSelect: () => openNote('return') }] : []),
 ])
 const menu = computed(() => [
-  ...(deciding.value ? [{ label: t('budgets.screens.claims.decline'), icon: 'i-lucide-x', onSelect: () => openNote('decline') }] : []),
+  ...(mayDecide.value ? [{ label: t('budgets.screens.claims.decline'), icon: 'i-lucide-x', onSelect: () => openNote('decline') }] : []),
   ...(data.value?.canVoid ? [{ label: t('budgets.screens.claims.void'), icon: 'i-lucide-ban', onSelect: () => openNote('void') }] : []),
 ])
 </script>
@@ -95,6 +101,13 @@ const menu = computed(() => [
           variant="subtle"
           icon="i-lucide-triangle-alert"
           :title="t('budgets.screens.approvals.needs-treasurer', { amount: money(over) })"
+        />
+        <UAlert
+          v-if="awaitingSecond"
+          color="neutral"
+          variant="subtle"
+          icon="i-lucide-users"
+          :title="t(second ? 'budgets.screens.claims.second-yours' : 'budgets.screens.claims.second-waiting')"
         />
         <UAlert
           v-if="data.review?.marks.notAskedFirst"

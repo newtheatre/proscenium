@@ -19,7 +19,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     items,
     events: await eventsOf(claim.id),
     mine,
-    review: review ? { yours: review.yours, overMinor: review.overMinor, marks: review.marks, any } : null,
+    review: review ? { yours: review.yours, overMinor: review.overMinor, marks: review.marks, any, awaitingSecond: review.awaitingSecond, mayApproveSecond: review.mayApproveSecond } : null,
     canVoid: !mine && claim.state === 'approved' && claim.paidMinor === 0 && (await can(actor, 'budgets.claim.approve-any')).allowed,
   }
 })

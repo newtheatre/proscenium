@@ -2,7 +2,7 @@
 // budgets for a production, a department and year, a season or a general purpose, approved by someone
 // other than who proposed them, with spent read from Finance. Requests and claims follow; this file
 // declares only what is built.
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, setting, task } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, setting, task } from '#kit'
 import { z } from 'zod'
 import { tables } from './server/db/schema'
 
@@ -13,6 +13,8 @@ export default defineModule({
   stability: 'experimental',
   switchable: true,
   requires: ['finance'],
+  // Claims are paid through Payments' outgoing payments when it is on; without it they are paid outside the app.
+  uses: ['payments'],
 
   records: defineRecords('budgets', {
     'budget': { table: 'budgets_budgets' },
@@ -39,6 +41,8 @@ export default defineModule({
     'claim.view-all': ability({ risk: 'privileged', fresh: false, audit: 'read' }),
     // The treasurer: decides over budget (C3) and voids approved claims (BC-25).
     'claim.approve-any': ability({ risk: 'privileged', implies: ['claim.view-all'] }),
+    // Records payments of approved claims and downloads the parent body's schedule (BC-29 to BC-32).
+    'claim.pay': ability({ risk: 'privileged', implies: ['claim.view-all'] }),
   }),
 
   // Read from budgets_holders at each request (decision 0009): authority from a fact, not a standing grant.
@@ -60,8 +64,19 @@ export default defineModule({
     // A claim above this with no request is marked "not asked first". Unset: never marked.
     'requests.expected-above': setting.money({ unset: true, min: 100, max: 1000000, change: 'budgets.settings.manage', audience: 'public', quotable: true }),
     // How long a claim, its items and receipts are kept after its last event. Shortening it erases at the next run.
+    // Above it a claim needs a second approver who holds claim.approve-any (C4). Unset: one approver.
+    'claims.second-approval-above': setting.money({ unset: true, min: 100, max: 10000000, change: 'budgets.settings.manage', audience: 'public', quotable: true }),
+    // How claims may be paid; each needs the matching Payments method.
+    'claims.routes': setting.list({ default: ['bank-transfer'], of: 'choice', options: ['bank-transfer', 'parent-body', 'cash', 'cheque'], change: 'budgets.settings.manage', audience: 'staff' }),
+    // Preselected on a new claim; one of the offered routes.
+    'claims.default-route': setting.choice({ default: 'bank-transfer', options: ['bank-transfer', 'parent-body', 'cash', 'cheque'], change: 'budgets.settings.manage', audience: 'staff' }),
     'retention.claims': setting.duration({ default: '6y', min: '2y', max: '10y', change: 'budgets.settings.manage', audience: 'staff', onChange: 'confirm' }),
   }),
+
+  settingRules: defineSettingRules('budgets', [
+    { id: 'routes-needed', check: s => Array.isArray(s['claims.routes']) && s['claims.routes'].length > 0 },
+    { id: 'default-route-offered', check: s => !Array.isArray(s['claims.routes']) || s['claims.routes'].includes(s['claims.default-route']) },
+  ]),
 
   tasks: {
     // Lapses approved requests past their date, and anonymises decided ones past retention.
@@ -154,10 +169,13 @@ export default defineModule({
       },
     ],
     'core.count': [{ id: 'budgets.approvals', file: 'approvals' }],
+    // Approved claims paid through Payments: the part clears claims payable and raises paid (BC-30, BC-31).
+    'payments.disbursement': [{ id: 'budgets' }],
     'core.navigation': [
       { id: 'budgets.budgets', menu: 'console', group: 'money', section: 'everyday', to: '/console/budgets', icon: 'i-lucide-piggy-bank', ability: 'budgets.budget.view', order: 85 },
       // Shown to whoever has a request waiting on them: holders hold budgets one by one, so no ability names them all.
       { id: 'budgets.approvals', menu: 'console', group: 'money', section: 'everyday', to: '/console/budgets/approvals', icon: 'i-lucide-inbox', order: 86, count: 'budgets.approvals', hideEmpty: true },
+      { id: 'budgets.to-pay', menu: 'console', group: 'money', section: 'everyday', to: '/console/budgets/to-pay', icon: 'i-lucide-banknote-arrow-up', ability: 'budgets.claim.pay', order: 87 },
       { id: 'budgets.expenses', menu: 'members', to: '/members/expenses', icon: 'i-lucide-receipt', ability: ['budgets.claim.make', 'budgets.request.make'], order: 40 },
       { id: 'budgets.categories', menu: 'admin', group: 'modules', to: '/admin/modules/budgets/categories', icon: 'i-lucide-tags', ability: 'budgets.category.manage', order: 35 },
     ],

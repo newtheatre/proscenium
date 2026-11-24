@@ -1,0 +1,1 @@
+ALTER TABLE `budgets_claims` ADD `first_approved_by` text;
