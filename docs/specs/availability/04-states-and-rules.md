@@ -70,7 +70,7 @@ A lapsed person can still answer; only the reminders end.
 
 **F3, best times.** A slot of the find's length is a best time only if every must-have person is free (or unmarked and treated as free) throughout and has no firm commitment. Best times rank by most people free, then fewest maybe, then fewest unknown, then earliest. Ten are listed.
 
-**F4, commitments.** Firm rows count as busy, tentative rows (Programme planning's pencils) as maybe. Each shows its source. Rows from `source` availability are dropped, because the stated levels already cover them.
+**F4, commitments.** Firm rows count as busy, tentative rows (Programme planning's pencils) as maybe. Each shows its source. Availability's own stated busy rows (kind `unavailable`) are dropped, because the stated levels already cover them; its arranged meetings count like any other commitment.
 
 **F5, rooms.** When the organiser chose spaces and the occupancy support module is on, a slot where a chosen space is taken is hatched and is not a best time, unless "Room optional" is ticked.
 
