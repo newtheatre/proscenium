@@ -208,31 +208,36 @@ export const budgetFields = z.object({
 /** A department budget is for one of the organisation's departments, not a production's (R3-07). */
 export const departments = () => listTerms('core.department', { group: 'organisation' })
 
+type SubjectInput = z.infer<typeof budgetFields> | Omit<z.infer<typeof budgetFields>, 'name'>
+type Subject = { name: string | null, yearStartsOn: string }
+const yearOf = async (date: string) => (await financeYearOf(date)).startsOn
+const field = (key: string, code: string, reason: string): never => refuse(code, reason, { status: 422, fields: { [key]: code } })
+
+/** Each scope's subject: its name and the date its finance year is found from, unless a year was given. */
+const SUBJECTS: Record<string, (input: SubjectInput, given: string | null) => Promise<Subject>> = {
+  async production(input, given) {
+    const row = input.productionId ? await first<{ title: string, firstStartsAt: number | null }>('SELECT title, first_starts_at AS firstStartsAt FROM core_productions WHERE id = ?', input.productionId) : null
+    if (!row) return field('productionId', 'budgets.budget.production', 'Choose the production this budget is for.')
+    return { name: row.title, yearStartsOn: given ?? await yearOf(row.firstStartsAt ? await localDate(row.firstStartsAt) : await today()) }
+  },
+  async season(input, given) {
+    const row = input.seasonId ? await first<{ name: string, startsOn: string }>('SELECT name, starts_on AS startsOn FROM core_seasons WHERE id = ?', input.seasonId) : null
+    if (!row) return field('seasonId', 'budgets.budget.season', 'Choose the season this budget is for.')
+    return { name: row.name, yearStartsOn: given ?? await yearOf(row.startsOn) }
+  },
+  async department(input, given) {
+    const row = input.departmentTermId ? (await departments()).find(t => t.id === input.departmentTermId) : null
+    if (!row) return field('departmentTermId', 'budgets.budget.department', 'Choose the department this budget is for.')
+    const yearStartsOn = given ?? await yearOf(await today())
+    return { name: `${row.label} ${yearStartsOn.slice(0, 4)}`, yearStartsOn } // not-policy: the year of a date
+  },
+}
+
 /** What a new budget is about, its default name and the finance year it falls in. */
-export async function subjectOf(input: z.infer<typeof budgetFields> | Omit<z.infer<typeof budgetFields>, 'name'>): Promise<{ name: string | null, yearStartsOn: string }> {
-  const yearOf = async (date: string) => (await financeYearOf(date)).startsOn
+export async function subjectOf(input: SubjectInput): Promise<Subject> {
   const given = input.year ? await yearOf(input.year) : null
-  const field = (key: string, code: string, reason: string): never => refuse(code, reason, { status: 422, fields: { [key]: code } })
-  switch (input.scope) {
-    case 'production': {
-      const row = input.productionId ? await first<{ title: string, firstStartsAt: number | null }>('SELECT title, first_starts_at AS firstStartsAt FROM core_productions WHERE id = ?', input.productionId) : null
-      if (!row) return field('productionId', 'budgets.budget.production', 'Choose the production this budget is for.')
-      return { name: row.title, yearStartsOn: given ?? await yearOf(row.firstStartsAt ? await localDate(row.firstStartsAt) : await today()) }
-    }
-    case 'season': {
-      const row = input.seasonId ? await first<{ name: string, startsOn: string }>('SELECT name, starts_on AS startsOn FROM core_seasons WHERE id = ?', input.seasonId) : null
-      if (!row) return field('seasonId', 'budgets.budget.season', 'Choose the season this budget is for.')
-      return { name: row.name, yearStartsOn: given ?? await yearOf(row.startsOn) }
-    }
-    case 'department': {
-      const row = input.departmentTermId ? (await departments()).find(t => t.id === input.departmentTermId) : null
-      if (!row) return field('departmentTermId', 'budgets.budget.department', 'Choose the department this budget is for.')
-      const yearStartsOn = given ?? await yearOf(await today())
-      return { name: `${row.label} ${yearStartsOn.slice(0, 4)}`, yearStartsOn }
-    }
-    default:
-      return { name: null, yearStartsOn: given ?? await yearOf(await today()) }
-  }
+  const subject = SUBJECTS[input.scope]
+  return subject ? subject(input, given) : { name: null, yearStartsOn: given ?? await yearOf(await today()) }
 }
 
 /** A parent line must be an expense line, live, of another budget in the same currency that this one does not fund. */
