@@ -50,6 +50,7 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   // Delivery limits, not day-to-day choices: the Webhooks screen is the list alone (Matt, 21 November 2026).
   'webhooks': advanced,
   'lists': advanced,
+  'measures': advanced,
   'programme': on('programme'),
   'grants': on('people'),
   'members-area': on('people'),
@@ -87,6 +88,8 @@ export const settings = defineSettings('core', {
 
   'external.timeout': setting.duration({ default: '15s', min: '1s', max: '60s', change }),
   'external.reconcile-after': setting.duration({ default: '5m', min: '1m', max: '1d', change }),
+  // How long one figure may take before a report shows it unavailable (Reports spec, R3-21).
+  'measures.read-budget': setting.duration({ default: '10s', min: '2s', max: '60s', change }),
 
   'access.fresh-within': setting.duration({ default: '10m', min: '1m', max: '1d', change }),
   'idempotency.keep-for': setting.duration({ default: '48h', min: '1h', max: '7d', change }),

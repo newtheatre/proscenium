@@ -60,3 +60,5 @@ export type { Performance, PerformanceState, PerformanceQuery } from './programm
 export { relyingParty } from './identity/web'
 export { currentVersion as currentPolicyVersion } from './policies/versions'
 export type { PolicyVersion } from './policies/versions'
+export { readMeasure, listMeasures, mayReadMeasure } from './measures/service'
+export type { MeasureAnswer, MeasureListing } from './measures/service'
