@@ -11,6 +11,7 @@ export interface MeetingView {
   mine: Response | null
   counts: Record<Response, number>
   invitees?: { accountId: string, name: string, response: Response }[]
+  under18?: { late: string[], oneToOne: boolean }
 }
 
 const TONE: Record<Response, 'info' | 'success' | 'neutral'> = { 'pending': 'info', 'going': 'success', 'not-going': 'neutral' }

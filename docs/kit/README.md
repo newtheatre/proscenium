@@ -192,6 +192,17 @@ Any module may import core's services without listing core: `import { notifyAddr
   once that passes, and it is not served after. A slot with `access: 'record'` is served only to
   someone your `core.file-access` contribution allows: key it by the owning record type and export
   `{ canRead(actor, record, file) }` (type `FileAccess` from `#modules/core`).
+- Write services for productions, performances and credits (C-68), each adding to your unit and
+  checking no ability (your route checks its own): `createProduction(unit, { title, kind, seasonId?,
+  summary?, categoryTermId?, companyName?, runningMinutes?, credits? })` and `createPerformance(unit,
+  { productionId, spaceId, startsAt, endsAt?, ..., made? })` make drafts (pass `made` with the
+  production's running time when it was made earlier in the same unit; the statement checks it
+  exists); `movePerformance(unit, id, { spaceId, startsAt, endsAt })`; `schedulePerformances(unit,
+  ids)` answers `{ scheduled, refused: { id, reason }[] }`, reason `space-taken`, `closed`,
+  `not-draft` or `started`, and catches drafts that clash with each other;
+  `setProductionCompanyName(unit, productionId, name)`; `listCredits(productionId)`,
+  `addCredit(unit, { productionId, creditedName, role, sectionTermId, accountId?, visibility? })`,
+  `updateCredit(unit, creditId, patch)` (never visibility) and `removeCredit(unit, creditId)`.
 - `isSpaceFree(spaceId, from, to, { except? })`: no scheduled performance or blocking closure, and
   nothing another module reports to `core.space-busy`, overlaps the window; `except` leaves out one
   module's own times. A read for showing and for a module's check just before its own write; a core
@@ -669,14 +680,54 @@ markup only where Nuxt UI has nothing suitable. The core layer registers the mod
 Icons are bundled at build time, so nothing is fetched from Iconify while the Worker runs.
 Shells, page types and the navigation declaration are in [interface.md](interface.md).
 
-## Practice stores
+## Practice mode
 
-`PracticeStore` (`#kit/practice/store`) is a SQLite-backed Durable Object, one per person, made from
-the same migration bundle as D1. `storeDatabase(stub)` (`#kit/practice/database`) wraps its stub as
-a D1Database: `prepare`, `bind`, `run`, `all`, `first`, `raw` and `batch` behave as D1's, `batch`
-commits whole or not at all, and results carry D1's `meta`, `changes` included. Run the kit against
-a store by putting it in the context's env as `DB`. `destroy()` deletes everything the store holds.
-Proof P-PM-1 is in `tests/integration/practice-store.test.ts`.
+Practice mode (`docs/specs/practice-mode`) runs the real live screens on a throwaway copy of the
+theatre. A module does not branch on it: the kit swaps the request's bindings, and the module
+declares only what the kit needs.
+
+- **The store.** `PracticeStore` (`#kit/practice/store`, binding `PRACTICE`) is a SQLite-backed
+  Durable Object, one per person, named `practice:<account id>` and made from the same migration
+  bundle as D1. `storeDatabase(stub)` (`#kit/practice/database`) wraps it as a D1Database, so the
+  unit of work commits whole or not at all there too. Its four tables of its own
+  (`core_practice_session`, `_outbox`, `_calls`, `_task_results`, in `#kit/practice/tables`) are
+  made after the bundle and never exist in D1. Proof P-PM-1 is in
+  `tests/integration/practice-store.test.ts`.
+- **The mark.** A practice tab sends `Proscenium-Practice: 1`. `defineRoute` reads the actor from the
+  real database, then hands a marked request to core's practice gate, which checks the person may
+  practise the session's scenario and swaps the context to the store (`practiceEnv`): `DB` is the
+  store, files go under `practice/<account id>/`, cache keys under `practice:<account id>:`, and
+  there are no queues, no mail binding and no credentials (`credential()` answers null). Inside, the
+  person holds exactly the scenario's abilities. An unmarked change whose referrer is a
+  `/practice/` page is refused `core.practice.unmarked-request`.
+- **A route's `practice` option.** `'refuse'` refuses a marked request (`core.practice.not-in-practice`):
+  signing in and out, passkeys, the authenticator, recovery, data requests and setup say so.
+  `'outside'` runs against the real database whether marked or not: the practice routes that start,
+  list and leave sessions.
+- **Nothing leaves.** `externalCall` in practice never calls out: the call handler's `practice`
+  answer (`defineCall({ ..., practice })`) is recorded and settled as the provider's would be, or
+  `'ask-trainee'` waits for the practice card reader; a handler with none is refused
+  `core.practice.no-outside-calls`. Any other server `fetch` throws the same refusal. Jobs a practice
+  unit commits run in the store after the response; realtime rooms and held codes take the
+  session's prefix (`practiceName`). Core's mailer writes to the store's outbox instead of sending.
+- **A table's `practice` option.** `'empty'` (the default), `'copy'` or `'replace'`. A copied table's
+  rows come across when a store is made, each column through its erasure rule, special and sealed
+  columns as null, account columns pointing at the store's "Practice staff". The build refuses
+  `copy` on an audience or members table, an append-only table, or one with a required special column.
+- **Contributing.** A scenario is a `core.practice-scenario` entry (the live page it opens, the pages
+  it allows, the abilities it acts with, its sample sets and tasks). A sample set is a
+  `core.practice-sample` file, `definePracticeSample({ after, seed })`, whose `seed(unit, context)`
+  writes fictional records through the module's own services and returns named results such as
+  `{ tonight: 'perf_...' }`. A scenario's task checks are one `core.practice-check` file keyed by the
+  scenario id, `definePracticeChecks({ taskId: async context => boolean })`, run after each marked
+  change. Core's own sets are `core.people` and `core.tonight`.
+- **In the app.** Live pages are served again under `/practice/live/...` inside the practice frame,
+  and `$api` marks every request from a `/practice` page; `docs/kit/interface.md` ("Live mode")
+  says how. A scenario's `runnable` tasks run in the store from the panel's "Run now"
+  (`POST /api/core/practice/run`); nothing runs a store's tasks on a timer.
+- **Ending.** `endPractice(accountId, reason)` (core's `server/practice/session.ts`) deletes a store,
+  its files and its cache keys; erasure and merges call it. A store's alarm ends it when idle or at
+  the end of the show night.
 
 ## Testing
 
