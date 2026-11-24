@@ -8,7 +8,7 @@ import { startSession } from '../../../identity/sessions'
 import { ensureModuleDefaults } from '../../../identity/defaults'
 import { switchOnAtSetup } from '#kit/modules-store'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   public: true,
   rateLimit: 'sign-in',
   input: z.object({ code: z.string().max(40) }), // not-policy: a recovery code is eleven characters

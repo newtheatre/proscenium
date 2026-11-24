@@ -2,13 +2,14 @@
 // asked for, and the requests asking me. A person sees everything of their own, labels and reasons too.
 import { getQuery } from 'h3'
 import { sql } from 'drizzle-orm'
-import { defineRoute, inAccountScope, refuse, useDb, useSetting } from '#kit'
+import { defineRoute, inAccountScope, refuse, theatreTimeZone, useDb, useSetting } from '#kit'
 import type { Unmarked } from '../../../shared/levels'
 import { daysQuery } from '../../inputs'
 import { nextDate, resolveDay } from '../../levels'
 import { rowsOf } from '../../reading'
 import { myRequests } from '../../requests'
 import { entryDates } from '../../entries'
+import { commitmentsOf } from '../../commitments'
 
 const DAYS_MAX = 62 // not-policy: rule F2's widest window
 
@@ -41,6 +42,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     patterns: patterns.map(p => ({ id: p.id, label: p.label, startsOn: p.starts_on, endsOn: p.ends_on, lines: lines.filter(l => l.pattern_id === p.id).map(l => ({ weekday: l.weekday, from: l.from_local, until: l.until_local, level: l.level })) })),
     exceptions: exceptions.map(e => ({ id: e.id, firstDate: e.first_date, lastDate: e.last_date, weekdays: e.weekdays ? JSON.parse(e.weekdays as string) : null, from: e.from_local, until: e.until_local, level: e.level, reason: e.reason, reasonShared: !!e.reason_shared, onBehalf: e.entered_by !== me, requestId: e.request_id })),
     days: dates.map(date => ({ date, pieces: resolveDay(date, rows.lines, rows.exceptions, unmarked, () => true) })),
+    commitments: (await commitmentsOf([me], dates, await theatreTimeZone()))[me] ?? {},
     requests: await myRequests(me),
   }
 })
