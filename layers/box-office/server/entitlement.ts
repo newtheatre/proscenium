@@ -64,6 +64,15 @@ export async function entitle(performanceId: string, lines: readonly { ticketTyp
       await byReference(performanceId, type, mine, buyer.account, out, guards)
       continue
     }
+    // A signed-in holder's own membership meets the tickets given no reference; each one given a
+    // reference is a friend's, judged without the buyer's account so theirs never stands in (V14).
+    const friends = met ? mine.filter(({ l }) => !!l.reference) : []
+    if (friends.length) {
+      const own = met!.evidence ? new Set([met!.evidence]) : new Set<string>()
+      await byReference(performanceId, type, friends, null, out, guards, own)
+      if (friends.length === mine.length) continue
+    }
+    const ownCount = count - friends.length
     if (!met) {
       if (answers.every(a => a.unavailable)) refuse('box-office.requirement.unavailable', `${type.name} tickets are not on sale just now.`, { status: 409, remedy: 'Choose another kind of ticket.' })
       const said = answers.find(a => !a.unavailable && a.reason)
@@ -74,16 +83,16 @@ export async function entitle(performanceId: string, lines: readonly { ticketTyp
     }
     const limit = met.quantity ?? type.maxPerHolder
     const tooMany = { code: 'box-office.requirement.limit', reason: limit === 0 ? `You cannot have ${type.name} tickets for this performance.` : `You can have at most ${limit} ${type.name} ${limit === 1 ? 'ticket' : 'tickets'} for this performance, counting any you already hold.`, remedy: 'Choose fewer, or another kind of ticket.' }
-    if (count > limit) refuse(tooMany.code, tooMany.reason, { status: 422, remedy: tooMany.remedy })
+    if (ownCount > limit) refuse(tooMany.code, tooMany.reason, { status: 422, remedy: tooMany.remedy })
     const account = buyer.account!
     lines.forEach((l, i) => {
-      if (l.ticketTypeId === type.id) out[i] = { ref: met.ref, accountId: account, ...(met.evidence ? { evidence: met.evidence } : {}) }
+      if (l.ticketTypeId === type.id && !(friends.length && l.reference)) out[i] = { ref: met.ref, accountId: account, ...(met.evidence ? { evidence: met.evidence } : {}) }
     })
     // Live tickets of this type this holder already has for the performance, plus these, within the limit.
     guards.push(unit => unit.add(sql`UPDATE box_office_performance_sales SET updated_at = updated_at WHERE performance_id = ${performanceId}
       AND (SELECT count(*) FROM box_office_order_lines l JOIN box_office_claims c ON c.id = l.claim_id
         WHERE l.performance_id = ${performanceId} AND l.ticket_type_id = ${type.id} AND l.state = 'live' AND c.state IN ('held', 'confirmed')
-          AND ${inAccountScope('l.requirement_account_id', account)}) + ${count} <= ${limit}`).expect(1, tooMany))
+          AND ${inAccountScope('l.requirement_account_id', account)}) + ${ownCount} <= ${limit}`).expect(1, tooMany))
   }
   return { requirements: out, guard: unit => guards.forEach(g => g(unit)) }
 }
@@ -140,7 +149,7 @@ const REFERENCE_USED = { code: 'box-office.requirement.reference-used', reason: 
  * is checked through the kit, and its evidence goes on the line. One reference meets one ticket, here
  * and at this performance, which the claim batch holds to on the statement.
  */
-async function byReference(performanceId: string, type: TicketType, mine: { l: { reference?: string }, i: number }[], account: string | null, out: (Requirement | null)[], guards: ((unit: UnitView) => void)[]): Promise<void> {
+async function byReference(performanceId: string, type: TicketType, mine: { l: { reference?: string }, i: number }[], account: string | null, out: (Requirement | null)[], guards: ((unit: UnitView) => void)[], own?: Set<string>): Promise<void> {
   const seen = new Set<string>()
   for (const { l, i } of mine) {
     const value = l.reference!
@@ -149,9 +158,11 @@ async function byReference(performanceId: string, type: TicketType, mine: { l: {
     if (!met) {
       const said = answers.find(a => a.reason)
       // `ask`: the source can have staff check it by hand, so the page offers that (POST book/ask-check).
-      refuse('box-office.requirement.reference-not-met', said?.reason ?? `That reference does not give a ${type.name} ticket.`, { status: 403, remedy: 'Check it, or choose another kind of ticket.', fields: { reference: answers.some(a => a.ask) ? 'ask' : 'not-met' } })
+      // A friend's reference is never sent to staff on the buyer's account, so it is not offered then.
+      refuse('box-office.requirement.reference-not-met', said?.reason ?? `That reference does not give a ${type.name} ticket.`, { status: 403, remedy: 'Check it, or choose another kind of ticket.', fields: { reference: !own && answers.some(a => a.ask) ? 'ask' : 'not-met' } })
     }
     const evidence = met.evidence!
+    if (own?.has(evidence)) refuse(REFERENCE_USED.code, `Your own membership already covers one ${type.name} ticket; the others need the references of the people they are for.`, { status: 422, remedy: 'Type the reference of the person each ticket is for.', fields: { reference: 'repeated' } })
     if (seen.has(evidence)) refuse(REFERENCE_USED.code, `The same reference is given for two ${type.name} tickets.`, { status: 422, remedy: 'Each one is for one ticket.', fields: { reference: 'repeated' } })
     seen.add(evidence)
     out[i] = { ref: met.ref, accountId: met.holderAccountId ?? account, evidence }

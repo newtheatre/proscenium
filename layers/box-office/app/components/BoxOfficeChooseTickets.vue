@@ -3,7 +3,8 @@
      costs; pressing it holds the seats, which is when the countdown starts, and goes on to Check and
      pay. A companion ticket needs a paid ticket with it. No count of seats is ever shown. A member
      price the visitor is not signed in for can take a reference instead, such as a student ID: one
-     box for each ticket, worded by Membership, shown only on that ticket type. Above, when latecomers
+     box for each ticket, worded by Membership, shown only on that ticket type. A signed-in member's
+     own membership covers their own ticket, and each further one takes the friend's (V14). Above, when latecomers
      are let in, so nobody finds out on the night. In the drawer (`drawer`), holding goes on to Check
      and pay there instead of to its page. -->
 <script setup lang="ts">
@@ -12,7 +13,7 @@ import type { ChosenPass } from '~~/layers/box-office/app/components/BoxOfficePa
 import type { BoughtPass, PassOnSale } from '~~/layers/box-office/app/components/BoxOfficePassOffer.vue'
 import type { PassSwap } from '~~/layers/box-office/app/components/BoxOfficePassSwap.vue'
 
-interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, shape: string } }
+interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, own?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, noun?: string, shape: string } }
 interface Seats { state: 'available' | 'limited' | 'sold-out', seatsLeft?: number, sellingFast?: true }
 interface Page {
   performance: { id: string, startsAt: number, venue: string, state: string, latecomers?: string }
@@ -48,7 +49,7 @@ const referenceId = useId()
 // What to do about a price that cannot be chosen: the source's way to put it right, or signing in.
 const remedyOf = (type: TicketType) => type.remedy ?? (type.unmet && !type.unmetHelp && !viewer.value.signedIn ? { label: t('box-office.book.sign-in'), to: `/sign-in?next=${encodeURIComponent(here.value)}` } : undefined)
 // A price limited per person says so once the limit is reached.
-const atMost = (bandId: string, type: TicketType) => type.most !== undefined && type.most < (data.value?.maxPerOrder ?? Infinity) && (counts.value[keyOf(bandId, type.ticketTypeId)] ?? 0) >= type.most
+const atMost = (bandId: string, type: TicketType) => !forFriends(type) && type.most !== undefined && type.most < (data.value?.maxPerOrder ?? Infinity) && (counts.value[keyOf(bandId, type.ticketTypeId)] ?? 0) >= type.most
 const chosen = computed(() => (data.value?.bands ?? []).flatMap(b => b.types.map(type => ({ band: b, type, quantity: counts.value[keyOf(b.bandId, type.ticketTypeId)] ?? 0 }))).filter(c => c.quantity > 0))
 // Passes added by their codes (BO-64): one entry each, at no charge. A signed-in holder's own pass is there already.
 const passes = ref<ChosenPass[]>((data.value?.passes.mine ?? []).filter(m => !m.unusable).slice(0, 1).map(m => ({ code: m.code, name: m.name, priceName: m.priceName, owedMinor: m.owedMinor, wheelchair: false, own: true })))
@@ -140,7 +141,7 @@ const atLimit = computed(() => !!data.value && quantity.value >= data.value.maxP
 function mostOf(bandId: string, type: TicketType): number {
   const most = data.value!.maxPerOrder
   const own = counts.value[keyOf(bandId, type.ticketTypeId)] ?? 0
-  return Math.max(own, Math.min(type.most ?? most, most - quantity.value + own))
+  return Math.max(own, Math.min(forFriends(type) ? most : (type.most ?? most), most - quantity.value + own))
 }
 // An amount, or "free" when there is nothing to pay.
 const price = (minor: number) => (minor === 0 ? t('box-office.book.free') : money(minor, currency.value))
@@ -170,6 +171,7 @@ function labelOf(band: Page['bands'][number], type: TicketType): string {
 const noteOf = (band: Page['bands'][number], type: TicketType) => [
   typing(type) ? type.reference!.label : (type.proofNote ?? (type.needsPaidTicket ? t('box-office.book.needs-paid') : '')),
   atMost(band.bandId, type) ? t('box-office.book.most', { count: type.most! }) : '',
+  forFriends(type) && (counts.value[keyOf(band.bandId, type.ticketTypeId)] ?? 0) >= Math.max(type.own!, 1) ? friendsNote(type) : '',
 ].filter(Boolean).join(' ') || undefined
 // Nuxt UI passes the stepper's button props through, attributes included; its type lists props only.
 const named = (label: string) => ({ 'aria-label': label }) as unknown as ButtonProps
@@ -181,14 +183,22 @@ const turnstile = useTemplateRef<{ reset: () => void }>('turnstile')
 // References typed for a type the visitor may have only by giving one, one for each ticket in turn.
 const references = ref<Record<string, string[]>>({})
 const typing = (type: TicketType) => !!type.unmet && !!type.reference
-const referencesOf = (bandId: string, typeId: string, count: number) => (references.value[keyOf(bandId, typeId)] ?? []).slice(0, count).map(r => r.trim())
+// A member's own tickets need nothing typed; each one past them is a friend's, with the friend's reference.
+const forFriends = (type: TicketType) => !type.unmet && !!type.reference && type.own !== undefined
+const firstTyped = (type: TicketType) => (forFriends(type) ? type.own! : 0)
+const takesReferences = (type: TicketType) => typing(type) || forFriends(type)
+const whose = (type: TicketType) => (type.reference!.noun && type.reference!.noun !== 'member number' ? t('box-office.book.friends.either', { noun: type.reference!.noun }) : t('box-office.book.friends.number'))
+// The ticket numbers that take a reference: every one, or for a member, those past their own.
+const typedNumbers = (bandId: string, type: TicketType) => Array.from({ length: Math.max(0, (counts.value[keyOf(bandId, type.ticketTypeId)] ?? 0) - firstTyped(type)) }, (_, i) => firstTyped(type) + i + 1)
+const friendsNote = (type: TicketType) => (type.own ? t('box-office.book.friends.note', { count: type.own, whose: whose(type) }) : t('box-office.book.friends.none', { whose: whose(type) }))
+const referencesOf = (bandId: string, typeId: string, count: number) => Array.from({ length: count }, (_, i) => (references.value[keyOf(bandId, typeId)]?.[i] ?? '').trim())
 function setReference(bandId: string, typeId: string, n: number, value: string) {
   const list = [...(references.value[keyOf(bandId, typeId)] ?? [])]
   list[n] = value
   references.value = { ...references.value, [keyOf(bandId, typeId)]: list }
   if (referenceRefusal.value) refusal.value = null
 }
-const referencesMissing = computed(() => chosen.value.some(c => typing(c.type) && referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity).filter(Boolean).length < c.quantity))
+const referencesMissing = computed(() => chosen.value.some(c => takesReferences(c.type) && referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity).slice(firstTyped(c.type)).filter(Boolean).length < c.quantity - firstTyped(c.type)))
 // A member price swapped for without signing in needs what proves it, one for each pass.
 const swapReferencesMissing = computed(() => swaps.value.some(s => (data.value?.passes.onSale.find(p => p.id === s.passTypeId)?.prices.find(p => p.id === s.passPriceId)?.allowed === false) && s.references.slice(0, s.count).filter(r => r?.trim()).length < s.count))
 // The button is always there to press and says what is missing; only the bot check, which no field can fix, holds it back.
@@ -288,7 +298,7 @@ async function hold() {
   try {
     const basket = await $api<{ orderId: string, token: string, expiresAt: number }>('/api/box-office/baskets', {
       method: 'POST',
-      body: { performanceId: performanceId.value, lines: asked.value.lines.filter(c => c.quantity > 0).map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(typing(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code, ...(passes.value.length ? { passes: passes.value.map(p => ({ code: p.code, ...(p.wheelchair ? { wheelchair: true } : {}) })) } : {}), ...(buying.value.length || asked.value.buys.length ? { buy: [...buying.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.wheelchair ? { wheelchair: true } : {}) })), ...asked.value.buys] } : {}), ...(covered.value.length && asked.value.buys.length ? { cover: covered.value } : {}) },
+      body: { performanceId: performanceId.value, lines: asked.value.lines.filter(c => c.quantity > 0).map(c => ({ bandId: c.band.bandId, ticketTypeId: c.type.ticketTypeId, quantity: c.quantity, ...(takesReferences(c.type) && c.quantity > firstTyped(c.type) ? { references: referencesOf(c.band.bandId, c.type.ticketTypeId, c.quantity) } : {}) })), promoCode: promo.value?.code, ...(passes.value.length ? { passes: passes.value.map(p => ({ code: p.code, ...(p.wheelchair ? { wheelchair: true } : {}) })) } : {}), ...(buying.value.length || asked.value.buys.length ? { buy: [...buying.value.map(b => ({ passTypeId: b.passTypeId, passPriceId: b.passPriceId, ...(b.wheelchair ? { wheelchair: true } : {}) })), ...asked.value.buys] } : {}), ...(covered.value.length && asked.value.buys.length ? { cover: covered.value } : {}) },
       headers: challenge.value ? { 'cf-turnstile-response': challenge.value } : {},
     })
     // Changing tickets: the new ones are held, so the old basket is let go.
@@ -465,15 +475,15 @@ async function hold() {
                   :ui="{ root: 'w-full', increment: '[&_button:disabled]:opacity-40', decrement: '[&_button:disabled]:opacity-40' }"
                 />
               </UFormField>
-              <template v-if="typing(type) && counts[keyOf(band.bandId, type.ticketTypeId)]">
+              <template v-if="takesReferences(type) && (counts[keyOf(band.bandId, type.ticketTypeId)] ?? 0) > firstTyped(type)">
                 <UFormField :error="referenceRefusal?.reason">
                   <div class="space-y-2">
                     <UInput
-                      v-for="n in (counts[keyOf(band.bandId, type.ticketTypeId)] ?? 0)"
+                      v-for="n in typedNumbers(band.bandId, type)"
                       :id="`${referenceId}-${band.bandId}-${type.ticketTypeId}-${n}`"
                       :key="n"
                       :model-value="references[keyOf(band.bandId, type.ticketTypeId)]?.[n - 1] ?? ''"
-                      :aria-label="t('box-office.book.reference', { label: type.reference!.field ?? type.reference!.label, n })"
+                      :aria-label="forFriends(type) ? t('box-office.book.friends.reference', { whose: whose(type), n }) : t('box-office.book.reference', { label: type.reference!.field ?? type.reference!.label, n })"
                       :placeholder="t('box-office.book.reference-placeholder', { n })"
                       autocomplete="off"
                       maxlength="64"
@@ -484,7 +494,7 @@ async function hold() {
                   </div>
                 </UFormField>
                 <UButton
-                  v-if="mayAsk"
+                  v-if="mayAsk && typing(type)"
                   size="xs"
                   color="neutral"
                   variant="link"
