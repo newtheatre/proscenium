@@ -213,12 +213,16 @@ export async function listVocabularies(): Promise<(Vocabulary & { live: number, 
   return rows.map(r => ({ ...toVocabulary(r), live: r.live, retired: r.retired }))
 }
 
-/** Terms in the vocabulary's order. Pickers leave retired terms out. */
-export async function listTerms(vocabularyKey: string, options: { includeRetired?: boolean } = {}): Promise<Term[]> {
+/**
+ * Terms in the vocabulary's order. Pickers leave retired terms out. `groupKey` keeps the terms under
+ * the heading with that fixed key: core.department's 'production' or 'organisation' (R3-07).
+ */
+export async function listTerms(vocabularyKey: string, options: { includeRetired?: boolean, groupKey?: string } = {}): Promise<Term[]> {
   const vocabulary = await getVocabulary(vocabularyKey)
   if (!vocabulary) return []
   const order = vocabulary.ordering === 'alphabetical' ? 'lower(label), sort' : 'sort, lower(label)'
-  const rows = await all<TermRow>(`SELECT * FROM core_terms WHERE vocabulary_key = ? ${options.includeRetired ? '' : 'AND retired_at IS NULL'} ORDER BY ${order}`, vocabularyKey)
+  const where = [options.includeRetired ? '' : 'AND retired_at IS NULL', options.groupKey ? 'AND group_id IN (SELECT id FROM core_term_groups WHERE vocabulary_key = ?1 AND key = ?2)' : ''].join(' ')
+  const rows = await all<TermRow>(`SELECT * FROM core_terms WHERE vocabulary_key = ?1 ${where} ORDER BY ${order}`, vocabularyKey, ...(options.groupKey ? [options.groupKey] : []))
   return rows.map(toTerm)
 }
 
