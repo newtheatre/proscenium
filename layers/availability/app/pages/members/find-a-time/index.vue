@@ -266,6 +266,10 @@ const pollLine = (p: PollRow) => t('availability.poll.sent-line', { answered: p.
               >
                 {{ t('availability.find.hidden', { count: found.hidden }) }}
               </p>
+              <AvailabilityUnder18Notes
+                :late="[]"
+                :one-to-one="found.under18.oneToOne"
+              />
               <PageSection
                 :title="t('availability.find.best')"
                 :description="t('availability.find.best-help')"
@@ -288,6 +292,15 @@ const pollLine = (p: PollRow) => t('availability.poll.sent-line', { answered: p.
                     :description="t('availability.find.best-line', { free: s.free, total: found.people.length, maybe: s.maybe, unknown: s.unknown })"
                   >
                     <template #trailing>
+                      <span
+                        v-if="f.lateAt(s).length"
+                        role="img"
+                        :aria-label="t('availability.under-18.slot')"
+                        :title="t('availability.under-18.slot')"
+                      ><UIcon
+                        name="i-lucide-triangle-alert"
+                        class="size-5 text-warning"
+                      /></span>
                       <UButton
                         :label="t('availability.find.who')"
                         color="neutral"
@@ -395,6 +408,7 @@ const pollLine = (p: PollRow) => t('availability.poll.sent-line', { answered: p.
             class="ms-2"
             @click="arranging = chosen; chosen = null"
           />
+          <AvailabilityUnder18Notes :late="f.lateAt(chosen)" />
           <UAlert
             v-for="(s, i) in takenHere"
             :key="i"

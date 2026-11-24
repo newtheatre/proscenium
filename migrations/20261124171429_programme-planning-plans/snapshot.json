@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "90c2f5c0-156e-4199-b1fd-55a29a366be9",
+  "id": "a630e1d2-57da-4fc1-aa64-9ebe4e5b6cab",
   "prevIds": [
     "e0e3daf9-2b7a-40df-bbb9-846200ee7777"
   ],
@@ -719,62 +719,6 @@
       "entityType": "tables"
     },
     {
-      "name": "inventory_categories",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_category_inspections",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_departments",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_disposals",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_faults",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_inspection_dues",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_inspection_kinds",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_inspections",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_item_events",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_item_tags",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_items",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_loan_lines",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_loans",
-      "entityType": "tables"
-    },
-    {
-      "name": "inventory_locations",
-      "entityType": "tables"
-    },
-    {
       "name": "invoicing_export_codes",
       "entityType": "tables"
     },
@@ -868,6 +812,18 @@
     },
     {
       "name": "payments_webhook_events",
+      "entityType": "tables"
+    },
+    {
+      "name": "programme_planning_entries",
+      "entityType": "tables"
+    },
+    {
+      "name": "programme_planning_placements",
+      "entityType": "tables"
+    },
+    {
+      "name": "programme_planning_plans",
       "entityType": "tables"
     },
     {
@@ -18903,1786 +18859,6 @@
       "entityType": "columns"
     },
     {
-      "table": "inventory_categories",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_categories",
-      "name": "department_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_categories",
-      "name": "name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_categories",
-      "name": "requirements",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'[]'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_categories",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'active'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_categories",
-      "name": "sort",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_categories",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_categories",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_category_inspections",
-      "name": "category_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_category_inspections",
-      "name": "kind_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "tag_prefix",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "next_tag_number",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "1",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "lends_to",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'members'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "requirements",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'[]'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "guidance",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "contact",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "department_term_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'active'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "sort",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "item_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "quantity",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "1",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'proposed'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "method",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "recipient",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "police_reference",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "value_at_disposal",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "proposed_by",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "decided_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "decided_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "done_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "item_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'open'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "takes_out_of_service",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "description",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "source",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "loan_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "inspection_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "production_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "reported_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "resolution",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "closed_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "closed_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "item_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "kind_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "source",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "applies",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "next_due_on",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "last_inspection_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "description",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "interval_days",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "inspector_requirements",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'[]'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "contractor_allowed",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "certificate",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'optional'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "blocks_when_overdue",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'active'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "sort",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "item_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "kind_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "done_on",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "result",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "readings",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "contractor",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "next_due_on",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "supersedes_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "requirement_overridden_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "recorded_by",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "item_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "kind",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "loan_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "inspection_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "fault_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "disposal_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "from_location_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "to_location_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "condition",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "reason",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "actor",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_tags",
-      "name": "item_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_item_tags",
-      "name": "term_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "category_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "tag",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "description",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "tracking",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "quantity",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "1",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "home_location_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "current_location_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "container_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'active'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "out_of_service_reason",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "condition",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'good'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "lendable",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "requirements",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'[]'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "make",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "model",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "serial_number",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "acquired_on",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "replacement_value",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "currency",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "ownership",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'owned'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "owner_name",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "owner_company_ref",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "owner_due_back_on",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "created_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_items",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "loan_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "item_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "wanted",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "quantity",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "1",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "with_line_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "out_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "returned_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "out_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "returned_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "out_condition",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "returned_condition",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "returned_quantity",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "fault_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "requirement_overridden_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "sort",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "department_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "kind",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "production_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "responsible_account_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "borrower_name",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "borrower_email",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "borrower_phone",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "company_ref",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "purpose",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "starts_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "due_back_on",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "due_back_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "due_back_set",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'by-person'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "requested_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "decided_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "decided_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "decline_note",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "out_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "returned_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "cancel_reason",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "last_reminded_on",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "parent_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "venue_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "space_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'active'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "sort",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
       "table": "invoicing_export_codes",
       "name": "id",
       "type": "text",
@@ -23537,6 +21713,456 @@
       "name": "handled_at",
       "type": "integer",
       "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "plan_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "source_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "category_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'candidate'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "company_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "applicant_account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "get_in_minutes",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "get_out_minutes",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "performances_wanted",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "shape",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'timed'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "rights_status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'unknown'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "collection_ids",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "staff_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "withdrawn_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "entry_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "line_up_item_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "offered_slot_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "told_fingerprint",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "season_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'planning'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "board_from",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "board_to",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "day_starts",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'09:00'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "day_ends",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'00:00'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "call_opens_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "call_closes_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "publish_productions",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "published_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "published_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "version",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -31747,382 +30373,6 @@
       "entityType": "indexes"
     },
     {
-      "table": "inventory_categories",
-      "name": "inventory_categories_name",
-      "columns": [
-        {
-          "value": "department_id",
-          "isExpression": false
-        },
-        {
-          "value": "lower(\"name\")",
-          "isExpression": true
-        }
-      ],
-      "isUnique": true,
-      "where": "state = 'active'",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "inventory_departments_name",
-      "columns": [
-        {
-          "value": "lower(\"name\")",
-          "isExpression": true
-        }
-      ],
-      "isUnique": true,
-      "where": "state = 'active'",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "inventory_departments_prefix",
-      "columns": [
-        {
-          "value": "tag_prefix",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "inventory_disposals_open",
-      "columns": [
-        {
-          "value": "item_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "state IN ('proposed', 'approved')",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "inventory_faults_item",
-      "columns": [
-        {
-          "value": "item_id",
-          "isExpression": false
-        },
-        {
-          "value": "state",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "inventory_inspection_dues_next",
-      "columns": [
-        {
-          "value": "next_due_on",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": "applies = 1",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "inventory_inspection_kinds_name",
-      "columns": [
-        {
-          "value": "lower(\"name\")",
-          "isExpression": true
-        }
-      ],
-      "isUnique": true,
-      "where": "state = 'active'",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "inventory_inspections_item",
-      "columns": [
-        {
-          "value": "item_id",
-          "isExpression": false
-        },
-        {
-          "value": "kind_id",
-          "isExpression": false
-        },
-        {
-          "value": "done_on",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "inventory_inspections_supersedes",
-      "columns": [
-        {
-          "value": "supersedes_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "supersedes_id IS NOT NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "inventory_item_events_item",
-      "columns": [
-        {
-          "value": "item_id",
-          "isExpression": false
-        },
-        {
-          "value": "at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_item_tags",
-      "name": "inventory_item_tags_term",
-      "columns": [
-        {
-          "value": "term_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_tag",
-      "columns": [
-        {
-          "value": "tag",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_category",
-      "columns": [
-        {
-          "value": "category_id",
-          "isExpression": false
-        },
-        {
-          "value": "state",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_home",
-      "columns": [
-        {
-          "value": "home_location_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_container",
-      "columns": [
-        {
-          "value": "container_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_name",
-      "columns": [
-        {
-          "value": "lower(\"name\")",
-          "isExpression": true
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "inventory_loan_lines_item",
-      "columns": [
-        {
-          "value": "item_id",
-          "isExpression": false
-        },
-        {
-          "value": "state",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "inventory_loan_lines_loan",
-      "columns": [
-        {
-          "value": "loan_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_due",
-      "columns": [
-        {
-          "value": "state",
-          "isExpression": false
-        },
-        {
-          "value": "due_back_on",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_production",
-      "columns": [
-        {
-          "value": "production_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_department",
-      "columns": [
-        {
-          "value": "department_id",
-          "isExpression": false
-        },
-        {
-          "value": "state",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_responsible",
-      "columns": [
-        {
-          "value": "responsible_account_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "inventory_locations_name",
-      "columns": [
-        {
-          "value": "coalesce(\"parent_id\", '')",
-          "isExpression": true
-        },
-        {
-          "value": "lower(\"name\")",
-          "isExpression": true
-        }
-      ],
-      "isUnique": true,
-      "where": "state = 'active'",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "inventory_locations_parent",
-      "columns": [
-        {
-          "value": "parent_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
       "table": "invoicing_export_codes",
       "name": "invoicing_export_codes_account",
       "columns": [
@@ -32820,6 +31070,80 @@
         }
       ],
       "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_plan",
+      "columns": [
+        {
+          "value": "plan_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_source_ref",
+      "columns": [
+        {
+          "value": "source_ref",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"programme_planning_entries\".\"source_ref\" IS NOT NULL AND \"programme_planning_entries\".\"state\" IN ('candidate', 'accepted')",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "programme_planning_placements_entry",
+      "columns": [
+        {
+          "value": "entry_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_season",
+      "columns": [
+        {
+          "value": "season_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -36768,561 +35092,6 @@
       "entityType": "fks"
     },
     {
-      "table": "inventory_categories",
-      "name": "fk_inventory_categories_department_id_inventory_departments_id_fk",
-      "columns": [
-        "department_id"
-      ],
-      "tableTo": "inventory_departments",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_category_inspections",
-      "name": "fk_inventory_category_inspections_category_id_inventory_categories_id_fk",
-      "columns": [
-        "category_id"
-      ],
-      "tableTo": "inventory_categories",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_category_inspections",
-      "name": "fk_inventory_category_inspections_kind_id_inventory_inspection_kinds_id_fk",
-      "columns": [
-        "kind_id"
-      ],
-      "tableTo": "inventory_inspection_kinds",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "fk_inventory_departments_department_term_id_core_terms_id_fk",
-      "columns": [
-        "department_term_id"
-      ],
-      "tableTo": "core_terms",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "fk_inventory_disposals_item_id_inventory_items_id_fk",
-      "columns": [
-        "item_id"
-      ],
-      "tableTo": "inventory_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "fk_inventory_faults_item_id_inventory_items_id_fk",
-      "columns": [
-        "item_id"
-      ],
-      "tableTo": "inventory_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "fk_inventory_faults_loan_id_inventory_loans_id_fk",
-      "columns": [
-        "loan_id"
-      ],
-      "tableTo": "inventory_loans",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "fk_inventory_faults_inspection_id_inventory_inspections_id_fk",
-      "columns": [
-        "inspection_id"
-      ],
-      "tableTo": "inventory_inspections",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "fk_inventory_faults_production_id_core_productions_id_fk",
-      "columns": [
-        "production_id"
-      ],
-      "tableTo": "core_productions",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "fk_inventory_inspection_dues_item_id_inventory_items_id_fk",
-      "columns": [
-        "item_id"
-      ],
-      "tableTo": "inventory_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "fk_inventory_inspection_dues_kind_id_inventory_inspection_kinds_id_fk",
-      "columns": [
-        "kind_id"
-      ],
-      "tableTo": "inventory_inspection_kinds",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "fk_inventory_inspection_dues_last_inspection_id_inventory_inspections_id_fk",
-      "columns": [
-        "last_inspection_id"
-      ],
-      "tableTo": "inventory_inspections",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "fk_inventory_inspections_item_id_inventory_items_id_fk",
-      "columns": [
-        "item_id"
-      ],
-      "tableTo": "inventory_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "fk_inventory_inspections_kind_id_inventory_inspection_kinds_id_fk",
-      "columns": [
-        "kind_id"
-      ],
-      "tableTo": "inventory_inspection_kinds",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "fk_inventory_inspections_supersedes_id_inventory_inspections_id_fk",
-      "columns": [
-        "supersedes_id"
-      ],
-      "tableTo": "inventory_inspections",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "fk_inventory_item_events_item_id_inventory_items_id_fk",
-      "columns": [
-        "item_id"
-      ],
-      "tableTo": "inventory_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "fk_inventory_item_events_loan_id_inventory_loans_id_fk",
-      "columns": [
-        "loan_id"
-      ],
-      "tableTo": "inventory_loans",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "fk_inventory_item_events_inspection_id_inventory_inspections_id_fk",
-      "columns": [
-        "inspection_id"
-      ],
-      "tableTo": "inventory_inspections",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "fk_inventory_item_events_fault_id_inventory_faults_id_fk",
-      "columns": [
-        "fault_id"
-      ],
-      "tableTo": "inventory_faults",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "fk_inventory_item_events_disposal_id_inventory_disposals_id_fk",
-      "columns": [
-        "disposal_id"
-      ],
-      "tableTo": "inventory_disposals",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "fk_inventory_item_events_from_location_id_inventory_locations_id_fk",
-      "columns": [
-        "from_location_id"
-      ],
-      "tableTo": "inventory_locations",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "fk_inventory_item_events_to_location_id_inventory_locations_id_fk",
-      "columns": [
-        "to_location_id"
-      ],
-      "tableTo": "inventory_locations",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_item_tags",
-      "name": "fk_inventory_item_tags_item_id_inventory_items_id_fk",
-      "columns": [
-        "item_id"
-      ],
-      "tableTo": "inventory_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_item_tags",
-      "name": "fk_inventory_item_tags_term_id_core_terms_id_fk",
-      "columns": [
-        "term_id"
-      ],
-      "tableTo": "core_terms",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "fk_inventory_items_category_id_inventory_categories_id_fk",
-      "columns": [
-        "category_id"
-      ],
-      "tableTo": "inventory_categories",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "fk_inventory_items_home_location_id_inventory_locations_id_fk",
-      "columns": [
-        "home_location_id"
-      ],
-      "tableTo": "inventory_locations",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "fk_inventory_items_current_location_id_inventory_locations_id_fk",
-      "columns": [
-        "current_location_id"
-      ],
-      "tableTo": "inventory_locations",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "fk_inventory_items_container_id_inventory_items_id_fk",
-      "columns": [
-        "container_id"
-      ],
-      "tableTo": "inventory_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "fk_inventory_loan_lines_loan_id_inventory_loans_id_fk",
-      "columns": [
-        "loan_id"
-      ],
-      "tableTo": "inventory_loans",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "fk_inventory_loan_lines_item_id_inventory_items_id_fk",
-      "columns": [
-        "item_id"
-      ],
-      "tableTo": "inventory_items",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "fk_inventory_loan_lines_with_line_id_inventory_loan_lines_id_fk",
-      "columns": [
-        "with_line_id"
-      ],
-      "tableTo": "inventory_loan_lines",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "fk_inventory_loan_lines_fault_id_inventory_faults_id_fk",
-      "columns": [
-        "fault_id"
-      ],
-      "tableTo": "inventory_faults",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "fk_inventory_loans_department_id_inventory_departments_id_fk",
-      "columns": [
-        "department_id"
-      ],
-      "tableTo": "inventory_departments",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "fk_inventory_loans_production_id_core_productions_id_fk",
-      "columns": [
-        "production_id"
-      ],
-      "tableTo": "core_productions",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "fk_inventory_locations_parent_id_inventory_locations_id_fk",
-      "columns": [
-        "parent_id"
-      ],
-      "tableTo": "inventory_locations",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "fk_inventory_locations_venue_id_core_venues_id_fk",
-      "columns": [
-        "venue_id"
-      ],
-      "tableTo": "core_venues",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "fk_inventory_locations_space_id_core_spaces_id_fk",
-      "columns": [
-        "space_id"
-      ],
-      "tableTo": "core_spaces",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
       "table": "invoicing_export_codes",
       "name": "fk_invoicing_export_codes_profile_id_invoicing_export_profiles_id_fk",
       "columns": [
@@ -37809,6 +35578,96 @@
         "attempt_id"
       ],
       "tableTo": "payments_attempts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "fk_programme_planning_entries_plan_id_programme_planning_plans_id_fk",
+      "columns": [
+        "plan_id"
+      ],
+      "tableTo": "programme_planning_plans",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "fk_programme_planning_entries_category_term_id_core_terms_id_fk",
+      "columns": [
+        "category_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "fk_programme_planning_entries_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "fk_programme_planning_placements_performance_id_core_performances_id_fk",
+      "columns": [
+        "performance_id"
+      ],
+      "tableTo": "core_performances",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "fk_programme_planning_placements_entry_id_programme_planning_entries_id_fk",
+      "columns": [
+        "entry_id"
+      ],
+      "tableTo": "programme_planning_entries",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "fk_programme_planning_plans_season_id_core_seasons_id_fk",
+      "columns": [
+        "season_id"
+      ],
+      "tableTo": "core_seasons",
       "columnsTo": [
         "id"
       ],
@@ -38928,31 +36787,11 @@
       "entityType": "pks"
     },
     {
-      "table": "inventory_category_inspections",
-      "name": "inventory_category_inspections_pk",
+      "table": "programme_planning_placements",
+      "name": "programme_planning_placements_pk",
       "columns": [
-        "category_id",
-        "kind_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "inventory_inspection_dues_pk",
-      "columns": [
-        "item_id",
-        "kind_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_item_tags",
-      "name": "inventory_item_tags_pk",
-      "columns": [
-        "item_id",
-        "term_id"
+        "performance_id",
+        "entry_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -40351,105 +38190,6 @@
       "entityType": "pks"
     },
     {
-      "table": "inventory_categories",
-      "name": "inventory_categories_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "inventory_departments_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "inventory_disposals_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "inventory_faults_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "inventory_inspection_kinds_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "inventory_inspections_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "inventory_item_events_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "inventory_loan_lines_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "inventory_locations_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "invoicing_export_codes",
       "name": "invoicing_export_codes_pk",
       "columns": [
@@ -40659,6 +38399,24 @@
     {
       "table": "payments_webhook_events",
       "name": "payments_webhook_events_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_pk",
       "columns": [
         "id"
       ],
@@ -42802,396 +40560,6 @@
       "entityType": "checks"
     },
     {
-      "table": "inventory_categories",
-      "name": "inventory_categories_name_length",
-      "value": "length(\"name\") BETWEEN 1 AND 60",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_categories",
-      "name": "inventory_categories_state",
-      "value": "\"state\" IN ('active', 'archived')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "inventory_departments_name_length",
-      "value": "length(\"name\") BETWEEN 1 AND 60",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "inventory_departments_prefix_shape",
-      "value": "\"tag_prefix\" GLOB '[A-Z]*' AND length(\"tag_prefix\") BETWEEN 1 AND 4 AND \"tag_prefix\" NOT GLOB '*[^A-Z]*'",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "inventory_departments_counter",
-      "value": "\"next_tag_number\" >= 1",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "inventory_departments_lends_to",
-      "value": "\"lends_to\" IN ('productions', 'members', 'anyone')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "inventory_departments_guidance",
-      "value": "\"guidance\" IS NULL OR length(\"guidance\") <= 2000",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "inventory_departments_contact",
-      "value": "\"contact\" IS NULL OR length(\"contact\") <= 200",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_departments",
-      "name": "inventory_departments_state",
-      "value": "\"state\" IN ('active', 'archived')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "inventory_disposals_quantity",
-      "value": "\"quantity\" >= 1",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "inventory_disposals_state",
-      "value": "\"state\" IN ('proposed', 'approved', 'declined', 'done')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "inventory_disposals_method",
-      "value": "\"method\" IN ('sold', 'donated', 'recycled', 'scrapped', 'lost', 'stolen', 'returned-to-owner')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "inventory_disposals_recipient",
-      "value": "\"recipient\" IS NULL OR length(\"recipient\") <= 120",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_disposals",
-      "name": "inventory_disposals_police",
-      "value": "\"police_reference\" IS NULL OR (\"method\" = 'stolen' AND length(\"police_reference\") <= 40)",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "inventory_faults_state",
-      "value": "\"state\" IN ('open', 'repaired', 'written-off')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "inventory_faults_source",
-      "value": "\"source\" IN ('report', 'return', 'inspection', 'show-report')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "inventory_faults_description",
-      "value": "length(\"description\") BETWEEN 1 AND 2000",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "inventory_faults_resolution",
-      "value": "\"resolution\" IS NULL OR length(\"resolution\") <= 1000",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_faults",
-      "name": "inventory_faults_closed",
-      "value": "(\"state\" = 'open') = (\"closed_at\" IS NULL)",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "inventory_inspection_dues_source",
-      "value": "\"source\" IN ('category', 'item')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_inspection_dues",
-      "name": "inventory_inspection_dues_excused",
-      "value": "\"applies\" = 1 OR \"next_due_on\" IS NULL",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "inventory_inspection_kinds_name_length",
-      "value": "length(\"name\") BETWEEN 1 AND 80",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "inventory_inspection_kinds_description",
-      "value": "\"description\" IS NULL OR length(\"description\") <= 2000",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "inventory_inspection_kinds_interval",
-      "value": "\"interval_days\" BETWEEN 1 AND 3650",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "inventory_inspection_kinds_certificate",
-      "value": "\"certificate\" IN ('none', 'optional', 'required')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_inspection_kinds",
-      "name": "inventory_inspection_kinds_state",
-      "value": "\"state\" IN ('active', 'archived')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "inventory_inspections_result",
-      "value": "\"result\" IN ('pass', 'fail')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "inventory_inspections_readings",
-      "value": "\"readings\" IS NULL OR length(\"readings\") <= 500",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "inventory_inspections_contractor",
-      "value": "\"contractor\" IS NULL OR length(\"contractor\") BETWEEN 1 AND 120",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_inspections",
-      "name": "inventory_inspections_fail_sets_no_date",
-      "value": "\"result\" = 'pass' OR \"next_due_on\" IS NULL",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "inventory_item_events_kind",
-      "value": "\"kind\" IN ('added', 'edited', 'recategorised', 'moved', 'condition-changed', 'out-of-service', 'back-in-service', 'checked-out', 'returned', 'inspected', 'fault-reported', 'fault-closed', 'marked-missing', 'found', 'disposed')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_item_events",
-      "name": "inventory_item_events_reason",
-      "value": "\"reason\" IS NULL OR \"reason\" GLOB '[a-z]*' AND \"reason\" NOT GLOB '*[^a-z-]*'",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_name_length",
-      "value": "length(\"name\") BETWEEN 1 AND 120",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_description",
-      "value": "\"description\" IS NULL OR length(\"description\") <= 4000",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_tracking",
-      "value": "\"tracking\" IN ('individual', 'counted')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_quantity",
-      "value": "(\"tracking\" = 'individual' AND \"quantity\" = 1) OR (\"tracking\" = 'counted' AND \"quantity\" >= 0)",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_state",
-      "value": "\"state\" IN ('active', 'out-of-service', 'missing', 'disposed')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_out_of_service",
-      "value": "(\"state\" = 'out-of-service') = (\"out_of_service_reason\" IS NOT NULL)",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_condition",
-      "value": "\"condition\" IN ('as-new', 'good', 'worn', 'damaged')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_not_own_container",
-      "value": "\"container_id\" IS NULL OR \"container_id\" <> \"id\"",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_details",
-      "value": "coalesce(length(\"make\"), 0) <= 80 AND coalesce(length(\"model\"), 0) <= 80 AND coalesce(length(\"serial_number\"), 0) <= 80",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_value",
-      "value": "\"replacement_value\" IS NULL OR \"replacement_value\" >= 0",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_ownership",
-      "value": "\"ownership\" IN ('owned', 'hired-in', 'borrowed-in')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_items",
-      "name": "inventory_items_owner",
-      "value": "\"ownership\" = 'owned' OR (\"owner_name\" IS NOT NULL AND length(\"owner_name\") BETWEEN 1 AND 120 AND \"owner_due_back_on\" IS NOT NULL)",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "inventory_loan_lines_state",
-      "value": "\"state\" IN ('wanted', 'listed', 'promised', 'out', 'returned', 'lost', 'cancelled')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "inventory_loan_lines_wanted",
-      "value": "(\"state\" = 'wanted' AND \"item_id\" IS NULL) OR (\"state\" <> 'wanted' AND (\"item_id\" IS NOT NULL OR \"state\" = 'cancelled'))",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "inventory_loan_lines_wanted_text",
-      "value": "\"item_id\" IS NOT NULL OR (\"wanted\" IS NOT NULL AND length(\"wanted\") BETWEEN 1 AND 200)",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "inventory_loan_lines_quantity",
-      "value": "\"quantity\" >= 1",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loan_lines",
-      "name": "inventory_loan_lines_returned",
-      "value": "\"returned_quantity\" IS NULL OR \"returned_quantity\" BETWEEN 0 AND \"quantity\"",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_kind",
-      "value": "\"kind\" IN ('production', 'member', 'outside')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_state",
-      "value": "\"state\" IN ('draft', 'requested', 'approved', 'out', 'returned', 'declined', 'cancelled')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_draft",
-      "value": "\"state\" <> 'draft' OR \"kind\" = 'production'",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_production",
-      "value": "(\"kind\" = 'production') = (\"production_id\" IS NOT NULL)",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_linked",
-      "value": "\"responsible_account_id\" IS NOT NULL OR \"borrower_email\" IS NOT NULL",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_responsible_kind",
-      "value": "\"kind\" = 'outside' OR \"responsible_account_id\" IS NOT NULL",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_name",
-      "value": "\"borrower_name\" IS NULL OR length(\"borrower_name\") <= 120",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_phone",
-      "value": "\"borrower_phone\" IS NULL OR length(\"borrower_phone\") <= 40",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_purpose",
-      "value": "\"purpose\" IS NULL OR length(\"purpose\") <= 500",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_decline_note",
-      "value": "\"decline_note\" IS NULL OR length(\"decline_note\") <= 500",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_window",
-      "value": "\"due_back_at\" > \"starts_at\"",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_due_back_set",
-      "value": "\"due_back_set\" IN ('by-person', 'from-production')",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_loans",
-      "name": "inventory_loans_cancel_reason",
-      "value": "(\"state\" = 'cancelled') = (\"cancel_reason\" IS NOT NULL)",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "inventory_locations_name_length",
-      "value": "length(\"name\") BETWEEN 1 AND 60",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "inventory_locations_not_own_parent",
-      "value": "\"parent_id\" IS NULL OR \"parent_id\" <> \"id\"",
-      "entityType": "checks"
-    },
-    {
-      "table": "inventory_locations",
-      "name": "inventory_locations_state",
-      "value": "\"state\" IN ('active', 'archived')",
-      "entityType": "checks"
-    },
-    {
       "table": "invoicing_export_codes",
       "name": "invoicing_export_codes_code",
       "value": "\"code\" IS NULL OR length(\"code\") BETWEEN 1 AND 50",
@@ -43573,6 +40941,114 @@
       "table": "payments_till_splits",
       "name": "payments_till_splits_one_receipt",
       "value": "\"receipt_account_id\" IS NULL OR \"receipt_to\" IS NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_source",
+      "value": "\"source\" IN ('call', 'manual', 'companies', 'import')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_kind",
+      "value": "\"kind\" IN ('own', 'visiting', 'hire', 'event')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_state",
+      "value": "\"state\" IN ('candidate', 'accepted', 'declined', 'withdrawn')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_shape",
+      "value": "\"shape\" IN ('timed', 'drop-in')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_rights",
+      "value": "\"rights_status\" IN ('none-needed', 'needed', 'held-by-company', 'unknown')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_withdrawn",
+      "value": "\"withdrawn_reason\" IS NULL OR \"withdrawn_reason\" IN ('applicant', 'staff', 'production-cancelled', 'retention')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_title",
+      "value": "length(\"title\") BETWEEN 1 AND 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_source_ref_length",
+      "value": "\"source_ref\" IS NULL OR length(\"source_ref\") <= 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_minutes",
+      "value": "\"minutes\" IS NULL OR \"minutes\" BETWEEN 1 AND 1440",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_get_in",
+      "value": "\"get_in_minutes\" BETWEEN 0 AND 720 AND \"get_out_minutes\" BETWEEN 0 AND 720",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_wanted",
+      "value": "\"performances_wanted\" BETWEEN 1 AND 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_note",
+      "value": "\"staff_note\" IS NULL OR length(\"staff_note\") <= 2000",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_accepted",
+      "value": "(\"state\" = 'accepted') = (\"production_id\" IS NOT NULL) OR \"state\" = 'withdrawn'",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "programme_planning_placements_fingerprint",
+      "value": "\"told_fingerprint\" IS NULL OR length(\"told_fingerprint\") <= 64",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_state",
+      "value": "\"state\" IN ('planning', 'published', 'closed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_board",
+      "value": "\"board_to\" >= \"board_from\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_hours",
+      "value": "(\"day_starts\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"day_starts\" <= '24:00') AND (\"day_ends\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"day_ends\" <= '24:00') AND (\"day_ends\" > \"day_starts\" OR \"day_ends\" = '00:00')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_call",
+      "value": "\"call_closes_at\" IS NULL OR \"call_opens_at\" IS NULL OR \"call_closes_at\" > \"call_opens_at\"",
       "entityType": "checks"
     },
     {
