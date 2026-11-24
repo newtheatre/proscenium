@@ -8,6 +8,7 @@ import { slotQuiz } from '#modules/forms'
 import type { ChangeKind, CourseState, NeededFor, StepKind, VersionState } from '../shared/states'
 import type { CourseChange, CourseInput, StepInput } from './inputs'
 import { endOfLocalDay, theatreDay } from './days'
+import { sourceParams } from './sources'
 
 export interface Course {
   id: string
@@ -53,6 +54,8 @@ export interface Step {
   maxAttempts: number | null
   retryAfter: number | null
   showAnswers: 'never' | 'after-pass' | 'after-each' | null
+  sourceId: string | null
+  sourceParams: Record<string, unknown> | null
   carriesStepId: string | null
 }
 
@@ -63,7 +66,7 @@ const VERSION = `SELECT id, course_id AS courseId, number, status, change_kind A
 const STEP = `SELECT id, version_id AS versionId, position, title, kind, needed_for AS neededFor, times_required AS timesRequired, guidance,
   material_url AS materialUrl, material_file_id AS materialFileId, evidence_expiry AS evidenceExpiry, evidence_file AS evidenceFile,
   form_id AS formId, form_version_id AS formVersionId, max_attempts AS maxAttempts, retry_after AS retryAfter, show_answers AS showAnswers,
-  carries_step_id AS carriesStepId FROM training_course_steps`
+  source_id AS sourceId, source_params AS sourceParams, carries_step_id AS carriesStepId FROM training_course_steps`
 
 const SECTION_COLUMNS = ['id', 'step_id', 'position', 'kind', 'title', 'body', 'video_url', 'video_id', 'video_caption_note', 'scenario_id', 'carries_section_id', 'created_at', 'updated_at']
 
@@ -88,12 +91,15 @@ export async function versionsOf(courseId: string): Promise<Version[]> {
   return all<Version>(`${VERSION} WHERE course_id = ? ORDER BY number DESC`, courseId)
 }
 
+const stepRow = <S extends Step>(row: any): S => ({ ...row, sourceParams: typeof row.sourceParams === 'string' ? JSON.parse(row.sourceParams) : row.sourceParams ?? null })
+
 export async function stepsOf(versionId: string): Promise<Step[]> {
-  return all<Step>(`${STEP} WHERE version_id = ? ORDER BY position`, versionId)
+  return (await all(`${STEP} WHERE version_id = ? ORDER BY position`, versionId)).map(r => stepRow(r))
 }
 
 export async function getStep(id: string): Promise<(Step & { courseId: string, versionStatus: VersionState }) | null> {
-  return first(`SELECT s.*, v.course_id AS courseId, v.status AS versionStatus FROM (${STEP}) s JOIN training_course_versions v ON v.id = s.versionId WHERE s.id = ?`, id)
+  const row = await first(`SELECT s.*, v.course_id AS courseId, v.status AS versionStatus FROM (${STEP}) s JOIN training_course_versions v ON v.id = s.versionId WHERE s.id = ?`, id)
+  return row ? stepRow<Step & { courseId: string, versionStatus: VersionState }>(row) : null
 }
 
 /** The version in preparation, if there is one. */
@@ -166,11 +172,14 @@ export async function saveSteps(unit: UnitView, courseId: string, input: StepInp
   const before = new Map((await stepsOf(version.id)).map(s => [s.id, s]))
   const defaultAttempts = await useSetting('training.quizzes.default-max-attempts') as number | null
   const defaultRetry = await useSetting('training.quizzes.retry-after') as number
+  // An activity step names a source that is on, with parameters the source accepts (H1).
+  const sources = new Map<number, Record<string, unknown>>()
+  for (const [i, x] of input.entries()) if (x.kind === 'activity') sources.set(i, await sourceParams(x.sourceId, x.sourceParams))
   const ids: string[] = []
   const rows = input.map((step, i) => {
     const old = step.id ? before.get(step.id) : undefined
     if (step.id && !old) refuse('training.step.not-found', 'A step was changed by someone else while you were editing.', { status: 409, remedy: 'Reload the course and try again.' })
-    const timesRequired = step.kind === 'practical' ? step.timesRequired : 1
+    const timesRequired = step.kind === 'practical' || step.kind === 'activity' ? step.timesRequired : 1
     const keepsCarry = old && !step.changed && old.kind === step.kind && old.timesRequired === timesRequired
     const id = old?.id ?? newId('tstp')
     ids.push(id)
@@ -185,6 +194,8 @@ export async function saveSteps(unit: UnitView, courseId: string, input: StepInp
       maxAttempts: step.kind === 'quiz' ? (step.maxAttempts === undefined ? defaultAttempts : step.maxAttempts) : null,
       retryAfter: step.kind === 'quiz' ? step.retryAfter ?? defaultRetry : null,
       showAnswers: step.kind === 'quiz' ? step.showAnswers : null,
+      sourceId: step.kind === 'activity' ? step.sourceId : null,
+      sourceParams: step.kind === 'activity' ? JSON.stringify(sources.get(i)) : null,
       carriesStepId: keepsCarry ? old.carriesStepId : null,
     }
   })
@@ -197,10 +208,10 @@ export async function saveSteps(unit: UnitView, courseId: string, input: StepInp
   unit.add({ sql: 'DELETE FROM training_course_steps WHERE version_id = ?', params: [version.id] })
   unit.add({
     sql: `INSERT INTO training_course_steps (id, version_id, position, title, kind, needed_for, times_required, guidance, material_url, material_file_id, evidence_expiry, evidence_file,
-        form_id, max_attempts, retry_after, show_answers, carries_step_id)
+        form_id, max_attempts, retry_after, show_answers, source_id, source_params, carries_step_id)
       SELECT j.value ->> 'id', ?, j.value ->> 'position', j.value ->> 'title', j.value ->> 'kind', j.value ->> 'neededFor', j.value ->> 'timesRequired', j.value ->> 'guidance',
         j.value ->> 'materialUrl', j.value ->> 'materialFileId', j.value ->> 'evidenceExpiry', j.value ->> 'evidenceFile',
-        j.value ->> 'formId', j.value ->> 'maxAttempts', j.value ->> 'retryAfter', j.value ->> 'showAnswers', j.value ->> 'carriesStepId'
+        j.value ->> 'formId', j.value ->> 'maxAttempts', j.value ->> 'retryAfter', j.value ->> 'showAnswers', j.value ->> 'sourceId', j.value ->> 'sourceParams', j.value ->> 'carriesStepId'
       FROM json_each(?) j`,
     params: [version.id, JSON.stringify(rows)],
   }).expect(rows.length)
@@ -220,9 +231,9 @@ export async function startVersion(unit: UnitView, courseId: string): Promise<st
   const steps = (await stepsOf(course.liveVersionId)).map(s => ({ ...s, newId: newId('tstp') }))
   unit.add({
     sql: `INSERT INTO training_course_steps (id, version_id, position, title, kind, needed_for, times_required, guidance, material_url, material_file_id, evidence_expiry, evidence_file,
-        form_id, max_attempts, retry_after, show_answers, carries_step_id)
+        form_id, max_attempts, retry_after, show_answers, source_id, source_params, carries_step_id)
       SELECT j.value ->> 'newId', ?, s.position, s.title, s.kind, s.needed_for, s.times_required, s.guidance, s.material_url, s.material_file_id, s.evidence_expiry, s.evidence_file,
-        s.form_id, s.max_attempts, s.retry_after, s.show_answers, s.id
+        s.form_id, s.max_attempts, s.retry_after, s.show_answers, s.source_id, s.source_params, s.id
       FROM json_each(?) j JOIN training_course_steps s ON s.id = j.value ->> 'id'`,
     params: [versionId, JSON.stringify(steps.map(s => ({ id: s.id, newId: s.newId })))],
   })
