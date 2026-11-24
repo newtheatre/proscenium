@@ -69,12 +69,15 @@ export default defineModule({
     'record.view': ability({ on: 'training.record', owner: 'grants', audit: 'read', implies: ['course.view', 'core.account.find'] }),
     'record.award': ability({ on: 'training.course', risk: 'privileged', implies: ['record.view'] }),
     'record.revoke': ability({ on: 'training.record', risk: 'privileged', implies: ['record.view'] }),
+    // Changes who meets every requirement that names the competency (R9).
+    'competency.manage': ability({ on: 'training.competency', risk: 'privileged', implies: ['course.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
   // Part 6, "The facts". Both may be pinned to one record on Identity's permission screen.
   facts: defineFacts('training', {
     'course-trainer': factDecl({ on: 'training.course', pin: true, defaults: ['training.sign-off.record'] }),
+    'competent': factDecl({ on: 'training.competency', pin: true }),
   }),
 
   tables,
@@ -117,6 +120,7 @@ export default defineModule({
         },
       },
     }],
+    'core.requirement': [{ id: 'training', file: 'training' }],
     'core.record-resolver': [
       { id: 'training.course', file: 'course' },
       { id: 'training.session', file: 'session' },
@@ -135,6 +139,8 @@ export default defineModule({
       'training.sign-off.voided': event({ version: 1, payload: z.object({ signOffId: z.string(), accountId: z.string(), courseId: z.string() }), internal: true }),
       'training.record.awarded': event({ version: 1, payload: z.object({ ...record, expiresAt: z.number().int().nullable() }), internal: true }),
       'training.record.revoked': event({ version: 1, payload: z.object(record), internal: true }),
+      // Who holds the competency may have changed; listeners ask core.requirement again.
+      'training.competency.routes-changed': event({ version: 1, payload: z.object({ competencyId: z.string() }), internal: false }),
     },
   },
 

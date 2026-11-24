@@ -1,7 +1,7 @@
 // What Training's routes accept. Limits are the schema's (part 2); a step kind is accepted here once
 // the slice that delivers it is built.
 import { z } from 'zod'
-import { EVIDENCE_EXPIRY, EVIDENCE_FILE, NEEDED_FOR, REVOKE_CODES } from '../shared/states'
+import { EVIDENCE_EXPIRY, EVIDENCE_FILE, NEEDED_FOR, REVOKE_CODES, ROUTE_STATES } from '../shared/states'
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/ // not-policy: the shape of a date
 export const day = z.string().regex(DAY, 'Give the date as a day, month and year.')
@@ -66,4 +66,23 @@ export const directAwardInput = z.object({
 export const revokeInput = z.object({
   code: z.enum(REVOKE_CODES),
   note: z.string().trim().min(1).max(500), // not-policy: the schema's limit (part 2)
+})
+
+export const competencyInput = z.object({
+  title: z.string().trim().min(1).max(80), // not-policy: the schema's limit (part 2)
+  description: optionalText(500), // not-policy: the schema's limit (part 2)
+})
+export const competencyChange = competencyInput.partial()
+
+const routeItem = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('course'), courseId: z.string().min(1) }),
+  z.object({ kind: z.literal('recognised'), requirementRef: z.string().trim().min(3).max(200) }), // not-policy: the schema's limit (part 2)
+])
+export const routesInput = z.object({
+  routes: z.array(z.object({
+    id: z.string().optional(),
+    label: z.string().trim().min(1).max(80), // not-policy: the schema's limit (part 2)
+    status: z.enum(ROUTE_STATES).default('active'),
+    items: z.array(routeItem).max(10), // not-policy: a route of more than ten items is a different competency
+  })).max(10), // not-policy: R5 offers three; ten keeps the screen readable
 })
