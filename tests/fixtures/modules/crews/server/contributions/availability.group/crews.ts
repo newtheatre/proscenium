@@ -9,5 +9,5 @@ export default {
   list: async viewerId => [...crews].filter(([, c]) => c.planners.includes(viewerId)).map(([id, c]) => ({ id, label: c.label })),
   members: groupId => sql`SELECT value AS id FROM json_each(${JSON.stringify(crews.get(groupId)?.members ?? [])})`,
   canPlan: async (viewerId, groupId) => !!crews.get(groupId)?.planners.includes(viewerId),
-  groupsOf: async accountId => [...crews].filter(([, c]) => c.members.includes(accountId)).map(([id, c]) => ({ id, label: c.label })),
+  groupsOf: async accountId => [...crews].filter(([, c]) => c.members.includes(accountId)).map(([id, c]) => ({ id, label: c.label, plannedBy: 'The crew chiefs' })),
 } satisfies AvailabilityGroup
