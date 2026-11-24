@@ -1,1 +1,0 @@
-ALTER TABLE `core_performances` ADD `shape` text DEFAULT 'timed' NOT NULL;

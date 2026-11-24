@@ -214,8 +214,9 @@ const { te } = useT()
           :aria-label="items.length > 1 ? items.find(i => i.value === current)?.label : undefined"
         >
           <!-- A tab of its own boundary: one whose content waits for data keeps the last tab in view
-               until it is ready, and never unsettles the page around it. -->
-          <Suspense>
+               until it is ready, and never unsettles the page around it. Suspensible, so the page
+               counts as loaded (and hydrated) only once the first tab is: a press before then is lost. -->
+          <Suspense suspensible>
             <div :key="current">
               <component
                 :is="contributedNow.component"

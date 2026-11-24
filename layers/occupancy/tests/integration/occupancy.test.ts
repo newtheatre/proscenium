@@ -83,7 +83,8 @@ describe('a support module (C-65)', () => {
 
   it('is listed on the Modules screen with no switch and the modules that need it (OC-03)', async () => {
     const listed = await (await call(handle, 'GET', '/api/core/modules', { actor: person(['core.health.view']) })).json() as { modules: { id: string, support: boolean, alwaysOn: boolean, on: boolean, requiredBy: string[], alsoOn: string[] }[] }
-    expect(listed.modules.find(m => m.id === 'occupancy')).toMatchObject({ support: true, alwaysOn: false, on: false, requiredBy: ['rehearse'] })
+    expect(listed.modules.find(m => m.id === 'occupancy')).toMatchObject({ support: true, alwaysOn: false, on: false })
+    expect(listed.modules.find(m => m.id === 'occupancy')!.requiredBy.toSorted()).toEqual(['availability', 'rehearse', 'spaces'])
     // Switching its requirer on asks about nothing else: occupancy simply comes with it.
     expect(listed.modules.find(m => m.id === 'rehearse')).toMatchObject({ support: false, alsoOn: [] })
   })

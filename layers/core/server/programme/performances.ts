@@ -106,11 +106,6 @@ async function performanceRow(id: string): Promise<PerformanceRow> {
   return row
 }
 
-/** The production a performance belongs to, for routes whose ability is on the production. */
-export async function productionOfPerformance(id: string): Promise<string> {
-  return (await performanceRow(id)).production_id
-}
-
 // ---------------------------------------------------------------------------------------------
 // Reads (part 4, services)
 

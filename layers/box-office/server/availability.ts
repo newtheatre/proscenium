@@ -3,7 +3,7 @@
 // next buyer.
 import { all, nowMs } from '#kit'
 import { getPerformance } from '#modules/core'
-import { offSaleAt } from './baskets'
+import { offSaleAt } from './sales-close'
 import { displacementsFor } from './layouts'
 import { pricesFor } from './prices'
 import { salesOf, type SaleState } from './setup'
