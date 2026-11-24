@@ -8,9 +8,10 @@
 import { sql } from 'drizzle-orm'
 import { all, first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { getPerformance, notify } from '#modules/core'
-import { postEntries } from '#modules/finance'
+import { defaultTaxCode, postEntries } from '#modules/finance'
 import type { OwnerEntry, Part } from '#modules/payments'
-import { spread, tagged, takenBack } from './cancel'
+import { spread, tagged, takenBackNet } from './cancel'
+import { coded, codedLines } from './vat'
 import { claimSeats, releaseHold } from './capacity'
 import { hashOf, randomToken } from './codes'
 import { cancellations, orderLines } from './db/schema'
@@ -181,9 +182,11 @@ async function makeExchange(unit: UnitView, x: { order: OrderRow, chosen: LineRo
   // What was paid and is not going back stays owed to the audience, now for the new performance.
   const carriedMinor = oldMinor - (refund?.amountMinor ?? 0)
   if (paid && carriedMinor > 0) {
-    const back = spread(chosen, refund?.amountMinor ?? 0)
+    const codedChosen = await codedLines(chosen)
+    const back = spread(codedChosen, refund?.amountMinor ?? 0)
     const moving = new Map<string, number>()
-    for (const line of chosen) moving.set(line.performance_id, (moving.get(line.performance_id) ?? 0) + line.amount_minor)
+    for (const line of codedChosen) moving.set(line.performance_id, (moving.get(line.performance_id) ?? 0) + line.amount_minor)
+    const off = await takenBackNet(moving)
     for (const [performanceId, amount] of back) moving.set(performanceId, moving.get(performanceId)! - amount)
     await postEntries(unit, {
       key: `box-office:exchange:${cancellationId}`,
@@ -191,7 +194,7 @@ async function makeExchange(unit: UnitView, x: { order: OrderRow, chosen: LineRo
       kind: 'transfer',
       currency: order.currency,
       postedBy: input.by,
-      entries: [...await takenBack(moving), ...await tagged(DEFERRED, new Map([[input.performanceId, carriedMinor]]), -1)],
+      entries: [...off.entries, ...await tagged(DEFERRED, new Map([[input.performanceId, off.totalMinor]]), -1)],
     })
   }
 
@@ -304,7 +307,7 @@ export async function settleExchange(unit: UnitView, part: Part): Promise<OwnerE
   unit.add(sql`UPDATE box_office_claims SET state = 'confirmed', expires_at = NULL WHERE hold_id = ${exchange.hold_id} AND state = 'held' AND displaced_for_id IS NULL`).expect(held.length, CHANGED)
   const made = await makeExchange(unit, { order, chosen, moves, claimed, input, refund: null, extraMinor: exchange.difference_minor })
   unit.add(sql`UPDATE box_office_exchanges SET state = 'completed', cancellation_id = ${made.cancellationId}, updated_at = ${at} WHERE id = ${exchange.id} AND state = 'awaiting_payment'`).expect(1, CHANGED)
-  return tagged(DEFERRED, new Map([[exchange.performance_id, exchange.difference_minor]]), -1)
+  return tagged(DEFERRED, new Map([[coded(exchange.performance_id, await defaultTaxCode()), exchange.difference_minor]]), -1)
 }
 
 /** Each line's new seats, ticket type and price; an exchange kept before lines could differ gives every line the same. */

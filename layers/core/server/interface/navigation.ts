@@ -25,9 +25,6 @@ export interface DeclaredEntry extends NavigationEntry {
 /** Who may see a module's page in Admin without changing anything on it: its About tab and the catalogue. */
 export const MODULE_VIEWERS = ['core.modules.manage', 'core.health.view']
 
-/** Core's own screens (modules, settings, jobs, credentials, health, audit) sit in the System group. */
-export const SYSTEM_GROUP = 'system'
-
 /**
  * Every entry of every module that is on, plus one for each page of settings that holds a setting
  * of a module that is on. A page's entry is open to whoever may change one of its settings.
