@@ -7,8 +7,8 @@
   "d1_databases": [{ "binding": "DB", "database_name": "tests", "database_id": "00000000-0000-0000-0000-000000000000" }],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "tests" }],
   "kv_namespaces": [{ "binding": "CACHE", "id": "tests" }],
-  "durable_objects": { "bindings": [{ "name": "RATE_LIMITS", "class_name": "RateLimitCounter" }, { "name": "REALTIME", "class_name": "RealtimeHub" }] },
-  "migrations": [{ "tag": "core-rate-limits", "new_sqlite_classes": ["RateLimitCounter"] }, { "tag": "core-realtime", "new_sqlite_classes": ["RealtimeHub"] }],
+  "durable_objects": { "bindings": [{ "name": "RATE_LIMITS", "class_name": "RateLimitCounter" }, { "name": "REALTIME", "class_name": "RealtimeHub" }, { "name": "PRACTICE", "class_name": "PracticeStore" }] },
+  "migrations": [{ "tag": "core-rate-limits", "new_sqlite_classes": ["RateLimitCounter"] }, { "tag": "core-realtime", "new_sqlite_classes": ["RealtimeHub"] }, { "tag": "core-practice", "new_sqlite_classes": ["PracticeStore"] }],
   // Test values only. A real deployment sets its own as Worker secrets; every other key is saved in the app.
   "vars": { "CORE_SESSION_KEY": "test-session-key-not-secret", "CORE_ENCRYPTION_KEY": "test-encryption-key-not-secret" }
 }

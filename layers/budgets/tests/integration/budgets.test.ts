@@ -167,7 +167,7 @@ describe('making a budget (BC-06)', () => {
     const { departments } = await ok('GET', '/api/budgets/budgets/new')
     expect(departments.map((d: { label: string }) => d.label)).toEqual(['Technical', 'Publicity', 'Front of house', 'Bar', 'Social', 'General'])
     expect(await rows("SELECT count(*) AS n FROM core_terms WHERE vocabulary_key = 'core.department'")).toEqual([{ n: 18 }])
-    const [heading] = await rows<{ id: string }>("SELECT id FROM core_term_groups WHERE vocabulary_key = 'core.department' AND key = 'organisation'")
+    const [heading] = await rows<{ id: string }>("SELECT id FROM core_term_groups WHERE vocabulary_key = 'core.department' AND slug = 'organisation'")
     await expect(inContext(() => removeTermGroup(createUnit().view(), 'core.department', heading!.id))).rejects.toMatchObject({ code: 'core.term-group.keyed' })
     const { budgetId } = await ok('POST', '/api/budgets/budgets', { scope: 'department', departmentTermId: technical!.id, year: '2027-03-01' })
     expect((await view(budgetId)).budget).toMatchObject({ name: 'Technical 2026', yearStartsOn: '2026-08-01' })
