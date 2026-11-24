@@ -136,16 +136,28 @@ export async function createException(unit: UnitView, accountId: string, entered
   return id
 }
 
-interface ExceptionRowSql { id: string, first_date: string, last_date: string }
+interface ExceptionRowSql { id: string, account_id: string, first_date: string, last_date: string }
 
 async function ownException(accountId: string, id: string): Promise<ExceptionRowSql> {
-  const [row] = await useDb().all<ExceptionRowSql>(sql`SELECT id, first_date, last_date FROM availability_exceptions WHERE id = ${id} AND ${inAccountScope('account_id', accountId)}`)
+  const [row] = await useDb().all<ExceptionRowSql>(sql`SELECT id, account_id, first_date, last_date FROM availability_exceptions WHERE id = ${id} AND ${inAccountScope('account_id', accountId)}`)
   return row ?? refuse('availability.exception.not-found', 'There is no such entry of yours.', { status: 404 })
 }
 
-/** Removes an entry. One that began before today keeps its past days, ending yesterday (A3). */
+/** Removes one of the person's own entries (A1). */
 export async function deleteException(unit: UnitView, accountId: string, id: string): Promise<void> {
-  const was = await ownException(accountId, id)
+  await removeException(unit, await ownException(accountId, id))
+}
+
+/** A8: a planner removes only an entry they added for someone else. */
+export async function deleteOnBehalf(unit: UnitView, plannerId: string, id: string): Promise<void> {
+  const [row] = await useDb().all<ExceptionRowSql>(sql`SELECT id, account_id, first_date, last_date FROM availability_exceptions
+    WHERE id = ${id} AND ${inAccountScope('entered_by', plannerId)} AND NOT ${inAccountScope('account_id', plannerId)}`)
+  await removeException(unit, row ?? refuse('availability.exception.not-found', 'There is no such entry you added.', { status: 404 }))
+}
+
+/** One that began before today keeps its past days, ending yesterday (A3). */
+async function removeException(unit: UnitView, was: ExceptionRowSql): Promise<void> {
+  const { id, account_id: accountId } = was
   const { today } = await entryDates()
   if (was.last_date < today) refuse('availability.past', 'Days before today cannot be changed.', { status: 422 })
   if (was.first_date < today) {
@@ -166,4 +178,11 @@ export async function setUnmarked(unit: UnitView, accountId: string, means: Unma
     ON CONFLICT (account_id) DO UPDATE SET unmarked_means = excluded.unmarked_means, changed_at = excluded.changed_at, updated_at = excluded.updated_at`)
   const { today, horizon } = await entryDates()
   unit.announce('availability.entry.updated', { accountId, from: today, to: horizon }, { record: ['core.account', accountId] })
+}
+
+/** Retention, daily: exceptions whose last date is further back than `retention.past` go (A3). */
+export async function sweepPastEntries(unit: UnitView): Promise<void> {
+  const { today } = await entryDates()
+  const days = Math.round((await useSetting('availability.retention.past') as number) / 86_400) // not-policy: seconds in a day
+  unit.add(sql`DELETE FROM availability_exceptions WHERE julianday(${today}) - julianday(last_date) > ${days}`)
 }

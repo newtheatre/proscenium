@@ -21,7 +21,8 @@ Sixteen settings and thirteen abilities, in Foundations' formats. Every number i
 | `invoicing.write-off.min-overdue` | duration | 90d | 0d to 730d | Invoices | An invoice may be written off only after this long overdue |
 | `invoicing.records.keep-for` | duration | 2192d (6 years) | 2192d to 3653d | Records | How long issued invoices and bills keep their personal details after the end of their finance year (part 2) |
 | `invoicing.exports.keep-files-for` | duration | 400d | 30d to 3653d | Exports | Kept copies of export files; the run's row and fingerprint stay for good |
-| `invoicing.exports.default-profile` | choice | unset | the active profiles | Exports | What S8 opens on |
+| `invoicing.exports.default-profile` | reference | unset | the active profiles | Exports | What S8 opens on; set from S10's "Open Exports on this one" |
+| `invoicing.exports.starter` | choice | journal | journal, union | Exports | The profile made when the module is first switched on; the `student-society` preset sets union |
 
 Setting rules, checked together with every pending change: `second-after` is longer than `first-after`; `pay-online` cannot be on with no Stripe provider account; `keep-for` is never shorter than six years.
 

@@ -78,6 +78,13 @@ function when(e: Entry): string {
           variant="ghost"
           :label="t('availability.asked.title')"
         />
+        <UButton
+          to="/members/availability/privacy"
+          icon="i-lucide-eye"
+          color="neutral"
+          variant="ghost"
+          :label="t('availability.privacy.title')"
+        />
         <AvailabilityPaintTools
           v-model:tool="tool"
           v-model:target="target"
