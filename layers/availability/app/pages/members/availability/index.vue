@@ -73,6 +73,13 @@ function when(e: Entry): string {
         >
           {{ heading }}
         </h2>
+        <UButton
+          to="/members/availability/patterns"
+          icon="i-lucide-repeat"
+          color="neutral"
+          variant="ghost"
+          :label="t('availability.mine.patterns')"
+        />
         <UFormField
           :label="t('availability.mine.paint')"
           orientation="horizontal"

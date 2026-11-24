@@ -26,3 +26,10 @@ Tests: `layers/availability/tests/integration/gate.test.ts` (through the routes 
 - **Read.** `GET /api/availability/me` takes dates (`from`, `to`, at most 62 days) and answers each day's pieces in minutes past midnight, worked out per A4 with the person's own reasons, so the grid needs no time-zone arithmetic. It also answers the grid settings and the requests asking the person, with "This is right" on the screen.
 - **Settings** `grid.day-starts` (09:00) and `grid.day-ends` (23:00, at most 23:59, the kit's time kind) are added; the grid opens scrolled to the first.
 - **Not yet:** commitments on the grid (after `core.person-busy`), calendar imports (S14), S2 patterns, S4 and S5 as pages of their own.
+
+## Weekly patterns (S2), 24 November 2026
+
+- **Screens.** `/members/availability/patterns` lists the person's patterns, newest first, with their dates and the days they mark; "Remove" asks first. "New pattern" takes a name, a first day, an optional last day and, in place of "Copy from last term", a choice of any earlier pattern whose times to copy (the newest by default). It opens the pattern's page.
+- **Editing** happens on `/members/availability/patterns/<id>`: the name and dates above the same grid as My availability, showing a typical week (Monday to Sunday). Strokes change the page only; "Save pattern" sends the name, dates and every line in one `PUT`, and leaving with changes asks first. A clash with another pattern's dates is refused naming it, as before.
+- **A mouse click** paints the one cell clicked; dragging paints a stretch. Tapping start then end is for touch screens and the keyboard.
+- **Read.** `GET /api/availability/patterns` answers the person's own patterns with their lines and the grid settings.

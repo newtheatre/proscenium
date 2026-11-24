@@ -16,6 +16,8 @@ const props = defineProps<{
   /** The label of the pattern covering each date, where one does. */
   patterns?: Record<string, string>
   readonly?: boolean
+  /** Headings in place of dates, as for a pattern's typical week; every day can then be painted. */
+  headings?: Record<string, string>
 }>()
 const emit = defineEmits<{ paint: [stroke: { date: string, start: number, end: number }] }>()
 const { t } = useT()
@@ -36,7 +38,8 @@ const LOOK: Record<ShownLevel, string> = {
   unknown: 'availability-hatch text-muted',
 }
 const word = (level: ShownLevel) => t(`availability.levels.${level}`)
-const open = (date: string) => !props.readonly && date >= props.today && date <= props.horizon
+const open = (date: string) => !props.readonly && (!!props.headings || (date >= props.today && date <= props.horizon))
+const named = (date: string) => props.headings?.[date] ?? dates.dayNamed(date)
 
 interface Cell { minute: number, level: ShownLevel, reason?: string, first: boolean, label: string }
 const columns = computed(() => props.days.map(d => ({
@@ -51,7 +54,7 @@ const columns = computed(() => props.days.map(d => ({
       level,
       reason,
       first: !!piece && (piece.start >= minute && piece.start < minute + props.step),
-      label: t('availability.grid.cell', { day: dates.dayNamed(d.date), from: clockOf(minute), until: clockOf(Math.min(minute + props.step, DAY_MINUTES)), level: word(level) }) + (reason ? `, ${reason}` : ''),
+      label: t('availability.grid.cell', { day: named(d.date), from: clockOf(minute), until: clockOf(Math.min(minute + props.step, DAY_MINUTES)), level: word(level) }) + (reason ? `, ${reason}` : ''),
     }
   }),
 })))
@@ -149,13 +152,13 @@ function move(event: KeyboardEvent) {
             role="columnheader"
           >
             <UButton
-              :label="dates.dayBrief(col.date)"
+              :label="headings?.[col.date] ?? dates.dayBrief(col.date)"
               :disabled="!col.open"
               color="neutral"
               variant="ghost"
               size="sm"
               block
-              :aria-label="t('availability.grid.whole-day', { day: dates.dayNamed(col.date) })"
+              :aria-label="t('availability.grid.whole-day', { day: named(col.date) })"
               @click="emit('paint', { date: col.date, start: 0, end: DAY_MINUTES }); focus = { day: d, row: focus.row }"
             />
             <p
