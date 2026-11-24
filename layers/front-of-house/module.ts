@@ -188,6 +188,7 @@ export default defineModule({
       { id: 'front-of-house.handouts', menu: 'live', to: '/live/front-of-house/handouts', icon: 'i-lucide-shirt', ability: 'front-of-house.handout.record', order: 12 },
       { id: 'front-of-house.tonight', menu: 'live', to: '/live/front-of-house', icon: 'i-lucide-drama', ability: ['front-of-house.shift.view', 'front-of-house.incident.report', 'front-of-house.emergency-card.view'], order: 10 },
       { id: 'front-of-house.rota', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/rota', icon: 'i-lucide-calendar-range', ability: 'front-of-house.shift.view', order: 10 },
+      { id: 'front-of-house.grid', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/grid', icon: 'i-lucide-grid-3x3', ability: 'front-of-house.shift.view', order: 12 },
       { id: 'front-of-house.incidents', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/incidents', icon: 'i-lucide-shield-alert', ability: 'front-of-house.incident.view', order: 20 },
       { id: 'front-of-house.crew-calls', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/crew-calls', icon: 'i-lucide-users-round', ability: 'front-of-house.crew-call.manage', order: 15 },
       { id: 'front-of-house.night-reports', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/night-reports', icon: 'i-lucide-notebook-pen', ability: 'front-of-house.night-report.view', order: 30 },
