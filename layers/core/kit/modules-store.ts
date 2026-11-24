@@ -1,10 +1,12 @@
-// Which modules are switched on. The core and any module with switchable: false are always on.
-// Switching on never runs a migration and switching off never deletes anything (M4).
+// Which modules are switched on. The core and any module with switchable: false are always on; a
+// support module (C-65) is on while a module that is on requires it. Switching on never runs a
+// migration and switching off never deletes anything (M4).
 import { useContext } from './context'
 import { useRegistry } from './registry'
 import { Refusal } from './refusal'
 import { nowMs } from './clock'
 import type { UnitView } from './unit'
+import type { ModuleManifest } from './manifest'
 
 async function states(): Promise<Map<string, boolean>> {
   const context = useContext()
@@ -27,17 +29,41 @@ function alwaysOn(id: string): boolean {
   return id === 'core' || entry?.manifest.switchable === false
 }
 
+function isSupport(id: string): boolean {
+  return useRegistry().modules.get(id)?.manifest.support === true
+}
+
+/**
+ * Which modules are on, given which are switched on: the core, those that cannot be switched, those
+ * switched on, and every support module that one of those requires, directly or through another
+ * support module. A support module's own stored row, if any, is ignored.
+ */
+export function resolveOn(manifests: Iterable<Pick<ModuleManifest, 'id' | 'switchable' | 'support' | 'requires'>>, switchedOn: (id: string) => boolean): Set<string> {
+  const all = [...manifests]
+  const on = new Set(all.filter(m => !m.support && (m.id === 'core' || m.switchable === false || switchedOn(m.id))).map(m => m.id))
+  const support = new Map(all.filter(m => m.support).map(m => [m.id, m]))
+  const queue = [...on]
+  while (queue.length) {
+    const id = queue.pop()!
+    for (const needed of all.find(m => m.id === id)?.requires ?? []) {
+      if (support.has(needed) && !on.has(needed)) {
+        on.add(needed)
+        queue.push(needed)
+      }
+    }
+  }
+  return on
+}
+
 /** The ids of every module that is on now. */
 export async function enabledModules(): Promise<Set<string>> {
   const map = await states()
-  const on = new Set<string>()
-  for (const id of useRegistry().modules.keys()) if (alwaysOn(id) || map.get(id)) on.add(id)
-  return on
+  return resolveOn([...useRegistry().modules.values()].map(e => e.manifest), id => map.get(id) === true)
 }
 
 export async function isEnabled(id: string): Promise<boolean> {
   if (!useRegistry().modules.has(id)) return false
-  return alwaysOn(id) || (await states()).get(id) === true
+  return (await enabledModules()).has(id)
 }
 
 /** Whether anybody has ever switched the module on or off (it has a row). A new site has none. */
@@ -79,7 +105,7 @@ export async function requiredOff(id: string): Promise<string[]> {
   const visit = (other: string, path: string[]) => {
     if (path.includes(other)) return
     for (const needed of registry.modules.get(other)?.manifest.requires ?? []) visit(needed, [...path, other])
-    if (other !== id && !enabled.has(other) && !out.includes(other)) out.push(other)
+    if (other !== id && !enabled.has(other) && !isSupport(other) && !out.includes(other)) out.push(other)
   }
   visit(id, [])
   return out
@@ -100,16 +126,16 @@ export async function setModuleEnabled(unit: UnitView, id: string, on: boolean, 
   const entry = registry.modules.get(id)
   if (!entry) throw new Refusal('core.module.unknown', `There is no module called ${id}.`, { status: 404 })
   if (alwaysOn(id)) throw new Refusal('core.module.always-on', `${id} is always on.`, { status: 409 })
+  if (isSupport(id)) throw new Refusal('core.module.support', `${id} has no switch: it is on while a module that needs it is on.`, { status: 409 })
   const enabled = await enabledModules()
   let switching = [id]
   if (on) {
-    const missing = (entry.manifest.requires ?? []).filter(other => !enabled.has(other))
+    const missing = await requiredOff(id)
     if (missing.length && !options.withRequired) throw new Refusal('core.module.requires', `${id} needs ${missing.join(', ')} switched on first.`, { status: 409, remedy: `Switch on ${missing.join(', ')}, then ${id}.`, fields: { requires: missing.join(',') } })
     if (missing.length) {
-      const also = await requiredOff(id)
-      const absent = also.filter(other => !registry.modules.has(other))
+      const absent = missing.filter(other => !registry.modules.has(other))
       if (absent.length) throw new Refusal('core.module.absent', `${id} needs ${absent.join(', ')}, which this installation does not have.`, { status: 409, fields: { requires: absent.join(',') } })
-      switching = [...also, id]
+      switching = [...missing, id]
     }
     for (const other of switching) {
       const secrets = missingSecrets(other)
@@ -117,9 +143,14 @@ export async function setModuleEnabled(unit: UnitView, id: string, on: boolean, 
     }
   }
   else {
-    const dependants = [...registry.modules.values()].filter(m => enabled.has(m.manifest.id) && m.manifest.requires?.includes(id)).map(m => m.manifest.id)
+    const dependants = [...registry.modules.values()].filter(m => enabled.has(m.manifest.id) && !m.manifest.support && keptBy(m.manifest.id, id)).map(m => m.manifest.id)
     if (dependants.length) throw new Refusal('core.module.required', `${id} cannot be switched off while ${dependants.join(', ')} ${dependants.length === 1 ? 'needs' : 'need'} it.`, { status: 409, remedy: `Switch off ${dependants.join(', ')} first.`, fields: { requiredBy: dependants.join(',') } })
   }
+  // Support modules that come on or go off with this switch are announced too, so their listeners
+  // (a vocabulary made, a cache cleared) run as for any module.
+  const map = await states()
+  const after = resolveOn([...registry.modules.values()].map(e => e.manifest), other => switching.includes(other) ? on : map.get(other) === true)
+  const carried = [...registry.modules.keys()].filter(other => isSupport(other) && enabled.has(other) !== after.has(other))
   const context = useContext()
   const at = nowMs()
   for (const moduleId of switching) {
@@ -131,6 +162,18 @@ export async function setModuleEnabled(unit: UnitView, id: string, on: boolean, 
     unit.audit({ action: 'state', ability: 'core.modules.manage', record: ['core.module', moduleId], detail: moduleId === id ? { on } : { on, with: id } })
     unit.announce(on ? 'core.module.enabled' : 'core.module.disabled', { moduleId })
   }
+  for (const moduleId of carried) {
+    const now = after.has(moduleId)
+    unit.audit({ action: 'state', ability: 'core.modules.manage', record: ['core.module', moduleId], detail: { on: now, with: id } })
+    unit.announce(now ? 'core.module.enabled' : 'core.module.disabled', { moduleId })
+  }
   unit.afterCommit(() => { delete context.cache.modules })
-  return switching
+  return [...switching, ...carried]
+}
+
+/** Whether `id` needs `needed`, directly or through support modules it requires. */
+function keptBy(id: string, needed: string, seen = new Set<string>()): boolean {
+  if (seen.has(id)) return false
+  seen.add(id)
+  return (useRegistry().modules.get(id)?.manifest.requires ?? []).some(other => other === needed || (isSupport(other) && keptBy(other, needed, seen)))
 }

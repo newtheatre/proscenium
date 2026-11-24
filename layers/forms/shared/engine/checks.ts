@@ -5,7 +5,8 @@
 import { OTHER, PATTERNS } from './types'
 import { unreached } from './reach'
 import { isDecision, isFinal } from './workflow'
-import type { Comparison, Condition, Definition, Expression, Operand, Question, Rule, RuleName } from './types'
+import { isMarkable, totalPoints } from './marking'
+import type { Comparison, Condition, Correct, Definition, Expression, Operand, Question, Rule, RuleName } from './types'
 import { calculationsRead } from './calculations'
 import { conditionsOf, questionsOf } from './definition'
 import type { Index, ValueKind } from './values'
@@ -23,6 +24,8 @@ export type ProblemCode
     | 'returned-no-way-back' | 'stage-unreachable' | 'stage-dead-end'
     | 'review-wrong-kind' | 'review-no-reviewers' | 'review-no-criteria' | 'criterion-no-label' | 'review-quorum' | 'reason-not-decision'
     | 'unknown-action' | 'action-unmapped' | 'action-wrong-question'
+    | 'answer-wrong-type' | 'answer-in-group' | 'answer-special' | 'answer-empty' | 'answer-unknown-option' | 'answer-range' | 'answer-never-right'
+    | 'pass-mark-over' | 'marking-no-answers'
 export interface Problem { level: 'error' | 'warning', code: ProblemCode, at: string, params?: Record<string, string> }
 
 export interface CheckOptions {
@@ -291,6 +294,39 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
       if (!reached.has(stage.key)) problems.push({ level: 'warning', code: 'stage-unreachable', at })
       else if (!isFinal(stage.kind) && stage.kind !== 'returned' && !transitions.some(t => t.from === stage.key)) problems.push({ level: 'warning', code: 'stage-dead-end', at })
     }
+  }
+
+  // ---- correct answers and the pass mark (FB-513) ----
+  for (const { question: q, group } of questionsOf(def)) {
+    const key = q.answer
+    if (!key) continue
+    if (!isMarkable(q)) error('answer-wrong-type', q.id)
+    else if (group) error('answer-in-group', q.id)
+    // Marking reads the answer and says whether it was right, which would tell of a sealed answer.
+    else if (q.dataClass === 'special') error('answer-special', q.id)
+    else checkAnswer(q, key.correct)
+  }
+  function checkAnswer(q: Question, correct: Correct) {
+    if (q.type === 'yesno') return void (typeof correct !== 'boolean' && error('answer-wrong-type', q.id))
+    if (q.type === 'number') {
+      if (typeof correct !== 'object' || Array.isArray(correct)) return error('answer-wrong-type', q.id)
+      if (correct.min === undefined && correct.max === undefined) return error('answer-empty', q.id)
+      if (correct.min !== undefined && correct.max !== undefined && correct.min > correct.max) error('answer-range', q.id)
+      return
+    }
+    if (!Array.isArray(correct)) return error('answer-wrong-type', q.id)
+    if (!correct.some(c => c.trim())) return error('answer-empty', q.id)
+    if (q.type === 'text.short') return
+    const own = new Set((q.options ?? []).map(o => o.id))
+    for (const id of correct) if (!own.has(id)) error('answer-unknown-option', q.id, { option: id })
+    // One choice can never hold two options, so a key naming two could never be right.
+    const single = q.type === 'choice.single' || (q.type === 'choice.dropdown' && !q.multiple)
+    if (single && new Set(correct).size > 1) error('answer-never-right', q.id)
+  }
+  if (def.marking) {
+    const total = totalPoints(def)
+    if (total === 0) problems.push({ level: 'warning', code: 'marking-no-answers', at: 'form:end' })
+    if (def.marking.passMark !== undefined && def.marking.passMark > total) error('pass-mark-over', 'form:end', { total: String(total) })
   }
 
   // ---- what can never be reached or shown (warnings: they do not stop a publish) ----

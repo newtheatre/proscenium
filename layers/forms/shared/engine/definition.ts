@@ -2,7 +2,7 @@
 // Whether it makes sense to publish (a condition that points nowhere, a circle of calculations) is
 // `checkDefinition`'s job, so a draft may be saved while it still has problems.
 import { z } from 'zod'
-import { CALCULATION_TYPES, DATA_CLASSES, DEFAULT_LIMITS, FORMAT, FUNCTIONS, MOVERS, OPERATORS, OTHER, PASS_MARKS, QUESTION_TYPES, REVIEW_MODES, RULES, STAGE_KINDS } from './types'
+import { CALCULATION_TYPES, DATA_CLASSES, DEFAULT_LIMITS, FORMAT, FUNCTIONS, MARKING_SHOWS, MOVERS, OPERATORS, OTHER, PASS_MARKS, QUESTION_TYPES, REVIEW_MODES, RULES, STAGE_KINDS } from './types'
 import type { Condition, Definition, Expression, Group, Limits, Question } from './types'
 
 const id = z.string().regex(/^[\w-]{1,64}$/)
@@ -51,6 +51,17 @@ const rule = z.strictObject({
   message: z.string().max(300).optional(),
 })
 
+const feedback = z.string().max(500)
+const answerKey = z.strictObject({
+  correct: z.union([
+    z.array(z.string().min(1).max(300)).max(50),
+    z.boolean(),
+    z.strictObject({ min: z.number().optional(), max: z.number().optional() }),
+  ]),
+  points: z.number().int().min(0).max(100).optional(),
+  feedback: z.strictObject({ right: feedback.optional(), wrong: feedback.optional() }).optional(),
+})
+
 const question = z.strictObject({
   kind: z.literal('question'),
   id,
@@ -69,6 +80,7 @@ const question = z.strictObject({
   dataClass: z.enum(DATA_CLASSES),
   peopleInvolved: z.boolean().optional(),
   openSearch: z.boolean().optional(),
+  answer: answerKey.optional(),
 }) satisfies z.ZodType<Question>
 
 const group = z.strictObject({
@@ -110,6 +122,7 @@ const definition = z.strictObject({
   })).min(1),
   calculations: z.array(z.strictObject({ id, key, type: z.enum(CALCULATION_TYPES), expression, label: z.string().max(300).optional(), page: id.optional() })).max(100).optional(),
   endings: z.array(z.strictObject({ id, title: z.string().max(300), message: text.optional(), submits: z.boolean() })).max(30).optional(),
+  marking: z.strictObject({ passMark: z.number().int().min(0).optional(), show: z.enum(MARKING_SHOWS) }).optional(),
   presentation: z.strictObject({ introduction: text.optional(), submitLabel: z.string().max(60).optional(), confirmation: text.optional(), progress: z.boolean().optional() }).optional(),
   workflow: z.strictObject({
     stages: z.array(z.strictObject({ key, name: z.string().max(100), kind: z.enum(STAGE_KINDS), status: z.string().max(100).optional(), review: review.optional() })).min(1).max(20),
