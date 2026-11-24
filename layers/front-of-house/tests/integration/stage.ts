@@ -44,8 +44,9 @@ import openShiftsGet from '../../server/api/front-of-house/open-shifts.get'
 import myShiftsGet from '../../server/api/front-of-house/me/shifts.get'
 import calendarGet from '../../server/api/front-of-house/assignments/[id]/calendar.ics.get'
 import feedGet from '../../server/api/front-of-house/calendar/[token].get'
-import feedPost from '../../server/api/front-of-house/me/calendar/index.post'
-import feedReset from '../../server/api/front-of-house/me/calendar/reset.post'
+import feedPost from '../../../calendar-feed/server/api/calendar-feed/me/index.post'
+import feedReset from '../../../calendar-feed/server/api/calendar-feed/me/reset.post'
+import calendarFeedGet from '../../../calendar-feed/server/routes/calendar/[file].get'
 import checkInPost from '../../server/api/front-of-house/assignments/[id]/check-in.post'
 import timingsPost from '../../server/api/front-of-house/performances/[id]/timings.post'
 import timingDelete from '../../server/api/front-of-house/performances/[id]/timings/[kind].delete'
@@ -149,8 +150,9 @@ export const handle = server({
   'POST /api/front-of-house/assignments/:id/cover': coverPost,
   'GET /api/front-of-house/assignments/:id/calendar.ics': calendarGet,
   'GET /api/front-of-house/calendar/:token': feedGet,
-  'POST /api/front-of-house/me/calendar': feedPost,
-  'POST /api/front-of-house/me/calendar/reset': feedReset,
+  'POST /api/calendar-feed/me': feedPost,
+  'POST /api/calendar-feed/me/reset': feedReset,
+  'GET /calendar/:file': calendarFeedGet,
   'GET /api/front-of-house/open-shifts': openShiftsGet,
   'GET /api/front-of-house/me/shifts': myShiftsGet,
   'POST /api/front-of-house/assignments/:id/check-in': checkInPost,
