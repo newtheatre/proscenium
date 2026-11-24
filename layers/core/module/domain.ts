@@ -227,6 +227,11 @@ export const points = {
    */
   'core.space-busy': point({ kind: 'code', contract: 'space-busy' }),
   /**
+   * Whether people are committed elsewhere in a window (C-66): each contributor answers only about
+   * the accounts asked, with a translation key rather than words. Read through the person-busy module.
+   */
+  'core.person-busy': point({ kind: 'code', contract: 'person-busy' }),
+  /**
    * Whether a module can live with a change: allow, or refuse with a reason and optionally a link to
    * its own screen where the matter is settled. Core runs every guard and stops on the first refusal.
    */
@@ -391,6 +396,8 @@ export const contributes = {
     { id: 'core.emails', holds: 'Whether emails we sent you were delivered', why: 'To know that tickets and notices reach you', basis: 'Our legitimate interests in running a reliable service', keptFor: 'While you have an account', order: 50 },
     { id: 'core.audit', holds: 'A record of what staff changed', why: 'To protect you and them, and to put mistakes right', basis: 'Our legitimate interests in running a safe, honest theatre', keptFor: 'For as long as the record it describes', order: 60 },
   ],
+  // Credited people are busy for each timed performance of the production (C-66).
+  'core.person-busy': [{ id: 'core.credits', file: 'credits' }],
   'core.record-resolver': ['performance', 'production', 'season', 'venue', 'account'].map(n => ({ id: `core.${n}`, file: n })),
   // What the command palette finds by name (H9): each type through its own list's search.
   'core.search-source': [
