@@ -82,45 +82,49 @@ export interface MyStep {
   action: StepAction
 }
 
-async function actionFor(actor: Actor, course: Course, step: Step): Promise<StepAction> {
-  const accountId = actor.accountId
-  switch (step.kind) {
-    case 'session': {
-      const place = accountId ? (await placesOfPerson(accountId)).find(p => p.session.courseId === course.id) : undefined
-      return { kind: 'session', place: place ? { sessionId: place.sessionId, startsAt: place.session.startsAt, state: place.state } : null }
-    }
-    case 'practical': return { kind: 'trainer' }
-    case 'reading': return { kind: 'reading', materialUrl: step.materialUrl, materialFileId: step.materialFileId }
-    case 'lesson': {
-      const lesson = await lessonFor(actor, course.id, step.id)
-      return { kind: 'lesson', reached: lesson.sections.filter(s => s.reached).length, sections: lesson.sections.length }
-    }
-    case 'quiz': {
-      const state = accountId ? await quizState(accountId, course.id, step) : null
-      return { kind: 'quiz', tries: step.maxAttempts, used: state?.used ?? 0, nextTryAt: state?.nextTryAt ?? null }
-    }
-    case 'certificate':
-    case 'declaration': {
-      const last = accountId
-        ? await first<{ state: string, reason: string | null }>(`SELECT state, reject_reason AS reason FROM training_evidence WHERE step_id = ?1 AND account_id IN (${accountScopeSql('?2')}) ORDER BY created_at DESC LIMIT 1`, step.id, accountId)
-        : null
-      return {
-        kind: step.kind,
-        waiting: last?.state === 'submitted',
-        lastReason: last?.state === 'rejected' ? last.reason : null,
-        expiry: step.evidenceExpiry,
-        file: step.evidenceFile,
-        qualifications: step.qualifications ?? [],
-        otherQualification: step.otherQualification ?? true,
-        hasQuestions: !!step.formVersionId,
-      }
-    }
-    case 'activity': {
-      const source = step.sourceId ? await stepSource(step.sourceId) : null
-      return { kind: 'activity', source: source ? await source.describe(step.sourceParams ?? {}) : null }
-    }
+type ActionBuilder = (actor: Actor, course: Course, step: Step) => Promise<StepAction> | StepAction
+
+async function evidenceAction(actor: Actor, _course: Course, step: Step): Promise<StepAction> {
+  const last = actor.accountId
+    ? await first<{ state: string, reason: string | null }>(`SELECT state, reject_reason AS reason FROM training_evidence WHERE step_id = ?1 AND account_id IN (${accountScopeSql('?2')}) ORDER BY created_at DESC LIMIT 1`, step.id, actor.accountId)
+    : null
+  return {
+    kind: step.kind as 'certificate' | 'declaration',
+    waiting: last?.state === 'submitted',
+    lastReason: last?.state === 'rejected' ? last.reason : null,
+    expiry: step.evidenceExpiry,
+    file: step.evidenceFile,
+    qualifications: step.qualifications ?? [],
+    otherQualification: step.otherQualification ?? true,
+    hasQuestions: !!step.formVersionId,
   }
 }
+
+/** What the person does next on a step, one builder per kind. */
+const ACTIONS: Record<StepKind, ActionBuilder> = {
+  session: async (actor, course) => {
+    const place = actor.accountId ? (await placesOfPerson(actor.accountId)).find(p => p.session.courseId === course.id) : undefined
+    return { kind: 'session', place: place ? { sessionId: place.sessionId, startsAt: place.session.startsAt, state: place.state } : null }
+  },
+  practical: () => ({ kind: 'trainer' }),
+  reading: (_actor, _course, step) => ({ kind: 'reading', materialUrl: step.materialUrl, materialFileId: step.materialFileId }),
+  lesson: async (actor, course, step) => {
+    const lesson = await lessonFor(actor, course.id, step.id)
+    return { kind: 'lesson', reached: lesson.sections.filter(s => s.reached).length, sections: lesson.sections.length }
+  },
+  quiz: async (actor, course, step) => {
+    const state = actor.accountId ? await quizState(actor.accountId, course.id, step) : null
+    return { kind: 'quiz', tries: step.maxAttempts, used: state?.used ?? 0, nextTryAt: state?.nextTryAt ?? null }
+  },
+  certificate: evidenceAction,
+  declaration: evidenceAction,
+  activity: async (_actor, _course, step) => {
+    const source = step.sourceId ? await stepSource(step.sourceId) : null
+    return { kind: 'activity', source: source ? await source.describe(step.sourceParams ?? {}) : null }
+  },
+}
+
+const actionFor = (actor: Actor, course: Course, step: Step) => ACTIONS[step.kind](actor, course, step)
 
 export interface LearnerCourse {
   course: Pick<Course, 'id' | 'slug' | 'title' | 'summary' | 'expires' | 'validFor' | 'selfSignUp'>
@@ -178,6 +182,16 @@ export interface MyTraining {
   warnBefore: number
 }
 
+/** A course the person has begun and does not hold now, with how far they are; null otherwise. */
+async function inProgressOn(courseId: string, accountId: string, held: RecordView | undefined): Promise<MyTraining['inProgress'][number] | null> {
+  if (held && (held.standing === 'current' || held.standing === 'expiring') && !held.cutReason) return null
+  const course = await getCourse(courseId)
+  if (!course?.liveVersionId) return null
+  const progress = await progressOn(course, accountId)
+  if (progress.complete || !progress.steps.some(s => s.done > 0)) return null
+  return { courseId, slug: course.slug, title: course.title, done: progress.steps.filter(s => s.met).length, of: progress.steps.length }
+}
+
 /** M1 and M5: what the person holds, what they are part-way through, their places and any evidence turned down. */
 export async function myTraining(accountId: string): Promise<MyTraining> {
   const records = await recordsOf(accountId)
@@ -191,13 +205,8 @@ export async function myTraining(accountId: string): Promise<MyTraining> {
   )
   const inProgress: MyTraining['inProgress'] = []
   for (const { courseId } of started) {
-    const held = latest.get(courseId)
-    if (held && (held.standing === 'current' || held.standing === 'expiring') && !held.cutReason) continue
-    const course = await getCourse(courseId)
-    if (!course?.liveVersionId) continue
-    const progress = await progressOn(course, accountId)
-    const done = progress.steps.filter(s => s.met).length
-    if (progress.steps.some(s => s.done > 0) && !progress.complete) inProgress.push({ courseId, slug: course.slug, title: course.title, done, of: progress.steps.length })
+    const item = await inProgressOn(courseId, accountId, latest.get(courseId))
+    if (item) inProgress.push(item)
   }
   const notApproved = await all<MyTraining['notApproved'][number]>(
     `SELECT e.id AS evidenceId, e.course_id AS courseId, c.slug, c.title, e.reject_reason AS reason FROM training_evidence e JOIN training_courses c ON c.id = e.course_id

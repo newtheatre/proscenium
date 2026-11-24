@@ -1,7 +1,7 @@
 <!-- M3's Steps tab (amended part 5): each step with the person's progress and its own action by kind.
      Reading is opened and confirmed here; certificates and declarations open their panel. -->
 <script setup lang="ts">
-import type { MyStep } from '../../server/learner'
+import type { MyStep, StepAction } from '../../server/learner'
 import type { EvidenceStep } from '../composables/useEvidenceForm'
 
 const props = defineProps<{ courseId: string, steps: MyStep[], sessions: number }>()
@@ -30,21 +30,25 @@ async function confirmReading(step: MyStep) {
   }
 }
 
+type Action<K extends StepAction['kind']> = Extract<StepAction, { kind: K }>
+const evidenceLine = (a: Action<'certificate' | 'declaration'>) => a.lastReason ? t('training.steps.not-approved', { reason: a.lastReason }) : undefined
+/** What happens next on an unfinished step, one line per kind. */
+const NEXT: { [K in StepAction['kind']]: (a: Action<K>) => string | undefined } = {
+  session: a => a.place ? t('training.steps.place', { state: t(`training.place-states.${a.place.state}`), when: dateTime(a.place.startsAt) }) : props.sessions ? undefined : t('training.steps.no-sessions'),
+  trainer: () => t('training.steps.trainer'),
+  reading: () => undefined,
+  lesson: a => a.reached ? t('training.steps.sections', { reached: a.reached, sections: a.sections }) : t('training.steps.lesson'),
+  quiz: a => a.nextTryAt ? t('training.steps.try-from', { when: dateTime(a.nextTryAt) }) : a.tries ? t('training.steps.tries', { used: a.used, tries: a.tries }) : t('training.steps.quiz'),
+  certificate: evidenceLine,
+  declaration: evidenceLine,
+  activity: a => a.source ?? undefined,
+}
+
 /** The line under a step's title: how far the person is, or what happens next. */
 function progress(step: MyStep): string | undefined {
-  const a = step.action
-  if (step.needed > 1 && !step.met) return t('training.steps.times', { done: step.done, needed: step.needed })
   if (step.met) return undefined
-  switch (a.kind) {
-    case 'session': return a.place ? t('training.steps.place', { state: t(`training.place-states.${a.place.state}`), when: dateTime(a.place.startsAt) }) : props.sessions ? undefined : t('training.steps.no-sessions')
-    case 'trainer': return t('training.steps.trainer')
-    case 'lesson': return a.reached ? t('training.steps.sections', { reached: a.reached, sections: a.sections }) : t('training.steps.lesson')
-    case 'quiz': return a.nextTryAt ? t('training.steps.try-from', { when: dateTime(a.nextTryAt) }) : a.tries ? t('training.steps.tries', { used: a.used, tries: a.tries }) : t('training.steps.quiz')
-    case 'certificate':
-    case 'declaration': return a.lastReason ? t('training.steps.not-approved', { reason: a.lastReason }) : undefined
-    case 'activity': return a.source ?? undefined
-    default: return undefined
-  }
+  if (step.needed > 1) return t('training.steps.times', { done: step.done, needed: step.needed })
+  return (NEXT[step.action.kind] as (a: StepAction) => string | undefined)(step.action)
 }
 const evidence = (step: MyStep) => step.action.kind === 'certificate' || step.action.kind === 'declaration' ? { id: step.id, title: step.title, action: step.action } : null
 </script>
