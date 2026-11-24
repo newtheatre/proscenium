@@ -8,8 +8,9 @@ import { setting, defineSettings, validateSettingValue, formatSetting, optionsOf
 import { catalogueLabel, searchable } from '../../layers/core/shared/choices'
 import { ability, defineAbilities, record, defineRecords } from '#kit/abilities'
 import { code, defineModule, event, job, task } from '#kit/manifest'
-import { col, columnMeta, defineTable } from '#kit/db'
+import { col, columnMeta, defineTable, withoutRowidSql } from '#kit/db'
 import { latestSlot } from '#kit/jobs'
+import { resolveOn } from '#kit/modules-store'
 import { instantOfLocal } from '#kit/clock'
 import { DeclarationError } from '#kit/refusal'
 import { buildRegistry, installRegistry, type ModuleEntry } from '#kit/registry'
@@ -246,6 +247,33 @@ describe('tables', () => {
   it('take the realms audience, members, operational and system', () => {
     expect(() => defineTable('lost_property_bins', { id: col.id() }, { id: 'lpb', realm: 'system' })).not.toThrow()
     expect(() => defineTable('lost_property_bins', { id: col.id() }, { id: 'lpb', realm: 'member' as 'members' })).toThrow(/realm/)
+  })
+  it('keep no times in a table declared timestamps: false (R3-23)', () => {
+    const ballot = () => ({ id: col.id(), choice: col.internal(text('choice')) })
+    expect(() => defineTable('lost_property_votes', ballot(), { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false })).not.toThrow()
+    expect(() => defineTable('lost_property_votes', { ...ballot(), at: col.createdAt() }, { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false })).toThrow(/lost_property_votes\.at.*keeps no times/)
+    expect(() => defineTable('lost_property_votes', { ...ballot(), changed: col.updatedAt() }, { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false })).toThrow(/keeps no times/)
+    expect(() => defineTable('lost_property_votes', { ...ballot(), cast: col.timestamp('cast_at') }, { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false })).toThrow(/keeps no times/)
+    expect(() => defineTable('lost_property_votes', { ...ballot(), day: col.localDate('day') }, { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false })).toThrow(/keeps no times/)
+  })
+  it('want random ids and no retention in a table that keeps no times, since either would date its rows', () => {
+    const ballot = () => ({ id: col.id(), choice: col.internal(text('choice')) })
+    expect(() => defineTable('lost_property_votes', ballot(), { id: 'lpv', realm: 'members', subject: 'none', timestamps: false })).toThrow(/random: true/)
+    expect(() => defineTable('lost_property_votes', ballot(), { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false, retention: { fixed: '30d' } })).toThrow(/retention/)
+    expect(() => defineTable('lost_property_votes', ballot(), { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: true as false })).toThrow(/timestamps/)
+  })
+  it('make a table WITHOUT ROWID only when it has a primary key and is not searched (R3-23)', () => {
+    expect(() => defineTable('lost_property_votes', { id: col.id() }, { id: 'lpv', realm: 'members', subject: 'none', random: true, withoutRowid: true })).not.toThrow()
+    expect(() => defineTable('lost_property_tallies', { choice: col.internal(text('choice')) }, { realm: 'members', subject: 'none', withoutRowid: true })).toThrow(/primary key/)
+    expect(() => defineTable('lost_property_votes', { id: col.id() }, { id: 'lpv', realm: 'members', subject: 'none', withoutRowid: 'yes' as unknown as true })).toThrow(/withoutRowid/)
+  })
+  it('add WITHOUT ROWID to the statements that make such a table, and to a rebuild of it', () => {
+    const sql = 'CREATE TABLE `lost_property_votes` (\n\t`id` text PRIMARY KEY\n);\n--> statement-breakpoint\nCREATE TABLE `lost_property_bins` (\n\t`id` text PRIMARY KEY\n);\n--> statement-breakpoint\nCREATE TABLE `__new_lost_property_votes` (\n\t`id` text PRIMARY KEY,\n\t`x` text\n);\n'
+    const out = withoutRowidSql(sql, ['lost_property_votes'])
+    expect(out).toContain('CREATE TABLE `lost_property_votes` (\n\t`id` text PRIMARY KEY\n) WITHOUT ROWID;')
+    expect(out).toContain('CREATE TABLE `__new_lost_property_votes` (\n\t`id` text PRIMARY KEY,\n\t`x` text\n) WITHOUT ROWID;')
+    expect(out).toContain('CREATE TABLE `lost_property_bins` (\n\t`id` text PRIMARY KEY\n);')
+    expect(withoutRowidSql(out, ['lost_property_votes'])).toBe(out)
   })
   it('mark a column to be sealed with the core key', () => {
     expect(columnMeta(col.internal(text('secret'), { encrypted: true }))?.encrypted).toBe(true)
@@ -506,5 +534,23 @@ describe('format additions of 16 November (fixed retention, erase clear, reserve
   it('reserves every settled module id', async () => {
     const { RESERVED_MODULE_IDS } = await import('../../layers/core/kit/registry')
     expect(RESERVED_MODULE_IDS).toEqual(expect.arrayContaining(['core', 'box-office', 'payments', 'finance', 'forms', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications']))
+  })
+})
+
+describe('support modules (C-65)', () => {
+  const m = (id: string, more: object = {}) => ({ id, ...more })
+  it('are on exactly while a module that is on requires them, through other support modules too', () => {
+    const modules = [m('core', { switchable: false }), m('occupancy', { support: true }), m('busy', { support: true, requires: ['occupancy'] }), m('spaces', { requires: ['busy'] }), m('rehearsals', { requires: ['occupancy'] })]
+    expect([...resolveOn(modules, () => false)].sort()).toEqual(['core'])
+    expect([...resolveOn(modules, id => id === 'spaces')].sort()).toEqual(['busy', 'core', 'occupancy', 'spaces'])
+    expect([...resolveOn(modules, id => id === 'rehearsals')].sort()).toEqual(['core', 'occupancy', 'rehearsals'])
+    // A stored row for a support module is ignored.
+    expect([...resolveOn(modules, id => id === 'occupancy')].sort()).toEqual(['core'])
+  })
+  it('have no switch of their own, so cannot also be always on or start on at setup', () => {
+    const base = { id: 'occupancy', manifest: 1 as const, since: '0.1.0' }
+    expect(() => defineModule({ ...base, support: true })).not.toThrow()
+    expect(() => defineModule({ ...base, support: true, switchable: false })).toThrow(/support/)
+    expect(() => defineModule({ ...base, support: true, onAtSetup: true })).toThrow(/onAtSetup/)
   })
 })

@@ -7,9 +7,9 @@
 // how often, the engine on every answer, data classes, the cap, the audit entry and the event.
 import { all, first, newId, nowMs, refuse, today, type Actor, type UnitView } from '#kit'
 import { ERASED } from '#kit/db'
-import type { Answers, DataClass, Definition, QuestionType, Value } from '../shared/engine'
-import { questionsOf, withoutWorkflow } from '../shared/engine'
-import { getForm, getVersion } from './forms'
+import type { Answers, DataClass, Definition, QuestionType, Value, Marked } from '../shared/engine'
+import { publicDefinition, questionsOf, withoutWorkflow } from '../shared/engine'
+import { VERSION, getForm, getVersion, type VersionRow } from './forms'
 import { PLACE, draftOf, readAnswers, sendResponse, shut, words, type LinkRow, type Shut, type StoredPlace } from './responses'
 import { EVERY, attachedTo, modeOf, slotOf, type FormsSlot } from './slots'
 
@@ -59,7 +59,7 @@ export async function slotForms(slotId: string, subjectId: string, actor: Actor)
       title: form.title,
       anonymous: form.anonymous,
       state: why ?? 'open',
-      definition: why ? null : withoutWorkflow(JSON.parse(version.definition) as Definition),
+      definition: why ? null : publicDefinition(withoutWorkflow(JSON.parse(version.definition) as Definition)),
       version: version.number,
       asksEmail: !form.anonymous && !actor.accountId,
       draft: draft ? { responseId: draft.response.id, answers: draft.answers } : null,
@@ -93,15 +93,29 @@ export async function slotDecides(slotId: string, subjectId: string): Promise<bo
  * go in the same unit. Give `responseId` (a `fres_` id made before the first try) so a retry stores
  * one response; one is made when left out. Never commits.
  */
-export async function addResponse(unit: UnitView, input: { slot: string, subject: string, formId: string, actor: Actor, answers: Answers, email?: string | null, responseId?: string }): Promise<{ responseId: string, reference: string }> {
+export async function addResponse(unit: UnitView, input: { slot: string, subject: string, formId: string, actor: Actor, answers: Answers, email?: string | null, responseId?: string, versionId?: string }): Promise<{ responseId: string, reference: string, marking?: Marked }> {
   const slot = await slotIn(input.slot, 'submission')
   const row = await first<StoredPlace>(`SELECT ${PLACE} FROM forms_placements WHERE slot_key = ? AND subject_type = ? AND subject_id = ? AND form_id = ? AND status <> 'ended'`, slot.id, slot.subject, input.subject, input.formId)
   const form = row ? await getForm(row.formId) : null
-  const version = form ? await getVersion(form.liveVersionId) : null
-  if (!row || !form || !version || form.status === 'draft' || form.status === 'archived') return refuse('forms.form.not-found', 'There is no form here.', { status: 404 }) // not-policy: HTTP status
+  if (!row || !form || form.status === 'draft' || form.status === 'archived') return refuse('forms.form.not-found', 'There is no form here.', { status: 404 }) // not-policy: HTTP status
+  // A host may pin the version its person was shown, such as a quiz begun before a new version was published.
+  const version = input.versionId === undefined ? await getVersion(form.liveVersionId) : await versionOf(form.id, input.versionId)
+  if (!version) return refuse(input.versionId === undefined ? 'forms.form.not-found' : 'forms.version-not-of-form', input.versionId === undefined ? 'There is no form here.' : 'That version is not one of this form\'s.', { status: 404 }) // not-policy: HTTP status
   if (input.responseId !== undefined && !/^fres_[0-9A-Za-z]{26}$/.test(input.responseId)) return refuse('forms.response.not-found', 'There is no response here.', { status: 404 }) // not-policy: HTTP status; an id is its prefix and 26 characters
   const link: LinkRow = { ...row, onePerPerson: !!row.onePerPerson }
-  return sendResponse(unit, { form, version, link, actor: input.actor, responseId: input.responseId ?? newId('fres'), answers: input.answers, email: input.email?.trim().toLowerCase() || null, at: nowMs() })
+  const sent = await sendResponse(unit, { form, version, link, actor: input.actor, responseId: input.responseId ?? newId('fres'), answers: input.answers, email: input.email?.trim().toLowerCase() || null, at: nowMs() })
+  return { responseId: sent.responseId, reference: sent.reference, ...(sent.marking ? { marking: sent.marking } : {}) }
+}
+
+/** A published version of a form, by id; null for a version of another form. */
+const versionOf = (formId: string, versionId: string) => first<VersionRow>(`SELECT ${VERSION} FROM forms_versions WHERE id = ? AND form_id = ?`, versionId, formId)
+
+/** One published version of the form on a placement, as its person may be sent it: without the correct answers or the stages. */
+export async function slotFormVersion(placementId: string, versionId: string): Promise<{ version: number, definition: Definition }> {
+  const place = await first<{ formId: string }>('SELECT form_id AS formId FROM forms_placements WHERE id = ?', placementId)
+  const version = place ? await versionOf(place.formId, versionId) : null
+  if (!version) return refuse('forms.version-not-of-form', 'That version is not one of this form\'s.', { status: 404 }) // not-policy: HTTP status
+  return { version: version.number, definition: publicDefinition(withoutWorkflow(JSON.parse(version.definition) as Definition)) }
 }
 
 // ---- custom fields, for the host's lists and exports ----
@@ -194,7 +208,7 @@ export async function eraseRecordFields(unit: UnitView, slotId: string, recordId
     sql: `UPDATE forms_placements SET response_count = response_count - (SELECT count(*) FROM forms_responses r WHERE r.placement_id = forms_placements.id AND r.id IN (${these}) AND r.state = 'submitted') WHERE id IN (SELECT placement_id FROM forms_responses WHERE id IN (${these}))`,
     params: [ids],
   })
-  unit.add({ sql: `UPDATE forms_responses SET state = 'withdrawn', unique_key = NULL, calculated = NULL, anonymised_at = ?2, updated_at = ?2 WHERE id IN (${these}) AND state = 'submitted'`, params: [ids, nowMs()] })
+  unit.add({ sql: `UPDATE forms_responses SET state = 'withdrawn', unique_key = NULL, calculated = NULL, score = NULL, passed = NULL, anonymised_at = ?2, updated_at = ?2 WHERE id IN (${these}) AND state = 'submitted'`, params: [ids, nowMs()] })
     .expect(gone.length, { code: 'forms.record.stale', reason: 'These fields changed while the record was being removed.', remedy: 'Try again.' })
   unit.audit(gone.map(r => ({ action: 'update' as const, record: ['forms.response', r.id] as [string, string], detail: { formId: r.formId, slot: slot.id, subject: recordId, withdrawn: 'record-gone' } })))
   return gone.length

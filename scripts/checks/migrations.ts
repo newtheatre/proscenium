@@ -51,6 +51,12 @@ export async function checkMigrations(modules: Loaded[], registry: any): Promise
     }
     const sql = existsSync(journal) ? readdirSync(journal).map(n => join(journal, n, 'migration.sql')).filter(existsSync).map(f => readFileSync(f, 'utf8')).join('\n') : ''
     for (const [name, { meta, module }] of registry.tables as Map<string, any>) {
+      if (modules.find(m => m.manifest.id === module)?.found.owner !== owner || !meta.options.withoutRowid) continue
+      const made = [...sql.matchAll(new RegExp(`CREATE TABLE \`(?:__new_)?${name}\` \\([\\s\\S]*?\\n\\)( WITHOUT ROWID)?;`, 'g'))]
+      if (!made.length || made.some(m => !m[1])) problems.push(`${JOURNALS[owner]}: the table ${name} is declared withoutRowid but a migration makes it without WITHOUT ROWID. Run bun run db:generate -- --name <what>${owner === 'site' ? ' --owner site' : ''}`)
+      if (sources.some(({ source }) => source.table.name === name)) problems.push(`${name}: a WITHOUT ROWID table cannot be searched, since a search index follows rowids`)
+    }
+    for (const [name, { meta, module }] of registry.tables as Map<string, any>) {
       if (modules.find(m => m.manifest.id === module)?.found.owner !== owner || !meta.options.appendOnly) continue
       for (const trigger of [`${name}_append_only_update`, `${name}_append_only_delete`]) if (!sql.includes(`CREATE TRIGGER \`${trigger}\``)) problems.push(`${JOURNALS[owner]}: the append-only table ${name} has no ${trigger} trigger`)
     }
