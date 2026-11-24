@@ -3,6 +3,7 @@
 import { all, first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { addAmount, budgetLines, changed, lineFloor, totalsOf, type Budget } from './budgets'
+import { openOn } from './requests'
 
 const LINE_AMOUNT = "coalesce((SELECT a.amount_minor FROM budgets_line_amounts a WHERE a.line_id = l.id AND a.stage = 'draft' ORDER BY a.set_at DESC, a.rowid DESC LIMIT 1), 0)"
 
@@ -66,9 +67,11 @@ export async function revise(unit: UnitView, budget: Budget, input: { lineId: st
   unit.audit({ action: 'update', record: ['budgets.line', input.lineId], detail: { fields: ['amount'], below: input.amountMinor < floor } })
 }
 
-/** Approved to closed. Requests, claims and awards will each add what keeps a budget open. */
-export function close(unit: UnitView, budget: Budget): void {
+/** Approved to closed, once no request on it is waiting or approved. Claims and awards will add theirs. */
+export async function close(unit: UnitView, budget: Budget): Promise<void> {
   if (budget.state !== 'approved') wrongState(budget, 'approved')
+  const open = await openOn(budget.id)
+  if (open) refuse('budgets.budget.open-requests', 'Requests on this budget are still waiting or approved.', { status: 409, detail: { requests: String(open) }, remedy: 'Decide or withdraw them first.' })
   const at = nowMs()
   unit.add({ sql: "UPDATE budgets_budgets SET state = 'closed', closed_at = ?, updated_at = ? WHERE id = ? AND state = 'approved'", params: [at, at, budget.id] }).expect(1, changed())
   unit.audit({ action: 'state', record: ['budgets.budget', budget.id], detail: { from: 'approved', to: 'closed' } })

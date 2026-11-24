@@ -1,5 +1,6 @@
-// Words shared by the Budgets screens: a finance year's name, a state's badge, and a line's figures.
+// Words shared by the Budgets screens: a finance year's name, a budget's or request's badge, and money.
 export type BudgetState = 'draft' | 'proposed' | 'approved' | 'closed'
+export type RequestState = 'requested' | 'approved' | 'declined' | 'withdrawn' | 'fulfilled' | 'lapsed'
 
 export function useBudgetText() {
   const { t } = useT()
@@ -11,7 +12,9 @@ export function useBudgetText() {
   }
   const TONES: Record<BudgetState, 'neutral' | 'info' | 'success' | 'warning'> = { draft: 'neutral', proposed: 'info', approved: 'success', closed: 'neutral' }
   const state = (s: BudgetState) => ({ tone: TONES[s], label: t(`budgets.screens.states.${s}`) })
-  return { year, state, money }
+  const REQUEST_TONES: Record<RequestState, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = { requested: 'info', approved: 'success', declined: 'danger', withdrawn: 'neutral', fulfilled: 'neutral', lapsed: 'warning' }
+  const requestState = (s: RequestState) => ({ tone: REQUEST_TONES[s], label: t(`budgets.screens.request-states.${s}`) })
+  return { year, state, requestState, money }
 }
 
 /** What a list of budget lines needs of each line. */

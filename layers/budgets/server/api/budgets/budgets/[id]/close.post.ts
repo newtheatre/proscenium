@@ -7,6 +7,6 @@ import { close } from '../../../../changes'
 
 export default defineRoute({ ability: 'budgets.budget.approve', rateLimit: 'write', input: z.object({}) }, async (event, { unit }) => {
   const budget = await requireBudget(getRouterParam(event, 'id'))
-  close(unit, budget)
+  await close(unit, budget)
   return { budgetId: budget.id }
 })

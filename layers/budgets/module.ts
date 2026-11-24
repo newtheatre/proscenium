@@ -2,7 +2,7 @@
 // budgets for a production, a department and year, a season or a general purpose, approved by someone
 // other than who proposed them, with spent read from Finance. Requests and claims follow; this file
 // declares only what is built.
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, setting } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, setting, task } from '#kit'
 import { z } from 'zod'
 import { tables } from './server/db/schema'
 
@@ -18,6 +18,7 @@ export default defineModule({
     budget: { table: 'budgets_budgets' },
     line: { table: 'budgets_lines', parent: 'budgets.budget' },
     category: { table: 'budgets_categories' },
+    request: { table: 'budgets_spending_requests', parent: 'budgets.line' },
   }),
   abilities: defineAbilities('budgets', {
     // Aggregates only: no claimant is named under it.
@@ -28,6 +29,10 @@ export default defineModule({
     'budget.hold': ability({ on: 'budgets.budget', implies: ['budget.view'] }),
     'category.manage': ability({}),
     'settings.manage': ability({ risk: 'privileged' }),
+    // Ask to spend, and see one's own requests (BC-15).
+    'request.make': ability({}),
+    // The treasurer: decides over budget (C3). Claims add what it implies.
+    'claim.approve-any': ability({ risk: 'privileged' }),
   }),
 
   // Read from budgets_holders at each request (decision 0009): authority from a fact, not a standing grant.
@@ -38,7 +43,16 @@ export default defineModule({
   settings: defineSettings('budgets', {
     // After a production's last performance, its budget is offered for closing.
     'close.after': setting.duration({ default: '60d', min: '7d', max: '1y', change: 'budgets.settings.manage', audience: 'staff' }),
+    // An approved request that nothing has spent stops counting as committed after this.
+    'requests.lapse-after': setting.duration({ default: '60d', min: '7d', max: '1y', change: 'budgets.settings.manage', audience: 'staff' }),
+    // How long a decided request keeps its requester and description. Shortening it erases at the next run.
+    'retention.requests': setting.duration({ default: '2y', min: '6mo', max: '7y', change: 'budgets.settings.manage', audience: 'public', quotable: true, onChange: 'confirm' }),
   }),
+
+  tasks: {
+    // Lapses approved requests past their date, and anonymises decided ones past retention.
+    'budgets.sweep-requests': task({ dailyAt: '04:50' }),
+  },
 
   tables,
 
@@ -46,6 +60,7 @@ export default defineModule({
     announces: {
       'budgets.budget.approved': event({ version: 1, payload: z.object({ budgetId: z.string(), scope: z.enum(['production', 'department', 'season', 'general']), productionId: z.string().optional(), totalMinor: z.number().int(), currency: z.enum(['GBP', 'EUR', 'USD']) }), internal: false }),
       'budgets.budget.closed': event({ version: 1, payload: z.object({ budgetId: z.string() }), internal: false }),
+      'budgets.request.decided': event({ version: 1, payload: z.object({ requestId: z.string(), decision: z.enum(['approved', 'declined']), amountMinor: z.number().int() }), internal: true }),
     },
     listens: { 'core.module.enabled': 'categories' },
   },
@@ -59,9 +74,43 @@ export default defineModule({
     'core.record-tab': [{ id: 'budgets.production', record: 'core.production', ability: 'budgets.budget.view', component: 'BudgetsProductionTab', order: 40 }],
     'core.record-fact': [{ id: 'budgets.production', record: 'core.production', ability: 'budgets.budget.view', component: 'BudgetsProductionFact', order: 40 }],
     'core.erasure-handler': [{ id: 'budgets', file: 'budgets' }],
-    'core.record-resolver': [{ id: 'budgets.budget', file: 'budget' }, { id: 'budgets.line', file: 'line' }, { id: 'budgets.category', file: 'category' }],
+    'core.record-resolver': [{ id: 'budgets.budget', file: 'budget' }, { id: 'budgets.line', file: 'line' }, { id: 'budgets.category', file: 'category' }, { id: 'budgets.request', file: 'request' }],
+    'core.notification-type': [
+      {
+        id: 'budgets.request-to-approve',
+        category: 'transactional' as const,
+        side: 'members' as const,
+        channels: ['email' as const, 'inbox' as const],
+        variables: { person: 'text' as const, amount: 'text' as const, line: 'text' as const, budget: 'text' as const, link: 'text' as const },
+        link: '/console/budgets/approvals',
+        wording: {
+          'en-GB': {
+            subject: '{{ person }} asks to spend {{ amount }}',
+            body: '{{ person }} asks to spend **{{ amount }}** on {{ line }}, in the budget {{ budget }}.\n\n[Approve or decline]({{ link }})',
+          },
+        },
+      },
+      {
+        id: 'budgets.request-decided',
+        category: 'transactional' as const,
+        side: 'members' as const,
+        channels: ['email' as const, 'inbox' as const],
+        variables: { amount: 'text' as const, line: 'text' as const, decision: 'text' as const, note: 'text' as const, link: 'text' as const },
+        link: '/members/expenses',
+        wording: {
+          'en-GB': {
+            subject: 'Your request to spend {{ amount }} was {{ decision }}',
+            body: 'Your request to spend **{{ amount }}** on {{ line }} was {{ decision }}.\n\n{{ note }}\n\n[See your requests]({{ link }})',
+          },
+        },
+      },
+    ],
+    'core.count': [{ id: 'budgets.approvals', file: 'approvals' }],
     'core.navigation': [
       { id: 'budgets.budgets', menu: 'console', group: 'money', section: 'everyday', to: '/console/budgets', icon: 'i-lucide-piggy-bank', ability: 'budgets.budget.view', order: 85 },
+      // Shown to whoever has a request waiting on them: holders hold budgets one by one, so no ability names them all.
+      { id: 'budgets.approvals', menu: 'console', group: 'money', section: 'everyday', to: '/console/budgets/approvals', icon: 'i-lucide-inbox', order: 86, count: 'budgets.approvals', hideEmpty: true },
+      { id: 'budgets.expenses', menu: 'members', to: '/members/expenses', icon: 'i-lucide-receipt', ability: 'budgets.request.make', order: 40 },
       { id: 'budgets.categories', menu: 'admin', group: 'modules', to: '/admin/modules/budgets/categories', icon: 'i-lucide-tags', ability: 'budgets.category.manage', order: 35 },
     ],
   },

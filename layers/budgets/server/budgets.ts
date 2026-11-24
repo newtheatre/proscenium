@@ -1,5 +1,5 @@
 // Budgets (BC-06 to BC-13): the plan for a production, a department and year, a season or a general
-// purpose. Figures are read, never stored: spent from Finance, committed from sub-budgets.
+// purpose. Figures are read, never stored: spent from Finance, committed from sub-budgets and requests.
 import { z } from 'zod'
 import { all, first, localDate, newId, nowMs, refuse, today, useSetting, type UnitView } from '#kit'
 import { balances, budgetLineTotals, financeYearOf, rangeOf } from '#modules/finance'
@@ -126,12 +126,20 @@ async function received(budget: Budget, sources: string[]): Promise<number> {
   return rows.filter(r => r.currency === budget.currency).reduce((sum, r) => sum + r.creditsMinor - r.debitsMinor, 0)
 }
 
-/** A budget's lines with their figures (BC-10), and the budgets funded from them (BC-12). */
+/** What approved requests still hold on each line of a budget: their amount less what has fulfilled them (BC-16). */
+async function approvedRequests(budgetId: string): Promise<{ lineId: string, amountMinor: number }[]> {
+  return all<{ lineId: string, amountMinor: number }>(
+    `SELECT r.line_id AS lineId, sum(r.amount_minor - r.fulfilled_minor) AS amountMinor FROM budgets_spending_requests r
+      WHERE r.state = 'approved' AND r.line_id IN (SELECT id FROM budgets_lines WHERE budget_id = ?) GROUP BY r.line_id`, budgetId)
+}
+
+/** A budget's lines with their figures (BC-10), committed from sub-budgets (BC-12) and approved requests, and the budgets funded from them. */
 export async function budgetLines(budget: Budget): Promise<{ lines: Line[], subBudgets: SubBudget[] }> {
   const rows = await lineRows(budget.id)
   const subs = await subBudgets(budget.id)
   const committed = new Map<string, number>()
   for (const sub of subs) if (LIVE.has(sub.state)) committed.set(sub.parentLineId, (committed.get(sub.parentLineId) ?? 0) + sub.totalMinor)
+  for (const r of await approvedRequests(budget.id)) committed.set(r.lineId, (committed.get(r.lineId) ?? 0) + r.amountMinor)
   const tagged = await budgetLineTotals(rows.map(r => r.id))
   const lines: Line[] = []
   for (const row of rows) {
