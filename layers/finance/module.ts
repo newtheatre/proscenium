@@ -1,6 +1,6 @@
 // Finance: the ledger. It stands alone and requires nothing; any module that handles money requires
-// it (Box office specification, parts 2 to 6). Finance ships no accounts of its own: each module
-// declares the accounts it posts to through finance.system-account and Finance makes them, locked.
+// it (Box office specification, parts 2 to 6). Each module declares the accounts it posts to through
+// finance.system-account and Finance makes them, locked. Finance's own are the two VAT accounts (F-A2).
 import { z } from 'zod'
 import { ability, defineAbilities, defineModule, defineRecords, defineSettingRules, defineSettings, event, point, setting } from '#kit'
 import { tables } from './server/db/schema'
@@ -19,9 +19,13 @@ export default defineModule({
     // A month and a day. Days stop at 28 so that every period starts on the same day of the month.
     'year.starts': setting.custom({ schema: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|1\d|2[0-8])$/), default: '08-01', change, audience: 'staff', onChange: 'confirm' }),
     'tax.registered': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
+    // The theatre's VAT registration number: GB and 9 digits, or 12 for a group or branch.
+    'tax.number': setting.custom({ schema: z.string().regex(/^GB(\d{9}|\d{12})$/), unset: true, change, audience: 'staff', onChange: 'confirm' }),
+    // Standard accounting counts VAT when it is invoiced; cash accounting when it is paid (I-46).
+    'tax.scheme': setting.choice({ default: 'standard', options: ['standard', 'cash'], change, audience: 'staff', onChange: 'confirm' }),
   }),
-  // Tax on sales is not supported in the first release.
-  settingRules: defineSettingRules('finance', [{ id: 'tax-not-yet', check: s => s['tax.registered'] !== true }]),
+  // A theatre registers for VAT with its number (F-A2).
+  settingRules: defineSettingRules('finance', [{ id: 'tax-number-needed', check: s => s['tax.registered'] !== true || typeof s['tax.number'] === 'string' }]),
 
   records: defineRecords('finance', {
     account: { table: 'finance_accounts' },
@@ -70,6 +74,11 @@ export default defineModule({
   },
 
   contributes: {
+    // VAT a module charged or paid, whichever module it was: one balance for the theatre (F-A2).
+    'finance.system-account': [
+      { id: 'vat-output', name: 'VAT on sales', kind: 'liability' },
+      { id: 'vat-input', name: 'VAT on purchases', kind: 'asset' },
+    ],
     'core.vocabulary': [{
       id: 'finance.reopen-reason',
       label: 'Reasons for reopening a period',
@@ -89,6 +98,7 @@ export default defineModule({
       { id: 'finance.productions', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/productions', icon: 'i-lucide-drama', ability: 'finance.ledger.view', order: 70 },
       { id: 'finance.reconcile', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/reconcile', icon: 'i-lucide-scale', ability: 'finance.ledger.view', order: 80 },
       { id: 'finance.accounts', menu: 'admin', group: 'modules', to: '/admin/modules/finance/accounts', icon: 'i-lucide-list-tree', ability: 'finance.account.manage', order: 20 },
+      { id: 'finance.tax-codes', menu: 'admin', group: 'modules', to: '/admin/modules/finance/tax-codes', icon: 'i-lucide-percent', ability: 'finance.settings.manage', order: 25 },
     ],
   },
 
