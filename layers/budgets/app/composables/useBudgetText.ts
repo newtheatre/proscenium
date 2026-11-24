@@ -13,3 +13,6 @@ export function useBudgetText() {
   const state = (s: BudgetState) => ({ tone: TONES[s], label: t(`budgets.screens.states.${s}`) })
   return { year, state, money }
 }
+
+/** What a list of budget lines needs of each line. */
+export interface SectionLine { id: string, name: string, figures: { over: boolean } }
