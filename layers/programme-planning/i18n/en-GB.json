@@ -86,5 +86,18 @@
   "programme-planning.entry.bring-none": "Every draft production of this season is already on the board.",
   "programme-planning.entry.brought": "Brought {title} onto the board",
   "programme-planning.entry.production": "Production",
-  "programme-planning.entry.production-placeholder": "Choose a production"
+  "programme-planning.entry.production-placeholder": "Choose a production",
+  "programme-planning.board.title": "Board",
+  "programme-planning.board.title-for": "Board: {season}",
+  "programme-planning.board.open": "Open the board",
+  "programme-planning.board.back": "Back to the plan",
+  "programme-planning.board.days": "Days",
+  "programme-planning.board.earlier": "Earlier",
+  "programme-planning.board.later": "Later",
+  "programme-planning.board.busy": "Busy",
+  "programme-planning.board.free": "Nothing on.",
+  "programme-planning.board.nothing-placed": "Nothing placed on this day yet.",
+  "programme-planning.board.phone": "Placing shows needs a wider screen. This is what is on, by space.",
+  "programme-planning.board.no-spaces.title": "No spaces to plan",
+  "programme-planning.board.no-spaces.description": "Add a venue and a space a show can be put in, then come back to the board."
 }
