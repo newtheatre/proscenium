@@ -227,6 +227,11 @@ export const points = {
    */
   'core.space-busy': point({ kind: 'code', contract: 'space-busy' }),
   /**
+   * Whether people are committed elsewhere in a window (C-66): each contributor answers only about
+   * the accounts asked, with a translation key rather than words. Read through the person-busy module.
+   */
+  'core.person-busy': point({ kind: 'code', contract: 'person-busy' }),
+  /**
    * Whether a module can live with a change: allow, or refuse with a reason and optionally a link to
    * its own screen where the matter is settled. Core runs every guard and stops on the first refusal.
    */
@@ -269,8 +274,6 @@ export const points = {
       termClass: z.enum(['public', 'internal']).optional(),
       // Headings, in order, for a grouped vocabulary: every term then names the heading it sits under.
       groups: z.array(z.string().min(1).max(80)).optional(), // not-policy: the label's bounds
-      // A fixed key for a heading code reads by, by its label: core.department's kinds (R3-07).
-      groupKeys: z.record(z.string(), z.string().regex(/^[a-z][a-z0-9-]*$/)).optional(),
       terms: z.array(z.object({
         slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
         label: z.string().min(1).max(80), // not-policy: the label's bounds
@@ -393,6 +396,8 @@ export const contributes = {
     { id: 'core.emails', holds: 'Whether emails we sent you were delivered', why: 'To know that tickets and notices reach you', basis: 'Our legitimate interests in running a reliable service', keptFor: 'While you have an account', order: 50 },
     { id: 'core.audit', holds: 'A record of what staff changed', why: 'To protect you and them, and to put mistakes right', basis: 'Our legitimate interests in running a safe, honest theatre', keptFor: 'For as long as the record it describes', order: 60 },
   ],
+  // Credited people are busy for each timed performance of the production (C-66).
+  'core.person-busy': [{ id: 'core.credits', file: 'credits' }],
   'core.record-resolver': ['performance', 'production', 'season', 'venue', 'account'].map(n => ({ id: `core.${n}`, file: n })),
   // What the command palette finds by name (H9): each type through its own list's search.
   'core.search-source': [
@@ -415,9 +420,9 @@ export const contributes = {
   // The vocabularies core ships (part 2, group 3). Labels are the theatre's to change afterwards.
   'core.vocabulary': [
     { id: 'core.production-category', label: 'Production categories', terms: terms(['play', 'Play'], ['musical', 'Musical'], ['comedy', 'Comedy'], ['dance', 'Dance'], ['music', 'Music'], ['workshop', 'Workshop'], ['social', 'Social'], ['other', 'Other']) },
-    // One list of departments (R3-07, Matt 24 November): a production's, under Production, and the
-    // organisation's, under Organisation. Budgets offers the second; Productions and Inventory read either.
-    { id: 'core.department', label: 'Departments', groups: ['Production', 'Organisation'], groupKeys: { Production: 'production', Organisation: 'organisation' }, terms: [
+    // One list of departments for every module (R3-07): a term's kind is its heading, production or
+    // organisation, so Productions' and Budgets' pickers narrow with listTerms(..., { group }).
+    { id: 'core.department', label: 'Departments', description: 'The parts of a production team and of the organisation, used by budgets, production teams and kit.', groups: ['Production', 'Organisation'], terms: [
       ...terms(['creative', 'Creative'], ['cast', 'Cast'], ['stage-management', 'Stage management'], ['lighting', 'Lighting'], ['sound', 'Sound'], ['video', 'Video'], ['set', 'Set'], ['props', 'Props'], ['costume', 'Costume'], ['hair-and-make-up', 'Hair and make-up'], ['music', 'Music'], ['production', 'Production']).map(t => ({ ...t, group: 'Production' })),
       ...terms(['technical', 'Technical'], ['publicity', 'Publicity'], ['front-of-house', 'Front of house'], ['bar', 'Bar'], ['social', 'Social'], ['general', 'General']).map(t => ({ ...t, group: 'Organisation' })),
     ] },

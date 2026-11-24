@@ -37,6 +37,7 @@ export function formsConditionSentence(condition: Condition, def: Definition): s
     if ('fact' in o) return o.fact
     if ('attribute' in o) return o.attribute
     if ('today' in o) return translate('forms.screens.logic.today')
+    if ('marking' in o) return translate(`forms.screens.logic.marking.${o.marking}`)
     if ('option' in o) return o.option === 'other' ? translate('forms.screens.options.other') : optionName(about, o.option)
     if (typeof o.value === 'boolean') return translate(o.value ? 'forms.screens.logic.yes' : 'forms.screens.logic.no')
     return String(o.value)
