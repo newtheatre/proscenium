@@ -24,7 +24,7 @@ export async function createProduction(unit: UnitView, input: NewProduction): Pr
   const { credits = [], ...production } = input
   const id = await createProductionAs(unit, production, actorId())
   const origin = credits.some(c => c.accountId) ? await siteOrigin() : ''
-  for (const credit of credits) await insertCredit(unit, id, { title: input.title, state: 'draft' }, credit, origin)
+  for (const credit of credits) await insertCredit(unit, { productionId: id, production: { title: input.title, state: 'draft' }, origin }, credit)
   return id
 }
 
@@ -39,7 +39,7 @@ export async function createPerformance(unit: UnitView, input: NewPerformance): 
   const { productionId, made, ...rest } = input
   const space = await first<{ venue_id: string }>('SELECT venue_id FROM core_spaces WHERE id = ?', rest.spaceId)
   if (!space) refuse('core.performance.space-unsuitable', 'Choose a space that is in use and can hold performances.', { status: 422, fields: { spaceId: 'Choose a space.' } })
-  return createPerformanceAs(unit, productionId, { ...rest, venueId: space.venue_id }, actorId(), made)
+  return createPerformanceAs(unit, productionId, { ...rest, venueId: space.venue_id }, { actorId: actorId(), made })
 }
 
 /** A new space and time: a draft moves freely; a scheduled one passes the guards and is announced as a move by hand is. */
@@ -59,7 +59,7 @@ export async function addCredit(unit: UnitView, input: NewCredit): Promise<strin
   const { productionId, ...credit } = input
   const production = await first<{ title: string, state: string }>('SELECT title, state FROM core_productions WHERE id = ?', productionId)
   if (!production) refuse('core.not-found', 'There is no such production.', { status: 404 })
-  return insertCredit(unit, productionId, production, credit, credit.accountId ? await siteOrigin() : '')
+  return insertCredit(unit, { productionId, production, origin: credit.accountId ? await siteOrigin() : '' }, credit)
 }
 
 async function productionOfCredit(creditId: string): Promise<string> {
@@ -71,7 +71,7 @@ async function productionOfCredit(creditId: string): Promise<string> {
 /** Changes a credit. Visibility is left out: a linked person's own choice is never overwritten by a caller. */
 export async function updateCredit(unit: UnitView, creditId: string, patch: Partial<Omit<CreditInput, 'visibility'>>): Promise<void> {
   const { visibility: _ignored, ...allowed } = patch as Partial<CreditInput>
-  await updateCreditOf(unit, await productionOfCredit(creditId), creditId, allowed, allowed.accountId ? await siteOrigin() : '')
+  await updateCreditOf(unit, { productionId: await productionOfCredit(creditId), creditId, origin: allowed.accountId ? await siteOrigin() : '' }, allowed)
 }
 
 export async function removeCredit(unit: UnitView, creditId: string): Promise<void> {
