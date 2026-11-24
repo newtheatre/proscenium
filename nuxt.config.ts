@@ -55,6 +55,9 @@ export default defineNuxtConfig({
     // The Worker's Durable Objects and its socket route (layers/core/server/entry.ts).
     serverEntry: { handler: r('./layers/core/server/entry.ts'), format: 'web' },
     experimental: { asyncContext: true },
+    // Nuxt Content's Cloudflare handler serves each collection's dump from the ASSETS binding, which
+    // the prerenderer does not have. The Worker answers these routes itself, so they are not prerendered.
+    prerender: { ignore: [/^\/__nuxt_content\/[^/]+\/sql_dump\.txt$/] },
     cloudflare: {
       deployConfig: true,
       nodeCompat: true,
