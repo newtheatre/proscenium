@@ -146,11 +146,13 @@ Matt chose the first providers (part 9, question 2): cash and attested card, the
 | --- | --- | --- |
 | No sales record, or `draft` with no `on_sale_at` | none | Box office contributes nothing; the core shows its external booking link, or no action |
 | `draft` with `on_sale_at` set | `not-yet` | "On sale Friday 10 am" |
-| `on_sale`, free seats above `box-office.availability.show-remaining-under` | `available` | "Book now" |
-| `on_sale`, free seats at or under it | `limited` | "14 seats left" |
+| `on_sale`, not nearly full | `available` | "Book now"; "Selling fast" (`sellingFast`) once half the house is sold, at the level "Say how it's going" |
+| `on_sale`, nearly full | `limited` | "14 seats left" (`seatsLeft`) at the level "Say how many"; "Last few seats" at the levels "Say how it's going" and "Say when it's nearly full"; `available` at "Say only when it's sold out" |
 | `on_sale`, no pool has a free seat | `sold-out` | "Sold out", with "Join the waiting list" when the waiting list is on |
 | `paused` | `closed` | "Sales paused" |
 | `closed` | `closed` | "Sales closed" |
+
+How much a date says is the theatre's `box-office.availability.seats-left`, and nearly full is `box-office.availability.threshold-share` percent of the house (rounded up) or `box-office.availability.show-remaining-under` seats, as `box-office.availability.threshold-unit` says. Wheelchair spaces stay out of the count. The answer carries only what the level allows, so the number never reaches a page that may not show it. Every public surface (the booking button, the spotlight's and show page's dates, Choose tickets) words the same answer.
 
 **Service used from identity.** `findOrCreateAccount(address, name, origin)` at checkout and at the desk, so every order for a named person is keyed to an account, claimed or not. The box office stores no name or address of its own. The one exception is an anonymous walk-up sale at the desk, where the buyer gives no details and the order has no account (integration ruling R-15; part 2).
 

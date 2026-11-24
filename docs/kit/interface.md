@@ -18,12 +18,17 @@ here is stable before 1.0.
 Every shell and live mode wear the brand (C-35): `app.vue` puts the brand's stylesheet (primary,
 greys, radius, already shaded to reach 4.5 to 1 in light and dark) in the head of every page, so a layout
 never loads it itself, and each header draws the theatre's logo, or its name when there is none, with
-`BrandMark`. The heading font (`core.brand.display-font`) is the public shell's alone: `layouts/default.vue`
-sets `public-shell` on `body` and `main.css` gives its `h1` to `h3` and the header's name
-`--brand-display-font`; the other shells keep the system font. The choices are font stacks the device
-already has, so nothing is downloaded. Fonts the site serves itself and remote fonts (such as Google
-Fonts) are not supported yet; adding one means a choice with a source as well as a stack, and a
-`@font-face` or stylesheet link from `themeCss`.
+`BrandMark`. The heading font (`core.brand.display-font`) and the body font (`core.brand.body-font`) are
+the public shell's alone: `layouts/default.vue` sets `public-shell` on `body`, `main.css` gives its `h1`
+to `h3` and the header's name `--brand-display-font`, and the brand's stylesheet sets the body font on
+`body.public-shell` unless it is the device's own; the other shells keep the system font.
+
+Both choose from `shared/brand-fonts.ts`: three stacks the device already has, and fonts the site serves
+itself from `layers/core/public/fonts`, each a variable font's latin and latin-ext files from Fontsource
+with its SIL Open Font License beside it. `themeCss` writes the `@font-face` rules for the chosen fonts
+only, so a font nobody chose is never downloaded, and no page asks another site for a font. To offer
+another font, add its two files and `OFL.txt` under `public/fonts/<id>/`, an entry in `BRAND_FONTS` and
+its two option labels; only fonts whose licence allows self-hosting (OFL or similar) belong there.
 
 `/account /members /console /admin /live /book /sign-in /setup /api /files` are reserved. A page under a
 shell prefix is checked before it renders by `middleware/access.global.ts`, which asks
@@ -175,7 +180,21 @@ the row arrow keys on the handle and Move up and Move down in its menu too (see 
 `bun run check:conformance` holds screens to this ("Screens are built from the kit"): no raw `<form>`
 (use `UForm` or `PageForm`), no `w-full` on a form control (controls already fill their field), no
 hand-built bordered list, no native date or time input, no date formatted by hand, no form without
-`novalidate`, and no native `required` on a control.
+`novalidate`, and no native `required` on a control. It also refuses:
+
+- `loading-auto` on a button outside its form (`form="…"`), which never spins: use `useFormRef`;
+- a `UInputNumber` outside the kit's fields: use `FieldNumber` (or `FieldMoney`, `DurationInput`);
+- `'en-GB'` named in an `Intl` call or `locale="en-GB"` in a page or component: use `useDates()` or
+  `useMoneyText()`, which follow `core.locale.language`;
+- `uqr` imported outside `QrCode`;
+- `useSeoMeta` with a title in English rather than through `t()`;
+- an `EmptyState` whose `actions` slot is one plain button (label, icon, `to`, a click): pass `action`;
+- a `USeparator` followed by a heading: use `FieldGroup`;
+- a hand-written `sticky` with a `top-` offset in a console or Admin page: use `sticky-panel` or `sticky-bar`.
+- a `UTable` or `TableOrList` on a page of `width="reading"`, too narrow for its columns.
+
+The Translations check also refuses a key written out in `t('…')` that no catalogue holds (or holds
+only as `.one` and `.other`), which a screen would show raw.
 
 ## Checking a form
 
@@ -199,6 +218,11 @@ app's words, and says what the server would say for the same value.
 - **Submit verbs.** A record with a page of its own is made with "Create <thing>" (Create production,
   Create venue, Create role); something added to a list is "Add <thing>" (Add season, Add space, Add
   closure). Its toast says "<Thing> added", with Undo where the act can be reversed.
+- **A Save outside its form.** A dialogue's footer button submits with `form="<id>"`, beyond the
+  form's reach, so `loading-auto` cannot see the submit. Give the form a ref with `useFormRef`
+  (`const venueForm = useFormRef('venueForm')`, `ref="venueForm"` on the `UForm`) and pass
+  `:loading="venueForm?.loading"`: it is true while the form validates and its `@submit` runs, so the
+  handler must return its promise. The same ref's `setErrors` puts the server's refusals on the fields.
 - **Do not disable the save button until the form is valid.** Let it be pressed and say what is
   missing. A form with no schema of its own names what it needs with `needs()`:
   `:validate="() => needs({ name: form.name, note: paid ? form.note : true })"`, each key the
@@ -353,6 +377,9 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
   `type="date"` or `type="datetime-local"`: a native picker ignores the locale and works in the
   viewer's zone.
 - `PageForm` has the kinds `date`, `daterange`, `datetime` and `money` for them.
+- **Money as text**: `useMoneyText()` gives `money(minor, currency, options?)` in the theatre's
+  language and `isCurrency(unit)` for a figure whose unit may be a currency. Finance's `useMoney`
+  adds the site's own currency on top.
 
 ### Small parts
 
@@ -361,6 +388,49 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
   refuses an icon-only `UButton`.
 - `RowActions`: the ellipsis menu a row or a record ends with. It takes `items` and a `label`
   ("Actions for Hamlet") and draws nothing when there are no items.
+- **Right-click menus.** A row's right-click menu is its ellipsis menu, never a second list: a
+  `RowActions` inside a `RecordListItem` (or a `SortableRow`) tells the row its items, and the row
+  offers the same ones on a right click, followed by "Open in a new tab" where the row is a link.
+  `PageList` does the same for its table rows from `row-actions` and `row-to`. A row with no actions
+  has no menu of ours, so the browser's own shows; so do a table's headings, and a touch screen,
+  where a long press stays the browser's. The ellipsis button stays: the right click is an extra
+  path, not the only one. The menu is not modal (`:modal="false"`): a modal Reka menu marks the rest
+  of the page `aria-hidden` while its links and buttons can still take focus, which axe rightly
+  refuses, and a right-click menu should close on a press elsewhere anyway. `rowMenu()` (`app/utils/row-menu.ts`) builds the items for a screen that
+  draws its own rows. Nothing is declared twice and no page writes a `UContextMenu` for a row.
+- A group of buttons of which one is pressed (the appearance choice, a date filter's presets) is a
+  `UToggleGroup`, not buttons with `aria-pressed` set by hand. A fixed choice in a form is still a
+  dropdown.
+- `SidePanel`: a small titled card for a record page's `aside` (the poster, "Published"), with the
+  same frame and heading as the checklist beside it. A screen does not write its own bordered
+  `section` there.
+- `PageActions`: a page's actions for PageFrame's `primary` slot when there are more than one. It
+  takes `actions` (`label`, `icon`, `to` or `onSelect`, `loading`, `disabled`, `lesser`); every one is
+  a worded button from 640 pixels, and on a phone the first stays a button while the rest fold into
+  one "More actions" menu (`more-label` names it), so the bar never overflows. Use it in place of
+  hiding buttons by hand with `max-sm:hidden` and a second menu. `menu` takes lesser items that
+  always sit behind an ellipsis; on a phone they share the one menu with the folded buttons, so a
+  page never shows two. An `onSelect` that returns a promise keeps its button spinning.
+- `TableOrList`: rows as a `UTable` from 640 pixels and a `RecordList` on a phone, chosen after
+  hydration so only one is drawn. It takes `rows`, `columns`, a `label` (the caption and the list's
+  name) and `to` (where a row leads, in both forms); the table's cells are UTable's slots
+  (`#when-cell`) and the phone's row is the `item` slot, a `RecordListItem`. `row-key` keys the
+  phone's rows, `flush` drops the list's frame inside a PageSection and `ui` goes to the table.
+  `row-actions` (with `row-label` for the menu's name) ends each table row with its `RowActions` and
+  offers the same items on a right click, as PageList does; the `item` slot receives them as
+  `actions`, for a `RowActions` in the phone's row. A page does not call `useScreenQuery` and draw
+  both itself.
+- `FieldNumber`: a count or whole number. It is `UInputNumber` at a width for a few digits (`w-32`),
+  where the theme's own default fills the row; `class="w-24"` or `class="w-full"` gives another.
+- `DefaultedNumber` and `DefaultedMinutes`: a count, or a length in minutes, that takes the
+  theatre's value until it is given its own. Left alone it shows that value with a "Theatre default"
+  badge and Change; changed, it is an ordinary box with "Use theatre default".
+- `sticky-panel` and `sticky-bar` (utilities in `main.css`): a panel that stays beside the content
+  as the page scrolls, and a bar of actions that stays at the foot. Inside a dashboard page `top` is
+  measured within the body's padding, so the panel uses `top: 0`; writing `sticky top-4` by hand sits
+  16 pixels low. With a breakpoint: `lg:sticky-panel`.
+- `AbilityPicker` folds each module to its count ("3 of 14 ticked") with Tick all on the module's
+  row; Core and any module with a tick start open.
 - A status is named by the catalogue (`core.states.draft`), never by capitalising its key, and a
   count comes from the catalogue's plural (`core.counts.records` with `count`).
 - A select whose list grows with the theatre's data (accounts, periods, spaces, seasons) is a
@@ -417,6 +487,16 @@ Four rules:
   menu. It shows the window the calendar is showing, not a paged list: a module that needs filters,
   sort or export over a longer period adds a `PageList` of its own.
 
+### One Save bar on a page of settings
+
+`SettingsSections` takes `one-save`: the sections then carry no Save of their own (only "Reset
+section" where there is something to reset) and one bar at the foot of the page, kept in view as it
+scrolls, says how many changes there are and saves them all ("Save changes"). `PageSettings` and a
+module's generated tab use it. A bespoke screen that draws one section among its own content (Email
+sending, Branding) keeps that section's own Save. Reset is not offered on words that may not be
+empty and default to nothing, such as the theatre's name, and "Find a setting" is a link that opens
+the search box, so a page of settings starts with its settings.
+
 ### Controls for the setting kinds
 
 The generated settings page gives each kind of setting its own control, and the same fields are there
@@ -462,7 +542,7 @@ one admin entry (the viewer then has the side `admin` and the account menu shows
 anyone else finds `/admin` is not there. The layout is `layouts/admin.vue`: the console's frame with an
 "Admin" mark at the start of every page's navbar that says where you are at every width (PageFrame
 draws it when the layout provides `ADMIN_SHELL`; there is no second bar, and below 1024 pixels the
-navbar's own menu button opens the drawer), a "Back to console" (or "Back to the site") row where the theatre's mark is,
+navbar's own menu button opens the drawer), a "Back to console" row at the foot of the sidebar for someone with a console,
 the same primary colour as the console (the brand's, as in every shell, C-35), so a control looks the same in either shell and in the
 console's settings window (the `admin-shell` class on `body` is kept as a hook), and a browser title
 that starts "Admin". A page uses it with `definePageMeta({ layout: 'admin' })`.
@@ -499,9 +579,10 @@ a layout, not a shell, and it has no navigation of its own.
   pixels) square.
 - **PageLive** is the page type: `title` and `context` (both already translated, for example the
   screen and the performance), an optional `back` address, the task in the default slot and a sticky
-  `footer` slot. Its status strip shows the title, the context, whether the device is online and the
-  way out: an arrow back to the Tonight hub from a screen, and on the hub a worded "Leave" button
-  (named "Leave live mode") back to the console, members' area or My account.
+  `footer` slot. Its status strip is as tall as the console's navbar and lines up with the page below it. It
+  shows the title, the context, whether the device is online and the way out: an arrow back to the
+  Tonight hub at the start from a screen, and on the hub a worded ghost "Leave" button (named "Leave
+  live mode") at the end, after the connection state, back to the console, members' area or My account.
 - **The till** (`/live/till`, Payments) is the combined till for show nights: every
   `payments.desk-basket` panel the seller may use, as tabs over one basket and one payment.
   `?only=box-office` (a comma list of modules) narrows it to those panels, which is how the
@@ -580,11 +661,11 @@ all exercised there; the tests use one worker because they share a local databas
 One menu: each navigation group of two or more entries is a collapsible section (open when it holds
 the current page), a group of one entry is a plain link, and there are no "Everyday" and "Set up"
 headings (everyday entries come first). The sidebar is resizable as well as collapsible (Nuxt UI's
-dashboard sidebar; the width is kept in a cookie). The foot holds a Documentation link (a placeholder
-pointing at the repository's docs until screens have help pages), a Admin link for anyone
-who holds an admin entry, and the account menu. In Admin the theatre's mark sits where it
-does in the console and "Back to console" (or "Back to the site") sits at the foot instead of the
-Admin link. The navbar keeps only search.
+dashboard sidebar; the width is kept in a cookie). The foot holds View site (the public site's home, in the same tab),
+a Documentation link (a placeholder pointing at the repository's docs until screens have help pages),
+an Admin link for anyone who holds an admin entry, and the account menu. In Admin the theatre's mark
+sits where it does in the console and "Back to console" sits at the foot instead of the Admin link,
+for someone with a console; anyone else has View site. The navbar keeps only search.
 ## Lists: defineList, filters, sort and columns
 
 A list is declared once and read by the page, the data route and the export. The declaration is

@@ -132,11 +132,9 @@
   "forms.problems.never-reached": "No route leads here, so nobody will see this page.",
   "forms.problems.never-shown": "Its condition can never be true, so nobody will see it.",
   "forms.problems.required-never-shown": "It is required, but its condition can never be true, so nobody will see it.",
-  "forms.screens.status.draft": "Draft",
   "forms.screens.status.live": "Open",
   "forms.screens.status.paused": "Closed",
   "forms.screens.status.closed": "Closed",
-  "forms.screens.status.archived": "Archived",
   "forms.screens.list.help": "Forms for anything your theatre asks people: sign-ups, feedback, nominations, proposals.",
   "forms.screens.list.new": "New form",
   "forms.screens.list.create": "Create form",
@@ -842,7 +840,6 @@
   "forms.screens.versions.n": "Version {n}",
   "forms.screens.fields.badge": "Custom fields",
   "forms.screens.fields.published": "Attach these fields where they belong, and they appear on every record there.",
-  "forms.screens.fields.none": "No custom fields have been set up here.",
   "forms.screens.fields.save": "Save",
   "forms.screens.fields.saved": "{name} saved",
   "forms.screens.fields.last-saved": "Last saved {when}",
@@ -962,5 +959,7 @@
   "forms.screens.palette.ending": "Ending",
   "forms.screens.palette.calculation": "Calculation",
   "forms.screens.details.advanced": "Advanced",
-  "forms.screens.publish.share-later": "Nobody yet: share it later"
+  "forms.screens.publish.share-later": "Nobody yet: share it later",
+  "forms.screens.builder.view": "Edit or preview",
+  "forms.screens.preview.width": "Preview width"
 }

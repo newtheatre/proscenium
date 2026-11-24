@@ -134,7 +134,10 @@ const actions = (l: Layout) => [[
             :key="g.space.id"
             :title="g.space.name"
           >
-            <RecordList :label="t('box-office.layouts.of-space', { space: g.space.name })">
+            <RecordList
+              :label="t('box-office.layouts.of-space', { space: g.space.name })"
+              flush
+            >
               <RecordListItem
                 v-for="l in g.layouts"
                 :key="l.id"
@@ -186,8 +189,9 @@ const actions = (l: Layout) => [[
             name="spaceId"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="form.spaceId"
+              value-key="value"
               :items="spaceItems"
               :disabled="!!editId"
               :placeholder="t('box-office.layouts.space-placeholder')"
@@ -209,7 +213,7 @@ const actions = (l: Layout) => [[
             name="seats"
             :help="t('box-office.layouts.seats-help')"
           >
-            <UInputNumber
+            <FieldNumber
               :model-value="form.seats ?? undefined"
               :min="0"
               @update:model-value="form.seats = $event ?? null"
@@ -220,7 +224,7 @@ const actions = (l: Layout) => [[
             name="wheelchairSpaces"
             required
           >
-            <UInputNumber
+            <FieldNumber
               v-model="form.wheelchairSpaces"
               :min="0"
               :max="500"
@@ -233,7 +237,7 @@ const actions = (l: Layout) => [[
             :help="t('box-office.layouts.each-help')"
             required
           >
-            <UInputNumber
+            <FieldNumber
               v-model="form.seatsPerSpace"
               :min="0"
               :max="20"

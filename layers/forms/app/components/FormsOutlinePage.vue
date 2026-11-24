@@ -41,12 +41,9 @@ const wrong = computed(() => ids.value.some(id => builder.problemsAt.value.get(i
         :aria-label="t('forms.screens.problems.has')"
       />
     </UButton>
-    <UDropdownMenu :items="menu as any">
-      <IconButton
-        icon="i-lucide-ellipsis-vertical"
-        size="sm"
-        :label="t('forms.screens.builder.actions-for', { name })"
-      />
-    </UDropdownMenu>
+    <RowActions
+      :items="menu as any"
+      :label="t('forms.screens.builder.actions-for', { name })"
+    />
   </li>
 </template>

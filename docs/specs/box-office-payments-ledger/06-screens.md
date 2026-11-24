@@ -35,7 +35,7 @@ Every public address sits under `/book`, which Foundations reserves, so no theat
 
 What the three screens must get right:
 
-- **Choose tickets.** The button says what it will do and what it costs. "14 seats left" appears only at or below `box-office.availability.show-remaining-under`. A companion ticket cannot be added without a paid ticket. Pressing the button runs the claim batch, and that is the moment the hold starts; if the house filled in the meantime the screen says how many are left and offers the waiting list.
+- **Choose tickets.** The button says what it will do and what it costs. How full the house is heads the bands, and with more than one band each says its own beside its name ("Selling fast", "Last few seats", "14 seats left"), each only as far as `box-office.availability.seats-left` allows (part 5, "The booking action in the core's states"). A companion ticket cannot be added without a paid ticket. Pressing the button runs the claim batch, and that is the moment the hold starts; if the house filled in the meantime the screen says how many are left and offers the waiting list.
 - **Check and pay.** The countdown is first seen here, is always visible, and is announced to screen readers at fixed points, not every second. With one minute left a button offers the one extension (part 3). When the countdown ends the screen says the seats were released and offers Try again, which claims afresh from the lines the browser remembered. The access-needs question is one optional field with a plain explanation of who will read it.
 - **Booked.** Shown only after the order is confirmed in the database. If the provider sends the buyer back before its answer has arrived, the screen waits and polls rather than guessing.
 
@@ -52,7 +52,7 @@ What the three screens must get right:
 | --- | --- | --- | --- | --- |
 | Sell | `/console/box-office/sell` | `box-office.order.sell` | The desk: pick a performance, add tickets, take payment; find and collect a reservation | First |
 | Orders | `/console/box-office/orders` | `box-office.order.view`; export needs `box-office.order.export` | Search by name, email or reference; filter by show, performance, state and how it was sold | First |
-| Order | `/console/box-office/orders/<id>` | `box-office.order.view` | Lines, tickets, payments, refunds, history; actions to resend, reissue, cancel, exchange, refund, each under its own ability | First |
+| Order | `/console/box-office/orders/<id>` | `box-office.order.view` | Lines, tickets, payments, refunds, history; actions to resend, reissue, cancel, exchange, refund, each under its own ability; a booking that lapsed unpaid, once its performance is past selling, can have a payment taken outside the site recorded (part 4) | First |
 | Door list | `/console/box-office/door-list/<performance>` | `box-office.ticket.admit` | Everyone expected, with admitted state and that an access note exists; printable. The fallback when the door has no connection | First |
 | Ticket set-up | `/console/box-office/performances` | `box-office.performance.manage` | Productions with performances to come, each opening its run's tickets, with its nights beneath: sale state, sold and free | First |
 | The run's tickets | `/console/box-office/performances/run/<production>`, and the Tickets tab on the production's page | `box-office.performance.manage` | The one place a run's tickets are set up (Matt, 21 November 2026): seats, sections, prices now or from a later date, wheelchair spaces, the run put on sale, and each night with where it stands | First |
@@ -106,8 +106,8 @@ What the door must get right:
 | --- | --- | --- | --- | --- |
 | My session | `/console/payments/session` | `payments.session.open` | Open with a float; cash up with a count; variance reason | First |
 | Sessions | `/console/payments/sessions` | `payments.session.view` | Every session, expected against counted | First |
-| Needs attention | `/console/payments/attention` | `payments.attempt.reconcile` | Attempts with no answer, unfulfilled payments, failed refunds, and (for someone who may approve them) refunds waiting for approval | First |
-| Refunds | `/console/payments/refunds` | `payments.refund.approve` | Requests waiting, with who asked and why | First |
+| Needs attention | `/console/payments/attention` | `payments.attempt.reconcile` | Attempts with no answer, with what they were for and a warning when the till had already given up on the payment (then answered "keep it", "send it back" or "did not go through"); payments being returned, which someone who may approve refunds can keep; failed refunds; and (for someone who may approve them) refunds waiting for approval | First |
+| Refunds | `/console/payments/refunds` | `payments.refund.approve` | Requests waiting, with who asked and why; a refund the system asked for can be withdrawn by keeping the payment, shown as Kept | First |
 | Providers and readers | `/console/payments/providers` | `payments.provider.manage` | Add a provider, pair a reader, test mode, health | First |
 | Ledger | `/console/finance/ledger` | `finance.ledger.view` | Postings with their entries; filter by account, production, performance, period; every row links to its source | First |
 | Accounts | `/console/finance/accounts` | `finance.account.manage` | Chart of accounts; rename and recode | First |

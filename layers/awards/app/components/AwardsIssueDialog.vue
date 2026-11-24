@@ -15,7 +15,7 @@ const today = () => toLocal(Date.now()).slice(0, 10) // not-policy: the length o
 const blank = () => ({ typeId: props.typeId ?? props.types[0]?.id ?? '', who: 'person' as 'person' | 'new' | 'name', accountId: undefined as string | undefined, recipientName: '', address: '', awardedOn: today(), awardedFor: '', citation: '', productionId: null as string | null, decidedOn: '', decisionNote: '' })
 const form = reactive(blank())
 const more = ref(false)
-const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('formEl')
+const formEl = useFormRef('formEl')
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 let idempotency = ''
 // A past award recorded by name alone is dated by hand: today's date would be invented for it.
@@ -99,8 +99,9 @@ async function issue() {
           :label="t('awards.screens.issue.type')"
           required
         >
-          <USelect
+          <USelectMenu
             v-model="form.typeId"
+            value-key="value"
             :items="types.map(x => ({ value: x.id, label: x.name }))"
           />
         </UFormField>
@@ -198,7 +199,7 @@ async function issue() {
       <UButton
         type="submit"
         form="awards-issue"
-        loading-auto
+        :loading="formEl?.loading"
         :label="t('awards.screens.issue.submit')"
       />
     </template>

@@ -16,9 +16,10 @@ const noViolations = async (page: Page) => expect((await new AxeBuilder({ page }
 test.describe('console staff who are not administrators', () => {
   test.use(as(person('Cass Console', [grant('gallery.sample.view')])))
 
-  test('the foot has Documentation and the account menu, and no Admin link', async ({ page }) => {
+  test('the foot has View site, Documentation and the account menu, and no Admin link', async ({ page }) => {
     await visit(page, '/console')
     const foot = page.getByRole('navigation', { name: 'Help and administration' })
+    await expect(foot.getByRole('link', { name: 'View site' })).toHaveAttribute('href', '/')
     await expect(foot.getByRole('link', { name: 'Documentation' })).toBeVisible()
     await expect(foot.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(0)
     const menu = page.getByRole('button', { name: /Open the menu for Cass Console/ })
@@ -49,6 +50,7 @@ test.describe('a site owner who runs the console', () => {
     await expect(back).toBeVisible()
     expect((await back.boundingBox())!.y).toBeGreaterThan(page.viewportSize()!.height / 2)
     await expect(page.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(0) // its own link is not repeated
+    await expect(page.getByRole('link', { name: 'View site' })).toHaveAttribute('href', '/')
     // The link to the other shell sits beneath Documentation here as it does in the console.
     const docs = (await page.getByRole('link', { name: 'Documentation' }).boundingBox())!
     expect(docs.y).toBeLessThan((await back.boundingBox())!.y)

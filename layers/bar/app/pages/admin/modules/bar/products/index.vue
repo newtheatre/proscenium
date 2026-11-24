@@ -1,7 +1,8 @@
 <!-- Products (S11): the bar's categories, in till order, each with its products and their Standard
      prices. A product opens its own page for its sizes and prices on every list. Products are put in
      order within their category by dragging, or from the keyboard and the row's menu. Retired categories
-     sit below a divider; the search finds a category or a product by name. -->
+     sit below a divider; the search finds a category or a product by name. The allergens home card
+     opens it with ?allergens=unchecked, showing only products with a size whose labels are not checked. -->
 <script setup lang="ts">
 import { categoryInput } from '../../../../../../server/input'
 
@@ -23,8 +24,14 @@ const COLOURS = ['primary', 'secondary', 'success', 'info', 'warning', 'error', 
 // Each colour with a swatch of itself beside its plain name.
 const colourItems = computed(() => [{ value: 'none', label: t('bar.screens.products.colour-none') }, ...COLOURS.map(c => ({ value: c, label: t(`bar.screens.colours.${c}`), chip: { color: c } }))])
 
+const route = useRoute()
+const uncheckedOnly = computed(() => route.query.allergens === 'unchecked')
+const { data: unchecked, execute: loadUnchecked } = await useAPI<{ sizes: { variantId: string, productId: string }[] }>('/api/bar/allergens/unchecked', { key: 'bar:allergens-unchecked', immediate: uncheckedOnly.value, watch: false })
+watch(uncheckedOnly, on => on && loadUnchecked())
+const uncheckedProducts = computed(() => new Set((unchecked.value?.sizes ?? []).map(s => s.productId)))
 const query = ref('')
 const searching = ref(false)
+const filtering = computed(() => !!query.value.trim() || uncheckedOnly.value)
 const showRetired = ref(false)
 const matches = (name: string) => name.toLowerCase().includes(query.value.trim().toLowerCase())
 
@@ -37,10 +44,12 @@ const ordered = computed<Section[]>(() => {
     { ...top, title: top.name },
     ...all.filter(c => c.parentId === top.id).map(c => ({ ...c, title: t('bar.screens.products.sub-title', { parent: nameOf(top.id), name: c.name }) })),
   ])
-  if (!query.value.trim()) return sections
+  if (!filtering.value) return sections
   return sections.flatMap((c) => {
-    if (matches(c.title)) return [c]
-    const products = c.products.filter(p => matches(p.name))
+    const listed = uncheckedOnly.value ? c.products.filter(p => uncheckedProducts.value.has(p.id)) : c.products
+    if (uncheckedOnly.value && !listed.length) return []
+    if (!query.value.trim() || matches(c.title)) return [{ ...c, products: listed }]
+    const products = listed.filter(p => matches(p.name))
     return products.length ? [{ ...c, products }] : []
   })
 })
@@ -71,7 +80,7 @@ const parentItems = computed(() => {
   return [{ value: 'none', label: t('bar.screens.products.parent-none') }, ...tops.map(c => ({ value: c.id, label: c.name }))]
 })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const categoryEl = useTemplateRef<{ setErrors: (errors: FieldError[]) => void }>('categoryEl')
+const categoryEl = useFormRef('categoryEl')
 async function editCategory(c?: Category) {
   refusal.value = null
   presets.value = (await $api<{ presets: { id: string, builtIn: boolean, name: string | null }[] }>('/api/bar/presets')).presets
@@ -186,21 +195,24 @@ async function move(p: Product, to: number) {
           icon="i-lucide-beer"
           :title="t('bar.screens.products.empty-title')"
           :description="t('bar.screens.products.empty')"
-        >
-          <template #actions>
-            <UButton
-              :label="t('bar.screens.products.new-category')"
-              icon="i-lucide-plus"
-              @click="editCategory()"
-            />
-          </template>
-        </EmptyState>
-        <p
-          v-else-if="query.trim() && !ordered.length"
-          class="text-sm text-muted"
-        >
-          {{ t('bar.screens.products.no-match') }}
-        </p>
+          :action="{ label: t('bar.screens.products.new-category'), icon: 'i-lucide-plus', onClick: () => editCategory() }"
+        />
+        <template v-else>
+          <UAlert
+            v-if="uncheckedOnly"
+            color="neutral"
+            variant="subtle"
+            icon="i-lucide-filter"
+            :title="t('bar.screens.products.unchecked-only')"
+            :actions="[{ label: t('bar.screens.products.show-all'), to: '/admin/modules/bar/products', color: 'neutral', variant: 'outline' }]"
+          />
+          <p
+            v-if="filtering && !ordered.length"
+            class="text-sm text-muted"
+          >
+            {{ query.trim() ? t('bar.screens.products.no-match') : t('bar.screens.products.all-checked') }}
+          </p>
+        </template>
         <div
           v-if="current.length"
           class="space-y-6"
@@ -211,7 +223,7 @@ async function move(p: Product, to: number) {
             :category="c"
             :standard-id="standard"
             :in-sub-categories="inSubCategories(c)"
-            :searching="!!query.trim()"
+            :searching="filtering"
             @add="newProduct(c)"
             @edit="editCategory(c)"
             @active="on => setCategoryActive(c, on)"
@@ -219,7 +231,7 @@ async function move(p: Product, to: number) {
           />
         </div>
         <CollapsibleDivider
-          :open="showRetired || !!query.trim()"
+          :open="showRetired || filtering"
           :label="t('bar.screens.products.retired-categories')"
           :count="retired.length"
           @update:open="v => showRetired = v"
@@ -231,7 +243,7 @@ async function move(p: Product, to: number) {
               :category="c"
               :standard-id="standard"
               :in-sub-categories="inSubCategories(c)"
-              :searching="!!query.trim()"
+              :searching="filtering"
               @edit="editCategory(c)"
               @active="on => setCategoryActive(c, on)"
               @move="move"
@@ -290,9 +302,10 @@ async function move(p: Product, to: number) {
             :help="t('bar.screens.products.parent-help')"
             name="parentId"
           >
-            <USelect
+            <USelectMenu
               v-model="category.parentId"
               :items="parentItems"
+              value-key="value"
             />
           </UFormField>
           <UCheckbox
@@ -305,9 +318,10 @@ async function move(p: Product, to: number) {
             :help="t('bar.screens.products.usual-preset-help')"
             name="usualPreset"
           >
-            <USelect
+            <USelectMenu
               v-model="category.usualPreset"
               :items="presetItems"
+              value-key="value"
             />
           </UFormField>
         </UForm>
@@ -316,7 +330,7 @@ async function move(p: Product, to: number) {
         <UButton
           type="submit"
           form="bar-category"
-          loading-auto
+          :loading="categoryEl?.loading"
           :label="t('bar.screens.save')"
         />
       </template>

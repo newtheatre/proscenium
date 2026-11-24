@@ -6,24 +6,21 @@ useSeoMeta({ title: () => t('core.policies.title'), description: () => t('core.p
 </script>
 
 <template>
-  <UContainer>
-    <UPage>
-      <UPageHeader
-        :title="t('core.policies.title')"
-        :description="t('core.policies.description')"
+  <PageFrame
+    :title="t('core.policies.title')"
+    :description="t('core.policies.description')"
+    width="reading"
+  >
+    <RecordList
+      :label="t('core.policies.title')"
+    >
+      <RecordListItem
+        v-for="policy in data.policies"
+        :key="policy.id"
+        :name="policy.title"
+        :description="policy.summary ?? undefined"
+        :to="`/policies/${policy.id}`"
       />
-      <UPageBody>
-        <UPageList class="gap-2">
-          <UPageCard
-            v-for="policy in data.policies"
-            :key="policy.id"
-            :title="policy.title"
-            :description="policy.summary ?? undefined"
-            :to="`/policies/${policy.id}`"
-            variant="ghost"
-          />
-        </UPageList>
-      </UPageBody>
-    </UPage>
-  </UContainer>
+    </RecordList>
+  </PageFrame>
 </template>

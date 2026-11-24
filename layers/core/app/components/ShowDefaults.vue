@@ -98,7 +98,7 @@ const summary = computed(() => [
             label="Intervals"
             name="intervalCount"
           >
-            <UInputNumber
+            <FieldNumber
               v-model="model.intervalCount"
               :placeholder="String(defaults.intervalCount)"
               :min="0"
@@ -120,7 +120,7 @@ const summary = computed(() => [
             label="Capacity"
             name="capacity"
           >
-            <UInputNumber
+            <FieldNumber
               v-model="model.capacity"
               :placeholder="defaults.capacity === null ? undefined : String(defaults.capacity)"
               :min="0"

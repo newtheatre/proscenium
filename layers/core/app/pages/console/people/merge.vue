@@ -21,7 +21,6 @@ const survivorId = ref<string | undefined>(typeof route.query.survivorId === 'st
 const mergedAccountId = ref<string | undefined>(typeof route.query.mergedAccountId === 'string' ? route.query.mergedAccountId : undefined)
 const preview = ref<Preview | null>(null)
 const refusal = ref<RefusalView | null>(null)
-const busy = ref(false)
 
 const labelOf = (s: Side | null) => s?.name || t('core.merges.unnamed')
 const { dayLong: day } = useDates()
@@ -47,7 +46,6 @@ async function merge() {
     consequence: t('core.merge.consequence'),
     button: t('core.merge.button'),
   })) return
-  busy.value = true
   refusal.value = null
   try {
     await $api('/api/core/accounts/merge', { method: 'POST', body: { survivorId: survivorId.value, mergedAccountId: mergedAccountId.value } })
@@ -56,9 +54,6 @@ async function merge() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    busy.value = false
   }
 }
 </script>
@@ -128,7 +123,7 @@ async function merge() {
         <template #footer>
           <UButton
             icon="i-lucide-merge"
-            :loading="busy"
+            loading-auto
             :label="t('core.merge.button')"
             @click="merge()"
           />

@@ -245,7 +245,7 @@ async function openRun() {
               v-if="!data.sections.length"
               :label="t('box-office.setup.capacity.whole')"
             >
-              <UInputNumber
+              <FieldNumber
                 v-model="wholeSeats"
                 class="w-40"
                 :min="0"
@@ -256,7 +256,7 @@ async function openRun() {
               :key="s.id"
               :label="sectioned ? s.name : t('box-office.setup.capacity.whole')"
             >
-              <UInputNumber
+              <FieldNumber
                 v-model="seats[s.id]"
                 class="w-40"
                 :min="0"
@@ -265,6 +265,7 @@ async function openRun() {
             <div class="flex flex-wrap items-center gap-2">
               <UButton
                 type="submit"
+                loading-auto
                 :label="t('box-office.production-tickets.run-seats.save')"
               />
             </div>
@@ -367,34 +368,32 @@ async function openRun() {
             </UFormField>
             <UButton
               type="submit"
+              loading-auto
               :label="t(takes === 'later' ? 'box-office.setup.prices.save-later' : 'box-office.setup.prices.save')"
             />
           </UForm>
-          <div
+          <FieldGroup
             v-if="data.scheduledPrices?.length"
-            class="mt-6 space-y-2"
+            :title="t('box-office.setup.prices.coming.title')"
           >
-            <h3 class="font-medium">
-              {{ t('box-office.setup.prices.coming.title') }}
-            </h3>
-            <ul class="divide-y divide-default">
-              <li
+            <RecordList :label="t('box-office.setup.prices.coming.title')">
+              <RecordListItem
                 v-for="s in data.scheduledPrices"
                 :key="`${s.bandId} ${s.ticketTypeId} ${s.from}`"
-                class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
+                :name="comingLine(s)"
               >
-                <span>{{ comingLine(s) }}</span>
                 <UButton
                   color="neutral"
                   variant="link"
                   icon="i-lucide-x"
+                  loading-auto
                   :label="t('box-office.setup.prices.coming.cancel')"
                   :aria-label="comingCancel(s)"
                   @click="cancelScheduled(s)"
                 />
-              </li>
-            </ul>
-          </div>
+              </RecordListItem>
+            </RecordList>
+          </FieldGroup>
         </PageSection>
 
         <PageSection
@@ -405,6 +404,7 @@ async function openRun() {
           <UButton
             icon="i-lucide-play"
             :label="t('box-office.setup.run.open', { count: notOnSale })"
+            loading-auto
             @click="openRun"
           />
         </PageSection>
@@ -414,24 +414,26 @@ async function openRun() {
           @changed="refresh()"
         />
 
-        <h2 class="pt-2 font-semibold text-highlighted">
-          {{ t('box-office.production-tickets.nights') }}
-        </h2>
-        <RecordList :label="t('box-office.record-tabs.production.label')">
-          <RecordListItem
-            v-for="row in data.performances"
-            :key="row.id"
-            :to="`/console/box-office/performances/${encodeURIComponent(row.id)}`"
-            :name="when(row)"
-            :description="describe(row)"
-            :muted="row.past"
+        <PageSection :title="t('box-office.production-tickets.nights')">
+          <RecordList
+            :label="t('box-office.production-tickets.nights')"
+            flush
           >
-            <StatusBadge
-              :tone="badge(row).tone"
-              :label="badge(row).label"
-            />
-          </RecordListItem>
-        </RecordList>
+            <RecordListItem
+              v-for="row in data.performances"
+              :key="row.id"
+              :to="`/console/box-office/performances/${encodeURIComponent(row.id)}`"
+              :name="when(row)"
+              :description="describe(row)"
+              :muted="row.past"
+            >
+              <StatusBadge
+                :tone="badge(row).tone"
+                :label="badge(row).label"
+              />
+            </RecordListItem>
+          </RecordList>
+        </PageSection>
       </template>
     </div>
   </DataBoundary>

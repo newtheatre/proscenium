@@ -63,6 +63,8 @@
   "core.webhooks.log-event": "Event",
   "core.webhooks.log-state": "State",
   "core.webhooks.log-tries": "Tries",
+  "core.webhooks.log-tries-count": "{count} tries",
+  "core.webhooks.log-tries-count.one": "1 try",
   "core.webhooks.log-answer": "Answer",
   "core.webhooks.log-no-answer": "None",
   "core.webhooks.log-next": "Next try {when}",

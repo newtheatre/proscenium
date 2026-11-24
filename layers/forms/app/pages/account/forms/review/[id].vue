@@ -45,12 +45,10 @@ function validate() {
   return asked.value.criteria.filter(c => typeof state.marks[c.id] !== 'number').map(c => ({ name: `marks.${c.id}`, message: t('forms.screens.review.give-mark', { max: c.max }) }))
 }
 const failure = ref<{ reason: string, remedy?: string } | null>(null)
-const saving = ref(false)
 const votes = computed(() => VOTES.map(value => ({ value, label: t(`forms.screens.review.vote.${value}`) })))
 
 async function save() {
   failure.value = null
-  saving.value = true
   try {
     await $api(address.value, { method: 'PUT', body: asked.value.mode === 'vote' ? { vote: state.vote, comment: state.comment } : { scores: state.marks, comment: state.comment } })
     await Promise.all([refresh(), refreshNuxtData('forms:mine')])
@@ -65,7 +63,6 @@ async function save() {
     const refusal = toRefusal(e)
     failure.value = { reason: refusal.reason, remedy: refusal.remedy }
   }
-  saving.value = false
 }
 
 async function conflict() {
@@ -161,12 +158,11 @@ async function conflict() {
               :help="t('forms.screens.review.mark-help', { max: c.max })"
               required
             >
-              <UInputNumber
+              <FieldNumber
                 v-model="state.marks[c.id]"
                 :min="0"
                 :max="c.max"
                 :disabled="!canChange"
-                class="w-32"
               />
             </UFormField>
           </template>
@@ -189,7 +185,7 @@ async function conflict() {
             <UButton
               type="submit"
               :label="t(asked.mine.status === 'submitted' ? 'forms.screens.review.change' : 'forms.screens.review.send')"
-              :loading="saving"
+              loading-auto
             />
             <UButton
               :label="t('forms.screens.review.declare')"

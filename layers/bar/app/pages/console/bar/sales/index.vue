@@ -19,8 +19,6 @@ const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 
-// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
-const phone = useScreenQuery('(max-width: 639px)')
 const ALL = 'all'
 const param = (key: string) => computed({
   get: () => (route.query[key] as string | undefined) ?? ALL,
@@ -30,6 +28,8 @@ const outlet = param('outlet')
 const state = param('state')
 const refunded = param('refunded')
 const opening = param('opening')
+const filtersOn = computed(() => [outlet, state, refunded, opening].filter(f => f.value !== ALL).length)
+const clearFilters = () => void router.replace({ query: { ...route.query, outlet: undefined, state: undefined, refunded: undefined, opening: undefined } })
 const search = ref((route.query.q as string | undefined) ?? '')
 watchDebounced(search, v => void router.replace({ query: { ...route.query, q: v.trim() || undefined } }), { debounce: 300 })
 const query = computed(() => ({
@@ -123,11 +123,11 @@ const columns = computed(() => [
     />
     <div
       v-if="!closerOnly"
-      :class="['mb-6 grid grid-cols-2 gap-4', openings.length ? 'sm:grid-cols-5' : 'sm:grid-cols-4']"
+      class="mb-6 flex items-end gap-2"
     >
       <UFormField
         :label="t('bar.screens.sales.find')"
-        class="max-sm:col-span-2"
+        class="min-w-0 flex-1 sm:max-w-xs"
       >
         <UInput
           v-model="search"
@@ -135,36 +135,40 @@ const columns = computed(() => [
           :placeholder="t('bar.screens.sales.find-placeholder')"
         />
       </UFormField>
-      <UFormField :label="t('bar.screens.sales.outlet')">
-        <USelect
-          v-model="outlet"
-          :items="outletItems"
-        />
-      </UFormField>
-      <UFormField
-        v-if="openings.length"
-        :label="t('bar.screens.sales.opening')"
+      <FilterPanel
+        :count="filtersOn"
+        @clear="clearFilters"
       >
-        <USelect
-          v-model="opening"
-          :items="openingItems"
-        />
-      </UFormField>
-      <UFormField :label="t('bar.screens.sales.state-heading')">
-        <USelect
-          v-model="state"
-          :items="stateItems"
-        />
-      </UFormField>
-      <UFormField
-        :label="t('bar.screens.sales.refunds')"
-        :class="openings.length ? '' : 'max-sm:col-span-2'"
-      >
-        <USelect
-          v-model="refunded"
-          :items="refundedItems"
-        />
-      </UFormField>
+        <UFormField :label="t('bar.screens.sales.outlet')">
+          <USelectMenu
+            v-model="outlet"
+            :items="outletItems"
+            value-key="value"
+          />
+        </UFormField>
+        <UFormField
+          v-if="openings.length"
+          :label="t('bar.screens.sales.opening')"
+        >
+          <USelectMenu
+            v-model="opening"
+            :items="openingItems"
+            value-key="value"
+          />
+        </UFormField>
+        <UFormField :label="t('bar.screens.sales.state-heading')">
+          <USelect
+            v-model="state"
+            :items="stateItems"
+          />
+        </UFormField>
+        <UFormField :label="t('bar.screens.sales.refunds')">
+          <USelect
+            v-model="refunded"
+            :items="refundedItems"
+          />
+        </UFormField>
+      </FilterPanel>
     </div>
     <p
       v-if="chosen"
@@ -186,34 +190,28 @@ const columns = computed(() => [
           :description="t('bar.screens.sales.empty.description')"
           icon="i-lucide-receipt"
         />
-        <RecordList
-          v-if="d.rows.length && phone"
-          :label="t('bar.navigation.sales.label')"
-        >
-          <RecordListItem
-            v-for="r in d.rows"
-            :key="r.reference"
-            :to="`/console/bar/sales/${r.reference}`"
-            :name="r.reference"
-            :description="[dateTime(r.at), r.outlet, r.state === 'paid' ? null : stateLabel(r.state)].filter(Boolean).join(' · ')"
-          >
-            <span class="text-right text-sm">
-              <span class="block font-medium tabular-nums">{{ money(r.totalMinor) }}</span>
-              <span
-                v-if="r.refundedMinor"
-                class="block text-muted"
-              >{{ t('bar.screens.sales.refunded', { amount: money(r.refundedMinor) }) }}</span>
-            </span>
-          </RecordListItem>
-        </RecordList>
-        <UTable
-          v-else-if="d.rows.length"
-          :data="d.rows"
+        <TableOrList
+          v-if="d.rows.length"
+          :rows="d.rows"
           :columns="columns"
-          :caption="t('bar.navigation.sales.label')"
-          :meta="{ class: { tr: 'cursor-pointer' } }"
-          @select="(_event: Event, row: { original: Row }) => navigateTo(`/console/bar/sales/${row.original.reference}`)"
+          :label="t('bar.navigation.sales.label')"
+          :to="(r: Row) => `/console/bar/sales/${r.reference}`"
         >
+          <template #item="{ row: r }">
+            <RecordListItem
+              :to="`/console/bar/sales/${r.reference}`"
+              :name="r.reference"
+              :description="[dateTime(r.at), r.outlet, r.state === 'paid' ? null : stateLabel(r.state)].filter(Boolean).join(' · ')"
+            >
+              <span class="text-right text-sm">
+                <span class="block font-medium tabular-nums">{{ money(r.totalMinor) }}</span>
+                <span
+                  v-if="r.refundedMinor"
+                  class="block text-muted"
+                >{{ t('bar.screens.sales.refunded', { amount: money(r.refundedMinor) }) }}</span>
+              </span>
+            </RecordListItem>
+          </template>
           <template #reference-cell="{ row }">
             <ULink
               :to="`/console/bar/sales/${row.original.reference}`"
@@ -237,7 +235,7 @@ const columns = computed(() => [
               :label="stateLabel(row.original.state)"
             />
           </template>
-        </UTable>
+        </TableOrList>
       </template>
     </DataBoundary>
   </PageFrame>

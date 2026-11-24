@@ -301,13 +301,13 @@ for (const scheme of ['light', 'dark'] as const) {
       const title = page.getByLabel('Show title', { exact: true })
       await title.fill('Macbeth')
       await expect(page.getByText('1 change')).toBeVisible()
-      await page.getByRole('button', { name: 'Save sample show settings' }).click()
+      await page.getByRole('button', { name: 'Save changes' }).click()
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
       await visit(page, '/console/gallery/list?settings=gallery') // waits for hydration, as a bare reload does not
       await expect(page.getByLabel('Show title', { exact: true })).toHaveValue('Macbeth')
       await expect(page.getByText('Default: Hamlet.')).toBeVisible()
       await page.getByRole('button', { name: /Reset Show title to its default/ }).click()
-      await page.getByRole('button', { name: 'Save sample show settings' }).click()
+      await page.getByRole('button', { name: 'Save changes' }).click()
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
     })
 
@@ -319,14 +319,14 @@ for (const scheme of ['light', 'dark'] as const) {
       await amount.fill('20')
       await amount.blur()
       await expect(page.getByText('1 change')).toBeVisible()
-      await page.getByRole('button', { name: 'Save sample show settings' }).click()
+      await page.getByRole('button', { name: 'Save changes' }).click()
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
       await visit(page, '/console/gallery/list?settings=gallery')
       await expect(page.getByRole('spinbutton', { name: 'How long seats are held: How many' })).toHaveValue('20')
       await expect(page.getByText('Default: 15 minutes.')).toBeVisible()
       await noViolations(page)
       await page.getByRole('button', { name: /Reset How long seats are held to its default/ }).click()
-      await page.getByRole('button', { name: 'Save sample show settings' }).click()
+      await page.getByRole('button', { name: 'Save changes' }).click()
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
     })
 
@@ -487,14 +487,16 @@ test.describe('the access scheme screens', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Apply' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Send application' })).toBeVisible()
-    // Needs are square ticks; the wheelchair question asks its follow-up only once ticked.
-    await expect(page.getByRole('checkbox', { name: 'Steps and stairs' })).toBeVisible()
+    // What would help is square ticks under the list's headings; the wheelchair question asks its follow-up only once ticked.
+    await expect(page.getByRole('checkbox', { name: 'A step-free route' })).toBeVisible()
+    await expect(page.getByRole('group', { name: 'Seeing and hearing the show' }).getByRole('checkbox', { name: 'BSL interpretation' })).toBeVisible()
+    await expect(page.getByRole('checkbox', { name: 'I come with an assistance dog' })).toBeVisible()
     await expect(page.getByRole('radio', { name: 'Move to a seat' })).toHaveCount(0)
     await page.getByRole('checkbox', { name: 'I use a wheelchair' }).click()
     await expect(page.getByRole('radio', { name: 'Stay in my wheelchair' })).toBeVisible()
     await expect(page.getByRole('radio', { name: 'Move to a seat' })).toBeVisible()
     // The needs question heads the form; a divider and "More about your visit" lead the rest.
-    await expect(page.getByRole('heading', { level: 2, name: 'Which of these make a visit harder for you?' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'What would help you?' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2, name: 'More about your visit' })).toBeVisible()
     // A companion is a tick box that asks how many only once ticked.
     await expect(page.getByRole('combobox', { name: 'How many people come with you?' })).toHaveCount(0)

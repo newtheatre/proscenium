@@ -120,23 +120,19 @@ const label = computed(() => viewer.value.name ?? t('core.menu.account'))
           >
             {{ t('core.menu.appearance') }}
           </p>
-          <UFieldGroup
-            class="w-full"
-            role="group"
+          <UToggleGroup
+            :model-value="colorMode.preference"
+            :items="MODES.map(mode => ({ value: mode, label: t(`core.menu.appearance.${mode}`), icon: MODE_ICONS[mode] }))"
+            attached
+            color="neutral"
+            variant="outline"
+            active-color="neutral"
+            active-variant="solid"
+            class="flex w-full"
+            :ui="{ item: 'flex-1 justify-center' }"
             :aria-labelledby="appearanceId"
-          >
-            <UButton
-              v-for="mode in MODES"
-              :key="mode"
-              :icon="MODE_ICONS[mode]"
-              :label="t(`core.menu.appearance.${mode}`)"
-              :aria-pressed="colorMode.preference === mode"
-              color="neutral"
-              :variant="colorMode.preference === mode ? 'solid' : 'outline'"
-              class="flex-1 justify-center"
-              @click="choose(mode)"
-            />
-          </UFieldGroup>
+            @update:model-value="$event && choose($event as typeof MODES[number])"
+          />
         </template>
         <USeparator class="my-3" />
         <UButton

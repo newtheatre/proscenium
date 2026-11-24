@@ -254,13 +254,15 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
           v-if="question.type === 'scale'"
           :label="t('forms.screens.details.scale-min')"
         >
-          <UInputNumber
+          <FieldNumber
+            class="w-full"
             :model-value="question.scale?.min ?? 0"
             @update:model-value="setQ('scale', { ...question.scale!, min: $event ?? 0 }, true)"
           />
         </UFormField>
         <UFormField :label="t(question.type === 'rating' ? 'forms.screens.details.rating-max' : 'forms.screens.details.scale-max')">
-          <UInputNumber
+          <FieldNumber
+            class="w-full"
             :model-value="question.scale?.max ?? 5"
             :min="1"
             @update:model-value="setQ('scale', { ...question.scale, max: $event ?? 1 }, true)"
@@ -330,7 +332,7 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
             v-else-if="rule.rule === 'maxFileSize'"
             size="sm"
           >
-            <UInputNumber
+            <FieldNumber
               class="w-24"
               :min="1"
               :model-value="Math.max(1, Math.round((rule.value as number) / MEGABYTE))"
@@ -343,7 +345,7 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
               :label="t('forms.screens.details.megabytes')"
             />
           </UFieldGroup>
-          <UInputNumber
+          <FieldNumber
             v-else-if="typeof rule.value === 'number'"
             class="w-28"
             size="sm"
@@ -372,7 +374,7 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
               :model-value="rule.value"
               @update:model-value="setRule(i, { value: $event ?? '' })"
             />
-            <UInputNumber
+            <FieldNumber
               v-else
               class="w-24"
               size="sm"
@@ -471,7 +473,8 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
       </UFormField>
       <div class="grid grid-cols-2 gap-3">
         <UFormField :label="t('forms.screens.details.group-min')">
-          <UInputNumber
+          <FieldNumber
+            class="w-full"
             :model-value="group.min ?? 0"
             :min="0"
             @update:model-value="edit<Group>((g) => { g.min = $event ?? 0 }, 'min')"
@@ -481,7 +484,8 @@ const TIPS = [{ key: 'tip-drag', icon: 'i-lucide-grip-vertical' }, { key: 'tip-s
           :label="t('forms.screens.details.group-max')"
           :hint="t('forms.screens.details.optional')"
         >
-          <UInputNumber
+          <FieldNumber
+            class="w-full"
             :model-value="group.max ?? null"
             :min="1"
             @update:model-value="edit<Group>((g) => { g.max = $event ?? undefined }, 'max')"

@@ -13,7 +13,7 @@ interface Item {
   unit: string | null
   required: boolean
 }
-type FormItem = Omit<Item, 'unit'> & { unit: string }
+type FormItem = Omit<Item, 'unit'> & { unit: string, key: string }
 interface Checklist {
   id: string
   name: string
@@ -43,7 +43,8 @@ const venueItems = computed(() => [{ value: ANY, label: t('front-of-house.any-ve
 const dutyItems = computed(() => [{ value: ANY, label: t('front-of-house.checklists.any-duty') }, ...(choices.value?.duties ?? []).map(d => ({ value: d.id, label: d.name }))])
 const venueName = (id: string | null) => id ? choices.value?.venues.find(v => v.id === id)?.name ?? '' : t('front-of-house.any-venue')
 
-const blankItem = (): FormItem => ({ label: '', help: null, kind: 'tick', unit: '', required: true })
+// A row's own key for dragging: its id once saved, made here until then.
+const blankItem = (): FormItem => ({ key: crypto.randomUUID(), label: '', help: null, kind: 'tick', unit: '', required: true })
 const blank = () => ({ name: '', moment: 'pre-show' as Moment, venueId: ANY, dutyId: ANY, items: [blankItem()] })
 const form = ref(blank())
 const editing = ref<Checklist | null>(null)
@@ -52,7 +53,7 @@ const open = ref(false)
 
 function edit(list: Checklist) {
   editing.value = list
-  form.value = { name: list.name, moment: list.moment, venueId: list.venueId ?? ANY, dutyId: list.dutyId ?? ANY, items: list.items.map(i => ({ ...i, unit: i.unit ?? '' })) }
+  form.value = { name: list.name, moment: list.moment, venueId: list.venueId ?? ANY, dutyId: list.dutyId ?? ANY, items: list.items.map(i => ({ ...i, key: i.id ?? crypto.randomUUID(), unit: i.unit ?? '' })) }
   refusal.value = null
   open.value = true
 }
@@ -62,11 +63,20 @@ function add() {
   refusal.value = null
   open.value = true
 }
-function move(i: number, by: -1 | 1) {
+function move(from: number, to: number) {
   const items = form.value.items
-  const j = i + by
-  if (j < 0 || j >= items.length) return
-  ;[items[i], items[j]] = [items[j]!, items[i]!]
+  if (to < 0 || to >= items.length || from === to) return
+  items.splice(to, 0, ...items.splice(from, 1))
+}
+// Arrow keys on the handle move the row and keep the focus on it.
+async function onHandleKey(event: KeyboardEvent, key: string) {
+  const by = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
+  if (!by) return
+  event.preventDefault()
+  const at = form.value.items.findIndex(x => x.key === key)
+  move(at, at + by)
+  await nextTick()
+  document.querySelector<HTMLElement>(`[data-drag-handle="${key}"]`)?.focus()
 }
 
 async function save() {
@@ -113,6 +123,7 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
   [{ label: t('front-of-house.edit'), icon: 'i-lucide-pencil', onSelect: () => edit(list) }],
   [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void setArchived(list, true) } }],
 ]
+const fhChecklistForm = useFormRef('fhChecklistForm')
 </script>
 
 <template>
@@ -200,6 +211,7 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
       <template #body>
         <UForm
           id="fh-checklist"
+          ref="fhChecklistForm"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ name: form.name })"
@@ -240,32 +252,36 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
               />
             </UFormField>
           </div>
-          <fieldset class="space-y-4">
-            <legend class="text-sm font-medium">
-              {{ t('front-of-house.checklists.items-legend') }}
-            </legend>
-            <div
-              v-for="(item, i) in form.items"
-              :key="item.id ?? `new-${i}`"
-              class="space-y-3 rounded-md border border-default p-3"
+          <FieldGroup :title="t('front-of-house.checklists.items-legend')">
+            <SortableList
+              :label="t('front-of-house.checklists.items-legend')"
+              @reorder="m => move(m.from, m.to)"
             >
-              <div class="flex items-end gap-2">
-                <UFormField
-                  :label="t('front-of-house.checklists.item', { n: i + 1 })"
-                  class="flex-1"
-                >
-                  <UInput
-                    v-model="item.label"
-                    maxlength="160"
+              <SortableRow
+                v-for="(item, i) in form.items"
+                :id="item.key"
+                :key="item.key"
+                :index="i"
+                :name="t('front-of-house.checklists.item', { n: i + 1 })"
+              >
+                <template #leading>
+                  <IconButton
+                    :data-drag-handle="item.key"
+                    icon="i-lucide-grip-vertical"
+                    size="sm"
+                    class="cursor-grab touch-none"
+                    :label="t('front-of-house.checklists.order-handle', { n: i + 1 })"
+                    aria-describedby="fh-checklist-order-help"
+                    @keydown="onHandleKey($event, item.key)"
                   />
-                </UFormField>
+                </template>
                 <IconButton
                   icon="i-lucide-arrow-up"
                   color="neutral"
                   variant="ghost"
                   :label="t('front-of-house.checklists.move-up', { n: i + 1 })"
                   :disabled="i === 0"
-                  @click="move(i, -1)"
+                  @click="move(i, i - 1)"
                 />
                 <IconButton
                   icon="i-lucide-arrow-down"
@@ -273,7 +289,7 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
                   variant="ghost"
                   :label="t('front-of-house.checklists.move-down', { n: i + 1 })"
                   :disabled="i === form.items.length - 1"
-                  @click="move(i, 1)"
+                  @click="move(i, i + 1)"
                 />
                 <IconButton
                   icon="i-lucide-trash-2"
@@ -282,31 +298,43 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
                   :label="t('front-of-house.checklists.remove-item', { n: i + 1 })"
                   @click="form.items.splice(i, 1)"
                 />
-              </div>
-              <div class="grid gap-3 sm:grid-cols-3">
-                <UFormField :label="t('front-of-house.checklists.kind-label')">
-                  <USelect
-                    v-model="item.kind"
-                    :items="kinds"
-                    value-key="value"
-                  />
-                </UFormField>
-                <UFormField
-                  v-if="item.kind === 'reading'"
-                  :label="t('front-of-house.checklists.unit')"
-                >
+                <template #below>
                   <UInput
-                    v-model="item.unit"
-                    maxlength="20"
+                    v-model="item.label"
+                    maxlength="160"
+                    class="mb-3"
+                    :aria-label="t('front-of-house.checklists.item-words', { n: i + 1 })"
                   />
-                </UFormField>
-                <UCheckbox
-                  v-model="item.required"
-                  :label="t('front-of-house.checklists.required')"
-                  class="self-end"
-                />
-              </div>
-            </div>
+                  <div class="grid gap-3 sm:grid-cols-3">
+                    <UFormField :label="t('front-of-house.checklists.kind-label')">
+                      <USelect
+                        v-model="item.kind"
+                        :items="kinds"
+                        value-key="value"
+                      />
+                    </UFormField>
+                    <UFormField
+                      v-if="item.kind === 'reading'"
+                      :label="t('front-of-house.checklists.unit')"
+                    >
+                      <UInput
+                        v-model="item.unit"
+                        maxlength="20"
+                      />
+                    </UFormField>
+                    <UCheckbox
+                      v-model="item.required"
+                      :label="t('front-of-house.checklists.required')"
+                      class="self-end"
+                    />
+                  </div>
+                </template>
+              </SortableRow>
+            </SortableList>
+            <span
+              id="fh-checklist-order-help"
+              class="sr-only"
+            >{{ t('front-of-house.checklists.order-keys') }}</span>
             <UButton
               icon="i-lucide-plus"
               color="neutral"
@@ -314,12 +342,13 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
               :label="t('front-of-house.checklists.add-item')"
               @click="form.items.push(blankItem())"
             />
-          </fieldset>
+          </FieldGroup>
         </UForm>
       </template>
       <template #footer>
         <UButton
           type="submit"
+          :loading="fhChecklistForm?.loading"
           form="fh-checklist"
           :label="editing ? t('front-of-house.save') : t('front-of-house.checklists.add-button')"
         />

@@ -7,6 +7,7 @@ import { venueInput } from '../../../../../../server/places/input'
 interface Space { id: string, name: string, defaultCapacity: number | null, managed: boolean, archived: boolean }
 interface Row { id: string, name: string, locality: string | null, archived: boolean, spaces: Space[] }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const { data, status, error, refresh } = await useAPI<{ rows: Row[] }>('/api/core/venues', { key: 'core:venues', query: { size: 100, state: 'active' } })
 const { data: old, refresh: refreshOld } = await useAPI<{ rows: Row[] }>('/api/core/venues', { key: 'core:venues:archived', query: { size: 100, state: 'archived' } })
@@ -24,8 +25,8 @@ watch(search, (words) => { if (words.trim() && archived.value.length) showArchiv
 
 const creating = ref(false)
 const fields = [
-  { name: 'name', label: 'Name', kind: 'text' as const },
-  { name: 'locality', label: 'Town or city', kind: 'text' as const, optional: true },
+  { name: 'name', label: t('core.venues.name'), kind: 'text' as const },
+  { name: 'locality', label: t('core.venues.town-or-city'), kind: 'text' as const, optional: true },
 ]
 const create = (values: Record<string, unknown>) => $api<{ venueId: string }>('/api/core/venues', { method: 'POST', body: values })
 // Undo takes a venue made by mistake out of use again; it has no performances yet.
@@ -45,15 +46,15 @@ onMounted(() => {
 
 const line = (row: Row) => {
   const spaces = row.spaces.filter(s => !s.archived)
-    .map(s => `${s.defaultCapacity ? `${s.name} (${s.defaultCapacity})` : s.name}${s.managed ? '' : ', not run by the theatre'}`).join('; ')
+    .map(s => `${s.defaultCapacity ? `${s.name} (${s.defaultCapacity})` : s.name}${s.managed ? '' : t('core.venues.not-ours')}`).join('; ')
   return [row.locality, spaces].filter(Boolean).join(' · ')
 }
 </script>
 
 <template>
   <PageFrame
-    title="Venues and spaces"
-    description="A venue is a building or site the theatre performs in. Each has one or more spaces, such as a main house and a studio."
+    :title="t('core.venues.venues-and-spaces')"
+    :description="t('core.venues.description-a-venue-is')"
     width="reading"
   >
     <template #primary>
@@ -61,10 +62,10 @@ const line = (row: Row) => {
         v-if="data?.rows.length || old?.rows.length"
         v-model="search"
         v-model:open="searching"
-        label="Search venues"
+        :label="t('core.venues.search-venues')"
       />
       <UButton
-        label="New venue"
+        :label="t('core.venues.new-venue')"
         :ui="{ label: searching ? 'max-sm:sr-only' : '' }"
         icon="i-lucide-plus"
         @click="creating = true"
@@ -79,8 +80,8 @@ const line = (row: Row) => {
       <div class="space-y-4">
         <EmptyState
           v-if="!data?.rows.length && !old?.rows.length"
-          title="No venues yet"
-          description="A venue is a building or site the theatre performs in. Each has one or more spaces, such as a main house and a studio."
+          :title="t('core.venues.no-venues-yet')"
+          :description="t('core.venues.description-a-venue-is')"
           icon="i-lucide-building"
         />
         <template v-else>
@@ -88,11 +89,11 @@ const line = (row: Row) => {
             v-if="!current.length && !archived.length"
             class="text-sm text-muted"
           >
-            No venues match “{{ search.trim() }}”.
+            {{ t('core.venues.no-match', { search: search.trim() }) }}
           </p>
           <RecordList
             v-if="current.length"
-            label="Venues"
+            :label="t('core.venues.venues')"
           >
             <RecordListItem
               v-for="v in current"
@@ -105,10 +106,10 @@ const line = (row: Row) => {
           <CollapsibleDivider
             v-if="archived.length"
             v-model:open="showArchived"
-            label="Archived"
+            :label="t('core.states.archived')"
             :count="archived.length"
           >
-            <RecordList label="Archived venues">
+            <RecordList :label="t('core.venues.archived-venues')">
               <RecordListItem
                 v-for="v in archived"
                 :key="v.id"
@@ -125,10 +126,10 @@ const line = (row: Row) => {
 
     <PageForm
       v-model:open="creating"
-      title="New venue"
-      description="The venue gets one space of the same name. Add more on the venue's page."
-      submit-label="Create venue"
-      done="Venue added"
+      :title="t('core.venues.new-venue')"
+      :description="t('core.venues.description-the-venue-gets')"
+      :submit-label="t('core.venues.create-venue')"
+      :done="t('core.venues.added')"
       :undo="undoCreate"
       :schema="venueInput"
       :fields="fields"

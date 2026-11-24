@@ -74,7 +74,7 @@ const fee = await useAPI<Fee>(() => `/api/membership-fees/memberships/${id.value
 // Not asked while Membership fees is off: there is nothing there to answer.
 if (data.value?.feesOn) await fee.execute()
 const charge = computed(() => fee.error.value ? null : fee.data.value?.charge ?? null)
-const money = (minor: number, currency: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(minor / 100) // not-policy: minor units to units
+const { money } = useMoneyText()
 const feeLine = computed(() => {
   const c = charge.value
   if (!c) return ''
@@ -136,6 +136,20 @@ async function saveDates() {
     datesRefusal.value = toRefusal(e)
   }
 }
+function openEnd() {
+  note.value = ''
+  refusal.value = null
+  ending.value = true
+}
+// Neither is the page's primary action: both change the record, and reading it is the common case.
+const pageActions = computed(() => [
+  ...(data.value?.canChangeDates ? [{ label: t('membership.membership.change-dates'), icon: 'i-lucide-calendar-cog', lesser: true, onSelect: openDates }] : []),
+  { label: t('membership.membership.end'), icon: 'i-lucide-circle-stop', lesser: true, onSelect: openEnd },
+])
+const membershipEndForm = useFormRef('membershipEndForm')
+const membershipWaiveForm = useFormRef('membershipWaiveForm')
+const membershipRefundForm = useFormRef('membershipRefundForm')
+const membershipDatesForm = useFormRef('membershipDatesForm')
 </script>
 
 <template>
@@ -156,21 +170,7 @@ async function saveDates() {
       v-if="m && (m.state === 'active' || m.state === 'pending')"
       #primary
     >
-      <UButton
-        v-if="data?.canChangeDates"
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-calendar-cog"
-        :label="t('membership.membership.change-dates')"
-        @click="openDates()"
-      />
-      <UButton
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-circle-stop"
-        :label="t('membership.membership.end')"
-        @click="ending = true; note = ''; refusal = null"
-      />
+      <PageActions :actions="pageActions" />
     </template>
     <DataBoundary
       :data="data"
@@ -272,6 +272,7 @@ async function saveDates() {
       <template #body>
         <UForm
           id="membership-end"
+          ref="membershipEndForm"
           :state="{ note }"
           :validate="() => needs({ note })"
           class="space-y-4"
@@ -301,7 +302,7 @@ async function saveDates() {
           type="submit"
           form="membership-end"
           color="error"
-          loading-auto
+          :loading="membershipEndForm?.loading"
           :label="t('membership.membership.end')"
         />
       </template>
@@ -314,6 +315,7 @@ async function saveDates() {
       <template #body>
         <UForm
           id="membership-waive"
+          ref="membershipWaiveForm"
           :state="{ waiveNote }"
           :validate="() => needs({ waiveNote })"
           class="space-y-4"
@@ -342,7 +344,7 @@ async function saveDates() {
         <UButton
           type="submit"
           form="membership-waive"
-          loading-auto
+          :loading="membershipWaiveForm?.loading"
           :label="t('membership.membership.waive')"
         />
       </template>
@@ -355,6 +357,7 @@ async function saveDates() {
       <template #body>
         <UForm
           id="membership-refund"
+          ref="membershipRefundForm"
           :state="{ refundMinor }"
           :validate="() => needs({ refundMinor: refundMinor || null })"
           class="space-y-4"
@@ -384,7 +387,7 @@ async function saveDates() {
           type="submit"
           form="membership-refund"
           color="error"
-          loading-auto
+          :loading="membershipRefundForm?.loading"
           :label="t('membership.membership.refund')"
         />
       </template>
@@ -397,6 +400,7 @@ async function saveDates() {
       <template #body>
         <UForm
           id="membership-dates"
+          ref="membershipDatesForm"
           :state="dates"
           :validate="() => needs({ startsOn: dates.startsOn, endsOn: indefinite ? true : dates.endsOn, note: dates.note })"
           class="space-y-4"
@@ -443,7 +447,7 @@ async function saveDates() {
         <UButton
           type="submit"
           form="membership-dates"
-          loading-auto
+          :loading="membershipDatesForm?.loading"
           :label="t('membership.membership.dates-save')"
         />
       </template>

@@ -18,6 +18,7 @@
      is a sheet, and a bar at the foot says what was last added, with an undo, and takes payment. -->
 <script setup lang="ts">
 import { createReusableTemplate, useDocumentVisibility, useIntervalFn, useMediaQuery, useResizeObserver } from '@vueuse/core'
+import type { ButtonProps } from '@nuxt/ui'
 import type { YourSession } from '../../shared/sessions'
 import type { ReceiptTo } from './PaymentsReceiptTo.vue'
 
@@ -1010,6 +1011,11 @@ function carryOn() {
 }
 
 const waiting = computed(() => result.value?.kind === 'waiting' || result.value?.kind === 'handoff' || !!payment.value?.waiting)
+// The same size: half the width each on a phone, each as wide as the wider from sm up (see its ui).
+const waitingActions = computed<ButtonProps[]>(() => [
+  ...(result.value?.kind === 'handoff' ? [{ label: t('payments.screens.test.open'), to: result.value.url, external: true, size: 'sm' as const, class: 'justify-center' }] : []),
+  { label: t('payments.screens.test.check'), size: 'sm', color: 'neutral', variant: 'outline', class: 'justify-center', onClick: () => check() },
+])
 
 async function cancel() {
   if (!sale.value) return
@@ -1770,24 +1776,9 @@ function ended() {
                   icon="i-lucide-loader"
                   :title="t('payments.screens.till.waiting')"
                   :description="t('payments.screens.till.waiting-help')"
-                >
-                  <template #actions>
-                    <UButton
-                      v-if="result?.kind === 'handoff'"
-                      :to="result.url"
-                      external
-                      size="sm"
-                      :label="t('payments.screens.test.open')"
-                    />
-                    <UButton
-                      size="sm"
-                      color="neutral"
-                      variant="outline"
-                      :label="t('payments.screens.test.check')"
-                      @click="check()"
-                    />
-                  </template>
-                </UAlert>
+                  :actions="waitingActions"
+                  :ui="{ actions: 'grid auto-cols-fr grid-flow-col gap-2 sm:w-fit' }"
+                />
 
                 <template v-if="!waiting">
                   <p
@@ -1871,7 +1862,7 @@ function ended() {
                       :help="t('payments.screens.till.tendered-help')"
                     >
                       <div class="space-y-2">
-                        <UInputNumber
+                        <FieldNumber
                           v-model="tendered"
                           :min="0"
                           :step="0.01"
@@ -1932,8 +1923,9 @@ function ended() {
                       :label="t('payments.screens.test.reader')"
                       required
                     >
-                      <USelect
+                      <USelectMenu
                         v-model="readerId"
+                        value-key="value"
                         :items="(chosen.readers ?? []).map(r => ({ value: r.id, label: r.label }))"
                       />
                     </UFormField>
@@ -2067,7 +2059,7 @@ function ended() {
 
             <aside
               v-if="beside"
-              :class="live ? 'hidden min-[900px]:sticky min-[900px]:top-16 min-[900px]:block min-[900px]:self-start' : 'hidden lg:sticky lg:top-4 lg:block lg:self-start'"
+              :class="live ? 'hidden min-[900px]:sticky min-[900px]:top-16 min-[900px]:block min-[900px]:self-start' : 'hidden lg:sticky-panel lg:block'"
               :aria-label="t('payments.screens.till.total-label')"
             >
               <PageSection :title="t('payments.screens.till.sale', { count })">

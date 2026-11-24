@@ -16,12 +16,10 @@ const { toRefusal } = useRefusal()
 const query = ref('')
 const fees = ref<WaitingFee[]>([])
 const searched = ref(false)
-const busy = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const chosen = ref<WaitingFee | null>(null)
 
 async function search() {
-  busy.value = true
   refusal.value = null
   try {
     fees.value = (await $api<{ fees: WaitingFee[] }>('/api/membership-fees/desk/waiting', { query: { q: query.value } })).fees
@@ -29,9 +27,6 @@ async function search() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
-  }
-  finally {
-    busy.value = false
   }
 }
 
@@ -84,7 +79,7 @@ const what = (fee: WaitingFee) => fee.lengthName ? `${fee.schemeName}, ${fee.len
         class="flex items-end gap-2"
         :state="{ query }"
         novalidate
-        @submit="search()"
+        @submit="search"
       >
         <UFormField
           :label="t('membership-fees.desk.search')"
@@ -100,7 +95,7 @@ const what = (fee: WaitingFee) => fee.lengthName ? `${fee.schemeName}, ${fee.len
           type="submit"
           :label="t('membership-fees.desk.find')"
           icon="i-lucide-search"
-          :loading="busy"
+          loading-auto
           :disabled="locked"
         />
       </UForm>

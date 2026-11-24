@@ -114,10 +114,11 @@ This is how the first theatre sells, so all seven are Gate stories. The rules ar
 | PAY-01 | As a treasurer I connect a payment provider | Guided setup names the secrets or connection needed, checks them, and offers a test payment in test mode. A provider with a missing secret is unavailable and the health screen says which secret | First |
 | PAY-02 | As a treasurer I pair a card reader | A reader is paired with a provider account and named; it appears as a button at the desk | First |
 | PAY-03 | As a seller I open and cash up my till session | Opening asks for a float. Closing asks for the cash counted and shows the difference from expected; a difference needs a reason, and above the limit a second person | First |
-| PAY-04 | As a treasurer I resolve a payment with no answer | "Needs attention" lists it with how long it has waited. The system keeps asking the provider. I can answer it from the provider's dashboard, recorded under my name | First |
+| PAY-04 | As a treasurer I resolve a payment with no answer | "Needs attention" lists it with how long it has waited. The system keeps asking the provider. I can answer it from the provider's dashboard, recorded under my name. If the till had given up on it and the buyer had what they paid for anyway, I can keep it rather than send it back | First |
 | PAY-05 | As the system I am not fooled by a repeated or forged webhook | A repeated event changes nothing. An event with a bad signature is stored and never acted on. Events out of order produce the same final state | First. Gate |
 | PAY-06 | As a treasurer I see what each provider charged | Where the provider reports fees, each is posted against the payment; otherwise fees are entered by hand per payout | First: by hand. Later: reported |
 | PAY-07 | As a seller I take one card payment for tickets and items from another module, so the one reader serves the whole sale | The reader takes one total; every part settles in the same batch or none does; the ledger credits each owner's account; a refund cannot exceed its own part. Tested with a stand-in second owner | First |
+| PAY-08 | As a treasurer I record money taken outside the site for a booking that lapsed unpaid, so the records match what was sold | Once the performance is past selling, the order offers it; it needs a note of how and when; the booking stays lapsed; the money is an Other payment and ticket income for the performance; a booking already paid refuses, and a performance still on sale points to the till | First |
 
 ## Finance
 

@@ -40,7 +40,7 @@ const decision = computed(() => [a.value?.decidedOn ? day(a.value.decidedOn) : n
 
 const editing = ref(false)
 const form = reactive({ recipientName: '', awardedOn: '', awardedFor: '', citation: '', productionId: null as string | null, decidedOn: '', decisionNote: '', visibility: 'public' as Award['visibility'] })
-const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('formEl')
+const formEl = useFormRef('formEl')
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const visibilities = computed(() => (['public', 'members', 'hidden'] as const).map(v => ({ value: v, label: t(`awards.screens.visibility.${v}`) })))
 function openEdit() {
@@ -79,7 +79,7 @@ async function listForHolder() {
 // An award recorded by name alone can be given its account later.
 const linking = ref(false)
 const link = reactive({ how: 'person' as 'person' | 'address', accountId: undefined as string | undefined, address: '' })
-const linkEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('linkEl')
+const linkEl = useFormRef('linkEl')
 const linkRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 let linkKey = ''
 const linkHow = computed(() => (['person', 'address'] as const).map(v => ({ value: v, label: t(`awards.screens.link.how-${v}`) })))
@@ -109,7 +109,7 @@ async function saveLink(merge: unknown = false) {
 
 const revoking = ref(false)
 const reason = ref('')
-const revokeEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('revokeEl')
+const revokeEl = useFormRef('revokeEl')
 const revokeRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
 async function revoke() {
   revokeRefusal.value = null
@@ -124,6 +124,18 @@ async function revoke() {
     revokeEl.value?.setErrors(fieldErrors(revokeRefusal.value))
   }
 }
+function openRevoke() {
+  reason.value = ''
+  revokeRefusal.value = null
+  revoking.value = true
+}
+// Neither is the page's primary action: both change the record, and reading it is the common case.
+const pageActions = computed(() => a.value?.state !== 'current'
+  ? []
+  : [
+      ...(data.value?.canUpdate ? [{ label: t('awards.screens.award.correct'), icon: 'i-lucide-pencil', lesser: true, onSelect: openEdit }] : []),
+      ...(data.value?.canRevoke ? [{ label: t('awards.screens.award.revoke'), icon: 'i-lucide-undo-2', lesser: true, onSelect: openRevoke }] : []),
+    ])
 </script>
 
 <template>
@@ -144,22 +156,7 @@ async function revoke() {
       v-if="a"
       #primary
     >
-      <UButton
-        v-if="data?.canUpdate && a.state === 'current'"
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-pencil"
-        :label="t('awards.screens.award.correct')"
-        @click="openEdit()"
-      />
-      <UButton
-        v-if="data?.canRevoke && a.state === 'current'"
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-undo-2"
-        :label="t('awards.screens.award.revoke')"
-        @click="revoking = true; reason = ''; revokeRefusal = null"
-      />
+      <PageActions :actions="pageActions" />
     </template>
     <DataBoundary
       :data="data"
@@ -303,7 +300,7 @@ async function revoke() {
         <UButton
           type="submit"
           form="awards-correct"
-          loading-auto
+          :loading="formEl?.loading"
           :label="t('awards.screens.award.save')"
         />
       </template>
@@ -380,7 +377,7 @@ async function revoke() {
         <UButton
           type="submit"
           form="awards-link"
-          loading-auto
+          :loading="linkEl?.loading"
           :label="t('awards.screens.link.submit')"
         />
       </template>
@@ -420,7 +417,7 @@ async function revoke() {
           type="submit"
           form="awards-revoke"
           color="error"
-          loading-auto
+          :loading="revokeEl?.loading"
           :label="t('awards.screens.award.revoke')"
         />
       </template>

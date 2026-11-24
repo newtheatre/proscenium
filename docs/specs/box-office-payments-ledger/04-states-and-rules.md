@@ -269,6 +269,26 @@ If any statement fails, none of it happened and the attempt is still pending, so
 
 It should not happen, because a hold with a pending or unknown attempt is never swept and a reservation with an attempt in flight is never released. It still can: a provider answers days late, or a person released the hold by hand. Then step 5's assertion fails. Payments catches that one named failure and commits a different batch: attempt `succeeded`, intent `unfulfilled`, a ledger posting to the `payments.unfulfilled` account, an automatic full refund requested, and an alert to the box office. The buyer is told the booking did not complete and that their money is on its way back. Nothing is oversold and no money is unaccounted for.
 
+### Keeping a payment being returned
+
+Money taken for a payment that could not complete (an unfulfilled intent, or a payment the seller gave up on that the provider took after all) is normally refunded in full by the system. Sometimes the buyer had what they paid for anyway: the till could not reach the reader, the seller charged the card on the machine itself and let the buyer in at the door, and the payment was answered "it went through" later under Needs attention. Returning that money would refund a sale that happened. So a person who may approve refunds (`payments.refund.approve`) may keep the payment instead, from the refund on Refunds, from the payment on Needs attention, or when answering a payment with no answer that the till had given up on ("It went through: keep it").
+
+Keeping is one batch and is all or nothing:
+
+1. Only the whole payment is kept: every attempt that took money together took the intent's amount, the intent is still unsettled, no refund of it has been sent or has succeeded, and none was asked for by a person.
+2. The system's refunds still `approved` move to `declined`, approved by the person keeping it, with the reason `payment-kept` from the list of reasons for declining a refund (offered by the system only, never in the decline dialog). A trigger gives their amounts back to the part's and the attempt's counters. The refund job finds nothing to send.
+3. The parts and the intent are marked settled (the intent keeps its state), so a later refund of the money takes it back off the owner's income as any refund does.
+4. Each owner's `kept(unit, part)` returns its income entries, as on a settle, completing its record where it is still waiting or refusing. Box office: a reservation still reserved, at the same total, is confirmed and its tickets issued; a booking that lapsed or was cancelled stays as it is and the money is deferred ticket income for its tickets' performances (recognised by the daily task as usual); a booking paid another way since refuses, since that money really is owed back.
+5. One posting moves the money out of `payments.unfulfilled` to the owners' accounts.
+
+Training covers the cause: a card charged on the reader outside the site is recorded at the till as an Other payment there and then, so nothing needs keeping later.
+
+### A payment taken outside the site
+
+The opposite case has no payment in the site at all: the reservation lapsed unpaid (released at its time, or by hand at the door) while the buyer paid some other way, such as on the card machine's own app, and came to the show. Once the performance is past selling (completed, or past `box-office.sales.desk-until-after` after its start), so that it can no longer be seated again and sold at the till, a person who may take payment for the order (`box-office.order.take-payment`) and answer for payments with no answer (`payments.attempt.reconcile`) records it from the order: "Record a payment taken outside the site", with how and when it was paid. A performance still on sale refuses, pointing to seating them again and taking the payment on the till; a cancelled performance refuses.
+
+It is one batch: a desk intent for the order's total with one `other_attested` attempt on an active live Other account, answered succeeded in the person's name with their note; the intent and its part settled; the owner's `kept(unit, part)` books the income (Box office: the booking stays lapsed and the money is deferred ticket income for its tickets' performances, recognised by the daily task as usual); and one posting from `payments.other` to those accounts. A record already paid for, and not refunded in full, refuses, with the guard on the statement so a race cannot record it twice.
+
 ## A refund
 
 | Transition | Guard |
@@ -279,6 +299,7 @@ It should not happen, because a hold with a pending or unknown attempt is never 
 | sent to succeeded | The provider's answer, or the person's confirmation. The owner's `refunded(unit, part, refund)` returns its entries and Payments writes the posting here |
 | sent to failed | The provider refused. The amount is given back to the part's and the attempt's counters and the box office is alerted |
 | requested to declined | By an approver, with a reason from the theatre's list. A declined refund was never counted, so no counter changes |
+| approved to declined | Only a refund the system asked for, withdrawn because the payment is kept (above). Its amount is given back to the part's and the attempt's counters |
 
 - A refund always goes back by the method that paid. Refunding a card payment in cash is not offered.
 - A refund names one part and can never exceed it. A refund across two owners is two refunds, each approved on its own.

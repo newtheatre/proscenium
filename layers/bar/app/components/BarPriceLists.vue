@@ -36,8 +36,7 @@ const retired = computed(() => shown.value.filter(l => !l.active))
 
 const form = ref<{ id: string | null, standard: boolean, name: string, restricted: boolean, fallsBack: boolean } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-type FormRef = { setErrors: (errors: FieldError[]) => void }
-const formEl = useTemplateRef<FormRef>('formEl')
+const formEl = useFormRef('formEl')
 function edit(l?: List) {
   refusal.value = null
   form.value = l
@@ -137,15 +136,8 @@ async function setActive(l: List, active: boolean) {
           icon="i-lucide-tags"
           :title="t('bar.screens.lists.empty-title')"
           :description="t('bar.screens.lists.empty')"
-        >
-          <template #actions>
-            <UButton
-              icon="i-lucide-plus"
-              :label="t('bar.screens.lists.new')"
-              @click="edit()"
-            />
-          </template>
-        </EmptyState>
+          :action="{ label: t('bar.screens.lists.new'), icon: 'i-lucide-plus', onClick: () => edit() }"
+        />
         <div
           v-else
           class="space-y-4"
@@ -258,7 +250,7 @@ async function setActive(l: List, active: boolean) {
         <UButton
           type="submit"
           form="bar-list"
-          loading-auto
+          :loading="formEl?.loading"
           :label="t('bar.screens.save')"
         />
       </template>

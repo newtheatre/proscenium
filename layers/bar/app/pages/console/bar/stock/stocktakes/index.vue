@@ -13,8 +13,6 @@ const { dateTime } = useDates()
 const { toRefusal } = useRefusal()
 const { data, status, error, refresh } = await useAPI<{ stocktakes: Stocktake[], locations: { id: string, name: string }[], categories: { id: string, name: string }[], uncategorised: number, can: { approve: boolean } }>('/api/bar/stocktakes', { key: 'bar:stocktakes' })
 
-// Chosen by width after hydration, so one form is drawn and a field or a label is never there twice.
-const phone = useScreenQuery('(max-width: 639px)')
 const tone = (s: State) => ({ counting: 'info', submitted: 'warning', approved: 'success', abandoned: 'neutral' } as const)[s]
 const columns = computed(() => [
   { id: 'when', header: t('bar.screens.stocktakes.started') },
@@ -76,44 +74,31 @@ async function start() {
           :title="t('bar.screens.stocktakes.empty.title')"
           :description="t('bar.screens.stocktakes.empty.description')"
           icon="i-lucide-clipboard-list"
-        >
-          <template #actions>
-            <UButton
-              icon="i-lucide-plus"
-              :label="t('bar.screens.stocktakes.start')"
-              @click="openStart"
-            />
-          </template>
-        </EmptyState>
-        <RecordList
-          v-if="d.stocktakes.length && phone"
-          :label="t('bar.screens.stocktakes.list-title')"
-        >
-          <RecordListItem
-            v-for="r in d.stocktakes"
-            :key="r.id"
-            :to="`/console/bar/stock/stocktakes/${r.id}`"
-            :name="[r.location, r.category ?? t('bar.screens.stocktakes.everything')].join(' · ')"
-            :description="[dateTime(r.startedAt), r.startedBy].join(' · ')"
-          >
-            <span
-              v-if="r.varianceValueMinor !== null"
-              class="text-sm tabular-nums"
-            >{{ money(r.varianceValueMinor) }}</span>
-            <StatusBadge
-              :tone="tone(r.state)"
-              :label="t(`bar.screens.stocktakes.states.${r.state}`)"
-            />
-          </RecordListItem>
-        </RecordList>
-        <UTable
-          v-else-if="d.stocktakes.length"
-          :data="d.stocktakes"
+          :action="{ label: t('bar.screens.stocktakes.start'), icon: 'i-lucide-plus', onClick: openStart }"
+        />
+        <TableOrList
+          v-if="d.stocktakes.length"
+          :rows="d.stocktakes"
           :columns="columns"
-          :caption="t('bar.screens.stocktakes.list-title')"
-          :meta="{ class: { tr: 'cursor-pointer' } }"
-          @select="(_event: Event, row: { original: Stocktake }) => navigateTo(`/console/bar/stock/stocktakes/${row.original.id}`)"
+          :label="t('bar.screens.stocktakes.list-title')"
+          :to="(r: Stocktake) => `/console/bar/stock/stocktakes/${r.id}`"
         >
+          <template #item="{ row: r }">
+            <RecordListItem
+              :to="`/console/bar/stock/stocktakes/${r.id}`"
+              :name="[r.location, r.category ?? t('bar.screens.stocktakes.everything')].join(' · ')"
+              :description="[dateTime(r.startedAt), r.startedBy].join(' · ')"
+            >
+              <span
+                v-if="r.varianceValueMinor !== null"
+                class="text-sm tabular-nums"
+              >{{ money(r.varianceValueMinor) }}</span>
+              <StatusBadge
+                :tone="tone(r.state)"
+                :label="t(`bar.screens.stocktakes.states.${r.state}`)"
+              />
+            </RecordListItem>
+          </template>
           <template #when-cell="{ row }">
             <ULink
               :to="`/console/bar/stock/stocktakes/${row.original.id}`"
@@ -134,7 +119,7 @@ async function start() {
               :label="t(`bar.screens.stocktakes.states.${row.original.state}`)"
             />
           </template>
-        </UTable>
+        </TableOrList>
       </template>
     </DataBoundary>
 
@@ -159,9 +144,10 @@ async function start() {
             name="locationId"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="starting.locationId"
               :items="locationItems"
+              value-key="value"
             />
           </UFormField>
           <UFormField
@@ -169,9 +155,10 @@ async function start() {
             :help="[t('bar.screens.stocktakes.what-help'), data?.uncategorised && starting.categoryId !== EVERYTHING ? t('bar.screens.stocktakes.uncategorised', { count: data.uncategorised }) : ''].filter(Boolean).join(' ')"
             name="categoryId"
           >
-            <USelect
+            <USelectMenu
               v-model="starting.categoryId"
               :items="scopeItems"
+              value-key="value"
             />
           </UFormField>
           <UCheckbox

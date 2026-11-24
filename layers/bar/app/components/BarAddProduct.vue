@@ -13,7 +13,6 @@ interface Category { id: string, name: string, parentId: string | null, ageRestr
 interface List { id: string, name: string, standard: boolean, active: boolean }
 interface Group { id: string, name: string, active: boolean }
 type Age = 'category' | 'yes' | 'no'
-type FormRef = { setErrors: (errors: FieldError[]) => void }
 
 // categoryId: the category it was opened from, whose usual preset (or its parent's) it starts on.
 const props = defineProps<{ categories: Category[], lists: List[], categoryId?: string }>()
@@ -33,7 +32,7 @@ const step = ref<1 | 2>(1)
 const preset = ref<Preset | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const form = ref({ name: '', categoryId: '', age: 'category' as Age, sizes: [] as { name: string, amountMinor: number | null }[], groupIds: [] as string[], mixer: false })
-const formEl = useTemplateRef<FormRef>('formEl')
+const formEl = useFormRef('formEl')
 // Whether somebody chose the age check here, so a change of category no longer moves it.
 const ageTouched = ref(false)
 
@@ -150,7 +149,7 @@ async function add() {
 // renames one of the theatre's own (id set).
 const saving = ref<{ id: string | null, name: string } | null>(null)
 const saveRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const saveEl = useTemplateRef<FormRef>('saveEl')
+const saveEl = useFormRef('saveEl')
 const measureOf = (name: string) => preset.value?.sizes.find(s => s.name === name)?.measure ?? null
 const presetBody = () => {
   const f = form.value
@@ -313,10 +312,11 @@ async function deletePreset(p: Preset) {
             name="categoryId"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="form.categoryId"
               :items="categoryItems"
               :placeholder="t('bar.screens.add-product.pick-category')"
+              value-key="value"
             />
           </UFormField>
         </div>
@@ -431,7 +431,7 @@ async function deletePreset(p: Preset) {
           <UButton
             type="submit"
             form="bar-add-product"
-            loading-auto
+            :loading="formEl?.loading"
             :label="confirmUnpriced && unpriced.length ? t('bar.screens.add-product.add-unpriced') : t('bar.screens.add-product.add')"
             @click="another = false"
           />
@@ -476,7 +476,7 @@ async function deletePreset(p: Preset) {
       <UButton
         type="submit"
         form="bar-save-preset"
-        loading-auto
+        :loading="saveEl?.loading"
         :label="t('bar.screens.save')"
       />
     </template>

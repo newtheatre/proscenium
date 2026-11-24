@@ -75,10 +75,12 @@ async function releaseUnpaid() {
   }
 }
 
-const more = computed(() => [[
+// The first is the page's primary action; on a phone the rest fold into one menu.
+const actions = computed(() => [
+  { label: t('box-office.door.open-live'), icon: 'i-lucide-maximize', to: `/live/door/${encodeURIComponent(id.value)}` },
   { label: t('box-office.live-door.print'), icon: 'i-lucide-printer', to: `/live/door/${encodeURIComponent(id.value)}/print` },
-  { label: t('box-office.door.release.button'), icon: 'i-lucide-clock-alert', onSelect: () => { void releaseUnpaid() } },
-]])
+  { label: t('box-office.door.release.button'), icon: 'i-lucide-clock-alert', loading: releasing.value, onSelect: () => { void releaseUnpaid() } },
+])
 const trail = computed(() => [
   { label: t('box-office.navigation.performances.label'), to: '/console/box-office/performances' },
   { label: t('box-office.door.set-up'), to: `/console/box-office/performances/${encodeURIComponent(id.value)}` },
@@ -96,35 +98,9 @@ const trail = computed(() => [
     :empty="{ title: t('box-office.door.empty.title'), description: t('box-office.door.empty.description'), icon: 'i-lucide-door-open' }"
   >
     <template #primary>
-      <UButton
-        :to="`/live/door/${encodeURIComponent(id)}`"
-        icon="i-lucide-maximize"
-        :label="t('box-office.door.open-live')"
-      />
-      <UButton
-        :to="`/live/door/${encodeURIComponent(id)}/print`"
-        icon="i-lucide-printer"
-        color="neutral"
-        variant="outline"
-        class="max-sm:hidden"
-        :label="t('box-office.live-door.print')"
-      />
-      <UButton
-        icon="i-lucide-clock-alert"
-        color="neutral"
-        variant="outline"
-        class="max-sm:hidden"
-        :loading="releasing"
-        :label="t('box-office.door.release.button')"
-        @click="releaseUnpaid"
-      />
-      <!-- Three worded buttons do not fit a phone's bar: the two lesser ones fold into a menu there. -->
-      <RowActions
-        class="sm:hidden"
-        size="md"
-        variant="outline"
-        :items="more"
-        :label="t('box-office.door.more')"
+      <PageActions
+        :actions="actions"
+        :more-label="t('box-office.door.more')"
       />
     </template>
     <template #cell-buyer="{ row }">
@@ -157,7 +133,8 @@ const trail = computed(() => [
           <UButton
             size="xs"
             variant="outline"
-            :loading="admitting === row.id"
+            loading-auto
+            :disabled="admitting === row.id"
             :label="t('box-office.door.admit-one')"
             :aria-label="t('box-office.door.admit-one-of', { reference: row.reference })"
             @click="admit(row, 1)"
@@ -166,7 +143,8 @@ const trail = computed(() => [
             v-if="row.tickets - row.admitted > 1"
             size="xs"
             variant="outline"
-            :loading="admitting === row.id"
+            loading-auto
+            :disabled="admitting === row.id"
             :label="t('box-office.door.admit-all', { count: row.tickets - row.admitted })"
             :aria-label="t('box-office.door.admit-all-of', { count: row.tickets - row.admitted, reference: row.reference })"
             @click="admit(row, row.tickets - row.admitted)"

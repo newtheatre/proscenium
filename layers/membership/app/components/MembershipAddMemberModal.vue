@@ -24,7 +24,7 @@ const asksFee = computed(() => !!scheme.value?.feesOn)
 const byLink = computed(() => asksFee.value && member.fee === 'link')
 const asksLength = computed(() => !!scheme.value && scheme.value.lengthRule !== 'indefinite' && scheme.value.options.length > 1)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const form = useTemplateRef('form')
+const form = useFormRef('form')
 
 const today = computed(() => toLocal(Date.now()).slice(0, 10)) // not-policy: the length of a date
 const alreadyEnded = computed(() => !byLink.value && !!member.endsOn && member.endsOn < today.value)
@@ -104,8 +104,9 @@ async function submit() {
           :label="t('membership.screens.add-member.scheme')"
           required
         >
-          <USelect
+          <USelectMenu
             :model-value="member.schemeId || undefined"
+            value-key="value"
             :items="choices.map(s => ({ value: s.id, label: s.name }))"
             :placeholder="t('membership.screens.add-member.scheme-placeholder')"
             @update:model-value="pick($event as string)"
@@ -215,7 +216,7 @@ async function submit() {
       <UButton
         type="submit"
         form="membership-add-member"
-        loading-auto
+        :loading="form?.loading"
         :label="t('membership.screens.add-member.submit')"
       />
     </template>

@@ -52,11 +52,9 @@ onMounted(() => {
   ticking = setInterval(() => (now.value = new Date()), 1000) // not-policy: a once-a-second countdown
 })
 onBeforeUnmount(() => clearInterval(ticking))
-const resending = ref<string | null>(null)
 const waitSeconds = (a: Address) => a.resendAt ? Math.max(0, Math.ceil((a.resendAt - now.value.getTime()) / 1000)) : 0 // not-policy: milliseconds to whole seconds
 
 async function resend(address: Address) {
-  resending.value = address.id
   refusal.value = null
   try {
     await $api('/api/core/me/addresses', { method: 'POST', body: { address: address.address } })
@@ -66,18 +64,13 @@ async function resend(address: Address) {
   catch (e) {
     refusal.value = toRefusal(e)
   }
-  finally {
-    resending.value = null
-  }
 }
 
 const schema = z.object({ address: z.email().max(254) })
 const adding = reactive({ address: '' })
-const sending = ref(false)
 const addRefusal = ref<RefusalView | null>(null)
 
 async function add() {
-  sending.value = true
   addRefusal.value = null
   const address = adding.address.trim()
   try {
@@ -88,9 +81,6 @@ async function add() {
   }
   catch (e) {
     addRefusal.value = toRefusal(e)
-  }
-  finally {
-    sending.value = false
   }
 }
 </script>
@@ -145,7 +135,7 @@ async function add() {
               color="neutral"
               variant="outline"
               icon="i-lucide-send"
-              :loading="resending === a.id"
+              loading-auto
               :disabled="waitSeconds(a) > 0"
               :label="waitSeconds(a) > 0 ? t('core.me.email.resend-in', { count: waitSeconds(a) }) : t('core.me.email.resend')"
               :aria-label="`${t('core.me.email.resend')} ${a.address}`"
@@ -202,7 +192,7 @@ async function add() {
       </UFormField>
       <UButton
         type="submit"
-        :loading="sending"
+        loading-auto
         icon="i-lucide-send"
         :label="t('core.me.email.send-link')"
       />

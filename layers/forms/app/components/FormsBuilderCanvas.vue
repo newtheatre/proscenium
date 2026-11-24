@@ -172,7 +172,7 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
   >
     <div class="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
       <nav
-        class="flex flex-col gap-4 lg:sticky lg:top-0 lg:self-start"
+        class="flex flex-col gap-4 lg:sticky-panel"
         :aria-label="t('forms.screens.builder.outline')"
       >
         <!-- On a phone the outline folds away, so the questions are not a screen below it. -->
@@ -284,13 +284,10 @@ const setPage = (fn: (p: Page) => void, field: string) => builder.apply(change(d
                   :aria-label="t('forms.screens.problems.has')"
                 />
               </UButton>
-              <UDropdownMenu :items="calculationMenu(c.id, i, figureName(c))">
-                <IconButton
-                  icon="i-lucide-ellipsis-vertical"
-                  size="sm"
-                  :label="t('forms.screens.builder.actions-for', { name: figureName(c) })"
-                />
-              </UDropdownMenu>
+              <RowActions
+                :items="calculationMenu(c.id, i, figureName(c))"
+                :label="t('forms.screens.builder.actions-for', { name: figureName(c) })"
+              />
             </li>
           </ul>
           <UButton

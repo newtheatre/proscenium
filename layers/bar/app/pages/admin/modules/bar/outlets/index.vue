@@ -46,8 +46,7 @@ const retired = computed(() => shown.value.filter(o => !o.active))
 
 const form = ref<{ id: string | null, name: string, kind: Kind, priceListId: string, spaceId: string, stockLocationId: string, tillLayout: Layout, favourites: string[] } | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-type FormRef = { setErrors: (errors: FieldError[]) => void }
-const formEl = useTemplateRef<FormRef>('formEl')
+const formEl = useFormRef('formEl')
 function edit(o?: Outlet) {
   refusal.value = null
   form.value = o
@@ -125,15 +124,8 @@ async function setActive(o: Outlet, active: boolean) {
           icon="i-lucide-store"
           :title="t('bar.screens.outlets.empty-title')"
           :description="t('bar.screens.outlets.empty')"
-        >
-          <template #actions>
-            <UButton
-              icon="i-lucide-plus"
-              :label="t('bar.screens.outlets.new')"
-              @click="edit()"
-            />
-          </template>
-        </EmptyState>
+          :action="{ label: t('bar.screens.outlets.new'), icon: 'i-lucide-plus', onClick: () => edit() }"
+        />
         <div
           v-else
           class="space-y-4"
@@ -235,9 +227,10 @@ async function setActive(o: Outlet, active: boolean) {
             :label="t('bar.screens.outlets.list')"
             name="priceListId"
           >
-            <USelect
+            <USelectMenu
               v-model="form.priceListId"
               :items="listItems"
+              value-key="value"
             />
           </UFormField>
           <UFormField
@@ -257,9 +250,10 @@ async function setActive(o: Outlet, active: boolean) {
             :help="t('bar.screens.outlets.stock-help')"
             name="stockLocationId"
           >
-            <USelect
+            <USelectMenu
               v-model="form.stockLocationId"
               :items="locationItems"
+              value-key="value"
             />
           </UFormField>
           <UFormField
@@ -291,7 +285,7 @@ async function setActive(o: Outlet, active: boolean) {
         <UButton
           type="submit"
           form="bar-outlet"
-          loading-auto
+          :loading="formEl?.loading"
           :label="t('bar.screens.save')"
         />
       </template>

@@ -67,25 +67,25 @@ const adding = reactive({ label: '', groupId: '' })
 function checkNew() {
   const missing = needs({ label: adding.label })
   if (missing.length || !grouped.value || adding.groupId) return missing
-  return [{ name: 'label', message: 'Choose the heading it goes under.' }]
+  return [{ name: 'label', message: t('core.vocabulary-terms.choose-heading') }]
 }
 async function add() {
   const label = adding.label.trim()
-  if (label && await run(() => api('/terms', 'POST', { label, ...(grouped.value ? { groupId: adding.groupId } : {}) }), `${label} added`)) adding.label = ''
+  if (label && await run(() => api('/terms', 'POST', { label, ...(grouped.value ? { groupId: adding.groupId } : {}) }), t('core.vocabulary-terms.added', { label }))) adding.label = ''
 }
 
 // Headings (C-54)
 const addingHeading = reactive({ label: '' })
 async function addHeading() {
   const label = addingHeading.label.trim()
-  if (label && await run(() => api('/groups', 'POST', { label }), `Heading ${label} added`)) addingHeading.label = ''
+  if (label && await run(() => api('/groups', 'POST', { label }), t('core.vocabulary-terms.heading-added', { label }))) addingHeading.label = ''
 }
 const editingHeading = ref<string | null>(null)
 const editHeading = reactive({ label: '' })
 async function saveHeading(h: Heading) {
   const label = editHeading.label.trim()
   if (!label || label === h.label) return (editingHeading.value = null)
-  if (await run(() => api(`/groups/${h.id}`, 'PATCH', { label }), `Renamed to ${label}`, () => api(`/groups/${h.id}`, 'PATCH', { label: h.label }))) editingHeading.value = null
+  if (await run(() => api(`/groups/${h.id}`, 'PATCH', { label }), t('core.vocabulary-terms.renamed', { label }), () => api(`/groups/${h.id}`, 'PATCH', { label: h.label }))) editingHeading.value = null
 }
 // The list is put in its new order at once and saved behind; a refusal reloads the order that stands.
 async function moveHeading(h: Heading, to: number) {
@@ -97,18 +97,18 @@ async function moveHeading(h: Heading, to: number) {
   if (!await run(() => api('/groups/order', 'PUT', { ids: next.map(x => x.id) }))) await refresh()
 }
 async function removeHeading(h: Heading) {
-  if (!await confirm({ verb: 'Remove', thing: `the heading ${h.label}`, consequence: 'It has no terms, so nothing else changes.', button: 'Remove heading' })) return
-  await run(() => api(`/groups/${h.id}`, 'DELETE'), `Heading ${h.label} removed`)
+  if (!await confirm({ verb: t('core.vocabulary-terms.remove'), thing: t('core.vocabulary-terms.the-heading', { label: h.label }), consequence: t('core.vocabulary-terms.remove-consequence'), button: t('core.vocabulary-terms.remove-heading') })) return
+  await run(() => api(`/groups/${h.id}`, 'DELETE'), t('core.vocabulary-terms.heading-removed', { label: h.label }))
 }
 function startEditHeading(h: Heading) {
   editingHeading.value = h.id
   editHeading.label = h.label
 }
 const headingActions = (h: Heading, at: number) => [[
-  { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startEditHeading(h) },
-  { label: 'Move up', icon: 'i-lucide-arrow-up', disabled: at === 0, onSelect: () => moveHeading(h, at - 1) },
-  { label: 'Move down', icon: 'i-lucide-arrow-down', disabled: at === headings.value.length - 1, onSelect: () => moveHeading(h, at + 1) },
-  ...(locked.value || h.terms > 0 ? [] : [{ label: 'Remove', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => removeHeading(h) }]),
+  { label: t('core.vocabulary-terms.rename'), icon: 'i-lucide-pencil', onSelect: () => startEditHeading(h) },
+  { label: t('core.vocabulary-terms.move-up'), icon: 'i-lucide-arrow-up', disabled: at === 0, onSelect: () => moveHeading(h, at - 1) },
+  { label: t('core.vocabulary-terms.move-down'), icon: 'i-lucide-arrow-down', disabled: at === headings.value.length - 1, onSelect: () => moveHeading(h, at + 1) },
+  ...(locked.value || h.terms > 0 ? [] : [{ label: t('core.vocabulary-terms.remove'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => removeHeading(h) }]),
 ]]
 
 const editing = ref<string | null>(null)
@@ -123,7 +123,7 @@ async function saveEdit(term: Term) {
   const moved = grouped.value && edit.groupId && edit.groupId !== term.groupId
   if (!label || (label === term.label && !moved)) return (editing.value = null)
   const back = { label: term.label, ...(moved && term.groupId ? { groupId: term.groupId } : {}) }
-  if (await run(() => api(`/terms/${term.id}`, 'PATCH', { label, ...(moved ? { groupId: edit.groupId } : {}) }), moved ? `${label} moved` : `Renamed to ${label}`, () => api(`/terms/${term.id}`, 'PATCH', back))) editing.value = null
+  if (await run(() => api(`/terms/${term.id}`, 'PATCH', { label, ...(moved ? { groupId: edit.groupId } : {}) }), moved ? t('core.vocabulary-terms.moved', { label }) : t('core.vocabulary-terms.renamed', { label }), () => api(`/terms/${term.id}`, 'PATCH', back))) editing.value = null
 }
 
 // A term moves among those it is listed with (its heading's, in a grouped list); the rest keep their places.
@@ -152,34 +152,34 @@ async function onHandleKey(event: KeyboardEvent, id: string, at: number, moveTo:
   focus()
 }
 
-const retire = (term: Term) => run(() => api(`/terms/${term.id}/retire`, 'POST'), `${term.label} retired`, () => api(`/terms/${term.id}/restore`, 'POST'))
-const restore = (term: Term) => run(() => api(`/terms/${term.id}/restore`, 'POST'), `${term.label} restored`, () => api(`/terms/${term.id}/retire`, 'POST'))
+const retire = (term: Term) => run(() => api(`/terms/${term.id}/retire`, 'POST'), t('core.vocabulary-terms.retired-toast', { label: term.label }), () => api(`/terms/${term.id}/restore`, 'POST'))
+const restore = (term: Term) => run(() => api(`/terms/${term.id}/restore`, 'POST'), t('core.vocabulary-terms.restored-toast', { label: term.label }), () => api(`/terms/${term.id}/retire`, 'POST'))
 const showRetired = ref(false)
 
 async function remove(term: Term) {
-  if (!await confirm({ verb: 'Delete', thing: `the term ${term.label}`, consequence: 'No record uses it, so nothing else changes. This cannot be undone.', button: 'Delete term' })) return
-  await run(() => api(`/terms/${term.id}`, 'DELETE'), `${term.label} deleted`)
+  if (!await confirm({ verb: t('core.vocabulary-terms.delete'), thing: t('core.vocabulary-terms.the-term', { label: term.label }), consequence: t('core.vocabulary-terms.delete-consequence'), button: t('core.vocabulary-terms.delete-term') })) return
+  await run(() => api(`/terms/${term.id}`, 'DELETE'), t('core.vocabulary-terms.deleted', { label: term.label }))
 }
 
-const orderHelp = 'Drag a row by its handle to reorder. From the keyboard, focus the handle and press the up or down arrow.'
+const orderHelp = t('core.vocabulary-terms.order-help')
 const uses = (term: Term) => t('core.counts.records', { count: term.uses })
 
 const actions = (term: Term, at: number, of: number) => [[
-  { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startEdit(term) },
+  { label: t('core.vocabulary-terms.rename'), icon: 'i-lucide-pencil', onSelect: () => startEdit(term) },
   ...(manual.value
     ? [
-        { label: 'Move up', icon: 'i-lucide-arrow-up', disabled: at === 0, onSelect: () => move(term, at - 1) },
-        { label: 'Move down', icon: 'i-lucide-arrow-down', disabled: at === of - 1, onSelect: () => move(term, at + 1) },
+        { label: t('core.vocabulary-terms.move-up'), icon: 'i-lucide-arrow-up', disabled: at === 0, onSelect: () => move(term, at - 1) },
+        { label: t('core.vocabulary-terms.move-down'), icon: 'i-lucide-arrow-down', disabled: at === of - 1, onSelect: () => move(term, at + 1) },
       ]
     : []),
-  ...(locked.value ? [] : [{ label: 'Retire', icon: 'i-lucide-archive', onSelect: () => retire(term) }]),
-  ...(locked.value || term.uses > 0 || (term.seeded && data.value?.vocabulary.owner !== 'theatre') ? [] : [{ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove(term) }]),
+  ...(locked.value ? [] : [{ label: t('core.vocabulary-terms.retire'), icon: 'i-lucide-archive', onSelect: () => retire(term) }]),
+  ...(locked.value || term.uses > 0 || (term.seeded && data.value?.vocabulary.owner !== 'theatre') ? [] : [{ label: t('core.vocabulary-terms.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove(term) }]),
 ]]
 </script>
 
 <template>
   <PageFrame
-    :title="data?.vocabulary.label ?? 'List'"
+    :title="data?.vocabulary.label ?? t('core.vocabulary-terms.list')"
     :description="data?.vocabulary.description ?? undefined"
     :trail="trail"
     width="reading"
@@ -188,7 +188,7 @@ const actions = (term: Term, at: number, of: number) => [[
       <StatusBadge
         v-if="locked"
         tone="neutral"
-        label="Locked"
+        :label="t('core.vocabulary-terms.locked')"
       />
     </template>
     <DataBoundary
@@ -201,8 +201,8 @@ const actions = (term: Term, at: number, of: number) => [[
 
       <PageSection
         v-if="grouped"
-        title="Headings"
-        description="Terms sit under headings, one level deep. A heading with terms under it cannot be removed: move them first."
+        :title="t('core.vocabulary-terms.headings')"
+        :description="t('core.vocabulary-terms.description-terms-sit-under')"
       >
         <UForm
           v-if="!locked"
@@ -216,21 +216,21 @@ const actions = (term: Term, at: number, of: number) => [[
             <UFieldGroup class="flex">
               <UInput
                 v-model="addingHeading.label"
-                placeholder="New heading"
-                aria-label="New heading"
+                :placeholder="t('core.vocabulary-terms.new-heading')"
+                :aria-label="t('core.vocabulary-terms.new-heading')"
                 maxlength="80"
                 class="flex-1"
               />
               <UButton
                 type="submit"
-                label="Add heading"
+                :label="t('core.vocabulary-terms.add-heading')"
                 icon="i-lucide-plus"
               />
             </UFieldGroup>
           </UFormField>
         </UForm>
         <SortableList
-          label="Headings"
+          :label="t('core.vocabulary-terms.headings')"
           @reorder="m => headings[m.from]?.id === m.id && moveHeading(headings[m.from]!, m.to)"
         >
           <SortableRow
@@ -254,7 +254,7 @@ const actions = (term: Term, at: number, of: number) => [[
                   <UInput
                     v-model="editHeading.label"
                     name="heading-label"
-                    aria-label="Heading"
+                    :aria-label="t('core.vocabulary-terms.heading')"
                     maxlength="80"
                     class="flex-1"
                     autofocus
@@ -262,7 +262,7 @@ const actions = (term: Term, at: number, of: number) => [[
                   />
                   <UButton
                     type="submit"
-                    label="Save"
+                    :label="t('core.vocabulary-terms.save')"
                   />
                 </UFieldGroup>
               </UForm>
@@ -273,14 +273,14 @@ const actions = (term: Term, at: number, of: number) => [[
                 icon="i-lucide-grip-vertical"
                 size="sm"
                 class="cursor-grab touch-none"
-                :label="`Move ${h.label}`"
+                :label="t('core.vocabulary-terms.move', { label: h.label })"
                 aria-describedby="vocabulary-heading-order-help"
                 @keydown="onHandleKey($event, h.id, hIndex, to => moveHeading(h, to))"
               />
             </template>
             <RowActions
               :items="headingActions(h, hIndex)"
-              :label="`Actions for ${h.label}`"
+              :label="t('core.vocabulary-terms.actions-for', { label: h.label })"
             />
           </SortableRow>
         </SortableList>
@@ -294,10 +294,8 @@ const actions = (term: Term, at: number, of: number) => [[
       </PageSection>
 
       <PageSection
-        title="Terms"
-        :description="locked
-          ? 'Renaming a term renames it on every record. This list is locked: you can rename and reorder its terms, but not add, retire or delete them.'
-          : 'Renaming a term renames it on every record. A term\'s label should never be a person\'s name.'"
+        :title="t('core.vocabulary-terms.terms')"
+        :description="locked ? t('core.vocabulary-terms.terms-help-locked') : t('core.vocabulary-terms.terms-help')"
       >
         <UForm
           v-if="!locked"
@@ -311,8 +309,8 @@ const actions = (term: Term, at: number, of: number) => [[
             <UFieldGroup class="flex">
               <UInput
                 v-model="adding.label"
-                placeholder="New term"
-                aria-label="New term"
+                :placeholder="t('core.vocabulary-terms.new-term')"
+                :aria-label="t('core.vocabulary-terms.new-term')"
                 maxlength="80"
                 class="flex-1"
               />
@@ -320,12 +318,12 @@ const actions = (term: Term, at: number, of: number) => [[
                 v-if="grouped"
                 v-model="adding.groupId"
                 :items="headingItems"
-                placeholder="Heading"
-                aria-label="Heading for the new term"
+                :placeholder="t('core.vocabulary-terms.heading')"
+                :aria-label="t('core.vocabulary-terms.heading-for-the-new')"
               />
               <UButton
                 type="submit"
-                label="Add term"
+                :label="t('core.vocabulary-terms.add-term')"
                 icon="i-lucide-plus"
               />
             </UFieldGroup>
@@ -335,7 +333,7 @@ const actions = (term: Term, at: number, of: number) => [[
           v-if="!live.length"
           class="text-sm text-muted"
         >
-          {{ locked ? 'This list has no terms.' : 'No terms yet. Add the first one above; it then shows wherever this list is offered.' }}
+          {{ locked ? t('core.vocabulary-terms.no-terms-locked') : t('core.vocabulary-terms.no-terms') }}
         </p>
 
         <template
@@ -352,12 +350,12 @@ const actions = (term: Term, at: number, of: number) => [[
             v-if="section.label && !section.terms.length"
             class="text-sm text-muted"
           >
-            No terms under this heading yet.
+            {{ t('core.vocabulary-terms.none-under-heading') }}
           </p>
           <component
             :is="manual ? SortableList : RecordList"
             v-if="section.terms.length"
-            :label="section.label ? `Terms under ${section.label}` : 'Terms'"
+            :label="section.label ? t('core.vocabulary-terms.terms-under', { heading: section.label }) : t('core.vocabulary-terms.terms')"
             @reorder="(m: { id: string, from: number, to: number }) => section.terms[m.from]?.id === m.id && move(section.terms[m.from]!, m.to)"
           >
             <component
@@ -383,7 +381,7 @@ const actions = (term: Term, at: number, of: number) => [[
                     <UInput
                       v-model="edit.label"
                       name="label"
-                      aria-label="Label"
+                      :aria-label="t('core.vocabulary-terms.label')"
                       maxlength="80"
                       class="flex-1"
                       autofocus
@@ -393,11 +391,11 @@ const actions = (term: Term, at: number, of: number) => [[
                       v-if="grouped"
                       v-model="edit.groupId"
                       :items="headingItems"
-                      aria-label="Heading"
+                      :aria-label="t('core.vocabulary-terms.heading')"
                     />
                     <UButton
                       type="submit"
-                      label="Save"
+                      :label="t('core.vocabulary-terms.save')"
                     />
                   </UFieldGroup>
                 </UForm>
@@ -411,14 +409,14 @@ const actions = (term: Term, at: number, of: number) => [[
                   icon="i-lucide-grip-vertical"
                   size="sm"
                   class="cursor-grab touch-none"
-                  :label="`Move ${term.label}`"
+                  :label="t('core.vocabulary-terms.move', { label: term.label })"
                   aria-describedby="vocabulary-order-help"
                   @keydown="onHandleKey($event, term.id, index, to => move(term, to))"
                 />
               </template>
               <RowActions
                 :items="actions(term, index, section.terms.length)"
-                :label="`Actions for ${term.label}`"
+                :label="t('core.vocabulary-terms.actions-for', { label: term.label })"
               />
             </component>
           </component>
@@ -432,27 +430,28 @@ const actions = (term: Term, at: number, of: number) => [[
         </p>
         <CollapsibleDivider
           v-model:open="showRetired"
-          label="Retired"
+          :label="t('core.vocabulary-terms.retired')"
           :count="retired.length"
         >
           <p class="mb-3 text-sm text-muted">
-            Retired terms are left out of every picker and still show on the records that use them.
+            {{ t('core.vocabulary-terms.retired-help') }}
           </p>
-          <RecordList label="Retired terms">
+          <RecordList :label="t('core.vocabulary-terms.retired-terms')">
             <RecordListItem
               v-for="term in retired"
               :key="term.id"
-              :name="term.mergedIntoId ? `${term.label} (merged into ${labelOf(term.mergedIntoId)})` : term.label"
+              :name="term.mergedIntoId ? t('core.vocabulary-terms.merged-into', { label: term.label, into: labelOf(term.mergedIntoId) }) : term.label"
               :description="uses(term)"
               muted
             >
               <UButton
                 v-if="!term.mergedIntoId && !locked"
-                label="Restore"
+                :label="t('core.vocabulary-terms.restore')"
                 color="neutral"
                 variant="outline"
                 size="sm"
-                :aria-label="`Restore ${term.label}`"
+                :aria-label="t('core.vocabulary-terms.restore-named', { label: term.label })"
+                loading-auto
                 @click="restore(term)"
               />
             </RecordListItem>

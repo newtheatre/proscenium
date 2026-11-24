@@ -30,6 +30,9 @@ async function create() {
     refusal.value = toRefusal(e)
   }
 }
+// Draft and archived are the catalogue's shared words; open and closed are a scheme's own.
+const schemeStateLabel = (state: string) => state === 'draft' || state === 'archived' ? t(`core.states.${state}`) : t(`membership.screens.states.${state}`)
+const membershipNewSchemeForm = useFormRef('membershipNewSchemeForm')
 </script>
 
 <template>
@@ -70,7 +73,7 @@ async function create() {
         >
           <StatusBadge
             :tone="TONE[s.state]"
-            :label="t(`membership.screens.states.${s.state}`)"
+            :label="schemeStateLabel(s.state)"
           />
         </RecordListItem>
       </RecordList>
@@ -94,6 +97,7 @@ async function create() {
       <template #body>
         <UForm
           id="membership-new-scheme"
+          ref="membershipNewSchemeForm"
           :state="form"
           :validate="() => needs({ name: form.name })"
           class="space-y-4"
@@ -118,7 +122,7 @@ async function create() {
         <UButton
           type="submit"
           form="membership-new-scheme"
-          loading-auto
+          :loading="membershipNewSchemeForm?.loading"
           :label="t('membership.screens.schemes.create')"
         />
       </template>

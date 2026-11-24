@@ -245,7 +245,6 @@ async function scan(code: string) {
 const overriding = ref(false)
 const reasons = ref<Term[]>([])
 const reasonId = ref<string | undefined>()
-const overrideBusy = ref(false)
 async function openOverride() {
   reasonId.value = undefined
   overriding.value = true
@@ -254,7 +253,6 @@ async function openOverride() {
 async function admitAnyway() {
   const target = shown.value?.override
   if (!target || !reasonId.value) return
-  overrideBusy.value = true
   try {
     const out = await $api<Scan>(`${base.value}/door/override`, { method: 'POST', body: { ticketId: target.ticketId, reasonTermId: reasonId.value } })
     const reason = reasons.value.find(r => r.id === reasonId.value)?.label ?? ''
@@ -267,9 +265,6 @@ async function admitAnyway() {
   catch (e) {
     overriding.value = false
     show({ tone: 'error', icon: ICONS.error, headline: t('box-office.live-door.result.problem'), line: toRefusal(e).reason, at: Date.now() })
-  }
-  finally {
-    overrideBusy.value = false
   }
 }
 
@@ -314,10 +309,8 @@ async function submitQuery() {
 // still unpaid go to people waiting. Undo seats them again where the seats are still free.
 const { confirm } = useConfirm()
 const { offer } = useUndo()
-const releasing = ref(false)
 async function releaseUnpaid() {
   if (!await confirm({ verb: t('box-office.door.release.verb'), thing: t('box-office.door.release.thing'), consequence: t('box-office.door.release.consequence'), button: t('box-office.door.release.button') })) return
-  releasing.value = true
   try {
     const { released } = await $api<{ released: string[] }>(`${base.value}/door/release-unpaid`, { method: 'POST', body: {} })
     await refresh()
@@ -334,9 +327,6 @@ async function releaseUnpaid() {
   catch (e) {
     const refusal = toRefusal(e)
     toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
-  }
-  finally {
-    releasing.value = false
   }
 }
 
@@ -472,7 +462,8 @@ async function admit(row: Row, count: number): Promise<number> {
                   variant="outline"
                   size="xl"
                   block
-                  :loading="admitting === group.id"
+                  loading-auto
+                  :disabled="admitting === group.id"
                   :label="t('box-office.door.admit-one')"
                   :aria-label="t('box-office.door.admit-one-of', { reference: group.reference })"
                   @click="admitFromGroup(1)"
@@ -482,7 +473,8 @@ async function admit(row: Row, count: number): Promise<number> {
                   icon="i-lucide-users"
                   size="xl"
                   block
-                  :loading="admitting === group.id"
+                  loading-auto
+                  :disabled="admitting === group.id"
                   :label="t('box-office.door.admit-all', { count: group.tickets - group.admitted })"
                   :aria-label="t('box-office.door.admit-all-of', { count: group.tickets - group.admitted, reference: group.reference })"
                   @click="admitFromGroup(group.tickets - group.admitted)"
@@ -520,29 +512,23 @@ async function admit(row: Row, count: number): Promise<number> {
               >
                 {{ t('box-office.live-door.recent') }}
               </h2>
-              <ul class="flex flex-col gap-2">
-                <li
+              <RecordList :label="t('box-office.live-door.recent')">
+                <RecordListItem
                   v-for="r in recent"
                   :key="r.at"
-                  class="flex items-center justify-between gap-2 rounded-md border border-default p-2 text-sm"
+                  :name="r.headline"
+                  :description="r.who || undefined"
                 >
-                  <span class="flex min-w-0 items-center gap-2">
+                  <template #leading>
                     <UIcon
                       :name="r.icon"
                       :class="TEXT[r.tone]"
                       class="size-5 shrink-0"
                     />
-                    <span class="flex min-w-0 flex-col">
-                      <span>{{ r.headline }}</span>
-                      <span
-                        v-if="r.who"
-                        class="truncate text-muted"
-                      >{{ r.who }}</span>
-                    </span>
-                  </span>
-                  <span class="text-muted">{{ time(r.at) }}</span>
-                </li>
-              </ul>
+                  </template>
+                  <span class="text-sm text-muted">{{ time(r.at) }}</span>
+                </RecordListItem>
+              </RecordList>
             </aside>
           </div>
         </template>
@@ -616,7 +602,7 @@ async function admit(row: Row, count: number): Promise<number> {
             <UButton
               type="submit"
               size="xl"
-              :loading="overrideBusy"
+              loading-auto
               :label="t('box-office.live-door.override.confirm')"
             />
           </div>
@@ -663,20 +649,19 @@ async function admit(row: Row, count: number): Promise<number> {
           >
             {{ t('box-office.live-door.find-none') }}
           </p>
-          <ul
+          <RecordList
             v-else-if="found"
-            class="divide-y divide-default"
+            :label="t('box-office.door.title')"
           >
-            <li
+            <RecordListItem
               v-for="row in found"
               :key="row.id"
-              class="flex flex-wrap items-center justify-between gap-2 py-3"
+              :name="nameOf(row)"
             >
-              <span class="flex flex-col">
-                <span class="font-medium">{{ nameOf(row) }}</span>
+              <template #description>
                 <span
                   v-if="row.unpaid"
-                  class="flex flex-wrap items-center gap-2 text-sm text-muted"
+                  class="flex flex-wrap items-center gap-2"
                 >
                   <StatusBadge
                     tone="info"
@@ -684,11 +669,10 @@ async function admit(row: Row, count: number): Promise<number> {
                   />
                   {{ row.reference }} · {{ t('box-office.live-door.owed', { count: row.tickets, amount: money(row.unpaid.amountDueMinor, row.unpaid.currency) }) }}
                 </span>
-                <span
-                  v-else
-                  class="text-sm text-muted"
-                >{{ row.reference }} · {{ t('box-office.door.admitted', { admitted: row.admitted, tickets: row.tickets }) }}</span>
-              </span>
+                <template v-else>
+                  {{ row.reference }} · {{ t('box-office.door.admitted', { admitted: row.admitted, tickets: row.tickets }) }}
+                </template>
+              </template>
               <UButton
                 v-if="row.unpaid && tillTo(row.reference)"
                 icon="i-lucide-hand-coins"
@@ -711,7 +695,8 @@ async function admit(row: Row, count: number): Promise<number> {
                   color="neutral"
                   variant="outline"
                   size="lg"
-                  :loading="admitting === row.id"
+                  loading-auto
+                  :disabled="admitting === row.id"
                   :label="t('box-office.door.admit-one')"
                   :aria-label="t('box-office.door.admit-one-of', { reference: row.reference })"
                   @click="admit(row, 1)"
@@ -719,14 +704,15 @@ async function admit(row: Row, count: number): Promise<number> {
                 <UButton
                   v-if="row.tickets - row.admitted > 1"
                   size="lg"
-                  :loading="admitting === row.id"
+                  loading-auto
+                  :disabled="admitting === row.id"
                   :label="t('box-office.door.admit-all', { count: row.tickets - row.admitted })"
                   :aria-label="t('box-office.door.admit-all-of', { count: row.tickets - row.admitted, reference: row.reference })"
                   @click="admit(row, row.tickets - row.admitted)"
                 />
               </span>
-            </li>
-          </ul>
+            </RecordListItem>
+          </RecordList>
         </div>
       </template>
       <template #footer>
@@ -736,7 +722,7 @@ async function admit(row: Row, count: number): Promise<number> {
           color="neutral"
           variant="outline"
           size="lg"
-          :loading="releasing"
+          loading-auto
           :label="t('box-office.door.release.button')"
           @click="releaseUnpaid"
         />

@@ -5,7 +5,8 @@ import { z } from 'zod'
 import type { Refusal } from '../utils/identity'
 import { catalogueLabel } from '../../shared/choices'
 
-useSeoMeta({ title: 'Set up your theatre' })
+const { t } = useT()
+useSeoMeta({ title: () => t('core.setup.title') })
 interface SetupState { needed: boolean, timeZones?: string[], countries?: string[] }
 // Once the theatre is set up there is nothing here: decided before the page is made.
 definePageMeta({
@@ -25,9 +26,9 @@ const busy = ref(false)
 // What each step checks, shown beside each field.
 const ownerSchema = z.object({ name: z.string().trim().min(1).max(120), address: z.email().max(254) }) // not-policy: the column's own lengths
 const theatreSchema = z.object({
-  name: z.string().trim().min(1, 'Give the theatre a name.').max(80), // not-policy: core.site.name's own length
-  timeZone: z.string().min(1, 'Choose the theatre\'s time zone.'),
-  country: z.string().min(1, 'Choose a country.'),
+  name: z.string().trim().min(1, t('core.setup.theatre-name-needed')).max(80), // not-policy: core.site.name's own length
+  timeZone: z.string().min(1, t('core.setup.time-zone-needed')),
+  country: z.string().min(1, t('core.setup.country-needed')),
   contactEmail: z.union([z.literal(''), z.email().max(254)]), // not-policy: the setting's own length
 })
 const ownerForm = useTemplateRef('ownerForm')
@@ -89,14 +90,14 @@ async function finish(code: string) {
 const description = computed(() => {
   if (codes.value) return undefined
   return step.value === 'owner'
-    ? 'Step 1 of 2. You will be the first Owner. Owners can do everything, so you will sign in with a passkey.'
-    : 'Step 2 of 2. About the theatre. You can change any of this later under Admin.'
+    ? t('core.setup.step-owner')
+    : t('core.setup.step-theatre')
 })
 </script>
 
 <template>
   <IdentityCard
-    title="Set up your theatre"
+    :title="t('core.setup.title')"
     :description="description"
   >
     <RefusalNotice :refusal="refusal" />
@@ -110,7 +111,7 @@ const description = computed(() => {
       @submit="toTheatre"
     >
       <UFormField
-        label="Your name"
+        :label="t('core.setup.owner-name')"
         name="name"
       >
         <UInput
@@ -119,7 +120,7 @@ const description = computed(() => {
         />
       </UFormField>
       <UFormField
-        label="Your email address"
+        :label="t('core.setup.owner-address')"
         name="address"
       >
         <UInput
@@ -133,9 +134,8 @@ const description = computed(() => {
         block
         :disabled="!live"
         trailing-icon="i-lucide-arrow-right"
-      >
-        Next
-      </UButton>
+        :label="t('core.setup.next')"
+      />
     </UForm>
     <UForm
       v-else-if="!codes"
@@ -147,9 +147,9 @@ const description = computed(() => {
       @submit="start"
     >
       <UFormField
-        label="The theatre's name"
+        :label="t('core.setup.theatre-name')"
         name="name"
-        help="Shown in the site's header, on emails and in page titles."
+        :help="t('core.setup.theatre-name-help')"
       >
         <UInput
           v-model="theatre.name"
@@ -157,36 +157,36 @@ const description = computed(() => {
         />
       </UFormField>
       <UFormField
-        label="Time zone"
+        :label="t('core.setup.time-zone')"
         name="timeZone"
-        help="Where the theatre is. Performance times, dates and scheduled work follow it."
+        :help="t('core.setup.time-zone-place')"
       >
         <USelectMenu
           v-model="theatre.timeZone"
           :items="zoneItems"
           value-key="value"
-          :search-input="{ placeholder: 'Search time zones' }"
-          placeholder="Choose…"
+          :search-input="{ placeholder: t('core.setup.time-zone-search') }"
+          :placeholder="t('core.setup.choose')"
           virtualize
         />
       </UFormField>
       <UFormField
-        label="Country"
+        :label="t('core.setup.country')"
         name="country"
       >
         <USelectMenu
           v-model="theatre.country"
           :items="countryItems"
           value-key="value"
-          :search-input="{ placeholder: 'Search countries' }"
-          placeholder="Choose…"
+          :search-input="{ placeholder: t('core.setup.country-search') }"
+          :placeholder="t('core.setup.choose')"
           virtualize
         />
       </UFormField>
       <UFormField
-        label="Contact email address"
+        :label="t('core.setup.contact')"
         name="contactEmail"
-        help="A shared address the public can write to, such as boxoffice@example.org, not your own. Leave it empty to add it later."
+        :help="t('core.setup.contact-help')"
       >
         <UInput
           v-model="theatre.contactEmail"
@@ -198,16 +198,16 @@ const description = computed(() => {
         color="warning"
         variant="subtle"
         icon="i-lucide-mail-warning"
-        title="Nothing is emailed yet"
-        description="Until a sending domain is verified in Admin, under Email sending, the site sends no email, sign-in links included. Your passkey and recovery codes are how you get in until then."
+        :title="t('core.setup.no-email.title')"
+        :description="t('core.setup.no-email.description')"
       />
       <p class="text-sm text-muted">
-        A passkey signs you in with your fingerprint, face or screen lock instead of a password. If this device cannot make one, your browser offers to use your phone.
+        {{ t('core.setup.passkey-explained') }}
         <ULink
           to="https://passkeys.dev/"
           target="_blank"
           class="text-primary underline"
-        >What is a passkey?</ULink>
+        >{{ t('core.setup.what-is-a-passkey') }}</ULink>
       </p>
       <div class="flex flex-col gap-2">
         <UButton
@@ -216,19 +216,17 @@ const description = computed(() => {
           icon="i-lucide-key-round"
           :loading="busy"
           :disabled="!live"
-        >
-          Make my passkey
-        </UButton>
+          :label="t('core.setup.make-passkey')"
+        />
         <UButton
           block
           color="neutral"
           variant="ghost"
           icon="i-lucide-arrow-left"
           :disabled="busy"
+          :label="t('core.setup.back')"
           @click="step = 'owner'"
-        >
-          Back
-        </UButton>
+        />
       </div>
     </UForm>
     <RecoveryCodes

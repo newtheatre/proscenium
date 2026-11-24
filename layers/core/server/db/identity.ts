@@ -435,6 +435,8 @@ export const accessProfiles = defineTable('core_access_profiles', {
   reviewDue: col.timestamp('review_due'),
   reminders: col.internal(integer('reminders').notNull().default(0)),
   flaggedAt: col.timestamp('flagged_at'),
+  // When the person said none of the entries added since they applied helps them.
+  optionsSeenAt: col.timestamp('options_seen_at'),
   updatedAt: col.updatedAt(),
 }, {
   realm: 'audience',

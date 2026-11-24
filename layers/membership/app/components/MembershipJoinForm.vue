@@ -44,7 +44,9 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const referenceRefused = computed(() => !!props.scheme.asksFor && !!refusal.value?.fields?.reference)
 // Said under its field instead, so it is not said twice.
 const notice = computed(() => refusal.value && !referenceRefused.value && !(choosing.value && refusal.value.fields?.lengthOptionId) ? refusal.value : null)
-const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('formEl')
+const formEl = useFormRef('formEl')
+// A dialogue that draws the Join button in its own footer reads this to spin it.
+defineExpose({ loading: computed(() => formEl.value?.loading ?? false) })
 
 interface ApplicationForm { formId: string, title: string, state: string, definition: Definition | null, draft: { answers: Answers } | null }
 const application = props.scheme.applicationForm

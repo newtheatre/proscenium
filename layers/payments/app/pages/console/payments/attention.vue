@@ -2,10 +2,12 @@
      payments taken that could not be completed and are being returned, and refunds the provider
      turned down, refunds waiting for someone to approve them (approved on Refunds), and till sessions that stopped with cash in them and wait to be counted (closed on
      Sessions). An unanswered payment is settled here once someone has checked the provider's own
-     records; settling it is final, so it asks first. -->
+     records; settling it is final, so it asks first. One the till had already given up on is either
+     kept (the buyer had what they paid for anyway) or sent back, and a payment being returned may be kept. -->
 <script setup lang="ts">
-interface Unknown { id: string, intentId: string, method: string, amountMinor: number, currency: string, providerRef: string | null, provider: string, waitingMs: number }
-interface Unfulfilled { id: string, amountMinor: number, currency: string, sinceMs: number }
+interface Owner { module: string, record: string, reference?: string, buyer?: string | null, to?: string }
+interface Unknown { id: string, intentId: string, method: string, amountMinor: number, currency: string, providerRef: string | null, provider: string, waitingMs: number, abandoned: boolean, owners: Owner[], mayKeep: boolean }
+interface Unfulfilled { id: string, amountMinor: number, currency: string, sinceMs: number, owners: Owner[], keepRefundId: string | null }
 interface Awaiting { id: string, place: string | null, pointLabel: string, openedByName: string, openedAt: number, expectedCashMinor: number, currency: string }
 interface FailedRefund { id: string, amountMinor: number, currency: string, method: string, sinceMs: number }
 
@@ -24,19 +26,52 @@ const nothing = computed(() => !!data.value && !data.value.awaitingCount.length 
 const { dateTime: when } = useDates()
 const tillName = (s: Awaiting) => [s.place ?? t('payments.screens.session.unknown-place'), s.pointLabel].filter(Boolean).join(' · ')
 
-async function settle(a: Unknown, outcome: 'succeeded' | 'failed') {
+// What a payment was for, by reference and buyer, so the right one is checked in the provider's records.
+const forWhat = (owners: Owner[]) => {
+  const named = owners.filter(o => o.reference).map(o => (o.buyer ? `${o.reference} (${o.buyer})` : o.reference!))
+  return named.length ? t('payments.screens.attention.for', { references: named.join(', ') }) : null
+}
+const unknownLine = (a: Unknown) => [
+  t('payments.screens.attention.waited', { time: waited(a.waitingMs) }),
+  a.providerRef ? t('payments.screens.attention.reference', { reference: a.providerRef }) : null,
+  forWhat(a.owners),
+].filter(Boolean).join(' · ')
+
+// `refund` and `keep` answer a payment the till gave up on: it went through, and the money goes back or stays.
+type Outcome = 'succeeded' | 'failed' | 'refund' | 'keep'
+async function settle(a: Unknown, outcome: Outcome) {
   const amount = money(a.amountMinor, a.currency)
   const ok = await confirm({
     verb: t(`payments.screens.attention.${outcome}-verb`),
-    thing: t('payments.screens.attention.thing', { amount, provider: a.provider }),
+    thing: t(outcome === 'keep' ? 'payments.screens.attention.keep-thing' : 'payments.screens.attention.thing', { amount, provider: a.provider }),
     consequence: t(`payments.screens.attention.${outcome}-consequence`),
     button: t(`payments.screens.attention.${outcome}-button`),
   })
   if (!ok) return
   refusal.value = null
+  const body = { outcome: outcome === 'failed' ? 'failed' : 'succeeded', providerRef: references[a.id]?.trim() || undefined, keep: outcome === 'keep' || undefined }
   try {
-    await $api(`/api/payments/attempts/${a.id}/reconcile` as string, { method: 'POST', body: { outcome, providerRef: references[a.id]?.trim() || undefined } })
-    toast.add({ title: t('payments.screens.attention.settled'), color: 'success' })
+    await $api(`/api/payments/attempts/${a.id}/reconcile` as string, { method: 'POST', body })
+    toast.add({ title: t(outcome === 'keep' ? 'payments.screens.attention.kept' : 'payments.screens.attention.settled'), color: 'success' })
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  await refresh()
+}
+
+async function keep(i: Unfulfilled) {
+  const ok = await confirm({
+    verb: t('payments.screens.attention.keep-verb'),
+    thing: t('payments.screens.attention.keep-amount', { amount: money(i.amountMinor, i.currency) }),
+    consequence: t('payments.screens.attention.keep-consequence'),
+    button: t('payments.screens.attention.unfulfilled-keep'),
+  })
+  if (!ok || !i.keepRefundId) return
+  refusal.value = null
+  try {
+    await $api(`/api/payments/refunds/${i.keepRefundId}/keep` as string, { method: 'POST', body: {} })
+    toast.add({ title: t('payments.screens.attention.kept'), color: 'success' })
     await refresh()
   }
   catch (e) {
@@ -73,9 +108,17 @@ async function settle(a: Unknown, outcome: 'succeeded' | 'failed') {
                 v-for="a in loaded.unknown"
                 :key="a.id"
                 :name="`${money(a.amountMinor, a.currency)} · ${methodLabel(a.method)} · ${a.provider}`"
-                :description="a.providerRef ? `${t('payments.screens.attention.waited', { time: waited(a.waitingMs) })} · ${t('payments.screens.attention.reference', { reference: a.providerRef })}` : t('payments.screens.attention.waited', { time: waited(a.waitingMs) })"
+                :description="unknownLine(a)"
               >
                 <template #below>
+                  <UAlert
+                    v-if="a.abandoned"
+                    color="warning"
+                    variant="subtle"
+                    icon="i-lucide-triangle-alert"
+                    :description="t('payments.screens.attention.abandoned')"
+                    class="mb-2"
+                  />
                   <div class="flex flex-wrap items-end gap-2">
                     <UFormField
                       v-if="!a.providerRef"
@@ -88,7 +131,25 @@ async function settle(a: Unknown, outcome: 'succeeded' | 'failed') {
                         size="sm"
                       />
                     </UFormField>
+                    <template v-if="a.abandoned">
+                      <UButton
+                        v-if="a.mayKeep"
+                        :label="t('payments.screens.attention.keep-button')"
+                        icon="i-lucide-check"
+                        size="sm"
+                        @click="settle(a, 'keep')"
+                      />
+                      <UButton
+                        :label="t('payments.screens.attention.refund-button')"
+                        icon="i-lucide-undo-2"
+                        color="neutral"
+                        variant="outline"
+                        size="sm"
+                        @click="settle(a, 'refund')"
+                      />
+                    </template>
                     <UButton
+                      v-else
                       :label="t('payments.screens.attention.succeeded-button')"
                       icon="i-lucide-check"
                       size="sm"
@@ -118,8 +179,16 @@ async function settle(a: Unknown, outcome: 'succeeded' | 'failed') {
                 v-for="i in loaded.unfulfilled"
                 :key="i.id"
                 :name="money(i.amountMinor, i.currency)"
+                :description="[t('payments.screens.attention.since', { time: waited(i.sinceMs) }), forWhat(i.owners)].filter(Boolean).join(' · ')"
               >
-                <span class="text-sm text-muted">{{ t('payments.screens.attention.since', { time: waited(i.sinceMs) }) }}</span>
+                <UButton
+                  v-if="i.keepRefundId"
+                  :label="t('payments.screens.attention.unfulfilled-keep')"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  @click="keep(i)"
+                />
               </RecordListItem>
             </RecordList>
           </PageSection>

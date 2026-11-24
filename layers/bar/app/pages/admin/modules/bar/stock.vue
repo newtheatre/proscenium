@@ -215,15 +215,8 @@ async function setActive(path: string, name: string, active: boolean) {
           icon="i-lucide-package"
           :title="t('bar.screens.stock.empty-title')"
           :description="t('bar.screens.stock.empty')"
-        >
-          <template #actions>
-            <UButton
-              icon="i-lucide-plus"
-              :label="t('bar.screens.stock.new-item')"
-              @click="editItem()"
-            />
-          </template>
-        </EmptyState>
+          :action="{ label: t('bar.screens.stock.new-item'), icon: 'i-lucide-plus', onClick: () => editItem() }"
+        />
         <PageSection
           v-else
           :title="t('bar.screens.stock.items')"
@@ -243,7 +236,7 @@ async function setActive(path: string, name: string, active: boolean) {
               v-if="!shownItems.length"
               class="text-sm text-muted"
             >
-              {{ t('bar.screens.stock.no-match') }}
+              {{ query.trim() ? t('bar.screens.stock.no-match') : t('bar.screens.stock.all-checked') }}
             </p>
             <RecordList
               v-if="currentItems.length"
@@ -439,7 +432,7 @@ async function setActive(path: string, name: string, active: boolean) {
             required
           >
             <UFieldGroup>
-              <UInputNumber
+              <FieldNumber
                 v-model="item.packAmount"
                 :min="0"
                 :step="item.baseUnit !== 'each' && item.packScale === LARGE ? 0.1 : 1"
@@ -495,7 +488,7 @@ async function setActive(path: string, name: string, active: boolean) {
                   name="countUnitSize"
                 >
                   <UFieldGroup>
-                    <UInputNumber
+                    <FieldNumber
                       v-model="item.countUnitSize"
                       :min="1"
                       :placeholder="String(item.baseUnit === 'each' ? 1 : packSize ?? '')"
@@ -514,7 +507,7 @@ async function setActive(path: string, name: string, active: boolean) {
                   name="reorderLevel"
                 >
                   <UFieldGroup>
-                    <UInputNumber
+                    <FieldNumber
                       v-model="item.reorderLevel"
                       :min="0"
                     />
@@ -538,7 +531,7 @@ async function setActive(path: string, name: string, active: boolean) {
                     required
                   >
                     <UFieldGroup>
-                      <UInputNumber
+                      <FieldNumber
                         v-model="item.fullWeightG"
                         :min="1"
                       />
@@ -556,7 +549,7 @@ async function setActive(path: string, name: string, active: boolean) {
                     required
                   >
                     <UFieldGroup>
-                      <UInputNumber
+                      <FieldNumber
                         v-model="item.emptyWeightG"
                         :min="0"
                       />

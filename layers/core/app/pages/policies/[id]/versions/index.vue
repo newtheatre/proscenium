@@ -13,33 +13,35 @@ useSeoMeta({ title: () => t('core.policies.versions.title', { policy: data.value
 </script>
 
 <template>
-  <UContainer>
-    <UPage>
-      <UPageHeader
-        :title="t('core.policies.versions.title', { policy: data?.policy.title ?? '' })"
-        :description="t('core.policies.versions.description')"
-        :links="[{ label: t('core.policies.versions.current'), to: `/policies/${id}`, variant: 'outline', color: 'neutral' }]"
+  <PageFrame
+    :title="t('core.policies.versions.title', { policy: data?.policy.title ?? '' })"
+    :description="t('core.policies.versions.description')"
+    width="reading"
+  >
+    <template #primary>
+      <UButton
+        :label="t('core.policies.versions.current')"
+        :to="`/policies/${id}`"
+        color="neutral"
+        variant="outline"
       />
-      <UPageBody>
-        <UEmpty
-          v-if="!data?.versions.length"
-          icon="i-lucide-history"
-          :title="t('core.policies.versions.none')"
-        />
-        <UPageList
-          v-else
-          class="gap-2"
-        >
-          <UPageCard
-            v-for="version in data.versions"
-            :key="version.number"
-            :title="t('core.policies.versions.from', { date: day(version.createdAt) })"
-            :description="t('core.policies.versions.number', { number: version.number })"
-            :to="`/policies/${id}/versions/${version.number}`"
-            variant="ghost"
-          />
-        </UPageList>
-      </UPageBody>
-    </UPage>
-  </UContainer>
+    </template>
+    <EmptyState
+      v-if="!data?.versions.length"
+      icon="i-lucide-history"
+      :title="t('core.policies.versions.none')"
+    />
+    <RecordList
+      v-else
+      :label="t('core.policies.versions.title', { policy: data?.policy.title ?? '' })"
+    >
+      <RecordListItem
+        v-for="version in data.versions"
+        :key="version.number"
+        :name="t('core.policies.versions.from', { date: day(version.createdAt) })"
+        :description="t('core.policies.versions.number', { number: version.number })"
+        :to="`/policies/${id}/versions/${version.number}`"
+      />
+    </RecordList>
+  </PageFrame>
 </template>

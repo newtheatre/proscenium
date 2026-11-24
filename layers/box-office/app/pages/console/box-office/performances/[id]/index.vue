@@ -134,7 +134,7 @@ const layout = useTemplateRef<{ dirty: boolean, own: boolean, commit: () => Prom
 const dirty = computed(() => seatsChanged.value || windowChanged.value || priceRows.value.length > 0 || !!layout.value?.dirty)
 
 // The one Save: each part that changed is saved in turn, and one Undo puts every one of them back.
-const saving = ref(false)
+const nightSetUpForm = useFormRef('nightSetUpForm')
 async function save(confirmOverVenue = false): Promise<void> {
   const d = data.value
   if (!d) return
@@ -143,7 +143,6 @@ async function save(confirmOverVenue = false): Promise<void> {
     return
   }
   refusal.value = null
-  saving.value = true
   const undo: (() => Promise<unknown>)[] = []
   let message = t('box-office.setup.saved')
   try {
@@ -180,9 +179,6 @@ async function save(confirmOverVenue = false): Promise<void> {
     if (r?.code === 'box-office.capacity.confirm-over-venue' && !undo.length && await confirm({ verb: t('box-office.setup.capacity.over-verb'), thing: t('box-office.setup.capacity.over-thing'), consequence: r.reason, button: t('box-office.setup.capacity.over-button') })) return save(true)
     refusal.value = r
     if (undo.length) message = t('box-office.setup.saved-part')
-  }
-  finally {
-    saving.value = false
   }
   if (!undo.length) return
   // After a part was refused, what was typed for it stays in its boxes rather than being lost.
@@ -285,6 +281,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             :label="t('box-office.setup.pause.button')"
             color="neutral"
             variant="outline"
+            loading-auto
             @click="pause"
           />
           <UButton
@@ -292,6 +289,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             :label="t('box-office.setup.open')"
             icon="i-lucide-play"
             :disabled="checks.some(c => !c.done)"
+            loading-auto
             @click="open"
           />
         </template>
@@ -306,13 +304,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <UButton
             type="submit"
             form="night-set-up"
-            :loading="saving"
+            :loading="nightSetUpForm?.loading"
             :label="t('box-office.setup.save')"
           />
         </template>
 
         <UForm
           id="night-set-up"
+          ref="nightSetUpForm"
           class="space-y-8"
           :state="windowForm"
           :validate="() => needs({ from: takes === 'later' && priceRows.length ? from : true })"
@@ -382,7 +381,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </div>
             <div class="grid gap-4 sm:grid-cols-3">
               <UFormField :label="t('box-office.setup.window.max-per-order')">
-                <BoxOfficeDefaultedNumber
+                <DefaultedNumber
                   v-model="windowForm.maxPerOrder"
                   :fallback="d.defaults.maxPerOrder"
                   :min="1"
@@ -442,19 +441,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <div
               v-show="ownOpen"
               :id="ownId"
-              class="space-y-8"
+              class="space-y-6"
             >
-              <section class="space-y-3">
-                <div>
-                  <h3 class="font-medium text-highlighted">
-                    {{ t('box-office.setup.capacity.title') }}
-                  </h3>
-                  <p class="text-sm text-muted">
-                    {{ sectioned
-                      ? (d.houseCapacity ? t('box-office.setup.capacity.house', { capacity: d.houseCapacity, total: Object.values(capacity).reduce((sum, n) => sum + (n ?? 0), 0) }) : t('box-office.setup.capacity.description'))
-                      : (d.houseCapacity ? t('box-office.setup.capacity.house-whole', { capacity: d.houseCapacity }) : t('box-office.setup.capacity.description-whole')) }}
-                  </p>
-                </div>
+              <FieldGroup
+                :title="t('box-office.setup.capacity.title')"
+                :description="sectioned
+                  ? (d.houseCapacity ? t('box-office.setup.capacity.house', { capacity: d.houseCapacity, total: Object.values(capacity).reduce((sum, n) => sum + (n ?? 0), 0) }) : t('box-office.setup.capacity.description'))
+                  : (d.houseCapacity ? t('box-office.setup.capacity.house-whole', { capacity: d.houseCapacity }) : t('box-office.setup.capacity.description-whole'))"
+                first
+              >
                 <p
                   v-if="!d.bands.length"
                   class="text-sm text-muted"
@@ -474,7 +469,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     :label="sectioned ? b.name : t('box-office.setup.capacity.whole')"
                     :help="seatsHelp(d, b)"
                   >
-                    <UInputNumber
+                    <FieldNumber
                       v-model="capacity[b.id]"
                       class="w-40"
                       :min="0"
@@ -490,20 +485,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   :label="t('box-office.setup.own.follow-seats')"
                   @click="followRunSeats"
                 />
-              </section>
+              </FieldGroup>
 
-              <section
+              <FieldGroup
                 v-if="d.bands.length"
-                class="space-y-4"
+                :title="t('box-office.setup.prices.title')"
+                :description="t('box-office.setup.own.prices-description')"
               >
-                <div>
-                  <h3 class="font-medium text-highlighted">
-                    {{ t('box-office.setup.prices.title') }}
-                  </h3>
-                  <p class="text-sm text-muted">
-                    {{ t('box-office.setup.own.prices-description') }}
-                  </p>
-                </div>
                 <p
                   v-if="!activeTypes.length"
                   class="text-sm text-muted"
@@ -581,26 +569,26 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   v-if="coming.length"
                   class="space-y-2"
                 >
-                  <h4 class="font-medium">
+                  <h4 class="text-sm font-medium">
                     {{ t('box-office.setup.prices.coming.title') }}
                   </h4>
-                  <ul class="divide-y divide-default">
-                    <li
+                  <RecordList :label="t('box-office.setup.prices.coming.title')">
+                    <RecordListItem
                       v-for="s in coming"
                       :key="`${s.bandId} ${s.ticketTypeId} ${s.from}`"
-                      class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
+                      :name="comingLine(s)"
                     >
-                      <span>{{ comingLine(s) }}</span>
                       <UButton
                         color="neutral"
                         variant="link"
                         icon="i-lucide-x"
+                        loading-auto
                         :label="t('box-office.setup.prices.coming.cancel')"
                         :aria-label="comingCancel(s)"
                         @click="cancelScheduled(s)"
                       />
-                    </li>
-                  </ul>
+                    </RecordListItem>
+                  </RecordList>
                 </div>
                 <p
                   v-if="runComing"
@@ -611,7 +599,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     {{ t('box-office.setup.run-link') }}
                   </ULink>
                 </p>
-              </section>
+              </FieldGroup>
 
               <BoxOfficeSeatingLayout
                 ref="layout"

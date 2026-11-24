@@ -84,6 +84,7 @@ const actions = (duty: Duty): DropdownMenuItem[][] => [
   [{ label: t('front-of-house.archive.button'), icon: 'i-lucide-archive', color: 'error', onSelect: () => { void setArchived(duty, true) } }],
 ]
 const minutes = (n: number) => t('front-of-house.minutes', { count: n })
+const fhDutyForm = useFormRef('fhDutyForm')
 </script>
 
 <template>
@@ -171,6 +172,7 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
       <template #body>
         <UForm
           id="fh-duty"
+          ref="fhDutyForm"
           class="space-y-4"
           :state="form"
           :validate="() => needs({ name: form.name })"
@@ -241,6 +243,7 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
       <template #footer>
         <UButton
           type="submit"
+          :loading="fhDutyForm?.loading"
           form="fh-duty"
           :label="editing ? t('front-of-house.save') : t('front-of-house.duties.add-button')"
         />

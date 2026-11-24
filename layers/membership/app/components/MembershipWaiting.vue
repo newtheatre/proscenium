@@ -63,6 +63,7 @@ const waitsFor = (a: Application) => a.waitsFor === 'approval'
 const FIRST = 5 // not-policy: how many rows show before the fold
 const more = ref(false)
 const shown = computed(() => more.value ? data.value?.applications ?? [] : (data.value?.applications ?? []).slice(0, FIRST))
+const membershipDecideForm = useFormRef('membershipDecideForm')
 </script>
 
 <template>
@@ -124,6 +125,7 @@ const shown = computed(() => more.value ? data.value?.applications ?? [] : (data
       <template #body>
         <UForm
           id="membership-decide"
+          ref="membershipDecideForm"
           :state="{ note }"
           class="space-y-4"
           novalidate
@@ -176,7 +178,7 @@ const shown = computed(() => more.value ? data.value?.applications ?? [] : (data
         <UButton
           type="submit"
           form="membership-decide"
-          loading-auto
+          :loading="membershipDecideForm?.loading"
           :color="deciding?.outcome === 'decline' ? 'error' : 'primary'"
           :label="deciding ? t(`membership.screens.applications.${deciding.outcome}`) : ''"
         />

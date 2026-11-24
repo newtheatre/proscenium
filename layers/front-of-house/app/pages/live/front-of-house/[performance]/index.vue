@@ -156,7 +156,7 @@ const context = computed(() => {
   return [p.title, time(p.startsAt), p.venueName, p.spaceName !== p.venueName ? p.spaceName : null].filter(Boolean).join(' · ')
 })
 const checklistLine = (c: Board['checklists'][number]) => c.state.startsWith('complete')
-  ? t('front-of-house.live.checklist-done')
+  ? t('core.states.completed')
   : c.exceptions
     ? t('front-of-house.live.done-problems', { done: c.entered - c.exceptions, total: c.required, problems: c.exceptions })
     : t('front-of-house.live.done-of', { done: c.entered, total: c.required })

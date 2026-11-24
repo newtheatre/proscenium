@@ -65,30 +65,30 @@ async function save() {
   const id = editId.value
   const before = data.value?.rows.find(s => s.id === id)
   const ok = id
-    ? await run(() => patch(id, body), 'Season saved', before ? () => patch(id, fields(before)) : undefined)
-    : await run(() => create(body), 'Season added', ({ id: added }) => destroy(added))
+    ? await run(() => patch(id, body), t('core.seasons.saved'), before ? () => patch(id, fields(before)) : undefined)
+    : await run(() => create(body), t('core.seasons.added'), ({ id: added }) => destroy(added))
   if (ok) editing.value = false
 }
 const shift = (id: string, to: State) => $api<unknown>(`/api/core/seasons/${id}/state` as string, { method: 'POST', body: { to } })
 const move = (s: Season, to: State, done: string) => run(() => shift(s.id, to), done, () => shift(s.id, s.state))
 async function remove(s: Season) {
-  if (!await confirm({ verb: 'Delete', thing: s.name, consequence: 'The season is removed. You can undo this for a few seconds.', button: 'Delete season' })) return
+  if (!await confirm({ verb: t('core.seasons.delete'), thing: s.name, consequence: t('core.seasons.delete-consequence'), button: t('core.seasons.delete-button') })) return
   // A deleted season is a draft with no productions, so undoing it adds the same draft again.
-  await run(() => destroy(s.id), 'Season deleted', () => create(fields(s)))
+  await run(() => destroy(s.id), t('core.seasons.deleted'), () => create(fields(s)))
 }
 const actions = (s: Season) => [[
-  { label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => open(s) },
-  ...(s.state === 'draft' ? [{ label: 'Publish', icon: 'i-lucide-globe', onSelect: () => move(s, 'published', 'Season published') }] : []),
-  ...(s.state === 'published' ? [{ label: 'Archive', icon: 'i-lucide-archive', onSelect: () => move(s, 'archived', 'Season archived') }, { label: 'Back to draft', icon: 'i-lucide-undo-2', onSelect: () => move(s, 'draft', 'Season back to draft') }] : []),
-  ...(s.state === 'archived' ? [{ label: 'Publish again', icon: 'i-lucide-globe', onSelect: () => move(s, 'published', 'Season published') }] : []),
-  ...(s.state === 'draft' && !s.productions ? [{ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove(s) }] : []),
+  { label: t('core.seasons.edit'), icon: 'i-lucide-pencil', onSelect: () => open(s) },
+  ...(s.state === 'draft' ? [{ label: t('core.seasons.publish'), icon: 'i-lucide-globe', onSelect: () => move(s, 'published', t('core.seasons.published')) }] : []),
+  ...(s.state === 'published' ? [{ label: t('core.seasons.archive'), icon: 'i-lucide-archive', onSelect: () => move(s, 'archived', t('core.seasons.archived')) }, { label: t('core.seasons.to-draft'), icon: 'i-lucide-undo-2', onSelect: () => move(s, 'draft', t('core.seasons.back-to-draft')) }] : []),
+  ...(s.state === 'archived' ? [{ label: t('core.seasons.publish-again'), icon: 'i-lucide-globe', onSelect: () => move(s, 'published', t('core.seasons.published')) }] : []),
+  ...(s.state === 'draft' && !s.productions ? [{ label: t('core.seasons.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove(s) }] : []),
 ]]
 </script>
 
 <template>
   <PageFrame
-    title="Seasons"
-    description="A season groups productions under a name and dates. A new season is a draft: only staff see it. Publish it to show its name on its productions on the public site. Archived seasons leave what's on and stay in the archive."
+    :title="t('core.seasons.seasons')"
+    :description="t('core.seasons.description-a-season-groups')"
     width="reading"
   >
     <template #primary>
@@ -96,10 +96,10 @@ const actions = (s: Season) => [[
         v-if="data?.rows.length"
         v-model="search"
         v-model:open="searching"
-        label="Search seasons"
+        :label="t('core.seasons.search-seasons')"
       />
       <UButton
-        label="New season"
+        :label="t('core.seasons.new-season')"
         :ui="{ label: searching ? 'max-sm:sr-only' : '' }"
         icon="i-lucide-plus"
         @click="open()"
@@ -118,8 +118,8 @@ const actions = (s: Season) => [[
         />
         <EmptyState
           v-if="!data?.rows.length"
-          title="No seasons yet"
-          description="Seasons are optional. Use them to group productions, such as Autumn 2027."
+          :title="t('core.seasons.no-seasons-yet')"
+          :description="t('core.seasons.description-seasons-are-optional')"
           icon="i-lucide-calendar-range"
         />
         <template v-else>
@@ -127,11 +127,11 @@ const actions = (s: Season) => [[
             v-if="!matching.length"
             class="text-sm text-muted"
           >
-            No seasons match “{{ search.trim() }}”.
+            {{ t('core.seasons.no-match', { search: search.trim() }) }}
           </p>
           <RecordList
             v-if="current.length"
-            label="Seasons"
+            :label="t('core.seasons.seasons')"
           >
             <RecordListItem
               v-for="s in current"
@@ -145,26 +145,27 @@ const actions = (s: Season) => [[
               />
               <UButton
                 v-if="s.state === 'draft'"
-                label="Publish"
+                :label="t('core.seasons.publish')"
                 icon="i-lucide-globe"
                 color="neutral"
                 variant="outline"
                 size="sm"
-                :aria-label="`Publish ${s.name}`"
-                @click="move(s, 'published', 'Season published')"
+                :aria-label="t('core.seasons.publish-named', { name: s.name })"
+                loading-auto
+                @click="move(s, 'published', t('core.seasons.published'))"
               />
               <RowActions
                 :items="actions(s)"
-                :label="`Actions for ${s.name}`"
+                :label="t('core.seasons.actions-for', { name: s.name })"
               />
             </RecordListItem>
           </RecordList>
           <CollapsibleDivider
             v-model:open="showArchived"
-            label="Archived"
+            :label="t('core.states.archived')"
             :count="archived.length"
           >
-            <RecordList label="Archived seasons">
+            <RecordList :label="t('core.seasons.archived-seasons')">
               <RecordListItem
                 v-for="s in archived"
                 :key="s.id"
@@ -173,7 +174,7 @@ const actions = (s: Season) => [[
               >
                 <RowActions
                   :items="actions(s)"
-                  :label="`Actions for ${s.name}`"
+                  :label="t('core.seasons.actions-for', { name: s.name })"
                 />
               </RecordListItem>
             </RecordList>
@@ -184,7 +185,7 @@ const actions = (s: Season) => [[
 
     <UModal
       v-model:open="editing"
-      :title="editId ? 'Edit season' : 'New season'"
+      :title="editId ? t('core.seasons.edit-season') : t('core.seasons.new-season')"
     >
       <template #body>
         <UForm
@@ -198,7 +199,7 @@ const actions = (s: Season) => [[
           <RefusalNotice :refusal="refusal" />
           <UFormField
             name="name"
-            label="Name"
+            :label="t('core.seasons.name')"
             required
           >
             <UInput
@@ -208,12 +209,12 @@ const actions = (s: Season) => [[
           </UFormField>
           <UFormField
             name="days"
-            label="First and last day"
+            :label="t('core.seasons.first-and-last-day')"
             required
           >
             <FieldDateRange v-model="form.days" />
           </UFormField>
-          <UFormField label="Summary">
+          <UFormField :label="t('core.seasons.summary')">
             <UTextarea
               v-model="form.summary"
               :rows="3"
@@ -226,7 +227,7 @@ const actions = (s: Season) => [[
         <UButton
           type="submit"
           form="season-form"
-          :label="editId ? 'Save season' : 'Add season'"
+          :label="editId ? t('core.seasons.save-season') : t('core.seasons.add-season')"
         />
       </template>
     </UModal>

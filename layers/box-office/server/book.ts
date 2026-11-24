@@ -1,7 +1,7 @@
 // What the public Choose tickets page shows (Box office specification, part 6, "Choose tickets"):
 // one performance of a published production, whether it is on sale, and each band's ticket types
-// and prices. It never says how many seats the house holds or how many are sold: a band is either
-// available or sold out.
+// and prices. It never says how many seats the house holds or how many are sold; how full the house and each
+// band are comes only as far as the theatre's availability.seats-left allows (seats-left.ts).
 import { first, refuse, requirements, useContext, useSetting } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { getPerformance, getProduction, latecomersAt, placeName, placeOf, type LatecomerRule } from '#modules/core'
@@ -12,6 +12,7 @@ import { sellableTypes } from './ticket-types'
 import { passesFor, type OfferedPass } from './pass-entries'
 import { passesOnSale, type PassOnSale } from './pass-sales'
 import { WHEELCHAIR_TYPE } from './prices'
+import { seatsLeftRule, seatsLeftSay, type SeatsLeftSay } from './seats-left'
 
 export interface BookingPage {
   /** `latecomers`: when latecomers are let in. */
@@ -24,12 +25,16 @@ export interface BookingPage {
   /** The most tickets one order may hold. */
   maxPerOrder: number
   timing: PaymentTiming
+  /** How full the house is, wheelchair spaces aside: the headline above the bands. */
+  seats: SeatsLeftSay
   /** Whether a pass covers this performance, and the signed-in visitor's own passes that do (BO-64). */
   passes: { accepted: boolean, /** Whether the visitor may put a pass's entry in a wheelchair space here. */ wheelchair: boolean, /** Passes on sale that cover this performance, to buy with the booking. */ onSale: PassOnSale[], mine: OfferedPass[] }
   bands: {
     bandId: string
     name: string
     soldOut: boolean
+    /** How full this part of the house is; absent for wheelchair spaces, which keep their own wording. */
+    seats?: SeatsLeftSay
     /**
      * `most` is how many this visitor may have, for a type with requirements they meet; `unmet` is
      * the source's own words when they do not, and the type cannot be chosen, unless it takes a
@@ -81,6 +86,9 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
     }
   }
   const timing = await timingFor(performanceId)
+  const rule = await seatsLeftRule()
+  const seated = found.bands.filter(b => b.kind !== 'wheelchair')
+  const seats = seatsLeftSay(rule, seated.reduce((n, b) => n + b.free, 0), seated.reduce((n, b) => n + b.capacity, 0))
   return {
     performance: { id: performance.id, startsAt: performance.startsAt, venue: await placeName(performance.spaceId) ?? placeOf(performance.spaceName, performance.venueName), state: performance.state, latecomers: await latecomersAt(performance.id) },
     production: { id: production.id, slug: production.slug, title: production.title, subtitle: production.subtitle, ageMin: production.ageMin, ageRestricted: production.ageRestricted && production.ageMin !== null },
@@ -89,12 +97,14 @@ export async function bookingPage(performanceId: string): Promise<BookingPage> {
     currency: found.currency,
     maxPerOrder: sales?.maxPerOrder ?? await useSetting('box-office.orders.seat-cap') as number,
     timing,
+    seats,
     // A pass that must be paid for when it is bought is not offered where online orders can only be reserved.
     passes: { ...await passesFor(performanceId, account), onSale: (await passesOnSale(performanceId, { channel: 'online', account })).filter(p => p.reserveUnpaid || timing !== 'reserve'), wheelchair: [...types.values()].some(type => type.managedBy === WHEELCHAIR_TYPE && judged.get(type.id)?.most !== undefined && found.bands.some(b => b.free > 0 && b.prices.some(p => p.ticketTypeId === type.id))) },
     bands: found.bands.map(b => ({
       bandId: b.bandId,
       name: b.name,
       soldOut: b.free <= 0,
+      ...(b.kind === 'wheelchair' ? {} : { seats: seatsLeftSay(rule, b.free, b.capacity) }),
       types: b.prices.flatMap((p) => {
         const type = types.get(p.ticketTypeId)
         // Complimentary tickets are given, never bought; a desk-only type is sold at the box office.

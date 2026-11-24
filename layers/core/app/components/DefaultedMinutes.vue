@@ -10,6 +10,7 @@ const props = defineProps<{
   label: string
 }>()
 const model = defineModel<number | null>({ default: null })
+const { t } = useT()
 const inherits = computed(() => model.value === null && props.fallback !== null && props.fallback !== undefined)
 </script>
 
@@ -20,17 +21,17 @@ const inherits = computed(() => model.value === null && props.fallback !== null 
   >
     <span class="text-sm text-highlighted">{{ minutesInWords(fallback!) }}</span>
     <UBadge
-      label="Theatre default"
+      :label="t('core.defaulted.badge')"
       color="neutral"
       variant="subtle"
       size="sm"
     />
     <UButton
-      label="Change"
+      :label="t('core.defaulted.change')"
       color="neutral"
       variant="link"
       size="sm"
-      :aria-label="`Change ${label.toLowerCase()}`"
+      :aria-label="t('core.defaulted.change-label', { label: label.toLowerCase() })"
       @click="model = fallback!"
     />
   </div>
@@ -47,7 +48,7 @@ const inherits = computed(() => model.value === null && props.fallback !== null 
     />
     <UButton
       v-if="fallback !== null && fallback !== undefined"
-      :label="`Use theatre default (${minutesInWords(fallback)})`"
+      :label="t('core.defaulted.use', { value: minutesInWords(fallback) })"
       color="neutral"
       variant="link"
       size="sm"

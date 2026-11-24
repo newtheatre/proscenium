@@ -4,7 +4,8 @@
 <script setup lang="ts">
 import type { Refusal } from '../../utils/identity'
 
-useSeoMeta({ title: 'Add a passkey' })
+const { t } = useT()
+useSeoMeta({ title: () => t('core.passkey-offer.title') })
 const route = useRoute()
 const next = nextPath(route.query.next) ?? '/'
 const refusal = ref<Refusal | null>(null)
@@ -35,33 +36,31 @@ async function add() {
 
 <template>
   <IdentityCard
-    title="Add a passkey"
-    :description="codes ? undefined : 'A passkey lets you sign in with your fingerprint, face or screen lock instead of waiting for an email.'"
+    :title="t('core.passkey-offer.title')"
+    :description="codes ? undefined : t('core.passkey-offer.description')"
   >
     <template v-if="!codes">
       <UAlert
         v-if="me?.consoleNeedsPasskey"
         color="info"
         icon="i-lucide-info"
-        title="You will need a passkey to use the console."
+        :title="t('core.passkey-offer.console-needs')"
       />
       <RefusalNotice :refusal="refusal" />
       <UButton
         block
         icon="i-lucide-key-round"
         loading-auto
+        :label="t('core.passkey-offer.add')"
         @click="add()"
-      >
-        Add a passkey
-      </UButton>
+      />
       <UButton
         block
         color="neutral"
         variant="link"
+        :label="t('core.passkey-offer.not-now')"
         @click="notNow()"
-      >
-        Not now
-      </UButton>
+      />
     </template>
     <RecoveryCodes
       v-else

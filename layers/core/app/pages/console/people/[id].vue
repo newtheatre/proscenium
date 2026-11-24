@@ -94,7 +94,7 @@ const detailsSchema = z.object({
 })
 const editing = ref(false)
 const details = reactive({ name: '', pronouns: '' })
-const saving = ref(false)
+const detailsForm = useFormRef('detailsForm')
 const detailsRefusal = ref<RefusalView | null>(null)
 function openDetails() {
   const p = person.value
@@ -108,7 +108,6 @@ async function saveDetails() {
   const p = person.value
   if (!p) return
   const before = { pronouns: p.pronouns, ...(p.name ? { name: p.name } : {}) }
-  saving.value = true
   detailsRefusal.value = null
   try {
     await patch({ name: details.name.trim(), pronouns: details.pronouns.trim() || null })
@@ -123,9 +122,6 @@ async function saveDetails() {
   catch (e) {
     detailsRefusal.value = toRefusal(e)
   }
-  finally {
-    saving.value = false
-  }
 }
 
 // Addresses (ID-46): an added one does nothing until its link is used; the server keeps ID-12's rules.
@@ -134,7 +130,7 @@ const addressAt = (a: Address): string => `${addresses()}/${encodeURIComponent(a
 const addingAddress = ref(false)
 const newAddress = reactive({ address: '' })
 const addressSchema = z.object({ address: z.email().max(254) })
-const sendingLink = ref(false)
+const addressForm = useFormRef('addressForm')
 const addRefusal = ref<RefusalView | null>(null)
 const heldBy = computed(() => addRefusal.value?.code === 'core.address.on-another-account' ? addRefusal.value.detail?.accountId : undefined)
 function openAddAddress() {
@@ -148,7 +144,6 @@ async function sendLink(address: string) {
   await refresh()
 }
 async function addAddress() {
-  sendingLink.value = true
   addRefusal.value = null
   try {
     await sendLink(newAddress.address.trim())
@@ -156,9 +151,6 @@ async function addAddress() {
   }
   catch (e) {
     addRefusal.value = toRefusal(e)
-  }
-  finally {
-    sendingLink.value = false
   }
 }
 async function writeTo(a: Address) {
@@ -384,33 +376,39 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
               >
                 {{ t('core.person.no-addresses') }}
               </p>
-              <ul
+              <RecordList
                 v-else
-                class="space-y-2"
+                :label="t('core.person.addresses')"
               >
-                <li
+                <RecordListItem
                   v-for="a in p.addresses"
                   :key="a.id"
-                  class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
                 >
-                  <span class="w-full break-all">{{ a.address }}</span>
-                  <StatusBadge
-                    :tone="a.verified ? 'success' : 'neutral'"
-                    :label="a.verified ? t('core.person.verified') : t('core.person.unverified')"
-                  />
-                  <StatusBadge
-                    v-if="a.audience"
-                    tone="info"
-                    :label="t('core.person.email.audience')"
-                  />
-                  <RowActions
+                  <template #name>
+                    <span class="break-all">{{ a.address }}</span>
+                  </template>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <StatusBadge
+                      :tone="a.verified ? 'success' : 'neutral'"
+                      :label="a.verified ? t('core.person.verified') : t('core.person.unverified')"
+                    />
+                    <StatusBadge
+                      v-if="a.audience"
+                      tone="info"
+                      :label="t('core.person.email.audience')"
+                    />
+                  </div>
+                  <template
                     v-if="p.actions.update"
-                    class="ms-auto"
-                    :items="addressActions(a)"
-                    :label="t('core.person.email.actions', { address: a.address })"
-                  />
-                </li>
-              </ul>
+                    #trailing
+                  >
+                    <RowActions
+                      :items="addressActions(a)"
+                      :label="t('core.person.email.actions', { address: a.address })"
+                    />
+                  </template>
+                </RecordListItem>
+              </RecordList>
             </FieldGroup>
           </PageSection>
         </template>
@@ -626,6 +624,7 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
         <template #body>
           <UForm
             id="person-details"
+            ref="detailsForm"
             :schema="detailsSchema"
             :state="details"
             class="space-y-4"
@@ -660,7 +659,7 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
           <UButton
             type="submit"
             form="person-details"
-            :loading="saving"
+            :loading="detailsForm?.loading"
             :label="t('core.person.details.save')"
           />
         </template>
@@ -674,6 +673,7 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
         <template #body>
           <UForm
             id="person-address"
+            ref="addressForm"
             :schema="addressSchema"
             :state="newAddress"
             class="space-y-4"
@@ -707,7 +707,7 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
           <UButton
             type="submit"
             form="person-address"
-            :loading="sendingLink"
+            :loading="addressForm?.loading"
             :label="t('core.person.email.send-link')"
           />
         </template>

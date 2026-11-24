@@ -1,6 +1,6 @@
 // Box office's answers for the booking button (Box office specification, part 5, "The booking action
-// in the core's states"): on sale is available, or limited with the seats left at or under the
-// setting; no free seat is sold out; paused or past closing is closed; a draft with an opening time is
+// in the core's states"): on sale is available, or limited once nearly full, saying only as much as
+// availability.seats-left allows; no free seat is sold out; paused or past closing is closed; a draft with an opening time is
 // not yet; and a date with no sales record gets no answer from Box office, so it falls back to the
 // theatre's own link.
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -26,16 +26,41 @@ async function setting(key: string, value: unknown) {
 describe('the booking button from Box office', () => {
   beforeAll(ready)
 
-  it('says available with a link to Choose tickets, and limited with the seats left at or under the setting', async () => {
+  it('says available with a link to Choose tickets, and limited with the seats left once nearly full', async () => {
     const big = await house(50)
     const small = await house(5)
     const found = await answers(big, small)
     const slug = (await rows<{ slug: string }>('SELECT slug FROM core_productions WHERE id = ?', big.productionId))[0]!.slug
     expect(found[big.performanceId]).toEqual({ state: 'available', link: `/book/${slug}/${big.performanceId}`, drawer: 'BoxOfficeBookingDrawer' })
-    expect(found[small.performanceId]).toMatchObject({ state: 'limited', seatsLeft: 5, drawer: 'BoxOfficeBookingDrawer' })
+    // Nearly full is 10% of the house as shipped: one seat of five.
+    expect(found[small.performanceId]).toMatchObject({ state: 'available' })
+    expect((await buy(small, 4)).ok).toBe(true)
+    expect((await answers(small))[small.performanceId]).toMatchObject({ state: 'limited', seatsLeft: 1, drawer: 'BoxOfficeBookingDrawer' })
+    await setting('box-office.availability.threshold-unit', 'seats')
+    expect((await answers(big))[big.performanceId]).toEqual({ state: 'available', link: `/book/${slug}/${big.performanceId}`, drawer: 'BoxOfficeBookingDrawer' })
+    await setting('box-office.availability.show-remaining-under', 50)
+    expect((await answers(big))[big.performanceId]).toMatchObject({ state: 'limited', seatsLeft: 50 })
     await setting('box-office.availability.show-remaining-under', 0)
-    expect((await answers(small))[small.performanceId]!.state).toBe('available')
+    expect((await answers(big))[big.performanceId]!.state).toBe('available')
     await setting('box-office.availability.show-remaining-under', 20)
+    await setting('box-office.availability.threshold-unit', 'share')
+  })
+
+  it('says no more than the theatre\'s level allows: never the number below the most open', async () => {
+    const h = await house(10)
+    expect((await buy(h, 6)).ok).toBe(true)
+    await setting('box-office.availability.seats-left', 'progress')
+    expect((await answers(h))[h.performanceId]).toMatchObject({ state: 'available', sellingFast: true })
+    expect((await buy(h, 3)).ok).toBe(true)
+    const progress = (await answers(h))[h.performanceId]!
+    expect(progress).toMatchObject({ state: 'limited' })
+    expect(progress.seatsLeft).toBeUndefined()
+    await setting('box-office.availability.seats-left', 'nearly-full')
+    expect((await answers(h))[h.performanceId]).not.toHaveProperty('seatsLeft')
+    await setting('box-office.availability.seats-left', 'sold-out')
+    expect((await answers(h))[h.performanceId]).toMatchObject({ state: 'available' })
+    expect((await answers(h))[h.performanceId]).not.toHaveProperty('seatsLeft')
+    await setting('box-office.availability.seats-left', 'count')
   })
 
   it('says sold out when no seat is free', async () => {

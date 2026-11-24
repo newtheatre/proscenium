@@ -59,8 +59,9 @@ async function submit() {
           :label="t('box-office.order.comp.reason')"
           required
         >
-          <USelect
+          <USelectMenu
             v-model="form.reasonTermId"
+            value-key="value"
             :items="reasonItems"
           />
         </UFormField>

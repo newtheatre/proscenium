@@ -29,7 +29,7 @@ const published = ref(true)
 const elsewhere = ref<string[]>([])
 const loading = ref(false)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('formEl')
+const formEl = useFormRef('formEl')
 const audiences = computed(() => (['anyone', 'signed_in'] as const).map(value => ({ value, label: t(`forms.screens.link.audience-${value}`) })))
 
 watch(open, async (now) => {
@@ -160,10 +160,9 @@ async function save() {
           :hint="t('forms.screens.details.optional')"
           :help="t('forms.screens.link.cap-help')"
         >
-          <UInputNumber
+          <FieldNumber
             v-model="state.responseCap"
             :min="1"
-            class="w-32"
           />
         </UFormField>
         <UFormField
@@ -195,7 +194,7 @@ async function save() {
       <UButton
         type="submit"
         form="forms-link"
-        loading-auto
+        :loading="formEl?.loading"
         :disabled="loading"
         :label="shared ? t('forms.screens.settings.save') : t(place ? 'forms.screens.slot.attach' : 'forms.screens.link.share')"
       />

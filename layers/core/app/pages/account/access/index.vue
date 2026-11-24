@@ -10,7 +10,7 @@ interface Mine {
   enabled: boolean
   name?: string
   allowNote?: boolean
-  needs?: { id: string, key: string, label: string, description: string | null }[]
+  needs?: { id: string, key: string, label: string, description: string | null, group: string | null }[]
   application?: {
     status: 'submitted' | 'more-info' | 'accepted' | 'rejected'
     inForce: AccessApplicationValue | null
@@ -22,6 +22,8 @@ interface Mine {
     submittedAt: number
     decidedAt: number | null
     reviewDue: number | null
+    /** Entries added to the list since they last sent their details, that they have not chosen. */
+    newOptions: { id: string, label: string }[]
   } | null
   sharing?: { id: string, label: string, explanation: string, on: boolean, fixed: boolean }[]
   reads?: { at: number, capacity: string | null, purpose: string | null }[]
@@ -87,6 +89,16 @@ async function confirmStillRight() {
   }
 }
 
+async function noneHelp() {
+  try {
+    await $api('/api/core/me/access/options-seen', { method: 'POST', body: {} })
+    await refresh()
+  }
+  catch (error) {
+    refusal.value = toRefusal(error)
+  }
+}
+
 async function share(purpose: string, on: boolean) {
   try {
     await $api('/api/core/me/access/sharing', { method: 'PUT', body: { purpose, on } })
@@ -133,6 +145,18 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
     <RefusalNotice :refusal="refusal" />
 
     <div class="space-y-8">
+      <UAlert
+        v-if="application.newOptions?.length"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-list-plus"
+        :title="t('core.access.new-options.title')"
+        :description="t('core.access.new-options.description', { options: application.newOptions.map(o => o.label).join(', ') })"
+        :actions="[
+          { label: t('core.access.change'), to: APPLY },
+          { label: t('core.access.new-options.none'), color: 'neutral', variant: 'outline', onClick: noneHelp },
+        ]"
+      />
       <PageSection
         :title="t('core.access.state')"
       >
@@ -204,6 +228,7 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
           variant="outline"
           icon="i-lucide-check"
           :label="t('core.access.still-right')"
+          loading-auto
           @click="confirmStillRight"
         />
         <UButton
@@ -250,17 +275,12 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
       >
         {{ t('core.access.reads.none') }}
       </p>
-      <ul
+      <UTimeline
         v-else
-        class="space-y-1 text-sm"
-      >
-        <li
-          v-for="(read, i) in data.reads"
-          :key="i"
-        >
-          {{ t('core.access.reads.line', { date: day(read.at), by: purposeLabel(read) }) }}
-        </li>
-      </ul>
+        :items="data.reads.map(read => ({ date: day(read.at), title: purposeLabel(read) }))"
+        color="neutral"
+        size="xs"
+      />
     </PageSection>
   </PageFrame>
 </template>

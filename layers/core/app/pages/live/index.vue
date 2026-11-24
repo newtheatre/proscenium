@@ -10,11 +10,11 @@ import { useIntervalFn } from '@vueuse/core'
 interface Figure { id: string, label: string, value: string | number | null, state: 'ok' | 'attention' | 'unavailable', unit?: string, to?: string }
 interface Performance { id: string, title: string, label: string | null, startsAt: number, venue: string, latecomers?: string, figures: Figure[] }
 
-const CURRENCY = /^[A-Z]{3}$/ // not-policy: the shape of an ISO 4217 code
 const REFRESH = 30_000 // not-policy: how often the figures are read again
 
 const { t, te } = useT()
 const { time, dayBrief } = useDates()
+const { money, isCurrency } = useMoneyText()
 const { data: navigation } = await useNavigation('live')
 const tiles = computed(() => navigation.value?.items ?? [])
 const { data: tonight, refresh } = await useAPI<{ performances: Performance[], next?: { title: string, label: string | null, startsAt: number, venue: string } | null }>('/api/core/live/tonight', { key: 'core:live:tonight', default: () => ({ performances: [], next: null }) })
@@ -27,10 +27,7 @@ const next = computed(() => tonight.value?.next ?? null)
 const labelOf = (text: string) => (te(text) ? t(text) : text)
 function valueOf(f: Figure): string {
   if (f.value === null || f.state === 'unavailable') return t('core.live.figure-unavailable')
-  if (typeof f.value === 'number' && f.unit && CURRENCY.test(f.unit)) {
-    const format = new Intl.NumberFormat('en-GB', { style: 'currency', currency: f.unit })
-    return format.format(f.value / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2))
-  }
+  if (typeof f.value === 'number' && isCurrency(f.unit)) return money(f.value, f.unit)
   return f.unit ? `${f.value} ${f.unit}` : String(f.value)
 }
 </script>

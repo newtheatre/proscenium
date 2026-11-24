@@ -100,7 +100,7 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
     <slot />
     <div
       v-if="$slots.footer"
-      class="sticky bottom-0 flex justify-end gap-2 border-t border-default bg-default py-3"
+      class="sticky-bar flex justify-end gap-2"
     >
       <slot name="footer" />
     </div>
@@ -246,7 +246,7 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
         <slot />
         <div
           v-if="$slots.footer"
-          class="sticky bottom-0 flex justify-end gap-2 border-t border-default bg-default py-3"
+          class="sticky-bar flex justify-end gap-2"
         >
           <slot name="footer" />
         </div>

@@ -14,6 +14,7 @@ import type { BoughtPass, PassOnSale } from '~~/layers/box-office/app/components
 import type { PassSwap } from '~~/layers/box-office/app/components/BoxOfficePassSwap.vue'
 
 interface TicketType { ticketTypeId: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, amountMinor: number, most?: number, own?: number, unmet?: string, unmetHelp?: string, remedy?: { label: string, to: string }, reference?: { label: string, field?: string, noun?: string, shape: string } }
+interface Seats { state: 'available' | 'limited' | 'sold-out', seatsLeft?: number, sellingFast?: true }
 interface Page {
   performance: { id: string, startsAt: number, venue: string, state: string, latecomers?: string }
   production: { id: string, slug: string, title: string, subtitle: string | null, ageMin: number | null, ageRestricted: boolean }
@@ -21,7 +22,8 @@ interface Page {
   onSaleAt: number | null
   currency: string | null
   maxPerOrder: number
-  bands: { bandId: string, name: string, soldOut: boolean, types: TicketType[] }[]
+  seats?: Seats
+  bands: { bandId: string, name: string, soldOut: boolean, seats?: Seats, types: TicketType[] }[]
   passes: { accepted: boolean, wheelchair: boolean, onSale: PassOnSale[], mine: { code: string, name: string, priceName: string, owedMinor: number, left: number | null, unusable: string | null }[] }
 }
 
@@ -153,6 +155,8 @@ const rowsOf = (band: Page['bands'][number]) => {
   const headed = own.length > 0 && other.some(type => typing(type))
   return [...own.map(type => ({ type, otherStart: false })), ...other.map((type, i) => ({ type, otherStart: i === 0 && headed }))]
 }
+// How full the house, or one part of it, is, as far as the theatre says (availability.seats-left).
+const seatsNote = (s?: Seats) => s?.state === 'limited' ? (s.seatsLeft ? t('box-office.book.seats-left', { count: s.seatsLeft }) : t('box-office.book.last-few')) : s?.sellingFast ? t('box-office.book.selling-fast') : ''
 const allSoldOut = computed(() => !!data.value?.bands.length && data.value.bands.every(b => b.soldOut))
 // A link the source gives for someone who could qualify, which comes back here afterwards.
 const helpLink = (help: string) => `${help}${help.includes('?') ? '&' : '?'}next=${encodeURIComponent(here.value)}`
@@ -384,17 +388,29 @@ async function hold() {
         :title="t('box-office.book.ask.sent')"
         :description="t('box-office.book.ask.sent-help')"
       />
+      <p
+        v-if="seatsNote(data.seats)"
+        class="text-sm font-medium text-highlighted"
+      >
+        {{ seatsNote(data.seats) }}
+      </p>
       <section
         v-for="band in data.bands"
         :key="band.bandId"
         class="space-y-3"
       >
-        <h2
+        <div
           v-if="data.bands.length > 1"
-          class="text-lg font-semibold"
+          class="flex flex-wrap items-baseline gap-x-3"
         >
-          {{ band.name }}
-        </h2>
+          <h2 class="text-lg font-semibold">
+            {{ band.name }}
+          </h2>
+          <span
+            v-if="!band.soldOut && seatsNote(band.seats)"
+            class="text-sm text-muted"
+          >{{ seatsNote(band.seats) }}</span>
+        </div>
         <p
           v-if="band.soldOut"
           class="text-sm text-muted"
@@ -448,7 +464,7 @@ async function hold() {
                 size="lg"
                 :ui="{ root: 'items-center gap-4', wrapper: 'min-w-0', container: 'w-36 shrink-0' }"
               >
-                <UInputNumber
+                <FieldNumber
                   v-model="counts[keyOf(band.bandId, type.ticketTypeId)]"
                   :min="0"
                   :max="mostOf(band.bandId, type)"
@@ -456,7 +472,7 @@ async function hold() {
                   size="xl"
                   :increment="named(stepLabel(band, type, 'add'))"
                   :decrement="named(stepLabel(band, type, 'remove'))"
-                  :ui="{ increment: '[&_button:disabled]:opacity-40', decrement: '[&_button:disabled]:opacity-40' }"
+                  :ui="{ root: 'w-full', increment: '[&_button:disabled]:opacity-40', decrement: '[&_button:disabled]:opacity-40' }"
                 />
               </UFormField>
               <template v-if="takesReferences(type) && (counts[keyOf(band.bandId, type.ticketTypeId)] ?? 0) > firstTyped(type)">
@@ -611,7 +627,7 @@ async function hold() {
         @token="challenge = $event"
       />
       <!-- The button stays in reach while the list scrolls, on the page and in the drawer. -->
-      <div class="sticky bottom-0 z-10 border-t border-default bg-default py-3">
+      <div class="sticky-bar">
         <UButton
           size="xl"
           class="justify-center max-sm:w-full"

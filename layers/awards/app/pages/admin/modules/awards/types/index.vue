@@ -23,7 +23,7 @@ const describe = (x: AwardType) => [t('awards.screens.types.holders', { count: x
 const blank = (): TypeForm => ({ name: '', key: '', summary: '', givesTicketBenefit: false, onePerPerson: false, defaultVisibility: 'public' })
 const open = ref(false)
 const form = ref<TypeForm>(blank())
-const formEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('formEl')
+const formEl = useFormRef('formEl')
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 let idempotency = ''
 // The address follows the name until somebody types one.
@@ -144,7 +144,7 @@ async function create() {
         <UButton
           type="submit"
           form="awards-new-type"
-          loading-auto
+          :loading="formEl?.loading"
           :label="t('awards.screens.types.create')"
         />
       </template>
