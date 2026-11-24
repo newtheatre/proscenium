@@ -189,7 +189,10 @@ Any module may import core's services without listing core: `import { notifyAddr
   yours, with its starting terms, as a contribution to `core.vocabulary` (`id` is
   `<module>.<name>`); it is made the first time the module is on and from then on its terms are the
   theatre's. A record stores the term's id in a `col.ref('core_terms')` column, never the label.
-  `listTerms(key, { includeRetired? })` gives a picker's options in order; `getTerm(id)` gives a
+  `listTerms(key, { includeRetired?, group? })` gives a picker's options in order; `group` narrows
+  to the terms under one declared heading by its slug (made from the declared label, and kept when
+  the theatre renames the heading), which is how `core.department`'s kinds, `production` and
+  `organisation`, are read (R3-07); `getTerm(id)` gives a
   label for any term, retired or merged ones too; `assertTerm(id, key)` is the predicate to put on
   your own insert or update, then `.expect(1)`, so a retired term or one from another vocabulary
   is refused. Staff edit a module's terms on the Lists tab of its page in Admin
