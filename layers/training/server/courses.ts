@@ -70,10 +70,11 @@ const STEP = `SELECT id, version_id AS versionId, position, title, kind, needed_
 
 const SECTION_COLUMNS = ['id', 'step_id', 'position', 'kind', 'title', 'body', 'video_url', 'video_id', 'video_caption_note', 'scenario_id', 'carries_section_id', 'created_at', 'updated_at']
 
-const course = (row: any): Course => ({ ...row, expires: !!row.expires, selfSignUp: !!row.selfSignUp })
+type CourseRow = Omit<Course, 'expires' | 'selfSignUp'> & { expires: unknown, selfSignUp: unknown }
+const course = (row: CourseRow): Course => ({ ...row, expires: !!row.expires, selfSignUp: !!row.selfSignUp })
 
 export async function getCourse(id: string): Promise<Course | null> {
-  const row = await first(`${COURSE} WHERE id = ?`, id)
+  const row = await first<CourseRow>(`${COURSE} WHERE id = ?`, id)
   return row ? course(row) : null
 }
 
@@ -83,7 +84,7 @@ export async function courseOrRefuse(id: string): Promise<Course> {
 
 /** Courses by title. Unpublished ones only for those who manage courses. */
 export async function listCourses(options: { unpublished: boolean }): Promise<Course[]> {
-  const rows = await all(`${COURSE} ${options.unpublished ? '' : 'WHERE status = \'live\''} ORDER BY status = 'retired', lower(title)`)
+  const rows = await all<CourseRow>(`${COURSE} ${options.unpublished ? '' : 'WHERE status = \'live\''} ORDER BY status = 'retired', lower(title)`)
   return rows.map(course)
 }
 
@@ -175,30 +176,8 @@ export async function saveSteps(unit: UnitView, courseId: string, input: StepInp
   // An activity step names a source that is on, with parameters the source accepts (H1).
   const sources = new Map<number, Record<string, unknown>>()
   for (const [i, x] of input.entries()) if (x.kind === 'activity') sources.set(i, await sourceParams(x.sourceId, x.sourceParams))
-  const ids: string[] = []
-  const rows = input.map((step, i) => {
-    const old = step.id ? before.get(step.id) : undefined
-    if (step.id && !old) refuse('training.step.not-found', 'A step was changed by someone else while you were editing.', { status: 409, remedy: 'Reload the course and try again.' })
-    const timesRequired = step.kind === 'practical' || step.kind === 'activity' ? step.timesRequired : 1
-    const keepsCarry = old && !step.changed && old.kind === step.kind && old.timesRequired === timesRequired
-    const id = old?.id ?? newId('tstp')
-    ids.push(id)
-    return {
-      id, position: i + 1, title: step.title, kind: step.kind, neededFor: step.neededFor, timesRequired,
-      guidance: step.guidance ?? null,
-      materialUrl: 'materialUrl' in step ? step.materialUrl ?? null : null,
-      materialFileId: 'materialFileId' in step ? step.materialFileId ?? null : null,
-      evidenceExpiry: step.kind === 'certificate' ? step.evidenceExpiry : null,
-      evidenceFile: step.kind === 'certificate' ? step.evidenceFile : null,
-      formId: step.kind === 'quiz' ? step.formId : null,
-      maxAttempts: step.kind === 'quiz' ? (step.maxAttempts === undefined ? defaultAttempts : step.maxAttempts) : null,
-      retryAfter: step.kind === 'quiz' ? step.retryAfter ?? defaultRetry : null,
-      showAnswers: step.kind === 'quiz' ? step.showAnswers : null,
-      sourceId: step.kind === 'activity' ? step.sourceId : null,
-      sourceParams: step.kind === 'activity' ? JSON.stringify(sources.get(i)) : null,
-      carriesStepId: keepsCarry ? old.carriesStepId : null,
-    }
-  })
+  const rows = input.map((step, i) => stepRowFor(step, i, { before, defaultAttempts, defaultRetry, sourceParams: sources.get(i) }))
+  const ids = rows.map(r => r.id)
   // A lesson's sections go out with its step and come back if the step is kept as a lesson (O5).
   const kept = new Set(rows.filter(r => r.kind === 'lesson').map(r => r.id))
   const sections = (await all<{ step_id: string }>('SELECT * FROM training_lesson_sections WHERE step_id IN (SELECT id FROM training_course_steps WHERE version_id = ?)', version.id))
@@ -218,6 +197,34 @@ export async function saveSteps(unit: UnitView, courseId: string, input: StepInp
   if (sections.length) unit.add({ sql: `INSERT INTO training_lesson_sections (${SECTION_COLUMNS.join(', ')}) SELECT ${SECTION_COLUMNS.map(c => `j.value ->> '${c}'`).join(', ')} FROM json_each(?) j`, params: [JSON.stringify(sections)] }).expect(sections.length)
   unit.audit({ action: 'update', record: ['training.course', courseId], detail: { version: version.number, steps: rows.length } })
   return ids
+}
+
+const NO_KIND_FIELDS = { evidenceExpiry: null, evidenceFile: null, formId: null, maxAttempts: null, retryAfter: null, showAnswers: null, sourceId: null, sourceParams: null }
+
+interface StepDefaults { before: Map<string, Step>, defaultAttempts: number | null, defaultRetry: number, sourceParams?: Record<string, unknown> }
+
+/** The columns only one kind of step fills; every other kind leaves them empty. */
+function kindFields(step: StepInput, d: StepDefaults) {
+  if (step.kind === 'certificate') return { ...NO_KIND_FIELDS, evidenceExpiry: step.evidenceExpiry, evidenceFile: step.evidenceFile }
+  if (step.kind === 'quiz') return { ...NO_KIND_FIELDS, formId: step.formId, maxAttempts: step.maxAttempts === undefined ? d.defaultAttempts : step.maxAttempts, retryAfter: step.retryAfter ?? d.defaultRetry, showAnswers: step.showAnswers }
+  if (step.kind === 'activity') return { ...NO_KIND_FIELDS, sourceId: step.sourceId, sourceParams: JSON.stringify(d.sourceParams) }
+  return NO_KIND_FIELDS
+}
+
+/** The row a step of the editor saves as; one kept from before keeps its id and, unless changed, what it carries from (V3). */
+function stepRowFor(step: StepInput, i: number, d: StepDefaults) {
+  const old = step.id ? d.before.get(step.id) : undefined
+  if (step.id && !old) refuse('training.step.not-found', 'A step was changed by someone else while you were editing.', { status: 409, remedy: 'Reload the course and try again.' })
+  const timesRequired = step.kind === 'practical' || step.kind === 'activity' ? step.timesRequired : 1
+  const keepsCarry = old && !step.changed && old.kind === step.kind && old.timesRequired === timesRequired
+  const material = 'materialUrl' in step ? { materialUrl: step.materialUrl ?? null, materialFileId: step.materialFileId ?? null } : { materialUrl: null, materialFileId: null }
+  return {
+    id: old?.id ?? newId('tstp'), position: i + 1, title: step.title, kind: step.kind, neededFor: step.neededFor, timesRequired,
+    guidance: step.guidance ?? null,
+    ...material,
+    ...kindFields(step, d),
+    carriesStepId: keepsCarry ? old.carriesStepId : null,
+  }
 }
 
 /** Starts the next version by copying the live one's steps, each carrying from the step it copies (V1). */

@@ -9,4 +9,4 @@ export default defineRoute({
   record: event => ['training.course', getRouterParam(event, 'id')],
   rateLimit: 'write',
   input: quizInput,
-}, (event, { record, input, actor, unit }) => submitQuiz(unit.view(), actor, record!.id, getRouterParam(event, 'step')!, input.answers))
+}, (event, { record, input, actor, unit }) => submitQuiz(unit.view(), actor, { courseId: record!.id, stepId: getRouterParam(event, 'step')! }, input.answers))

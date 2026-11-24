@@ -168,32 +168,50 @@ async function holdersOfPlaces(sessionId: string): Promise<string[]> {
  */
 export async function updateSession(unit: UnitView, id: string, change: Partial<SessionInput>): Promise<void> {
   const before = await sessionOrRefuse(id)
-  if (before.status !== 'unpublished' && before.status !== 'published') refuse('training.session.closed', 'A cancelled or completed session cannot be changed.', { status: 409 })
-  const startsAt = change.startsAt ?? before.startsAt
-  const endsAt = change.endsAt ?? before.endsAt
-  const spaceId = change.spaceId === undefined ? before.spaceId : change.spaceId
-  const capacity = change.capacity ?? before.capacity
-  const moved = startsAt !== before.startsAt || endsAt !== before.endsAt || spaceId !== before.spaceId
-  if (moved) checkTimes(startsAt, endsAt)
-  if (moved && before.status === 'published' && spaceId) await checkSpace(spaceId, startsAt, endsAt, id)
-  if (capacity < before.placesTaken)
-    refuse('training.session.capacity-below-taken', `${before.placesTaken} places are taken, so capacity cannot go below that.`, { status: 409, fields: { capacity: `At least ${before.placesTaken}.` } })
+  const next = await plannedChange(before, change)
   unit.add({
     sql: `UPDATE training_sessions SET title = ?, starts_at = ?, ends_at = ?, space_id = ?, place_note = ?, capacity = ?, sign_up = ?, updated_at = ?
       WHERE id = ? AND status IN ('unpublished', 'published') AND places_taken <= ?`,
-    params: [change.title === undefined ? before.title : change.title, startsAt, endsAt, spaceId, change.placeNote === undefined ? before.placeNote : change.placeNote,
-      capacity, change.signUp ?? before.signUp, nowMs(), id, capacity],
+    params: [next.title, next.startsAt, next.endsAt, next.spaceId, next.placeNote, next.capacity, next.signUp, nowMs(), id, next.capacity],
   }).expect(1, { code: 'training.session.capacity-below-taken', reason: 'More places were taken meanwhile; capacity cannot go below them.' })
   if (change.trainerIds) await setTrainers(unit, id, change.trainerIds)
-  if (capacity > before.capacity) await promote(unit, before, capacity - before.placesTaken)
-  if (moved && before.status === 'published') {
-    const after = { ...before, startsAt }
-    const to = [...await holdersOfPlaces(id), ...(await sessionTrainers(before)).map(t => t.accountId)]
-    // Keyed by the new time and space, so moving back tells people again (P5).
-    if (to.length) await notify(unit, 'training.session-changed', { to: [...new Set(to)], variables: { session: nameOf(before), when: await whenOf(after) }, dedupeKey: `${id}:${startsAt}:${endsAt}:${spaceId}`, subject: ['training.session', id] })
-    unit.announce('training.session.changed', { sessionId: id, courseId: before.courseId }, { record: ['training.session', id] })
-  }
+  if (next.capacity > before.capacity) await promote(unit, before, next.capacity - before.placesTaken)
+  if (next.moved && before.status === 'published') await tellMoved(unit, before, next)
   unit.audit({ action: 'update', record: ['training.session', id], detail: { fields: Object.keys(change) } })
+}
+
+/** Each field as changed, or as it was where the change leaves it out; null clears a nullable one. */
+function merged(before: Session, change: Partial<SessionInput>) {
+  const pick = <K extends 'title' | 'spaceId' | 'placeNote'>(key: K) => change[key] === undefined ? before[key] : change[key] ?? null
+  return {
+    title: pick('title'),
+    startsAt: change.startsAt ?? before.startsAt,
+    endsAt: change.endsAt ?? before.endsAt,
+    spaceId: pick('spaceId'),
+    placeNote: pick('placeNote'),
+    capacity: change.capacity ?? before.capacity,
+    signUp: change.signUp ?? before.signUp,
+  }
+}
+
+/** The session as the change leaves it, refused where it may not change so (P4, P10). */
+async function plannedChange(before: Session, change: Partial<SessionInput>) {
+  if (before.status !== 'unpublished' && before.status !== 'published') refuse('training.session.closed', 'A cancelled or completed session cannot be changed.', { status: 409 })
+  const next = merged(before, change)
+  const moved = next.startsAt !== before.startsAt || next.endsAt !== before.endsAt || next.spaceId !== before.spaceId
+  if (moved) checkTimes(next.startsAt, next.endsAt)
+  if (moved && before.status === 'published' && next.spaceId) await checkSpace(next.spaceId, next.startsAt, next.endsAt, before.id)
+  if (next.capacity < before.placesTaken)
+    refuse('training.session.capacity-below-taken', `${before.placesTaken} places are taken, so capacity cannot go below that.`, { status: 409, fields: { capacity: `At least ${before.placesTaken}.` } })
+  return { ...next, moved }
+}
+
+/** Tells everyone with a place and the trainers that a published session moved (P5). */
+async function tellMoved(unit: UnitView, before: Session, next: { startsAt: number, endsAt: number, spaceId: string | null }): Promise<void> {
+  const to = [...await holdersOfPlaces(before.id), ...(await sessionTrainers(before)).map(t => t.accountId)]
+  // Keyed by the new time and space, so moving back tells people again (P5).
+  if (to.length) await notify(unit, 'training.session-changed', { to: [...new Set(to)], variables: { session: nameOf(before), when: await whenOf({ ...before, startsAt: next.startsAt }) }, dedupeKey: `${before.id}:${next.startsAt}:${next.endsAt}:${next.spaceId}`, subject: ['training.session', before.id] })
+  unit.announce('training.session.changed', { sessionId: before.id, courseId: before.courseId }, { record: ['training.session', before.id] })
 }
 
 /** Publishes a session: its course live, its start in the future and its space free (P10, TR-09). */
@@ -245,31 +263,38 @@ async function promote(unit: UnitView, session: Session, room: number): Promise<
   for (const w of waiting) unit.announce('training.place.promoted', { placeId: w.id, sessionId: session.id, accountId: w.accountId }, { record: ['training.session', session.id] })
 }
 
+/** Whether the session takes a place from this booker now (P1): open sign-up before it closes, or staff before the start. */
+async function checkBookable(session: Session, by: 'self' | 'staff'): Promise<void> {
+  if (session.status !== 'published') refuse('training.session.not-open', 'This session is not taking places.', { status: 409 })
+  if (by === 'staff') {
+    if (session.startsAt <= nowMs()) refuse('training.session.started', 'This session has started; add a walk-in instead.', { status: 409 })
+    return
+  }
+  if (session.signUp !== 'open') refuse('training.session.invited-only', 'Places on this session are given by whoever runs it.', { status: 403, remedy: 'Ask a trainer of the course for a place.' })
+  const closes = session.startsAt - (await useSetting('training.sessions.sign-up-closes-before') as number) * SECOND
+  if (nowMs() >= closes) refuse('training.session.sign-up-closed', 'Sign-up for this session has closed.', { status: 409, remedy: 'Ask a trainer of the course whether there is still room.' })
+}
+
+export interface Booking { sessionId: string, accountId: string, by: 'self' | 'staff' }
+
 /**
  * Gives a person a place (P1, P2): booked while a place is free, decided by the statement, or on the
  * waiting list when full and the list is on. `by` is 'self' for the person, 'staff' for anyone else.
  */
-export async function bookPlace(unit: UnitView, actor: Actor, sessionId: string, accountId: string, by: 'self' | 'staff'): Promise<{ placeId: string, state: 'booked' | 'waiting' }> {
+export async function bookPlace(unit: UnitView, actor: Actor, { sessionId, accountId, by }: Booking): Promise<{ placeId: string, state: 'booked' | 'waiting' }> {
   const session = await sessionOrRefuse(sessionId)
-  if (session.status !== 'published') refuse('training.session.not-open', 'This session is not taking places.', { status: 409 })
-  if (by === 'self') {
-    if (session.signUp !== 'open') refuse('training.session.invited-only', 'Places on this session are given by whoever runs it.', { status: 403, remedy: 'Ask a trainer of the course for a place.' })
-    const closes = session.startsAt - (await useSetting('training.sessions.sign-up-closes-before') as number) * SECOND
-    if (nowMs() >= closes) refuse('training.session.sign-up-closed', 'Sign-up for this session has closed.', { status: 409, remedy: 'Ask a trainer of the course whether there is still room.' })
-  }
-  else if (session.startsAt <= nowMs()) {
-    refuse('training.session.started', 'This session has started; add a walk-in instead.', { status: 409 })
-  }
+  await checkBookable(session, by)
   const person = await canonicalAccount(accountId)
   if (await placeFor(sessionId, person)) refuse('training.place.already', by === 'self' ? 'You already have a place on this session.' : 'They already have a place on this session.', { status: 409 })
   const id = newId('tplc')
   const at = nowMs()
-  const full = session.placesTaken >= session.capacity
-  if (full) {
-    if (!(await useSetting('training.sessions.waiting-list') as boolean)) refuse('training.session.full', 'This session is full.', { status: 409 })
+  const state = session.placesTaken >= session.capacity ? 'waiting' : 'booked'
+  if (state === 'waiting' && !(await useSetting('training.sessions.waiting-list') as boolean)) refuse('training.session.full', 'This session is full.', { status: 409 })
+  const notYet = `NOT EXISTS (SELECT 1 FROM training_session_places WHERE session_id = ?2 AND state != 'cancelled' AND account_id IN (${accountScopeSql('?3')}))`
+  if (state === 'waiting') {
     unit.add({
       sql: `INSERT INTO training_session_places (id, session_id, account_id, state, counted, waiting_since, added_by, created_at, updated_at)
-        SELECT ?1, ?2, ?3, 'waiting', 0, ?4, ?5, ?4, ?4 WHERE NOT EXISTS (SELECT 1 FROM training_session_places WHERE session_id = ?2 AND state != 'cancelled' AND account_id IN (${accountScopeSql('?3')})) /* not-policy: bound parameters */`,
+        SELECT ?1, ?2, ?3, 'waiting', 0, ?4, ?5, ?4, ?4 WHERE ${notYet} /* not-policy: bound parameters */`,
       params: [id, sessionId, person, at, actor.accountId ?? null],
     }).expect(1, { code: 'training.place.already', reason: 'There is already a place for this person on this session.' })
   }
@@ -277,15 +302,25 @@ export async function bookPlace(unit: UnitView, actor: Actor, sessionId: string,
     // The predicate on the statement takes the last place once; the loser is offered the waiting list (P2).
     unit.add({
       sql: `INSERT INTO training_session_places (id, session_id, account_id, state, counted, added_by, created_at, updated_at)
-        SELECT ?1, ?2, ?3, 'booked', 1, ?5, ?4, ?4 WHERE (SELECT places_taken < capacity FROM training_sessions WHERE id = ?2) /* not-policy: bound parameters */
-          AND NOT EXISTS (SELECT 1 FROM training_session_places WHERE session_id = ?2 AND state != 'cancelled' AND account_id IN (${accountScopeSql('?3')}))`,
+        SELECT ?1, ?2, ?3, 'booked', 1, ?5, ?4, ?4 WHERE (SELECT places_taken < capacity FROM training_sessions WHERE id = ?2) AND ${notYet} /* not-policy: bound parameters */`,
       params: [id, sessionId, person, at, actor.accountId ?? null],
     }).expect(1, { code: 'training.session.full', reason: 'The last place has just been taken.', remedy: 'Join the waiting list instead.' })
     await notify(unit, 'training.place-booked', { to: person, variables: { session: nameOf(session), when: await whenOf(session) }, dedupeKey: id, subject: ['training.session', sessionId] })
   }
-  unit.announce('training.place.booked', { placeId: id, sessionId, accountId: person, state: full ? 'waiting' : 'booked' }, { record: ['training.session', sessionId] })
-  unit.audit({ action: 'create', record: ['training.session', sessionId], detail: { place: id, account: person, state: full ? 'waiting' : 'booked', by } })
-  return { placeId: id, state: full ? 'waiting' : 'booked' }
+  unit.announce('training.place.booked', { placeId: id, sessionId, accountId: person, state }, { record: ['training.session', sessionId] })
+  unit.audit({ action: 'create', record: ['training.session', sessionId], detail: { place: id, account: person, state, by } })
+  return { placeId: id, state }
+}
+
+/** The person cancels their own place only until the deadline, or up to the start once promoted (P3). */
+async function checkOwnCancel(actor: Actor, place: Place, session: Session): Promise<void> {
+  if (!await samePerson(actor.accountId, place.accountId)) refuse('training.place.not-found', 'There is no such place.', { status: 404 })
+  if (place.state !== 'booked') return
+  const promoted = place.waitingSince !== null
+  const until = session.startsAt - (promoted ? 0 : (await useSetting('training.sessions.cancel-until') as number) * SECOND)
+  if (nowMs() < until) return
+  const trainer = (await sessionTrainers(session))[0]?.name
+  refuse('training.place.too-late', 'It is too late to cancel this place here.', { status: 409, remedy: trainer ? `Tell ${trainer}, who is running it.` : 'Tell whoever is running it.' })
 }
 
 /**
@@ -298,15 +333,7 @@ export async function cancelPlace(unit: UnitView, actor: Actor, placeId: string,
   const session = await sessionOrRefuse(place.sessionId)
   if (place.state !== 'booked' && place.state !== 'waiting') refuse('training.place.not-open', 'This place is already cancelled or marked.', { status: 409 })
   if (session.status !== 'published' || session.startsAt <= nowMs()) refuse('training.session.started', 'This session has started or closed, so its places are marked, not cancelled.', { status: 409 })
-  if (by === 'self') {
-    if (!await samePerson(actor.accountId, place.accountId)) refuse('training.place.not-found', 'There is no such place.', { status: 404 })
-    const promoted = place.state === 'booked' && place.waitingSince !== null
-    const until = session.startsAt - (promoted ? 0 : (await useSetting('training.sessions.cancel-until') as number) * SECOND)
-    if (place.state === 'booked' && nowMs() >= until) {
-      const trainer = (await sessionTrainers(session))[0]?.name
-      refuse('training.place.too-late', 'It is too late to cancel this place here.', { status: 409, remedy: trainer ? `Tell ${trainer}, who is running it.` : 'Tell whoever is running it.' })
-    }
-  }
+  if (by === 'self') await checkOwnCancel(actor, place, session)
   const at = nowMs()
   unit.add({
     sql: 'UPDATE training_session_places SET state = \'cancelled\', counted = 0, cancelled_at = ?, cancel_kind = ?, updated_at = ? WHERE id = ? AND state IN (\'booked\', \'waiting\')',
@@ -332,9 +359,27 @@ async function sessionStepsOf(session: Session): Promise<string[]> {
 }
 
 /** Writes the attendance sign-offs for one attended place and evaluates the award (S6). */
-async function signAttendance(unit: UnitView, actor: Actor, course: Course, session: Session, place: { id: string, accountId: string }, steps: string[], day: string): Promise<string | null> {
+interface Attendance { actor: Actor, course: Course, place: { id: string, accountId: string }, steps: string[], day: string }
+
+async function signAttendance(unit: UnitView, { actor, course, place, steps, day }: Attendance): Promise<string | null> {
   const pending: PendingSignOff[] = steps.map(stepId => addSignOff(unit, { accountId: place.accountId, courseId: course.id, stepId, kind: 'attendance', signedBy: actor.accountId ?? null, occurredOn: day, placeId: place.id }))
   return pending.length ? evaluateAward(unit, course, await canonicalAccount(place.accountId), pending) : null
+}
+
+/** Voids the attendance sign-offs of a place marked absent after attended (S6). */
+async function voidAttendance(unit: UnitView, actor: Actor, courseId: string, place: Place): Promise<void> {
+  const signed = await all<{ id: string }>(
+    'SELECT id FROM training_sign_offs s WHERE place_id = ? AND kind = \'attendance\' AND NOT EXISTS (SELECT 1 FROM training_sign_offs v WHERE v.voids_id = s.id)',
+    place.id,
+  )
+  if (!signed.length) return
+  const at = nowMs()
+  unit.add({
+    sql: `INSERT INTO training_sign_offs (id, account_id, course_id, step_id, kind, signed_by, occurred_on, voids_id, note, created_at)
+      SELECT j.value ->> 'void', s.account_id, s.course_id, s.step_id, 'void', ?, ?, s.id, 'Marked absent', ? FROM json_each(?) j JOIN training_sign_offs s ON s.id = j.value ->> 'id'`,
+    params: [actor.accountId ?? null, await theatreDay(at), at, JSON.stringify(signed.map(r => ({ id: r.id, void: newId('tsof') })))],
+  }).expect(signed.length)
+  for (const row of signed) unit.announce('training.sign-off.voided', { signOffId: row.id, accountId: place.accountId, courseId }, { record: ['training.course', courseId] })
 }
 
 /**
@@ -361,22 +406,11 @@ export async function markAttendance(unit: UnitView, actor: Actor, sessionId: st
       params: [mark.state, actor.accountId ?? null, at, at, place.id, place.state],
     }).expect(1, { code: 'training.place.changed', reason: 'Someone else marked this place meanwhile.', remedy: 'Reload and try again.' })
     if (mark.state === 'attended') {
-      const recordId = await signAttendance(unit, actor, course, session, place, steps, day)
+      const recordId = await signAttendance(unit, { actor, course, place, steps, day })
       if (recordId) awarded.push(recordId)
     }
     else if (place.state === 'attended') {
-      const signed = await all<{ id: string }>(
-        'SELECT id FROM training_sign_offs s WHERE place_id = ? AND kind = \'attendance\' AND NOT EXISTS (SELECT 1 FROM training_sign_offs v WHERE v.voids_id = s.id)',
-        place.id,
-      )
-      if (signed.length) {
-        unit.add({
-          sql: `INSERT INTO training_sign_offs (id, account_id, course_id, step_id, kind, signed_by, occurred_on, voids_id, note, created_at)
-            SELECT j.value ->> 'void', s.account_id, s.course_id, s.step_id, 'void', ?, ?, s.id, 'Marked absent', ? FROM json_each(?) j JOIN training_sign_offs s ON s.id = j.value ->> 'id'`,
-          params: [actor.accountId ?? null, await theatreDay(at), at, JSON.stringify(signed.map(r => ({ id: r.id, void: newId('tsof') })))],
-        }).expect(signed.length)
-        for (const row of signed) unit.announce('training.sign-off.voided', { signOffId: row.id, accountId: place.accountId, courseId: course.id }, { record: ['training.course', course.id] })
-      }
+      await voidAttendance(unit, actor, course.id, place)
     }
   }
   unit.audit({ action: 'update', record: ['training.session', sessionId], detail: { marked: marks.length } })
@@ -400,7 +434,7 @@ export async function addWalkIn(unit: UnitView, actor: Actor, sessionId: string,
     params: [id, sessionId, accountId, actor.accountId ?? null, at],
   }).expect(1, { code: 'training.session.full', reason: 'This session is full.', remedy: 'Raise its capacity first if the room allows.' })
   const course = await courseOrRefuse(session.courseId)
-  const recordId = await signAttendance(unit, actor, course, session, { id, accountId }, await sessionStepsOf(session), await theatreDay(session.startsAt))
+  const recordId = await signAttendance(unit, { actor, course, place: { id, accountId }, steps: await sessionStepsOf(session), day: await theatreDay(session.startsAt) })
   unit.announce('training.place.booked', { placeId: id, sessionId, accountId, state: 'attended' }, { record: ['training.session', sessionId] })
   unit.audit({ action: 'create', record: ['training.session', sessionId], detail: { place: id, account: accountId, state: 'attended', by: 'walk-in' } })
   return { placeId: id, accountId, recordId }
