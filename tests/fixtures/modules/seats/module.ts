@@ -17,6 +17,7 @@ export default defineModule({
     'settings.manage': ability({ risk: 'privileged', implies: ['orders.sell'] }),
     'members.look-up': ability({ audit: 'read' }),
     'orders.find': ability({ impliable: true }),
+    'figures.view': ability({ on: 'core.production' }),
   }),
   facts: defineFacts('seats', { regular: factDecl(), performer: factDecl({ on: 'seats.performance', pin: true }) }),
   tables,
@@ -44,6 +45,7 @@ export default defineModule({
     // A file the server makes for a performance, readable only through core.file-access.
     'core.file-slot': [{ id: 'seats.door-list', owner: 'seats.performance', ability: 'seats.settings.manage', accepts: ['json'], limit: 'core.files.brand-limit', access: 'record', textClass: 'personal', clean: false, source: 'server' }],
     'core.file-access': [{ id: 'seats.performance', file: 'seats-performance' }],
+    'core.measure': [{ id: 'seats.sold', file: 'sold' }, { id: 'seats.capacity', file: 'capacity' }, { id: 'seats.fill', file: 'fill' }, { id: 'seats.takings', file: 'takings' }],
     'core.operating-day': [{ id: 'seats.performances', table: 'seats_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],
   },
 })
