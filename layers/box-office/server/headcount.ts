@@ -73,9 +73,42 @@ function insert(unit: UnitView, performanceId: string, row: { id: string, kind: 
 }
 
 /** Announces a full house the first time the people inside reach capacity. */
-function announceFull(unit: UnitView, performanceId: string, before: Tally, after: Tally, capacity: number | null): void {
+function announceFull(unit: UnitView, full: { performanceId: string, before: Tally, after: Tally, capacity: number | null }): void {
+  const { performanceId, before, after, capacity } = full
   if (capacity && before.peak < capacity && after.inside >= capacity)
     unit.announce('box-office.headcount.full', { performanceId, inside: after.inside, capacity }, { record: ['core.performance', performanceId] })
+}
+
+interface Taking {
+  unit: ReturnType<typeof createUnit>
+  performanceId: string
+  options: { deviceLabel: string | null, offline: boolean }
+  window: number
+  outOffered: boolean
+  added: Tap[]
+  undoing: Set<string>
+}
+
+async function takeUndo(taking: Taking, item: Extract<TapItem, { kind: 'undo' }>): Promise<TapResult> {
+  const { performanceId, added, undoing } = taking
+  const fresh = added.find(t => t.id === item.reversesId)
+  const found = fresh
+    ? (undoing.has(fresh.id) ? { problem: 'already-undone' as const } : { tap: { id: fresh.id, performance_id: performanceId, kind: fresh.kind, quantity: fresh.quantity, reverses_id: null, tapped_at: fresh.tappedAt } })
+    : await undoable(performanceId, item.reversesId, undoing)
+  if ('problem' in found) return found.problem
+  if (item.at - Number(found.tap.tapped_at) > taking.window) return 'too-late'
+  undoing.add(found.tap.id)
+  const quantity = Number(found.tap.quantity)
+  insert(taking.unit.view(), performanceId, { id: item.id, kind: 'undo', quantity, reversesId: found.tap.id, deviceLabel: taking.options.deviceLabel, at: item.at, offline: taking.options.offline })
+  added.push({ id: item.id, kind: 'undo', quantity, reversesId: found.tap.id, tappedAt: item.at })
+  return 'counted'
+}
+
+function takePress(taking: Taking, item: Exclude<TapItem, { kind: 'undo' }>): TapResult {
+  if (item.kind === 'out' && !taking.outOffered) return 'out-not-offered'
+  insert(taking.unit.view(), taking.performanceId, { id: item.id, kind: item.kind, quantity: item.quantity, reversesId: null, deviceLabel: taking.options.deviceLabel, at: item.at, offline: taking.options.offline })
+  taking.added.push({ id: item.id, kind: item.kind, quantity: item.quantity, reversesId: null, tappedAt: item.at })
+  return 'counted'
 }
 
 /**
@@ -83,52 +116,20 @@ function announceFull(unit: UnitView, performanceId: string, before: Tally, afte
  * undo reverses a press within the undo window, measured by the device's clock.
  */
 export async function takeTaps(performanceId: string, items: TapItem[], options: { deviceLabel: string | null, offline: boolean }): Promise<{ results: { id: string, result: TapResult }[], headcount: Headcount }> {
-  const outOffered = await countsOut(performanceId)
   const window = (await useSetting('box-office.door.undo-within') as number) * 1000 // not-policy: seconds to milliseconds
-  const ids = items.map(i => i.id)
-  const seen = new Set((await all<{ id: string }>('SELECT id FROM box_office_headcount_taps WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(ids))).map(r => r.id))
+  const seen = new Set((await all<{ id: string }>('SELECT id FROM box_office_headcount_taps WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(items.map(i => i.id)))).map(r => r.id))
   const capacity = await capacityOf(performanceId)
   const existing = (await tapsOf([performanceId])).get(performanceId) ?? []
-  const before = tally(existing)
-  const unit = createUnit()
-  const added: Tap[] = []
-  const undoing = new Set<string>()
+  const taking: Taking = { unit: createUnit(), performanceId, options, window, outOffered: await countsOut(performanceId), added: [], undoing: new Set() }
   const results: { id: string, result: TapResult }[] = []
   for (const item of [...items].sort((a, b) => a.at - b.at)) {
-    if (seen.has(item.id)) {
-      results.push({ id: item.id, result: 'sent' })
-      continue
-    }
+    const repeated = seen.has(item.id)
     seen.add(item.id)
-    if (item.kind === 'undo') {
-      const fresh = added.find(t => t.id === item.reversesId)
-      const found = fresh
-        ? (undoing.has(fresh.id) ? { problem: 'already-undone' as const } : { tap: { id: fresh.id, performance_id: performanceId, kind: fresh.kind, quantity: fresh.quantity, reverses_id: null, tapped_at: fresh.tappedAt } })
-        : await undoable(performanceId, item.reversesId, undoing)
-      if ('problem' in found) {
-        results.push({ id: item.id, result: found.problem })
-        continue
-      }
-      if (item.at - Number(found.tap.tapped_at) > window) {
-        results.push({ id: item.id, result: 'too-late' })
-        continue
-      }
-      undoing.add(found.tap.id)
-      insert(unit.view(), performanceId, { id: item.id, kind: 'undo', quantity: Number(found.tap.quantity), reversesId: found.tap.id, deviceLabel: options.deviceLabel, at: item.at, offline: options.offline })
-      added.push({ id: item.id, kind: 'undo', quantity: Number(found.tap.quantity), reversesId: found.tap.id, tappedAt: item.at })
-    }
-    else {
-      if (item.kind === 'out' && !outOffered) {
-        results.push({ id: item.id, result: 'out-not-offered' })
-        continue
-      }
-      insert(unit.view(), performanceId, { id: item.id, kind: item.kind, quantity: item.quantity, reversesId: null, deviceLabel: options.deviceLabel, at: item.at, offline: options.offline })
-      added.push({ id: item.id, kind: item.kind, quantity: item.quantity, reversesId: null, tappedAt: item.at })
-    }
-    results.push({ id: item.id, result: 'counted' })
+    const result = repeated ? 'sent' : item.kind === 'undo' ? await takeUndo(taking, item) : takePress(taking, item)
+    results.push({ id: item.id, result })
   }
-  announceFull(unit.view(), performanceId, before, tally([...existing, ...added]), capacity)
-  await unit.commit()
+  announceFull(taking.unit.view(), { performanceId, before: tally(existing), after: tally([...existing, ...taking.added]), capacity })
+  await taking.unit.commit()
   return { results, headcount: (await headcountFor([performanceId]))[performanceId]! }
 }
 
