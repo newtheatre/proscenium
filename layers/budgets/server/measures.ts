@@ -68,24 +68,28 @@ export async function spent(query: MeasureQuery): Answer {
   const by = query.by.filter(k => k !== 'month')
   const months = byMonth ? monthsOf(query.from, query.to) : [{ month: '', from: query.from, to: query.to }]
   const rows: MeasureRow[] = []
-  for (const budget of budgets) {
-    const lines = (await budgetLines(budget)).lines.filter(l => l.kind === 'expense')
-    for (const m of months) {
-      const range = await rangeOf(m.from, m.to)
-      const totals = await budgetLineTotals(lines.map(l => l.id), { from: range.startsAt, to: range.endsAt })
-      for (const line of lines) {
-        const keys = keysOf(budget, line.id, by)
-        const amount = totals.get(line.id) ?? 0
-        if (keys && amount) collect(rows, byMonth ? { ...keys, month: m.month } : keys, budget.currency, amount)
-      }
-    }
-  }
+  for (const budget of budgets) await spentOn(rows, budget, { months, by, byMonth })
   return { rows }
 }
 
+async function spentOn(rows: MeasureRow[], budget: Budget, on: { months: Month[], by: readonly string[], byMonth: boolean }) {
+  const lines = (await budgetLines(budget)).lines.filter(l => l.kind === 'expense')
+  for (const m of on.months) {
+    const range = await rangeOf(m.from, m.to)
+    const totals = await budgetLineTotals(lines.map(l => l.id), { from: range.startsAt, to: range.endsAt })
+    for (const line of lines) {
+      const keys = keysOf(budget, line.id, on.by)
+      const amount = totals.get(line.id) ?? 0
+      if (keys && amount) collect(rows, on.byMonth ? { ...keys, month: m.month } : keys, budget.currency, amount)
+    }
+  }
+}
+
+type Month = { month: string, from: string, to: string }
+
 /** The period's calendar months, each clipped to the period. */
-function monthsOf(from: string, to: string): { month: string, from: string, to: string }[] {
-  const out: { month: string, from: string, to: string }[] = []
+function monthsOf(from: string, to: string): Month[] {
+  const out: Month[] = []
   const month = (date: string) => date.slice(0, 7) // not-policy: the YYYY-MM of an ISO date
   let first = `${month(from)}-01`
   while (first <= to) {
