@@ -71,6 +71,8 @@ interface Production {
   /** Absent from an answer cached before venues were added. */
   venues?: VenueSummary[]
   price: PriceSummaryView | null
+  /** A season's own words (C-67); absent from an answer cached before they were added. */
+  wording?: Record<string, string> | null
   /** Other modules' parts of the page (C-69, C-75) and the base it lives at while one moves it (C-73). */
   sections?: { id: string, component: string }[]
   lines?: { text: string, placement: 'under-title' | 'credits' | 'footer' }[]
@@ -91,6 +93,7 @@ const here = 'moved' in data.value ? null : data.value
 const prefix = here ? (here.base || (here.past ? 'shows' : 'whats-on')) : props.prefix
 if (moved || prefix !== props.prefix) await navigateTo(`/${prefix}/${moved ?? props.slug}`, { replace: true, redirectCode: 302 })
 const production = computed(() => (data.value && !('moved' in data.value) ? data.value : null))
+const { word } = usePublicWords(() => production.value?.wording)
 const creditLines = computed(() => production.value?.lines?.some(l => l.placement === 'credits') ?? false)
 const priceLine = computed(() => production.value?.price ? priceSummary(production.value.price, t) : '')
 
@@ -450,20 +453,20 @@ useHead(() => {
               v-if="!production.effects.length && production.effectsConfirmedNone && !production.advisories.length && production.advisoriesConfirmedNone"
               class="text-sm text-muted"
             >
-              {{ t('public-site.production.no-advisories') }}
+              {{ t('public-site.production.no-advisories', { production: word('production') }) }}
             </p>
             <template v-else>
               <p
                 v-if="!production.effects.length && production.effectsConfirmedNone"
                 class="text-sm text-muted"
               >
-                {{ t('public-site.production.no-effects') }}
+                {{ t('public-site.production.no-effects', { production: word('production') }) }}
               </p>
               <p
                 v-if="!production.advisories.length && production.advisoriesConfirmedNone"
                 class="text-sm text-muted"
               >
-                {{ t('public-site.production.no-warnings') }}
+                {{ t('public-site.production.no-warnings', { production: word('production') }) }}
               </p>
             </template>
           </div>
@@ -508,7 +511,7 @@ useHead(() => {
                         v-if="p.effectsOff.length && p.state === 'scheduled'"
                         class="text-sm"
                       >
-                        {{ t('public-site.production.effects-off', { effects: p.effectsOff.join(', ') }) }}
+                        {{ t('public-site.production.effects-off', { effects: p.effectsOff.join(', '), performance: word('performance') }) }}
                       </p>
                       <LatecomersNote
                         v-if="differs(p)"
@@ -517,7 +520,7 @@ useHead(() => {
                       <ul
                         v-if="p.access.length"
                         class="flex flex-wrap gap-1"
-                        :aria-label="t('public-site.production.access')"
+                        :aria-label="t('public-site.production.access', { performance: word('performance') })"
                       >
                         <li
                           v-for="a in p.access"
@@ -566,7 +569,7 @@ useHead(() => {
                         v-if="forDate(p).length && p.state !== 'cancelled'"
                         class="text-sm text-muted"
                       >
-                        {{ t('public-site.production.on-this-date', { credits: people(forDate(p)) }) }}
+                        {{ t('public-site.production.on-this-date', { credits: people(forDate(p)), performance: word('performance') }) }}
                       </p>
                     </div>
                     <span
@@ -670,7 +673,7 @@ useHead(() => {
                 id="about-heading"
                 class="text-lg font-semibold text-highlighted"
               >
-                {{ t('public-site.production.about') }}
+                {{ t('public-site.production.about', { production: word('production') }) }}
               </h2>
               <MarkdownText :text="production.description" />
             </section>
