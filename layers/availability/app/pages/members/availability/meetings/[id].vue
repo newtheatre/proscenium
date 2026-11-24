@@ -125,6 +125,13 @@ async function saved() {
                 :aria-pressed="d.mine === 'not-going'"
                 @click="answer('not-going')"
               />
+              <UButton
+                icon="i-lucide-calendar-days"
+                :label="t('availability.meeting.on-my-week')"
+                :to="{ path: '/members/availability', query: { from: d.local.date } }"
+                color="neutral"
+                variant="link"
+              />
             </div>
           </PageSection>
           <PageSection :title="t('availability.meeting.invited')">
