@@ -86,3 +86,6 @@ export const routesInput = z.object({
     items: z.array(routeItem).max(10), // not-policy: a route of more than ten items is a different competency
   })).max(10), // not-policy: R5 offers three; ten keeps the screen readable
 })
+
+/** A route that takes no body. */
+export const noInput = z.object({}).strict()

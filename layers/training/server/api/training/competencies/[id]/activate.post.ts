@@ -1,15 +1,12 @@
-// Makes a competency active; making it active needs an active route with an item (R1).
+// Makes a competency active; it needs an active route with an item to hold it by (R1).
 import { getRouterParam } from 'h3'
-import { z } from 'zod'
 import { defineRoute } from '#kit'
-import { setCompetencyStatus } from '../../../../competencies'
+import { activateCompetency } from '../../../../competencies'
+import { noInput } from '../../../../inputs'
 
 export default defineRoute({
   ability: 'training.competency.manage',
   record: event => ['training.competency', getRouterParam(event, 'id')],
   rateLimit: 'write',
-  input: z.object({}).strict(),
-}, async (_event, { record, unit }) => {
-  await setCompetencyStatus(unit.view(), record!.id, 'active')
-  return { competencyId: record!.id }
-})
+  input: noInput,
+}, (_event, { record, unit }) => activateCompetency(unit.view(), record!.id))
