@@ -1,0 +1,12 @@
+{
+  "occupancy.module.name": "Occupancy",
+  "occupancy.module.description": "The shared view of when each space is taken: performances, closures, room bookings, rehearsal calls and pencilled slots, on one grid. It has no switch: it comes on with Programme planning, Spaces or Rehearsals, whichever is on.",
+  "occupancy.grid.space": "Space",
+  "occupancy.grid.busy": "Busy",
+  "occupancy.grid.nothing": "Nothing in this period.",
+  "occupancy.kinds.performance-scheduled": "Scheduled",
+  "occupancy.kinds.performance-draft": "Draft",
+  "occupancy.kinds.closure": "Closed",
+  "occupancy.kinds.public-holiday": "Holiday",
+  "occupancy.kinds.other": "In use"
+}

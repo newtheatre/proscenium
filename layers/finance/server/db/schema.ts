@@ -66,6 +66,9 @@ export const postings = defineTable('finance_postings', {
   occurredAt: col.timestamp('occurred_at').notNull(),
   postedAt: col.timestamp('posted_at').notNull(),
   postedBy: col.account('posted_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  // Why a transfer was posted, from ledger.ts PURPOSES, checked in postEntries. A column rather than
+  // new kinds, so the append-only table is never rebuilt (Budgets and claims, part 4).
+  purpose: col.internal(text('purpose')),
 }, {
   id: 'post',
   realm: 'operational',
@@ -96,6 +99,8 @@ export const entries = defineTable('finance_entries', {
   performanceId: col.internal(text('performance_id')),
   taxCode: col.internal(text('tax_code').notNull().default('none')),
   taxMinor: col.minor('tax_minor').notNull().default(0),
+  // The budget line this entry is spent against: opaque here, like production_id. Budgets owns it.
+  budgetLineId: col.internal(text('budget_line_id')),
   createdAt: col.createdAt(),
 }, {
   id: 'led',
@@ -107,6 +112,8 @@ export const entries = defineTable('finance_entries', {
     index('finance_entries_account').on(t.accountId),
     index('finance_entries_production').on(t.productionId).where(sql`production_id IS NOT NULL`),
     index('finance_entries_performance').on(t.performanceId).where(sql`performance_id IS NOT NULL`),
+    index('finance_entries_budget_line').on(t.budgetLineId).where(sql`budget_line_id IS NOT NULL`),
+    index('finance_entries_tax_code').on(t.taxCode).where(sql`tax_code <> 'none'`),
     check('finance_entries_amount', sql`${t.amountMinor} <> 0`),
     check('finance_entries_tax', sql`${t.taxCode} <> 'none' OR ${t.taxMinor} = 0`),
   ],
@@ -149,12 +156,17 @@ export const periodCloses = defineTable('finance_period_closes', {
   ],
 })
 
-/** Tax codes. The first release ships only `none`; the columns are here so tax needs no ledger migration. */
+/**
+ * Tax codes (F-A2): `none` for a theatre that is not registered, and the VAT codes beside it. A code's
+ * rate never changes once an entry uses it (a trigger); a new rate is a new code.
+ */
 export const taxCodes = defineTable('finance_tax_codes', {
   code: col.internal(text('code').primaryKey()),
   label: col.internal(text('label').notNull()),
   rateBasisPoints: col.internal(integer('rate_basis_points').notNull().default(0)),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  // Whether a sale under this code goes on a VAT return at all: false for `none` and `outside`.
+  inScope: col.internal(integer('in_scope', { mode: 'boolean' }).notNull().default(true)),
 }, {
   realm: 'operational',
   subject: 'none',

@@ -49,12 +49,19 @@ try {
     }
     created = readdirSync(out).filter(name => !before.has(name))
   }
-  const { appendOnlyTriggers } = await jiti.import<any>(join(KIT, 'db.ts'))
+  const { appendOnlyTriggers, withoutRowidSql } = await jiti.import<any>(join(KIT, 'db.ts'))
   const { searchIndexStatements, dropSearchIndexStatements, searchIndexMarker } = await jiti.import<any>(join(KIT, 'search.ts'))
   for (const folder of created) {
     const file = join(out, folder, 'migration.sql')
     let sql = readFileSync(file, 'utf8')
     if (sql.split('\n').every(line => !line.trim() || line.trim().startsWith('--'))) sql = '' // a custom migration's placeholder comment
+    // Drizzle Kit cannot write WITHOUT ROWID (R3-23), so it is added to every statement making such a table.
+    const rowless = [...(registry.tables as Map<string, any>)].filter(([, { meta, module }]) => meta.options.withoutRowid && modules.find((m: any) => m.manifest.id === module)?.found.owner === owner).map(([name]) => name)
+    const marked = withoutRowidSql(sql, rowless)
+    if (marked !== sql) {
+      sql = marked
+      writeFileSync(file, sql)
+    }
     const extra: string[] = []
     for (const [name, { meta, module }] of registry.tables as Map<string, any>) {
       if (modules.find((m: any) => m.manifest.id === module)?.found.owner !== owner) continue

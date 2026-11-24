@@ -1,6 +1,6 @@
 // Tables and the data class of every column. `defineTable` refuses a column that is not wrapped in
 // one of the `col.*` helpers, so a column with no class cannot be written (F-03).
-import { integer, sqliteTableCreator, text, customType } from 'drizzle-orm/sqlite-core'
+import { integer, sqliteTableCreator, text, customType, getTableConfig } from 'drizzle-orm/sqlite-core'
 import type { SQLiteColumnBuilder } from 'drizzle-orm/sqlite-core'
 import { DeclarationError } from './refusal'
 import { ID_PREFIX, newId } from './ids'
@@ -48,6 +48,13 @@ export interface TableOptions {
   onErasure?: 'keep-row' | 'delete-row'
   /** Indexes and other table extras, given the built columns. */
   extra?: (table: any) => any[]
+  /**
+   * false: the table keeps no times, so its rows cannot be dated (a secret ballot, R3-23). It may
+   * hold no timestamp or date column, its ids are random and it has no retention.
+   */
+  timestamps?: false
+  /** true: made WITHOUT ROWID, so storage order follows the primary key, not insertion (R3-23). */
+  withoutRowid?: true
 }
 
 export interface TableMeta {
@@ -254,9 +261,20 @@ export function defineTable<TName extends string, TColumns extends Record<string
       if (c.meta.account && c.meta.account.onMerge !== 'alias') throw new DeclarationError(field(key), "an append-only table cannot be rewritten by a merge, so its account columns use onMerge: 'alias'")
     }
   }
+  if (options.timestamps !== undefined) {
+    if (options.timestamps !== false) throw new DeclarationError(field('timestamps'), 'is false or left out; a table keeps times unless it says otherwise')
+    for (const [key, c] of Object.entries(metas)) {
+      if (c.meta.helper === 'timestamp' || c.meta.helper === 'localDate') throw new DeclarationError(field(key), 'this table keeps no times (timestamps: false), so it may hold no timestamp or date column')
+    }
+    if (idColumn && !options.random) throw new DeclarationError(field('random'), 'a table that keeps no times needs random: true, since a time-sorted id dates its row')
+    if (options.retention !== undefined) throw new DeclarationError(field('retention'), 'a table that keeps no times cannot tell how old a row is, so it has no retention; its module removes rows with what they belong to')
+  }
+  if (options.withoutRowid !== undefined && options.withoutRowid !== true) throw new DeclarationError(field('withoutRowid'), 'is true or left out')
   if (typeof realm === 'object' && !all.some(c => c.sql === realm.column)) throw new DeclarationError(field('realm'), `realm column "${realm.column}" is not a column of this table`)
 
   const table = snakeTable(name, columns, options.extra as any)
+  if (options.withoutRowid && !getTableConfig(table as any).columns.some(c => c.primary) && !getTableConfig(table as any).primaryKeys.length)
+    throw new DeclarationError(field('withoutRowid'), 'a WITHOUT ROWID table needs a primary key, such as col.id()')
   const meta: TableMeta = { name, options, columns: metas, subjects }
   ;(table as any)[TABLE] = meta
   tables.set(name, table)
@@ -296,4 +314,17 @@ export function appendOnlyTriggers(meta: TableMeta): { name: string, sql: string
     { name: `${t}_append_only_delete`, sql: `CREATE TRIGGER ${quote(`${t}_append_only_delete`)} BEFORE DELETE ON ${quote(t)} BEGIN SELECT RAISE(ABORT, 'append-only: ${t}'); END;` },
     { name: `${t}_append_only_update`, sql: `CREATE TRIGGER ${quote(`${t}_append_only_update`)} BEFORE UPDATE ON ${quote(t)} WHEN NOT (${conditions.join(' AND ')}) BEGIN SELECT RAISE(ABORT, 'append-only: ${t}'); END;` },
   ]
+}
+
+/**
+ * Adds WITHOUT ROWID to each statement in a migration that makes one of `names`, including Drizzle
+ * Kit's rebuild (`__new_<name>`), which knows nothing of the option. Safe to run twice.
+ */
+export function withoutRowidSql(sql: string, names: readonly string[]): string {
+  let out = sql
+  for (const name of names) {
+    const make = new RegExp(`(CREATE TABLE \`(?:__new_)?${name}\` \\((?:[^;]|;(?!\\s*(?:\\n|$)))*?\\n\\))(;)`, 'g')
+    out = out.replace(make, (_all, body: string, end: string) => `${body} WITHOUT ROWID${end}`)
+  }
+  return out
 }

@@ -38,8 +38,9 @@ const side = computed<NavigationMenuItem[][]>(() => {
     badge: m.on && (m.missingSecrets.length || m.credentials.some(c => c.needed === 'always' && !c.set)) ? { icon: 'i-lucide-triangle-alert', color: 'warning', variant: 'subtle' } : undefined,
   })
   return [
-    { label: t('core.modules.group.on'), list: all.filter(m => m.on && !m.alwaysOn) },
-    { label: t('core.modules.group.available'), list: all.filter(m => !m.on && !m.alwaysOn) },
+    { label: t('core.modules.group.on'), list: all.filter(m => m.on && !m.alwaysOn && !m.support) },
+    { label: t('core.modules.group.available'), list: all.filter(m => !m.on && !m.alwaysOn && !m.support) },
+    { label: t('core.modules.group.support'), list: all.filter(m => m.support) },
     { label: t('core.modules.group.always-on'), list: all.filter(m => m.alwaysOn) },
   ].filter(g => g.list.length).map(g => [{ label: g.label, type: 'label' as const }, ...g.list.map(link)])
 })
@@ -87,8 +88,12 @@ const side = computed<NavigationMenuItem[][]>(() => {
         </span>
       </template>
       <template #primary>
+        <span
+          v-if="view?.support"
+          class="text-sm text-muted"
+        >{{ t(view.on ? 'core.modules.state.on' : 'core.modules.state.off') }}</span>
         <USwitch
-          v-if="view && data?.manage && !view.alwaysOn"
+          v-if="view && data?.manage && !view.alwaysOn && !view.support"
           :model-value="view.on"
           :label="t(view.on ? 'core.modules.state.on' : 'core.modules.state.off')"
           :loading="busy === view.id"
