@@ -26,6 +26,8 @@ function describe(b: Row) {
 function spent(b: Row) {
   return t('budgets.screens.list.spent-of', { spent: text.money(b.totals.actualMinor + b.totals.committedMinor, b.currency), budgeted: text.money(b.totals.budgetedMinor, b.currency) })
 }
+// The year's budgets and every line's figures as a spreadsheet (BC-37).
+const exportMenu = computed(() => [{ label: t('budgets.screens.list.export'), icon: 'i-lucide-download', to: `/api/budgets/export.csv${year.value ? `?year=${year.value}` : ''}`, external: true }])
 const over = (b: Row) => b.totals.remainingMinor < 0
 const share = (b: Row) => b.totals.budgetedMinor ? Math.min(100, Math.round(100 * (b.totals.actualMinor + b.totals.committedMinor) / b.totals.budgetedMinor)) : 0 // not-policy: a percentage
 </script>
@@ -34,8 +36,8 @@ const share = (b: Row) => b.totals.budgetedMinor ? Math.min(100, Math.round(100 
   <PageFrame :title="t('budgets.navigation.budgets.label')">
     <template #primary>
       <PageActions
-        v-if="data?.canManage"
-        :actions="[{ label: t('budgets.screens.new.title'), icon: 'i-lucide-plus', onSelect: () => { creating = true } }]"
+        :actions="data?.canManage ? [{ label: t('budgets.screens.new.title'), icon: 'i-lucide-plus', onSelect: () => { creating = true } }] : []"
+        :menu="exportMenu"
       />
     </template>
     <template #toolbar>

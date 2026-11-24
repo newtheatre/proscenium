@@ -3,7 +3,7 @@ import { getRouterParam } from 'h3'
 import { can, defineRoute, refuse, today } from '#kit'
 import { previousDate } from '#kit/clock'
 import { getPeriod } from '../../../periods'
-import { closeBlockers, periodTotals } from '../../../close'
+import { closeBlockers, closeWarnings, periodTotals } from '../../../close'
 import { balances } from '../../../ledger'
 
 export default defineRoute({
@@ -18,6 +18,8 @@ export default defineRoute({
   return {
     period: { ...period!, ...(await periodTotals(period!.id)) },
     blockers: await closeBlockers(period!),
+    // Worth knowing before closing, such as claims still to come; these never stop it.
+    warnings: await closeWarnings(period!),
     // Where the period's money came from and went: each income and expense account that moved,
     // as a positive figure (income is credits less debits, an expense debits less credits).
     movement: moved

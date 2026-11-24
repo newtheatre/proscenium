@@ -7,6 +7,7 @@ import { accountLabel } from '#modules/core'
 import { toCsv } from '#modules/finance'
 import { getClaim, isClaimant, logEvent } from './claims'
 import { tellClaimant } from './claim-decisions'
+import { major } from './money'
 
 interface Part { disbursementId: string, ownerRecord: string, amountMinor: number, currency: string }
 
@@ -81,12 +82,6 @@ const SCHEDULE_COLUMNS = [
   { key: 'amount', label: 'Amount' },
   { key: 'receipts', label: 'Receipts' },
 ] as const
-
-/** Minor units as the currency's major units, such as 12.50, for a spreadsheet. */
-function major(minor: number, currency: string): string {
-  const digits = new Intl.NumberFormat('en-GB', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2 // not-policy: a currency's own digits
-  return (minor / 10 ** digits).toFixed(digits) // not-policy: minor units to major
-}
 
 /**
  * BC-32: the parent body's schedule, one row per approved item of each claim it pays that is still

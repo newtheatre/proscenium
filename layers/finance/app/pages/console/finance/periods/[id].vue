@@ -15,7 +15,7 @@ const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const id = computed(() => String(route.params.id))
-const { data, status, error, refresh } = await useAPI<{ period: Period, blockers: Blocker[], movement: Movement[], held?: Held[], ended?: boolean, closableFrom?: string, canClose: boolean, canReopen: boolean }>(() => `/api/finance/periods/${id.value}`, { key: `finance:period:${id.value}` })
+const { data, status, error, refresh } = await useAPI<{ period: Period, blockers: Blocker[], warnings?: Blocker[], movement: Movement[], held?: Held[], ended?: boolean, closableFrom?: string, canClose: boolean, canReopen: boolean }>(() => `/api/finance/periods/${id.value}`, { key: `finance:period:${id.value}` })
 const { dayLong: dateOf } = useDates()
 
 // The chart is in the theatre's own currency; anything in another stays in the list beneath it.
@@ -191,6 +191,34 @@ async function reopen() {
                 <span v-else>{{ b.sentence }}</span>
               </li>
             </ul>
+            <div
+              v-if="loaded.warnings?.length"
+              class="mt-4 space-y-2"
+            >
+              <p class="text-sm text-muted">
+                {{ t('finance.screens.period.warnings') }}
+              </p>
+              <ul class="space-y-2">
+                <li
+                  v-for="(w, i) in loaded.warnings"
+                  :key="i"
+                  class="flex items-start gap-2"
+                >
+                  <UIcon
+                    name="i-lucide-info"
+                    class="mt-0.5 shrink-0 text-info"
+                  />
+                  <ULink
+                    v-if="w.to"
+                    :to="w.to"
+                    class="underline"
+                  >
+                    {{ w.sentence }}
+                  </ULink>
+                  <span v-else>{{ w.sentence }}</span>
+                </li>
+              </ul>
+            </div>
           </PageSection>
 
           <PageSection

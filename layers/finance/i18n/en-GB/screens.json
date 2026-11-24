@@ -118,6 +118,7 @@
   "finance.screens.period.checklist": "Before closing",
   "finance.screens.period.checklist-help": "Each of these stops the period closing. Most link to where they are put right.",
   "finance.screens.period.ready": "Nothing stops this period closing.",
+  "finance.screens.period.warnings": "Worth knowing before you close it. None of this stops the close:",
   "finance.screens.period.close-verb": "Close",
   "finance.screens.period.close-button": "Close period",
   "finance.screens.period.close-consequence": "Nothing more can be posted into it. Anything dated inside it from now on goes into the next open period.",

@@ -5,5 +5,5 @@ export type { PostingInput, EntryInput, PostingKind, PostingPurpose, AccountRef,
 export { entryRows, taxTotals, listTaxCodes, ENTRY_PAGE_MAX } from './tax'
 export type { LedgerRange, EntryRow, TaxTotal, TaxCode } from './tax'
 export { isPeriodOpen, financeYearOf } from './periods'
-export type { PeriodCloseCheck } from './points/period-close-check'
+export type { PeriodBounds, PeriodCloseCheck } from './points/period-close-check'
 export { rangeOf, toCsv } from './reports'
