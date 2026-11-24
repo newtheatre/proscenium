@@ -1977,6 +1977,35 @@
       "count": 1
     }
   },
+  "layers/spaces/app/pages/admin/modules/spaces/bookables/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/spaces/app/pages/admin/modules/spaces/purposes.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/spaces/app/pages/members/spaces/book.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
+  "layers/spaces/app/pages/members/spaces/index.vue": {
+    "complexity": {
+      "count": 1
+    }
+  },
   "layers/spaces/server/bookings.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
@@ -1986,6 +2015,41 @@
     },
     "max-params": {
       "count": 2
+    }
+  },
+  "layers/spaces/server/reading.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/spaces/server/rules.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/spaces/server/setup.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/spaces/shared/series.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
     }
   },
   "scripts/checks/interface.ts": {

@@ -1,7 +1,7 @@
 {
   "importCycles": 2,
-  "duplicatedLines": 750,
-  "typeCoverageServer": 91.34,
-  "typeCoverageApp": 92.04,
+  "duplicatedLines": 768,
+  "typeCoverageServer": 91.35,
+  "typeCoverageApp": 91.98,
   "ignoreComments": 4
 }
