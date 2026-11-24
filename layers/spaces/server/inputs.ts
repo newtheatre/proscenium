@@ -53,3 +53,25 @@ export const purposeInput = z.object({
   requirements,
 }).strict()
 export type PurposeInput = z.infer<typeof purposeInput>
+
+const when = z.number().int().min(0)
+export const askInput = z.object({
+  bookableId: z.string().min(1).max(40), // not-policy: shape bound
+  purposeId: z.string().min(1).max(40), // not-policy: shape bound
+  startsAt: when,
+  endsAt: when,
+  productionId: z.string().min(1).max(40).nullish(), // not-policy: shape bound
+  bookedFor: z.string().min(1).max(40).nullish(), // not-policy: shape bound
+  overrideReason: note(300), // not-policy: shape bound
+}).strict()
+
+export const detailsInput = z.object({
+  title: z.string().trim().min(3).max(120), // not-policy: as the table's CHECK
+  notes: note(1000), // not-policy: as the table's CHECK
+  attendees: z.number().int().min(1).max(10000).nullable(), // not-policy: shape bound
+}).strict()
+
+export const requestInput = askInput.extend(detailsInput.shape).strict()
+
+// The form sends what it has so far; only the time, place and purpose are checked.
+export const checkInput = askInput.extend({ title: z.string().max(120).optional(), notes: z.string().max(1000).nullish(), attendees: z.number().int().nullish() }).strict() // not-policy: shape bound

@@ -1,0 +1,362 @@
+<!-- Book a room (spec part 5, "Book a room"; SP-15 to SP-17): what for, then where and when. As the
+     person fills it in, a line under the form says what would happen: booked at once, sent for a
+     decision, or refused with the rule's reason and the nearest free time. -->
+<script setup lang="ts">
+import { parseDateTime, parseDate, parseTime, toZoned, today } from '@internationalized/date'
+import { watchDebounced } from '@vueuse/core'
+
+interface Bookable { id: string, name: string, kind: 'space' | 'resource', venueName: string | null, external: boolean, approvalNote: string | null, guidance: string | null, capacity: number | null, manage: boolean, override: boolean, purposes: string[] }
+interface Purpose { id: string, name: string, description: string | null, tier: number, openTo: string, needsProduction: boolean }
+interface Options { bookables: Bookable[], purposes: Purpose[], productions: { id: string, title: string }[], slotMinutes: number }
+interface Check {
+  outcome: 'confirm' | 'request' | 'refused'
+  rule: string | null
+  reason: string | null
+  remedy: string | null
+  external: boolean
+  blockers: { kind: string, startsAt: number, endsAt: number, label?: string }[]
+  nearest: { startsAt: number, endsAt: number } | null
+  waiting: number
+  overridden: string[]
+}
+
+const { t } = useT()
+const route = useRoute()
+const dates = useDates()
+const { $api } = useNuxtApp()
+const toast = useToast()
+
+const { data, status, error, refresh } = await useAPI<Options>('/api/spaces/bookings/options', { key: 'spaces:book-options' })
+
+const NONE = 'none'
+const one = (v: unknown) => (Array.isArray(v) ? v[0] : v) as string | undefined
+const form = reactive({
+  purposeId: '',
+  productionId: NONE,
+  bookableId: one(route.query.room) ?? '',
+  day: one(route.query.day) ?? today(dates.zone.value).toString(),
+  start: '',
+  end: '',
+  bookedFor: undefined as string | undefined,
+  overrideReason: '',
+  title: '',
+  attendees: null as number | null,
+  notes: '',
+})
+
+const purpose = computed(() => data.value?.purposes.find(p => p.id === form.purposeId))
+const bookable = computed(() => data.value?.bookables.find(b => b.id === form.bookableId))
+const staffAnywhere = computed(() => !!data.value?.bookables.some(b => b.manage))
+
+const purposeItems = computed(() => (data.value?.purposes ?? []).map(p => ({ value: p.id, label: p.name, description: p.description ?? undefined })))
+const productionItems = computed(() => [{ value: NONE, label: t('spaces.book.no-production') }, ...(data.value?.productions ?? []).map(p => ({ value: p.id, label: p.title }))])
+// Rooms that allow the purpose; rooms booked elsewhere come last under their own heading (SP-11).
+const bookableItems = computed(() => {
+  const open = (data.value?.bookables ?? []).filter(b => !form.purposeId || b.purposes.includes(form.purposeId))
+  const label = (b: Bookable) => b.venueName && b.kind === 'space' ? `${b.name} (${b.venueName})` : b.name
+  const here = open.filter(b => !b.external).map(b => ({ value: b.id, label: label(b) }))
+  const elsewhere = open.filter(b => b.external).map(b => ({ value: b.id, label: label(b) }))
+  return elsewhere.length ? [here, [{ type: 'label' as const, label: t('spaces.book.elsewhere') }, ...elsewhere]] : [here]
+})
+watch(() => form.purposeId, () => {
+  if (form.bookableId && bookable.value && !bookable.value.purposes.includes(form.purposeId)) form.bookableId = ''
+  if (!purpose.value?.needsProduction) form.productionId = NONE
+})
+
+function timeOf(value: string) {
+  try { return value ? parseTime(value) : undefined }
+  catch { return undefined }
+}
+const clockOf = (value: unknown) => value ? String(value).slice(0, 5) : '' // not-policy: HH:MM
+const clock = (ms: number) => dates.toLocal(ms).slice(11) // not-policy: the time part of "2027-09-01T19:30"
+/** The instants the form describes. An end at or before the start is past midnight, on the next day. */
+const span = computed(() => {
+  if (!form.day || !form.start || !form.end) return null
+  try {
+    const startsAt = toZoned(parseDateTime(`${form.day}T${form.start}`), dates.zone.value).toDate().getTime()
+    const endDay = form.end <= form.start ? parseDate(form.day).add({ days: 1 }).toString() : form.day
+    const endsAt = toZoned(parseDateTime(`${endDay}T${form.end}`), dates.zone.value).toDate().getTime()
+    return { startsAt, endsAt }
+  }
+  catch { return null }
+})
+
+const ask = computed(() => {
+  if (!form.purposeId || !form.bookableId || !span.value) return null
+  return {
+    bookableId: form.bookableId,
+    purposeId: form.purposeId,
+    ...span.value,
+    productionId: form.productionId === NONE ? null : form.productionId,
+    bookedFor: form.bookedFor ?? null,
+    overrideReason: form.overrideReason.trim() || null,
+  }
+})
+
+const check = ref<Check | null>(null)
+const checking = ref(false)
+watchDebounced(ask, async (body) => {
+  if (!body) {
+    check.value = null
+    return
+  }
+  checking.value = true
+  try { check.value = await $api<Check>('/api/spaces/bookings/check', { method: 'POST', body }) }
+  catch { check.value = null }
+  finally { checking.value = false }
+}, { debounce: 400, deep: true }) // not-policy: a pause in typing
+
+const OVERRIDABLE = ['P5', 'P6', 'P7', 'P8', 'P9']
+const mayOverride = computed(() => !!bookable.value?.override && (!!check.value?.overridden.length || (check.value?.outcome === 'refused' && OVERRIDABLE.includes(check.value.rule ?? ''))))
+
+const verdict = computed(() => {
+  const c = check.value
+  if (!c) return null
+  if (c.outcome === 'refused') {
+    return { color: 'error' as const, icon: 'i-lucide-circle-x', title: c.reason ?? t('spaces.book.refused'), description: c.remedy ?? undefined }
+  }
+  if (c.outcome === 'request') {
+    const title = c.external ? t('spaces.book.will-ask-elsewhere') : t('spaces.book.will-request')
+    const waiting = c.waiting ? t('spaces.book.waiting', { count: c.waiting }) : undefined
+    return { color: 'warning' as const, icon: 'i-lucide-hourglass', title, description: [bookable.value?.approvalNote, waiting].filter(Boolean).join(' ') || undefined }
+  }
+  return { color: 'success' as const, icon: 'i-lucide-circle-check', title: t('spaces.book.will-confirm'), description: c.overridden.length ? t('spaces.book.overriding') : undefined }
+})
+function takeNearest() {
+  const n = check.value?.nearest
+  if (!n) return
+  form.day = dates.toLocal(n.startsAt).slice(0, 10) // not-policy: the date part
+  form.start = clock(n.startsAt)
+  form.end = clock(n.endsAt)
+}
+
+const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const formEl = useFormRef('formEl')
+const validate = () => needs({ purposeId: form.purposeId, bookableId: form.bookableId, day: form.day, start: form.start, end: form.end, title: form.title, ...(purpose.value?.needsProduction ? { productionId: form.productionId === NONE ? '' : form.productionId } : {}) })
+const ready = computed(() => !!ask.value && form.title.trim().length >= 3 && check.value?.outcome !== 'refused') // not-policy: as the title's minimum
+async function save() {
+  if (!ask.value) return
+  refusal.value = null
+  try {
+    const made = await $api<{ bookingId: string, state: string }>('/api/spaces/bookings', {
+      method: 'POST',
+      body: { ...ask.value, title: form.title.trim(), notes: form.notes.trim() || null, attendees: form.attendees },
+    })
+    toast.add({ title: t(made.state === 'confirmed' ? 'spaces.book.booked' : 'spaces.book.requested'), color: 'success' })
+    await navigateTo(`/members/spaces/bookings/${made.bookingId}`)
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+</script>
+
+<template>
+  <PageFrame
+    :title="t('spaces.book.title')"
+    :description="t('spaces.book.description')"
+    width="reading"
+    :trail="[{ label: t('spaces.calendar.title'), to: '/members/spaces' }]"
+  >
+    <DataBoundary
+      :data="data"
+      :status="status"
+      :error="error"
+      @retry="refresh()"
+    >
+      <template #default="{ data: d }">
+        <EmptyState
+          v-if="!d.bookables.length"
+          icon="i-lucide-door-closed"
+          :title="t('spaces.book.no-rooms')"
+          :description="t('spaces.book.no-rooms-why')"
+        />
+        <UForm
+          v-else
+          ref="formEl"
+          :state="form"
+          :validate="validate"
+          class="space-y-6"
+          novalidate
+          @submit="save"
+        >
+          <UFormField
+            :label="t('spaces.book.purpose')"
+            name="purposeId"
+            required
+          >
+            <USelect
+              v-model="form.purposeId"
+              :items="purposeItems"
+              :placeholder="t('spaces.book.purpose-placeholder')"
+              class="min-w-64"
+            />
+          </UFormField>
+          <UFormField
+            v-if="purpose?.needsProduction"
+            :label="t('spaces.book.production')"
+            name="productionId"
+            :help="d.productions.length ? undefined : t('spaces.book.no-productions')"
+            required
+          >
+            <USelect
+              v-model="form.productionId"
+              :items="productionItems"
+              class="min-w-64"
+            />
+          </UFormField>
+          <UFormField
+            :label="t('spaces.book.room')"
+            name="bookableId"
+            required
+          >
+            <USelect
+              v-model="form.bookableId"
+              :items="bookableItems"
+              :placeholder="t('spaces.book.room-placeholder')"
+              class="min-w-64"
+            />
+          </UFormField>
+          <UAlert
+            v-if="bookable?.guidance"
+            color="neutral"
+            variant="subtle"
+            icon="i-lucide-info"
+            :description="bookable.guidance"
+          />
+          <div class="flex flex-wrap items-end gap-4">
+            <UFormField
+              :label="t('spaces.book.day')"
+              name="day"
+              required
+            >
+              <FieldDate v-model="form.day" />
+            </UFormField>
+            <UFormField
+              :label="t('spaces.book.from')"
+              name="start"
+              required
+            >
+              <UInputTime
+                :model-value="timeOf(form.start)"
+                :hour-cycle="24"
+                @update:model-value="form.start = clockOf($event)"
+              />
+            </UFormField>
+            <UFormField
+              :label="t('spaces.book.to')"
+              name="end"
+              required
+            >
+              <UInputTime
+                :model-value="timeOf(form.end)"
+                :hour-cycle="24"
+                @update:model-value="form.end = clockOf($event)"
+              />
+            </UFormField>
+          </div>
+          <div
+            v-if="verdict"
+            aria-live="polite"
+          >
+            <UAlert
+              :color="verdict.color"
+              variant="subtle"
+              :icon="checking ? 'i-lucide-loader-circle' : verdict.icon"
+              :title="verdict.title"
+              :description="verdict.description"
+            >
+              <template
+                v-if="check?.nearest"
+                #actions
+              >
+                <UButton
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  :label="t('spaces.book.take-nearest', { when: dates.range(check.nearest.startsAt, check.nearest.endsAt, 'dateTime') })"
+                  @click="takeNearest"
+                />
+              </template>
+            </UAlert>
+            <ul
+              v-if="check?.blockers.length"
+              class="mt-2 space-y-1 text-sm text-muted"
+            >
+              <li
+                v-for="(b, i) in check.blockers"
+                :key="i"
+              >
+                {{ t(`spaces.book.blocker.${b.kind}`, { what: b.label ?? t('spaces.calendar.booked'), from: dates.time(b.startsAt), to: dates.time(b.endsAt) }) }}
+              </li>
+            </ul>
+          </div>
+          <UFormField
+            v-if="mayOverride"
+            :label="t('spaces.book.override')"
+            :help="t('spaces.book.override-help')"
+          >
+            <UTextarea
+              v-model="form.overrideReason"
+              :rows="2"
+              :maxlength="300"
+            />
+          </UFormField>
+          <UFormField
+            v-if="staffAnywhere"
+            :label="t('spaces.book.for')"
+            :help="t('spaces.book.for-help')"
+          >
+            <PersonPicker
+              v-model="form.bookedFor"
+              :placeholder="t('spaces.book.for-me')"
+            />
+          </UFormField>
+          <UFormField
+            :label="t('spaces.book.what')"
+            name="title"
+            :help="t('spaces.book.what-help')"
+            required
+          >
+            <UInput
+              v-model="form.title"
+              :maxlength="120"
+            />
+          </UFormField>
+          <UFormField
+            :label="t('spaces.book.attendees')"
+            :help="bookable?.capacity ? t('spaces.book.capacity', { count: bookable.capacity }) : undefined"
+          >
+            <FieldNumber
+              v-model="form.attendees"
+              :min="1"
+              :max="10000"
+            />
+          </UFormField>
+          <UFormField :label="t('spaces.book.notes')">
+            <UTextarea
+              v-model="form.notes"
+              :rows="3"
+              :maxlength="1000"
+            />
+          </UFormField>
+          <RefusalNotice :refusal="refusal" />
+          <div class="flex gap-2">
+            <UButton
+              type="submit"
+              :label="check?.outcome === 'request' ? t('spaces.book.send-request') : t('spaces.book.book')"
+              :loading="formEl?.loading"
+              :disabled="!ready"
+            />
+            <UButton
+              to="/members/spaces"
+              color="neutral"
+              variant="ghost"
+              :label="t('spaces.book.cancel')"
+            />
+          </div>
+        </UForm>
+      </template>
+    </DataBoundary>
+  </PageFrame>
+</template>

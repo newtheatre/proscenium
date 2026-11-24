@@ -27,3 +27,17 @@ Proof runs P-1 to P-5 and P-7 are integration tests in `layers/spaces/tests/inte
 - **Not yet.** Requirements (rule P13) are stored on bookables and purposes but not edited on screen until the booking slice, where they are checked. The People tab and the "nobody can decide" health check (SP-13), and the role presets of part 6, come with the approval slice, once `spaces.booking.decide` and the booking abilities are declared: a role preset is offered once, so it must not ship with half its abilities.
 
 Integration tests: `layers/spaces/tests/integration/setup.test.ts`.
+
+## Booking (SP-14 to SP-18, SP-22 to SP-24), 24 November 2026
+
+- **Addresses.** Members book from Members > Room bookings: the calendar at `/members/spaces`, Book a room at `/members/spaces/book`, My bookings at `/members/spaces/bookings` and a booking at `/members/spaces/bookings/<id>`. The navigation entry needs `spaces.calendar.view`.
+- **Who may book.** `core.member` carries no abilities of its own, so a theatre gives members the calendar and booking by mapping `core.member` to `spaces.calendar.view` and `spaces.booking.request` (on every bookable, or on chosen ones). Nothing is mapped on switching the module on.
+- **The calendar's rooms** come with the calendar: `GET /api/spaces/calendar?from=&to=&bookables=` takes operating days (`YYYY-MM-DD`, at most 31) and answers the bookables the person may see with what they may do in each, and the items in the window. `GET /api/spaces/bookables` stays the set-up list. Performances and closures are drawn with a double edge, the person's own requests dashed, others' requests only for those who may decide them (K3), and others' bookings only as far as `spaces.calendar.show-details` allows (K2).
+- **The check as one types (SP-16).** `POST /api/spaces/bookings/check` runs every rule without writing and answers the outcome, the rule and its reason, what is in the way (named as K2 allows) and the nearest free time of the same length on the same day; the form offers to take it. An end at or before the start is read as past midnight.
+- **Staff purposes (P2)** are offered to people who may manage bookings in at least one room, and accepted only in rooms where they may.
+- **Overrides (P10).** A holder of `spaces.booking.override` is offered the reason box only when the check is refused by P5 to P9; the reason is stored on the booking and the audit records how many rules were set aside.
+- **Changing and cancelling (X1, X4, X5).** The booker may change the title, notes and head count until the booking ends, cancel a confirmed booking (inside `spaces.bookings.cancel-notice` it is a late cancellation), or withdraw a request. Staff cancelling someone else's booking must give a note, which is sent to the booker. A booking made by another module is changed there.
+- **Sweeps and reminders.** Every 15 minutes confirmed bookings past their end become Completed and requests past their start Expired, set-wise; reminders go once, `spaces.reminders.before` ahead, under the members' notification topic Room booking reminders.
+- **Not yet.** The requests queue, decisions and the console screens for staff come with the approval slice; until then a booking that needs approval waits as Requested and expires at its start.
+
+Integration tests: `layers/spaces/tests/integration/booking.test.ts`.
