@@ -9,7 +9,7 @@
 import { first, newId, nowMs, openColumn, refuse, sealColumn, useSetting, type UnitView } from '#kit'
 import { countAgainstRate } from '#kit/ratelimit'
 import { sameText } from './crypto'
-import { holdsPrivileged } from './me'
+import { holdsPrivileged } from './privileged'
 import { reassert, type CurrentSession } from './sessions'
 
 const STEP_SECONDS = 30 // not-policy: RFC 6238's time step, which every authenticator app uses
