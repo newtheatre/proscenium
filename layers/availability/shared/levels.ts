@@ -10,6 +10,11 @@ export type Unmarked = typeof UNMARKED[number]
 export const REQUEST_STATES = ['open', 'closed'] as const
 export const ASKED_STATES = ['asked', 'answered', 'lapsed', 'withdrawn'] as const
 export type AskedState = typeof ASKED_STATES[number]
+export const POLL_STATES = ['polling', 'decided', 'abandoned'] as const
+export type PollState = typeof POLL_STATES[number]
+/** A poll answer (F7): never changes the person's availability. */
+export const VOTES = ['yes', 'if-need-be', 'no'] as const
+export type Vote = typeof VOTES[number]
 
 const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/
 

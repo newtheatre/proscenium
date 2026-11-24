@@ -25,12 +25,14 @@ export default defineModule({
     'requests.default-due': setting.duration({ default: '7d', min: '1d', max: '60d', units: ['day'], change, audience: 'staff' }),
     'requests.first-reminder': setting.duration({ default: '3d', min: '0d', max: '14d', units: ['day'], change, audience: 'staff' }),
     'requests.second-reminder': setting.duration({ default: '1d', min: '0d', max: '7d', units: ['day'], change, audience: 'staff' }),
+    'polls.abandon-after': setting.duration({ default: '14d', min: '1d', max: '60d', units: ['day'], change, audience: 'staff' }),
     'retention.past': setting.duration({ default: '90d', min: '0d', max: '730d', units: ['day'], change, audience: 'staff', onChange: 'confirm' }),
     'retention.history': setting.duration({ default: '12mo', min: '3mo', max: '36mo', units: ['month'], change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   records: defineRecords('availability', {
     request: { table: 'availability_requests' },
+    poll: { table: 'availability_finds' },
   }),
 
   abilities: defineAbilities('availability', {
@@ -53,7 +55,7 @@ export default defineModule({
   },
 
   tasks: {
-    // Joiners and leavers (R2, R6), past exceptions and old requests (retention), lapsing at the end of the due date (R5) and closing at the end of the period (R7).
+    // Joiners and leavers (R2, R6), lapsing (R5) and closing (R7), giving up stale polls (F8), and retention.
     'availability.sweep-requests': task({ dailyAt: '04:30' }),
     // Reminders before the due date (R3).
     'availability.send-reminders': task({ every: '1h' }),
@@ -65,7 +67,7 @@ export default defineModule({
       { id: 'availability.find', menu: 'members', to: '/members/find-a-time', icon: 'i-lucide-calendar-search', ability: 'availability.find.use', order: 46 },
       { id: 'availability.requests', menu: 'members', to: '/members/find-a-time/requests', icon: 'i-lucide-send', ability: 'availability.request.send', order: 47 },
     ],
-    'core.record-resolver': [{ id: 'availability.request', file: 'request' }],
+    'core.record-resolver': [{ id: 'availability.request', file: 'request' }, { id: 'availability.poll', file: 'poll' }],
     'core.notification-type': [{
       id: 'availability.request-opened',
       category: 'transactional' as const,
@@ -108,6 +110,62 @@ export default defineModule({
           action: 'Check my availability',
         },
       },
+    }, {
+      id: 'availability.poll-asked',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/polls/{{ poll }}',
+      variables: { title: 'text' as const, organiser: 'text' as const, due: 'text' as const, poll: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'When can you make {{ title }}?',
+          body: '{{ organiser }} is choosing a time for **{{ title }}**. Please say which of the times you can make by {{ due }}. Only they see your answers.',
+          action: 'Answer the poll',
+        },
+      },
+    }, {
+      id: 'availability.poll-decided',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/polls/{{ poll }}',
+      variables: { title: 'text' as const, when: 'text' as const, poll: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: '{{ title }}: {{ when }}',
+          body: 'The time for **{{ title }}** has been chosen: **{{ when }}**.',
+          action: 'See the poll',
+        },
+      },
+    }, {
+      id: 'availability.poll-abandoned',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/polls/{{ poll }}',
+      variables: { title: 'text' as const, poll: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'No time chosen for {{ title }}',
+          body: 'The poll for **{{ title }}** has closed without a time being chosen. You do not need to do anything.',
+          action: 'See the poll',
+        },
+      },
+    }, {
+      id: 'availability.poll-expired',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/find-a-time/{{ poll }}',
+      variables: { title: 'text' as const, poll: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your poll for {{ title }} has closed',
+          body: 'Nobody chose a time for **{{ title }}**, so the poll has been given up and everyone asked has been told. You can start a new one from Find a time.',
+          action: 'See the answers',
+        },
+      },
     }],
   },
 
@@ -117,6 +175,7 @@ export default defineModule({
       'availability.entry.updated': event({ version: 1, payload: z.object({ accountId: z.string(), from: code(), to: code() }), internal: true }),
       'availability.request.opened': event({ version: 1, payload: z.object({ requestId: z.string() }), internal: true }),
       'availability.request.closed': event({ version: 1, payload: z.object({ requestId: z.string() }), internal: true }),
+      'availability.poll.decided': event({ version: 1, payload: z.object({ findId: z.string(), from: z.number(), to: z.number() }), internal: true }),
     },
   },
 })

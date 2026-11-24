@@ -34,7 +34,7 @@ function datesOf(from: string, to: string): string[] {
 }
 
 /** F1: everyone in the groups and the people named, each through plannable so nobody slips in. */
-async function people(viewer: Actor, input: FindInput): Promise<{ ids: string[], hidden: number, reasons: Set<string> }> {
+export async function peopleOf(viewer: Actor, input: Pick<FindInput, 'groupIds' | 'accountIds'>): Promise<{ ids: string[], hidden: number, reasons: Set<string> }> {
   const ids = new Set<string>()
   const reasons = new Set<string>()
   let hidden = 0
@@ -88,7 +88,7 @@ export async function findTime(viewer: Actor, input: FindInput): Promise<FindRes
 
   const dates = datesOf(input.from, input.to)
   const zone = await theatreTimeZone()
-  const { ids, hidden, reasons } = await people(viewer, input)
+  const { ids, hidden, reasons } = await peopleOf(viewer, input)
   const rows = await rowsOf(ids, input.from, input.to)
   const fallback = await useSetting('availability.entry.unmarked-default') as Unmarked
   const weeks: Record<string, Week> = {}

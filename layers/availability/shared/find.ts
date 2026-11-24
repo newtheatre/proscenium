@@ -4,6 +4,8 @@ import { pieceAt, type Piece } from './grid'
 import type { ShownLevel } from './levels'
 
 export const BEST_MAX = 10 // not-policy: rule F3 lists ten
+export const SLOTS_MIN = 2 // not-policy: rule F7's shortlist
+export const SLOTS_MAX = 6 // not-policy: rule F7's shortlist
 
 /** One person's levels: date to that day's pieces. */
 export type Week = Record<string, Piece[]>

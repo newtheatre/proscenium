@@ -92,5 +92,14 @@ export async function useFindATime() {
   const takenAt = (date: string, start: number, end: number) => (found.value?.taken[date] ?? []).filter(s => s.start < end && start < s.end)
   const when = (s: { start: number, end: number }) => `${clockOf(s.start)} to ${clockOf(s.end)}`
 
-  return { options, choices, found, refusal, searching, search, toggleMust, shown, first, move, at, counts, mustFails, takenAt, when }
+  /** The times picked for a poll (F7), in date and time order. */
+  const picked = ref<{ date: string, start: number, end: number }[]>([])
+  const isPicked = (s: { date: string, start: number }) => picked.value.some(p => p.date === s.date && p.start === s.start)
+  function pick(s: { date: string, start: number, end: number }) {
+    picked.value = isPicked(s)
+      ? picked.value.filter(p => !(p.date === s.date && p.start === s.start))
+      : [...picked.value, { date: s.date, start: s.start, end: s.end }].sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start)
+  }
+
+  return { options, choices, found, refusal, searching, search, toggleMust, shown, first, move, at, counts, mustFails, takenAt, when, picked, isPicked, pick }
 }
