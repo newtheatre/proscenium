@@ -117,6 +117,9 @@ Before the handler runs the kit checks, in order: the module is on (else 404), t
 naming the fields), so a caller without the ability learns nothing about the input. Every refusal has the body `{ code, reason, remedy?, fields?, detail? }`. `detail` holds facts a screen may link to or act on (the id of the record in the way), never prose. The kit commits the unit
 of work after the handler returns, with an audit entry when the ability is audited.
 
+A route outside `/api/<module>/` (the calendar feed's `/calendar/<token>.ics`) lives in the layer's
+`server/routes/` and names its module with `module: '<id>'`, so the same checks run.
+
 A route that takes a file's bytes declares `body: 'binary'`: the kit leaves the body unread for the
 handler (`readRawBody(event, false)`) and validates the query against `input` instead. Such a route
 cannot be idempotent.
@@ -193,6 +196,17 @@ Any module may import core's services without listing core: `import { notifyAddr
   once that passes, and it is not served after. A slot with `access: 'record'` is served only to
   someone your `core.file-access` contribution allows: key it by the owning record type and export
   `{ canRead(actor, record, file) }` (type `FileAccess` from `#modules/core`).
+- Write services for productions, performances and credits (C-68), each adding to your unit and
+  checking no ability (your route checks its own): `createProduction(unit, { title, kind, seasonId?,
+  summary?, categoryTermId?, companyName?, runningMinutes?, credits? })` and `createPerformance(unit,
+  { productionId, spaceId, startsAt, endsAt?, ..., made? })` make drafts (pass `made` with the
+  production's running time when it was made earlier in the same unit; the statement checks it
+  exists); `movePerformance(unit, id, { spaceId, startsAt, endsAt })`; `schedulePerformances(unit,
+  ids)` answers `{ scheduled, refused: { id, reason }[] }`, reason `space-taken`, `closed`,
+  `not-draft` or `started`, and catches drafts that clash with each other;
+  `setProductionCompanyName(unit, productionId, name)`; `listCredits(productionId)`,
+  `addCredit(unit, { productionId, creditedName, role, sectionTermId, accountId?, visibility? })`,
+  `updateCredit(unit, creditId, patch)` (never visibility) and `removeCredit(unit, creditId)`.
 - `isSpaceFree(spaceId, from, to, { except? })`: no scheduled performance or blocking closure, and
   nothing another module reports to `core.space-busy`, overlaps the window; `except` leaves out one
   module's own times. A read for showing and for a module's check just before its own write; a core
@@ -200,6 +214,16 @@ Any module may import core's services without listing core: `import { notifyAddr
   training session, a pencil) contributes to `core.space-busy` a file whose `busy({ spaceIds, from,
   to }, actor)` answers `{ spaceId, kind, from, to, yields, record, label }` items, the label null
   where the reader may not see it (contract in `layers/core/server/points/space-busy.ts`).
+- The calendar feed (C-70). A module whose records put a person somewhere at a time (a shift, a
+  call, a meeting) contributes to `core.calendar-feed` a file whose `events(accountId, from, to)`
+  answers that person's events (contract in `layers/core/server/points/calendar-feed.ts`); the
+  `calendar-feed` support module serves them all at one private address each, `/calendar/<token>.ics`,
+  writing each UID as `<contribution id>.<key>@<site marker>`. The point is `publicSafe`: each
+  contribution lists in `from` the `<table>.<column>` its titles and locations come from, and the
+  registry refuses a personal, free-text or special column there, since anyone holding the address
+  reads them. `siteMarker()` gives the marker (the host the feed was first served from, kept in
+  `core.calendar.site-marker`); `icsFile(name, events)` from `#modules/calendar-feed` writes any
+  other calendar file with the same escaping and folding.
 - Busy elsewhere (C-66): `personBusy(accountId, from, to)` and `personsBusy(accountIds, from, to)`
   from the support module `person-busy` (require it, import `#modules/person-busy`) merge every
   `core.person-busy` contribution overlapping `[from, to)` into `{ accountId, kind, from, to, firm,
@@ -711,6 +735,10 @@ declares only what the kit needs.
   `{ tonight: 'perf_...' }`. A scenario's task checks are one `core.practice-check` file keyed by the
   scenario id, `definePracticeChecks({ taskId: async context => boolean })`, run after each marked
   change. Core's own sets are `core.people` and `core.tonight`.
+- **In the app.** Live pages are served again under `/practice/live/...` inside the practice frame,
+  and `$api` marks every request from a `/practice` page; `docs/kit/interface.md` ("Live mode")
+  says how. A scenario's `runnable` tasks run in the store from the panel's "Run now"
+  (`POST /api/core/practice/run`); nothing runs a store's tasks on a timer.
 - **Ending.** `endPractice(accountId, reason)` (core's `server/practice/session.ts`) deletes a store,
   its files and its cache keys; erasure and merges call it. A store's alarm ends it when idle or at
   the end of the show night.

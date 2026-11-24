@@ -1,9 +1,10 @@
 // What the practice screens read and do (Practice mode, part 5): the scenario list, starting and
 // leaving, and inside a store the panel's tasks, outbox and waiting card reader.
-import { nowMs, refuse, useContext, useSetting, type Actor } from '#kit'
+import { createUnit, nowMs, refuse, useContext, useSetting, type Actor } from '#kit'
 import { bundleHash } from '#kit/migrations'
 import { answerPracticeCall } from '#kit/external'
 import { newId } from '#kit/ids'
+import { useRegistry } from '#kit/registry'
 import { checking, mayPractise, scenario, scenarios, unavailable, type PracticeScenario, type Unavailable } from './scenarios'
 import { lastEnded, readSession, startPractice, type SessionRow, type StartOptions } from './session'
 
@@ -12,6 +13,8 @@ export interface ScenarioCard {
   label: string
   summary: string
   minutes: number
+  /** The live pages it covers, for a live screen's "Practise this screen". */
+  routes: string[]
   /** Why it cannot start here, or null. */
   unavailable: Unavailable | null
 }
@@ -22,7 +25,7 @@ export async function practiceList(actor: Actor) {
   const cards: ScenarioCard[] = []
   for (const s of await scenarios()) {
     if (!admin && !(await mayPractise(actor, s.id))) continue
-    cards.push({ id: s.id, label: s.label, summary: s.summary, minutes: s.minutes, unavailable: await unavailable(s) })
+    cards.push({ id: s.id, label: s.label, summary: s.summary, minutes: s.minutes, routes: s.routes, unavailable: await unavailable(s) })
   }
   const session = actor.accountId ? await readSession(actor.accountId) : null
   return {
@@ -99,4 +102,18 @@ export async function answerCardReader(attemptId: string, outcome: 'approved' | 
   if (!attempt) refuse('core.not-found', 'There is nothing here.', { status: 404 })
   await env.DB.prepare("INSERT INTO core_practice_calls (id, attempt_id, call, reference, answer, chosen_by, at) VALUES (?, ?, ?, ?, 'unknown', 'trainee', ?)").bind(newId('pca'), attemptId, attempt.purpose, attempt.reference, nowMs()).run()
   return { state: 'unknown' }
+}
+
+/** O4: one of the scenario's scheduled tasks, run in the store now; nothing runs a store's tasks on a timer. */
+export async function runNow(task: string): Promise<{ jobId: string }> {
+  inStore()
+  const s = (await scenario(useContext().practice!.scenarioId))!
+  const declared = useRegistry().tasks.get(task)
+  if (!declared || !(s.runnable ?? []).includes(task)) refuse('core.practice.not-runnable', 'This practice does not run that.', { status: 404 })
+  const dueAt = nowMs()
+  const unit = createUnit()
+  unit.add({ sql: 'INSERT OR IGNORE INTO core_task_runs (task, due_at) VALUES (?, ?)', params: [task, dueAt] })
+  const jobId = unit.queueInternal('task', task, declared.module, { dueAt })
+  await unit.commit()
+  return { jobId }
 }

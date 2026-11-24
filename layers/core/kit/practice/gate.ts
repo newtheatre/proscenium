@@ -6,8 +6,7 @@ import type { Actor, KitEnv } from '../context'
 import { currentContext } from '../context-store'
 import { Refusal } from '../refusal'
 
-/** The mark a practice tab sends with every request (M1, M5). */
-export const PRACTICE_HEADER = 'proscenium-practice'
+export { PRACTICE_HEADER } from '../../shared/practice'
 
 /** The practice session a request, job or listener runs in. */
 export interface PracticeSession {

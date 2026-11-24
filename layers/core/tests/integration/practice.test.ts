@@ -20,6 +20,8 @@ import answer from '../../server/api/core/practice/calls/[id].post'
 import reassert from '../../server/api/core/me/reassert.post'
 import pretend from '../../server/api/core/practice/reassert.post'
 import sell from '../../../../tests/fixtures/modules/seats/server/api/seats/[id]/sell.post'
+import run from '../../server/api/core/practice/run.post'
+import { runs } from '../../../../tests/fixtures/modules/seats/server/tasks/count-seats'
 import { call, env, inContext, performance, person, rows, sent, server } from '../../../../tests/integration/helpers'
 
 const handle = server({
@@ -30,6 +32,7 @@ const handle = server({
   'POST /api/core/practice/calls/:id': answer,
   'POST /api/core/practice/reassert': pretend,
   'POST /api/core/me/reassert': reassert,
+  'POST /api/core/practice/run': run,
   'POST /api/seats/:id/sell': sell,
 })
 const MARK = { 'proscenium-practice': '1', 'referer': 'http://test/practice/live/door' }
@@ -180,6 +183,30 @@ describe('tasks (PM-13, T1 to T3)', () => {
     expect((await panel())[0].passedAt).toBeNull()
     await marked(me, 'POST', `/api/seats/${body.to.split('/').pop()}/sell`, { quantity: 1 })
     expect((await panel())[0].passedAt).toBeGreaterThan(0)
+  })
+})
+
+describe('scheduled tasks (PM-15, O4)', () => {
+  it('runs one of the scenario\'s tasks in the store only when the trainee presses Run now (T-PM-18)', async () => {
+    const me = admin()
+    await begin(me)
+    const before = await fingerprint()
+    const count = runs.length
+    const response = await marked(me, 'POST', '/api/core/practice/run', { task: 'seats.count-seats' })
+    expect(response.status).toBe(200)
+    await expect.poll(() => runs.length).toBe(count + 1)
+    expect(await storeOf(me.accountId!).prepare('SELECT COUNT(*) AS n FROM core_task_runs WHERE task = ?').bind('seats.count-seats').first('n')).toBe(1)
+    expect(await fingerprint()).toEqual(before)
+    await call(handle, 'POST', '/api/core/practice/leave', { actor: me, headers: MARK })
+  })
+
+  it('refuses a task the scenario does not offer', async () => {
+    const me = admin()
+    await begin(me, 'seats.desk')
+    const response = await marked(me, 'POST', '/api/core/practice/run', { task: 'seats.count-seats' })
+    expect(response.status).toBe(404)
+    expect((await response.json() as any).code).toBe('core.practice.not-runnable')
+    await call(handle, 'POST', '/api/core/practice/leave', { actor: me, headers: MARK })
   })
 })
 

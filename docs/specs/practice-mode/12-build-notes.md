@@ -34,3 +34,30 @@ T-PM-06, T-PM-09 to T-PM-12, T-PM-17, T-PM-20 to T-PM-23) and `tests/unit/practi
   administrators (`core.practice.manage`) can practise.
 - **"No answer"** on the card reader records `unknown` and settles nothing, so the till takes its
   timeout path.
+
+## Slice 2: the frame and the screens (PM-10, PM-12, PM-13, PM-16, PM-18)
+
+The screens PM-S1 to PM-S9 in core's app, with the browser test `tests/e2e/practice.spec.ts`
+(T-PM-13, T-PM-16) against a gallery scenario, `gallery.door`, and unit tests of the addresses in
+`tests/unit/practice.test.ts`.
+
+| Part | As built |
+| --- | --- |
+| Addresses | Every page under `/live` is also served under `/practice/live` (core's `pages:extend` hook), so a live page is practised unchanged. `/practice` is PM-S1, `/practice/<scenario id>` PM-S2 and PM-S6 (`?ended=1`), `/admin/practice` PM-S9 |
+| The frame | `PracticeFrame`, drawn by `app.vue` on every `/practice` page: the banner with the tasks count and the panel button, the border, the title prefix and the print line. Round a live page only, the panel (`PracticePanel`), the card reader (`PracticeCardReader`) and the fence (`PracticeFenced`) |
+| The mark | `$api` adds `Proscenium-Practice: 1` on a practice page, on the server render too. A change reads the panel again (T1), a "confirm it's you" refusal opens the pretend dialogue (`PracticeConfirmDialog`, M6), and `core.practice.ended` opens PM-S6 |
+| Navigation | The global middleware `00.practice.global.ts` opens a live link in the frame and fences any page outside the scenario's `routes`; the Tonight hub is always inside. Leaving goes to the page that opened practice (`?from=`) or `/live` |
+| Device copies | `useLiveData` and `useLiveQueue` keep practice copies under `practice:` keys, removed on leaving or starting again; `useRealtime` keeps practice rooms apart and always asks for their tickets with the mark |
+| Run now | `POST /api/core/practice/run` (`{ task }`) runs one of the scenario's `runnable` tasks in the store (T-PM-18) |
+| Entry points | The Tonight hub's "Practise" button and a live screen's "Practise this screen" (in its strip, which has no menu) show only when `GET /api/core/practice` lists a scenario; the list now gives each scenario's `routes` |
+
+### Departures from the wording
+
+- **The card reader sheet** does not show the amount: an external call's attempt keeps no amount,
+  and the till behind the sheet shows it.
+- **PM-S1** lists scenarios in one list, not grouped under the live screen each opens, and names no
+  course until Training declares `training.practice-open`.
+- **PM-S9** is a generated settings page: the scenarios switched off are the `core.practice.scenarios-off`
+  list, not a switch on each scenario.
+- **Printing** carries "Practice: not valid" at the head of the first page. Signing practice codes
+  with the store's keys (PM-11) comes with the door's scenario (PM-20).

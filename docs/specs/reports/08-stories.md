@@ -85,9 +85,8 @@ then needs both `reports.people.view` and the figure's own ability, on the scope
 one. Rows must be an `acc_` id, the asked key and a number of nought or more; a key value that is an
 account id or holds `@` makes the answer unavailable. Each read writes one audit row (action `read`,
 the figure's ability) whose detail is the figure, the period, the scope as kind and id, the breakdown,
-the outcome and the row count: no names, ids of people or figures. Until the Reports module exists, the
-test fixture `reports` stands in for it and `rota` contributes `rota.minutes`; see
-`tests/integration/person-measures.test.ts`. The real Reports module replaces the `reports` fixture.
+the outcome and the row count: no names, ids of people or figures. The test fixture `rota` contributes
+`rota.minutes`; see `tests/integration/person-measures.test.ts`.
 
 REP-02 is built in Box office: twelve figures in `layers/box-office/server/contributions/core.measure/`,
 ability `box-office.report.view`. `tickets-issued` counts valid tickets; `tickets-sold` those not on a
@@ -107,3 +106,19 @@ seats add up across its performances; `orders` and `bookers` are in, as the inte
 `layers/box-office/tests/integration/figures.test.ts` proves the money matches `productionStatement`
 to the penny.
 
+REP-04 is built as the `reports` module (`layers/reports/`), with abilities `reports.report.view` and
+`reports.people.view` (privileged, audit `read`, implies the first) and the data point
+`reports.report`. A ready-made report names its area, scope kind (none, season, production or venue),
+period rule, breakdown, one to twelve figures, an optional chart and the ability that lists it; it
+lists only while its module is on and the reader holds that ability (K1), and one that names a figure
+nobody declares, or whose ability does not cover its figures, is left out and logged (K3). The period
+rules are `scope` (a production's first to last show night, a season's dates), `last-week` (from
+`core.organisation.week-start`), `last-month`, `committee-year` and `last-committee-year` (from
+`core.organisation.year-end`) and `chosen`, all in operating days. `GET /api/reports/figures` reads one
+figure through `readMeasure`, names performances, productions, seasons and venues through
+`core.record-resolver` and gives each performance its start; a figure the reader may not see answers
+`hidden` and the page counts it rather than showing nought (M3). The page reads every figure by the
+breakdown and again as a total, in parallel, and writes nothing. Box office contributes Sales and
+attendance (scope production, breakdown performance, seven figures, a bar chart). The page offers the
+breakdowns its figures share among performance, production, season, venue, day and month; module keys
+such as channel wait for the builder. See `layers/reports/tests/integration/ready-made.test.ts`.
