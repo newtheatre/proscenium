@@ -1,15 +1,12 @@
-// Makes a competency retired; making it active needs an active route with an item (R1).
+// Retires a competency: nobody gains it from now, and holders' verdicts stop being met.
 import { getRouterParam } from 'h3'
-import { z } from 'zod'
 import { defineRoute } from '#kit'
-import { setCompetencyStatus } from '../../../../competencies'
+import { retireCompetency } from '../../../../competencies'
+import { noInput } from '../../../../inputs'
 
 export default defineRoute({
   ability: 'training.competency.manage',
   record: event => ['training.competency', getRouterParam(event, 'id')],
   rateLimit: 'write',
-  input: z.object({}).strict(),
-}, async (_event, { record, unit }) => {
-  await setCompetencyStatus(unit.view(), record!.id, 'retired')
-  return { competencyId: record!.id }
-})
+  input: noInput,
+}, (_event, { record, unit }) => retireCompetency(unit.view(), record!.id))

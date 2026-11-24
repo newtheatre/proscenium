@@ -108,3 +108,6 @@ export const walkInInput = z.union([
   z.object({ accountId: z.string().min(1) }),
   z.object({ name: z.string().trim().min(1).max(120), address: z.string().trim().email().max(254).nullable().optional() }), // not-policy: the account's limits
 ])
+
+/** A route that takes no body. */
+export const noInput = z.object({}).strict()

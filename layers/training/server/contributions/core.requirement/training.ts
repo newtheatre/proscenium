@@ -2,7 +2,7 @@
 // a host stores one and asks the kit, which asks here. A retired or unknown competency answers
 // unavailable, so the host's whenUnavailable decides, as for a module switched off.
 import { all, defineRequirementSource, type SourceAnswer } from '#kit'
-import { verdicts } from '../../verdicts'
+import { verdicts, type Verdict } from '../../verdicts'
 
 const idOf = (ref: string) => ref.slice('training:'.length)
 
@@ -14,6 +14,17 @@ async function active(ids?: string[]): Promise<Map<string, { title: string, rout
     ...(ids ? [JSON.stringify(ids)] : []),
   )
   return new Map(rows.map(r => [r.id, { title: r.title, routes: r.routes ?? '' }]))
+}
+
+/** One account's answer on one reference, from the verdicts already worked out. */
+function answerFor({ account, ref, live, byPair }: { account: string | null, ref: string, live: Map<string, { title: string }>, byPair: Map<string, Verdict> }): SourceAnswer {
+  const id = idOf(ref)
+  if (!live.has(id)) return { account, ref, verdict: 'unavailable', summary: 'This competency is no longer kept.' }
+  const v = account ? byPair.get(`${account}\u0000${id}`) : undefined
+  if (!v) return { account, ref, verdict: 'not-met', reason: 'Sign in to see whether your training counts.', summary: `${live.get(id)!.title}: not checked.` }
+  return v.met
+    ? { account, ref, verdict: 'met', ...(v.until === null ? {} : { until: v.until }), summary: v.summary, help: v.help }
+    : { account, ref, verdict: 'not-met', reason: v.reason ?? undefined, summary: v.summary, help: v.help, remedy: { label: 'See how to get it', to: v.help } }
 }
 
 export default defineRequirementSource({
@@ -39,21 +50,7 @@ export default defineRequirementSource({
     const byPair = new Map(found.map(v => [`${v.account}\u0000${v.competencyId}`, v]))
     const out: SourceAnswer[] = []
     for (const ref of refs) {
-      const id = idOf(ref)
-      for (const account of accountIds) {
-        if (!live.has(id)) {
-          out.push({ account, ref, verdict: 'unavailable', summary: 'This competency is no longer kept.' })
-          continue
-        }
-        const v = account ? byPair.get(`${account}\u0000${id}`) : undefined
-        if (!v) {
-          out.push({ account, ref, verdict: 'not-met', reason: 'Sign in to see whether your training counts.', summary: `${live.get(id)!.title}: not checked.` })
-          continue
-        }
-        out.push(v.met
-          ? { account, ref, verdict: 'met', ...(v.until === null ? {} : { until: v.until }), summary: v.summary, help: v.help }
-          : { account, ref, verdict: 'not-met', reason: v.reason ?? undefined, summary: v.summary, help: v.help, remedy: { label: 'See how to get it', to: v.help } })
-      }
+      for (const account of accountIds) out.push(answerFor({ account, ref, live, byPair }))
     }
     return out
   },
