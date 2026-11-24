@@ -56,6 +56,12 @@ export interface TableOptions {
   timestamps?: false
   /** true: made WITHOUT ROWID, so storage order follows the primary key, not insertion (R3-23). */
   withoutRowid?: true
+  /**
+   * What a practice store holds of this table when it is made (Practice mode, part 2): 'empty' (the
+   * default) for sample sets to fill, 'copy' for the theatre's own setup, each column through its
+   * erasure rule, or 'replace' for stand-in rows the module's sample set writes.
+   */
+  practice?: 'empty' | 'copy' | 'replace'
 }
 
 /** TableOptions with `extra` given the table's own built columns, so `t.key` is typed. */
@@ -272,6 +278,15 @@ export function defineTable<TName extends string, TColumns extends Record<string
     if (options.retention !== undefined) throw new DeclarationError(field('retention'), 'a table that keeps no times cannot tell how old a row is, so it has no retention; its module removes rows with what they belong to')
   }
   if (options.withoutRowid !== undefined && options.withoutRowid !== true) throw new DeclarationError(field('withoutRowid'), 'is true or left out')
+  if (options.practice !== undefined && !['empty', 'copy', 'replace'].includes(options.practice)) throw new DeclarationError(field('practice'), "is 'empty', 'copy' or 'replace'")
+  if (options.practice === 'copy') {
+    // The theatre's setup, never its people or its records of what happened.
+    if (realm === 'audience' || realm === 'members' || typeof realm === 'object') throw new DeclarationError(field('practice'), `a table of the ${typeof realm === 'object' ? 'per-row' : realm} realm holds people's records, so a practice store never copies it`)
+    if (options.appendOnly) throw new DeclarationError(field('practice'), 'an append-only table is a record of what happened (a ledger, audit or events), so a practice store never copies it')
+    for (const [key, builder] of Object.entries(columns)) {
+      if (metas[key]!.meta.class === 'special' && (builder as any).config?.notNull) throw new DeclarationError(field(key), 'a practice copy leaves special data out, so a copied table may not require it')
+    }
+  }
   if (typeof realm === 'object' && !all.some(c => c.sql === realm.column)) throw new DeclarationError(field('realm'), `realm column "${realm.column}" is not a column of this table`)
 
   const table = snakeTable(name, columns, options.extra as any)
