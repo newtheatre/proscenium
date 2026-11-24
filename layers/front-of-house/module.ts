@@ -15,6 +15,8 @@ export default defineModule({
   manifest: 1,
   since: '0.1.0',
   stability: 'experimental',
+  // A crew call's sign-up questions are a form in forms' slot (FH-49). Forms is always on.
+  requires: ['forms'],
 
   settings: defineSettings('front-of-house', {
     // Read when a shift is made or its times change; a later change does not move shifts that exist.
@@ -54,6 +56,7 @@ export default defineModule({
     'assignment': { table: 'front_of_house_assignments', parent: 'front-of-house.shift', owner: 'account_id' },
     'checklist-run': { table: 'front_of_house_checklist_runs', parent: 'core.performance' },
     'incident': { table: 'front_of_house_incidents', owner: 'reported_by' },
+    'crew-call': { table: 'front_of_house_crew_calls' },
   }),
 
   abilities: defineAbilities('front-of-house', {
@@ -77,6 +80,12 @@ export default defineModule({
     // Search for and redact a person with no account, for a data request. Each search is audited.
     'incident.redact-person': ability({ risk: 'privileged', fresh: true, audit: 'read', implies: ['incident.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
+    // Create and run crew calls, their questions and perks rules; see who answered (FH-49).
+    'crew-call.manage': ability({ on: 'front-of-house.crew-call' }),
+    // Dietary answers by name, for catering (FH-50). Counts are aggregates and need only crew-call.manage.
+    'crew-call.view-needs': ability({ on: 'front-of-house.crew-call', risk: 'privileged', audit: 'read' }),
+    // Record and undo T-shirt and meal handouts. Nobody hands themselves one (the service's own-record rule).
+    'handout.record': ability({ on: 'front-of-house.crew-call' }),
   }),
 
   // Authority follows the rota (part 3, "The three facts"). Every answer is read from stored times.
@@ -102,6 +111,8 @@ export default defineModule({
       'front-of-house.incident.closed': event({ version: 1, payload: z.object({ incidentId: z.string() }), internal: true }),
       // Nothing financial waits on it.
       'front-of-house.night-report.signed-off': event({ version: 1, payload: z.object({ performanceId: z.string() }), internal: false }),
+      // Says a named person received something, so internal.
+      'front-of-house.handout.recorded': event({ version: 1, payload: z.object({ handoutId: z.string(), crewCallId: z.string(), accountId: z.string(), item: z.enum(['tshirt', 'meal']) }), internal: true }),
       'front-of-house.checklist-run.completed': event({ version: 1, payload: z.object({ runId: z.string(), checklistId: z.string(), performanceId: z.string() }), internal: false }),
     },
     listens: {
@@ -132,6 +143,8 @@ export default defineModule({
   },
 
   contributes: {
+    // A crew call's sign-up questions, answered once each (FH-49, CC1, CC2).
+    'forms.slot': [{ id: 'front-of-house.crew-call', subject: 'front-of-house.crew-call', attach: 'front-of-house.crew-call.manage', label: 'front-of-house.crew-calls.slot', limit: 1 }],
     // Front of house's lines of the privacy notice's "what we hold" table (/policies/privacy).
     'core.privacy-record': [
       { id: 'front-of-house.assignments', holds: 'Shifts you signed up for, whether you came and the hours you gave', why: 'To run performances safely and recognise volunteers\' time', basis: 'Our legitimate interests in staffing performances', keptFor: 'front-of-house.retention.assignments', order: 200 },
@@ -143,6 +156,7 @@ export default defineModule({
       { id: 'front-of-house.assignment', file: 'assignment' },
       { id: 'front-of-house.checklist-run', file: 'checklist-run' },
       { id: 'front-of-house.incident', file: 'incident' },
+      { id: 'front-of-house.crew-call', file: 'crew-call' },
     ],
     'core.vocabulary': [{
       id: 'front-of-house.incident-category',
@@ -171,9 +185,12 @@ export default defineModule({
       { id: 'front-of-house.shifts', menu: 'members', to: '/members/front-of-house', icon: 'i-lucide-calendar-clock', ability: 'front-of-house.shift.sign-up', order: 30 },
       // The reporter's own incidents (FH-8): shown once they have reported one.
       { id: 'front-of-house.my-reports', menu: 'members', to: '/members/front-of-house/reports', icon: 'i-lucide-shield-alert', ability: 'front-of-house.incident.report', order: 31, count: 'front-of-house.my-reports', hideEmpty: true },
+      { id: 'front-of-house.handouts', menu: 'live', to: '/live/front-of-house/handouts', icon: 'i-lucide-shirt', ability: 'front-of-house.handout.record', order: 12 },
       { id: 'front-of-house.tonight', menu: 'live', to: '/live/front-of-house', icon: 'i-lucide-drama', ability: ['front-of-house.shift.view', 'front-of-house.incident.report', 'front-of-house.emergency-card.view'], order: 10 },
       { id: 'front-of-house.rota', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/rota', icon: 'i-lucide-calendar-range', ability: 'front-of-house.shift.view', order: 10 },
+      { id: 'front-of-house.grid', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/grid', icon: 'i-lucide-grid-3x3', ability: 'front-of-house.shift.view', order: 12 },
       { id: 'front-of-house.incidents', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/incidents', icon: 'i-lucide-shield-alert', ability: 'front-of-house.incident.view', order: 20 },
+      { id: 'front-of-house.crew-calls', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/crew-calls', icon: 'i-lucide-users-round', ability: 'front-of-house.crew-call.manage', order: 15 },
       { id: 'front-of-house.night-reports', menu: 'console', group: 'front-of-house', section: 'everyday', to: '/console/front-of-house/night-reports', icon: 'i-lucide-notebook-pen', ability: 'front-of-house.night-report.view', order: 30 },
       { id: 'front-of-house.hours', menu: 'console', group: 'people', section: 'everyday', to: '/console/people/volunteer-hours', icon: 'i-lucide-clock', ability: 'front-of-house.hours.view', order: 30 },
       { id: 'front-of-house.duties', menu: 'admin', group: 'modules', to: '/admin/modules/front-of-house/duties', icon: 'i-lucide-badge-check', ability: 'front-of-house.duty.manage', order: 60 },
@@ -193,10 +210,10 @@ export default defineModule({
     // The roles part 7 suggests, made when the module is first switched on (FH-4).
     'core.role-preset': [
       { id: 'front-of-house.volunteer', key: 'volunteer', name: 'Volunteer', description: 'Signs up for shifts, reports incidents and opens the emergency card.', abilities: ['front-of-house.shift.sign-up', 'front-of-house.incident.report', 'front-of-house.emergency-card.view'], opensMembersArea: true },
-      { id: 'front-of-house.manager', key: 'front-of-house-manager', name: 'Front of house manager', description: 'Runs the rota, duties and checklists, reviews incidents and reads night reports and hours.', abilities: ['front-of-house.shift.manage', 'front-of-house.checklist.manage', 'front-of-house.duty.manage', 'front-of-house.incident.manage', 'front-of-house.night-report.sign-off', 'front-of-house.night-report.view', 'front-of-house.hours.view', 'front-of-house.emergency-card.view'], opensMembersArea: true },
+      { id: 'front-of-house.manager', key: 'front-of-house-manager', name: 'Front of house manager', description: 'Runs the rota, duties and checklists, reviews incidents and reads night reports and hours.', abilities: ['front-of-house.shift.manage', 'front-of-house.checklist.manage', 'front-of-house.duty.manage', 'front-of-house.incident.manage', 'front-of-house.night-report.sign-off', 'front-of-house.night-report.view', 'front-of-house.hours.view', 'front-of-house.emergency-card.view', 'front-of-house.crew-call.manage', 'front-of-house.crew-call.view-needs', 'front-of-house.handout.record'], opensMembersArea: true },
     ],
     'core.merge-handler': [{ id: 'front-of-house.assignments', file: 'assignments' }],
-    'core.upcoming': [{ id: 'front-of-house.shifts', file: 'shifts' }],
+    'core.upcoming': [{ id: 'front-of-house.shifts', file: 'shifts' }, { id: 'front-of-house.crew-questions', file: 'crew-questions' }],
     'core.erasure-hold': [{ id: 'front-of-house.incident-open', file: 'incident-open' }],
     'core.export-contributor': [{ id: 'front-of-house.reported-incidents', file: 'reported-incidents' }],
     'core.health-check': [{ id: 'front-of-house.emergency-cards', file: 'emergency-cards' }, { id: 'front-of-house.incidents-unopened', file: 'incidents-unopened' }],

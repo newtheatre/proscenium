@@ -5,6 +5,8 @@ export interface ModuleView {
   since: string
   stability: 'experimental' | 'stable' | 'deprecated'
   alwaysOn: boolean
+  /** A support module: no switch, on while a module that is on requires it. */
+  support: boolean
   on: boolean
   requires: string[]
   uses: string[]

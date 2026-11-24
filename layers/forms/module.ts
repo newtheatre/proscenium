@@ -62,6 +62,8 @@ export default defineModule({
     // the form's own fields is, and so is every publish.
     'form.edit': ability({ on: 'forms.form', owner: 'grants', audit: false }),
     'form.publish': ability({ on: 'forms.form', implies: ['form.edit'] }),
+    // Correct answers, points and the pass mark (FB-513): apart from editing, so more people may edit wording than marking.
+    'form.mark': ability({ on: 'forms.form', implies: ['form.edit'], audit: false }),
     // Responses are read form by form: these are granted on the form, never on one response.
     'response.read': ability({ on: 'forms.form', owner: 'grants', audit: false }),
     // Moving a response between its form's stages; never one's own response (a guard in the service).

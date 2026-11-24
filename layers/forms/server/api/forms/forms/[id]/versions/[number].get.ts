@@ -1,10 +1,10 @@
 // One published version, to read as it was: its definition, never changed since it was published.
 import { getRouterParam } from 'h3'
 import { defineRoute, first, isRefusal, refuse, today } from '#kit'
-import { requireForm } from '../../../../../forms'
+import { authorDefinition, requireForm } from '../../../../../forms'
 import type { Definition } from '../../../../../../shared/engine'
 
-export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default' }, async (event, { record }) => {
+export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default' }, async (event, { record, actor }) => {
   const form = await requireForm(record!.id)
   const number = Number(getRouterParam(event, 'number'))
   const row = Number.isInteger(number) ? await first<{ definition: string }>('SELECT definition FROM forms_versions WHERE form_id = ? AND number = ?', form.id, number) : null
@@ -14,5 +14,5 @@ export default defineRoute({ ability: 'forms.form.edit', record: event => ['form
     if (isRefusal(error)) return null
     throw error
   })
-  return { number, today: day, definition: JSON.parse(row.definition) as Definition }
+  return { number, today: day, definition: await authorDefinition(JSON.parse(row.definition) as Definition, actor, form.id) }
 })
