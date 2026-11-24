@@ -5,8 +5,11 @@
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { BookingState } from '../../../../../shared/states'
 
+interface Brief { id: string, bookableName: string, startsAt: number, endsAt: number }
 interface Booking {
   id: string
+  bookableId: string
+  purposeId: string
   bookableName: string
   purpose: string
   state: BookingState
@@ -23,6 +26,9 @@ interface Booking {
   lateCancel: boolean
   overrideReason: string | null
   seriesId: string | null
+  noShow: boolean
+  change: Brief | null
+  replaces: Brief | null
   history: { kind: string, at: number, note: string | null, byBooker: boolean }[]
 }
 
@@ -116,14 +122,40 @@ async function cancelSeries(fromHere: boolean) {
   catch (e) { refusal.value = toRefusal(e) }
 }
 
+// X2 and X3: a confirmed booking not yet started may move, unless a change is already waiting.
+const moving = ref(false)
+const mayMove = computed(() => !!b.value && b.value.state === 'confirmed' && b.value.startsAt > Date.now() && !elsewhere.value && !b.value.change && (!!data.value?.own || !!data.value?.manage))
+async function moved(result: { bookingId: string, state: string }) {
+  toast.add({ title: t(result.state === 'confirmed' ? 'spaces.move.moved' : 'spaces.move.requested'), color: 'success' })
+  if (result.bookingId !== id.value) await navigateTo(`/members/spaces/bookings/${result.bookingId}`)
+  else await refresh()
+}
+
+// X6: staff mark a no-show on a booking that has happened.
+async function markNoShow(noShow: boolean) {
+  refusal.value = null
+  try {
+    await $api(`/api/spaces/bookings/${id.value}/no-show`, { method: 'POST', body: { noShow } })
+    toast.add({ title: t(noShow ? 'spaces.booking-page.no-show-set' : 'spaces.booking-page.no-show-cleared'), color: 'success' })
+    await refresh()
+  }
+  catch (e) { refusal.value = toRefusal(e) }
+}
+
 const primary = computed(() => live.value && !elsewhere.value ? { label: t('spaces.booking-page.edit'), icon: 'i-lucide-pencil' } : undefined)
 const actions = computed<DropdownMenuItem[][]>(() => {
+  if (b.value?.state === 'completed' && data.value?.manage) {
+    return [[b.value.noShow
+      ? { label: t('spaces.booking-page.clear-no-show'), icon: 'i-lucide-user-check', onSelect: () => markNoShow(false) }
+      : { label: t('spaces.booking-page.mark-no-show'), icon: 'i-lucide-user-x', onSelect: () => markNoShow(true) }]]
+  }
   if (!live.value || elsewhere.value || !b.value) return []
+  const move: DropdownMenuItem[] = mayMove.value ? [{ label: t('spaces.move.title'), icon: 'i-lucide-calendar-clock', onSelect: () => { moving.value = true } }] : []
   const one: DropdownMenuItem = b.value.state === 'requested'
     ? { label: t(b.value.seriesId ? 'spaces.booking-page.withdraw-this' : 'spaces.booking-page.withdraw'), icon: 'i-lucide-undo-2', color: 'error', onSelect: withdraw }
     : { label: t(b.value.seriesId ? 'spaces.booking-page.cancel-this' : 'spaces.booking-page.cancel'), icon: 'i-lucide-x', color: 'error', onSelect: cancel }
-  if (!b.value.seriesId) return [[one]]
-  return [[one,
+  if (!b.value.seriesId) return [move, [one]]
+  return [move, [one,
     { label: t('spaces.booking-page.cancel-later'), icon: 'i-lucide-calendar-x', color: 'error', onSelect: () => cancelSeries(true) },
     { label: t('spaces.booking-page.cancel-all'), icon: 'i-lucide-calendar-x-2', color: 'error', onSelect: () => cancelSeries(false) }]]
 })
@@ -137,6 +169,7 @@ const summary = computed(() => {
     { label: t('spaces.booking-page.booked-for'), value: x.bookedForName },
     ...(x.attendees ? [{ label: t('spaces.booking-page.attendees'), value: String(x.attendees) }] : []),
     ...(x.seriesId ? [{ label: t('spaces.booking-page.series'), value: t('spaces.booking-page.series-yes') }] : []),
+    ...(x.noShow ? [{ label: t('spaces.booking-page.no-show'), value: t('spaces.booking-page.no-show-yes') }] : []),
   ]
 })
 const tabs = computed(() => [{ id: 'details', label: t('spaces.booking-page.tabs.details') }, { id: 'history', label: t('spaces.booking-page.tabs.history') }])
@@ -173,6 +206,22 @@ const HISTORY_KINDS = ['requested', 'confirmed', 'declined', 'withdrawn', 'expir
               variant="subtle"
               icon="i-lucide-link"
               :title="t('spaces.booking-page.elsewhere')"
+            />
+            <UAlert
+              v-if="b.change"
+              color="warning"
+              variant="subtle"
+              icon="i-lucide-hourglass"
+              :title="t('spaces.move.change-waiting', { when: dates.range(b.change.startsAt, b.change.endsAt, 'dateTime'), room: b.change.bookableName })"
+              :actions="[{ label: t('spaces.move.see-change'), to: `/members/spaces/bookings/${b.change.id}`, color: 'neutral', variant: 'outline' }]"
+            />
+            <UAlert
+              v-if="b.replaces && b.state === 'requested'"
+              color="neutral"
+              variant="subtle"
+              icon="i-lucide-calendar-clock"
+              :title="t('spaces.move.replaces', { when: dates.range(b.replaces.startsAt, b.replaces.endsAt, 'dateTime'), room: b.replaces.bookableName })"
+              :actions="[{ label: t('spaces.move.see-booking'), to: `/members/spaces/bookings/${b.replaces.id}`, color: 'neutral', variant: 'outline' }]"
             />
             <UAlert
               v-if="b.decisionNote"
@@ -218,6 +267,13 @@ const HISTORY_KINDS = ['requested', 'confirmed', 'declined', 'withdrawn', 'expir
         </template>
       </PageRecord>
     </DataBoundary>
+
+    <SpacesMoveBooking
+      v-if="b"
+      v-model:open="moving"
+      :booking="b"
+      @moved="moved"
+    />
 
     <UModal
       v-model:open="editing"
