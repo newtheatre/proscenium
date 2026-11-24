@@ -1,9 +1,9 @@
 // Expense claims (BC-19 to BC-28, spec part 3, "The claim"): a member records what they bought, with
 // a receipt for each item, and submits it; holders of the lines it touches approve it. Its content is
 // fixed once submitted. Deciding a claim is in claim-decisions.ts.
-import { all, can, first, localDate, newId, nowMs, refuse, today, useSetting, files as store, type Actor, type UnitView } from '#kit'
+import { all, can, first, localDate, newId, nowMs, refuse, today, useSetting, type Actor, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import { accountLabel, holdersOf, notify } from '#modules/core'
+import { accountLabel, holdersOf, notify, stageUpload } from '#modules/core'
 import { financeYearOf } from '#modules/finance'
 import { requireLine, theatreCurrency } from './budgets'
 import { formatMoney } from './money'
@@ -246,17 +246,7 @@ export async function uploadReceipt(unit: UnitView, actor: Actor, on: { claim: C
   if (input.bytes.length > await receiptLimit()) refuse('core.files.too-large', 'This file is larger than a receipt may be.', { status: 413, fields: { file: 'too-large' } })
   if (item.receipts.filter(r => r.state !== 'rejected').length >= RECEIPTS_PER_ITEM)
     refuse('budgets.claim.receipts', 'An item holds at most five receipts.', { status: 422, fields: { file: 'budgets.claim.receipts' } })
-  const id = newId('fil', { random: true })
-  const objectKey = `files/${crypto.randomUUID()}`
-  await store.put(objectKey, input.bytes)
-  const digest = await crypto.subtle.digest('SHA-256', input.bytes as Uint8Array<ArrayBuffer>)
-  const sha = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('') // not-policy: hexadecimal
-  unit.add({
-    sql: "INSERT INTO core_files (id, object_key, owner_type, owner_id, slot, original_name, text_class, media_type, byte_size, sha256, access, state, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, 'personal', 'application/octet-stream', ?, ?, 'record', 'pending', ?, ?)",
-    params: [id, objectKey, ITEM_OWNER, item.id, RECEIPT_SLOT, input.name, input.bytes.length, sha, actor.accountId ?? null, nowMs()],
-  })
-  unit.enqueue('core.check-file', { fileId: id })
-  unit.audit({ action: 'create', record: ['core.file', id], detail: { slot: RECEIPT_SLOT } })
+  const id = await stageUpload(unit, { ownerType: ITEM_OWNER, ownerId: item.id, slot: RECEIPT_SLOT, name: input.name, bytes: input.bytes, by: actor.accountId ?? null })
   return { id, state: 'pending' }
 }
 
