@@ -1,5 +1,7 @@
 # Training records: specification
 
+> Amended by [`docs/specs/training/`](../training/), the third-round specification, which supersedes this folder where they differ.
+
 Nov 16, 2026 · @Matthew Adcock
 
 Training is a switchable module, id `training`, that records who has been trained in what, by whom and until when, and lets any other module require that training without knowing Training exists. This is its second-round specification, with every ruling of 16 November 2026 folded in, in the nine parts of the first six, one per tab.

@@ -15,6 +15,7 @@ import { labelsOf } from './people'
 import { isTestMoney } from './test-money'
 import type { AttemptRow } from './answers'
 import type { RefundAnswer } from './points/provider'
+import { ownerEntries } from './owner-entries'
 
 const SECOND = 1000 // not-policy: milliseconds in a second
 
@@ -135,7 +136,7 @@ async function succeed(unit: UnitView, refund: RefundRow, providerRef?: string) 
     const entries = await handler.refunded(unit, asPart(part, intent.currency), { id: refund.id, amountMinor: refund.amount_minor })
     const total = entries.reduce((s, e) => s + e.amountMinor, 0)
     if (total !== refund.amount_minor) throw new Refusal('payments.settlement.part-mismatch', `${part.owner_module}'s entries for this refund total ${total}, not ${refund.amount_minor}.`, { status: 500 })
-    back = entries.map(e => ({ account: e.account, amountMinor: e.amountMinor, forModule: part.owner_module, productionId: e.productionId ?? null, performanceId: e.performanceId ?? null }))
+    back = await ownerEntries(entries, part.owner_module)
   }
   await postEntries(unit, {
     key: `payments:refund:${refund.id}`,

@@ -53,6 +53,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'membership-fees.charge.view', 'membership-fees.charge.waive',
       'bar.sale.view',
       'reports.report.view', 'reports.run.export',
+      'invoicing.export.manage', 'invoicing.settings.manage',
     ],
   },
 ]

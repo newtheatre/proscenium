@@ -6,7 +6,7 @@ import { priceInput, productPatch, variantInput, variantPatch } from '../../../.
 
 interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | null, next: { amountMinor: number | null, from: number } | null }
 interface Variant { id: string, name: string, barcode: string | null, mixerMeasure: boolean, active: boolean, prices: VariantPrice[] }
-interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, ageFromCategory: boolean, active: boolean, groupIds: string[], variants: Variant[] }
+interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, ageFromCategory: boolean, taxCode: string | null, active: boolean, groupIds: string[], variants: Variant[] }
 interface List { id: string, name: string, standard: boolean }
 
 const { t } = useT()
@@ -42,7 +42,8 @@ const isMixer = computed(() => !!data.value?.product.variants.some(v => v.mixerM
 const groupNames = computed(() => (data.value?.product.groupIds ?? []).map(g => data.value!.groups.find(x => x.id === g)?.name).filter(Boolean).join(', '))
 
 // The product's own fields, the choices it asks at the till, and whether it can be a mixer.
-const editing = ref<{ name: string, categoryId: string, age: 'category' | 'yes' | 'no', groupIds: string[], mixer: boolean } | null>(null)
+const editing = ref<{ name: string, categoryId: string, age: 'category' | 'yes' | 'no', taxCode: string | null, groupIds: string[], mixer: boolean } | null>(null)
+const taxRegistered = useTaxRegistered()
 const ageItems = computed(() => [
   { value: 'category', label: t('bar.screens.add-product.age-as-category-plain') },
   { value: 'yes', label: t('bar.screens.product.age-yes') },
@@ -51,15 +52,15 @@ const ageItems = computed(() => [
 function edit() {
   const p = data.value!.product
   refusal.value = null
-  editing.value = { name: p.name, categoryId: p.categoryId, age: p.ageFromCategory ? 'category' : p.ageRestricted ? 'yes' : 'no', groupIds: [...p.groupIds], mixer: isMixer.value }
+  editing.value = { name: p.name, categoryId: p.categoryId, age: p.ageFromCategory ? 'category' : p.ageRestricted ? 'yes' : 'no', taxCode: p.taxCode, groupIds: [...p.groupIds], mixer: isMixer.value }
 }
 async function patch(body: Record<string, unknown>) {
   await $api(`/api/bar/products/${id.value}` as string, { method: 'PATCH', body })
   await refresh()
 }
 const productBody = () => {
-  const { name, categoryId, age } = editing.value!
-  return { name, categoryId, ageRestricted: age === 'category' ? null : age === 'yes' }
+  const { name, categoryId, age, taxCode } = editing.value!
+  return { name, categoryId, ageRestricted: age === 'category' ? null : age === 'yes', ...(taxRegistered.value ? { taxCode } : {}) }
 }
 async function save() {
   const { groupIds, mixer } = editing.value!
@@ -490,6 +491,17 @@ function planned(v: Variant, l: List): string | null {
             <USelect
               v-model="editing.age"
               :items="ageItems"
+            />
+          </UFormField>
+          <UFormField
+            v-if="taxRegistered"
+            :label="t('finance.screens.tax-code-select.label')"
+            :help="t('finance.screens.tax-code-select.help')"
+            name="taxCode"
+          >
+            <FinanceTaxCodeSelect
+              v-model="editing.taxCode"
+              usual
             />
           </UFormField>
           <UFormField

@@ -5,7 +5,8 @@
 import { OTHER, PATTERNS } from './types'
 import { unreached } from './reach'
 import { isDecision, isFinal } from './workflow'
-import type { Comparison, Condition, Definition, Expression, Operand, Question, Rule, RuleName } from './types'
+import { isMarkable, totalPoints } from './marking'
+import type { Comparison, Condition, Correct, Definition, Expression, Operand, Question, Rule, RuleName, Transition } from './types'
 import { calculationsRead } from './calculations'
 import { conditionsOf, questionsOf } from './definition'
 import type { Index, ValueKind } from './values'
@@ -23,6 +24,9 @@ export type ProblemCode
     | 'returned-no-way-back' | 'stage-unreachable' | 'stage-dead-end'
     | 'review-wrong-kind' | 'review-no-reviewers' | 'review-no-criteria' | 'criterion-no-label' | 'review-quorum' | 'reason-not-decision'
     | 'unknown-action' | 'action-unmapped' | 'action-wrong-question'
+    | 'answer-wrong-type' | 'answer-in-group' | 'answer-special' | 'answer-empty' | 'answer-unknown-option' | 'answer-range' | 'answer-never-right'
+    | 'pass-mark-over' | 'marking-no-answers'
+    | 'system-no-condition' | 'condition-not-system' | 'system-loop' | 'marking-unmarked'
 export interface Problem { level: 'error' | 'warning', code: ProblemCode, at: string, params?: Record<string, string> }
 
 export interface CheckOptions {
@@ -138,6 +142,10 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
       return 'any'
     }
     if ('today' in o) return 'date'
+    if ('marking' in o) {
+      if (!totalPoints(def)) return error('marking-unmarked', at), null
+      return o.marking === 'passed' ? 'any' : 'number'
+    }
     return 'any'
   }
   function checkComparison(c: Comparison, at: string, ownerPage: number | null, ownerGroup?: string) {
@@ -264,6 +272,9 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
       if (!seen.has(move.from) || !seen.has(move.to)) error('move-unknown-stage', at)
       else if (move.from === move.to) error('move-nowhere', at)
       else if (move.needsReason && !isDecision(def, move)) error('reason-not-decision', at)
+      // AT1: the system moves only on its condition, and nobody else's move has one.
+      if (move.who === 'system' && !move.when) error('system-no-condition', at)
+      if (move.who !== 'system' && move.when) error('condition-not-system', at)
       for (const use of move.actions ?? []) {
         const action = options.actions?.find(a => a.key === use.action)
         if (options.actions && !action) error('unknown-action', at, { action: use.action })
@@ -279,6 +290,7 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
         }
       }
     }
+    for (const key of systemLoop(transitions)) error('system-loop', `move:${key}`)
     // Somebody sent back must be able to send their changes in again.
     for (const stage of stages) if (stage.kind === 'returned' && !transitions.some(t => t.from === stage.key && t.who === 'submitter' && seen.has(t.to))) error('returned-no-way-back', `stage:${stage.key}`)
     const reached = new Set([stages[0]!.key])
@@ -293,6 +305,39 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
     }
   }
 
+  // ---- correct answers and the pass mark (FB-513) ----
+  for (const { question: q, group } of questionsOf(def)) {
+    const key = q.answer
+    if (!key) continue
+    if (!isMarkable(q)) error('answer-wrong-type', q.id)
+    else if (group) error('answer-in-group', q.id)
+    // Marking reads the answer and says whether it was right, which would tell of a sealed answer.
+    else if (q.dataClass === 'special') error('answer-special', q.id)
+    else checkAnswer(q, key.correct)
+  }
+  function checkAnswer(q: Question, correct: Correct) {
+    if (q.type === 'yesno') return void (typeof correct !== 'boolean' && error('answer-wrong-type', q.id))
+    if (q.type === 'number') {
+      if (typeof correct !== 'object' || Array.isArray(correct)) return error('answer-wrong-type', q.id)
+      if (correct.min === undefined && correct.max === undefined) return error('answer-empty', q.id)
+      if (correct.min !== undefined && correct.max !== undefined && correct.min > correct.max) error('answer-range', q.id)
+      return
+    }
+    if (!Array.isArray(correct)) return error('answer-wrong-type', q.id)
+    if (!correct.some(c => c.trim())) return error('answer-empty', q.id)
+    if (q.type === 'text.short') return
+    const own = new Set((q.options ?? []).map(o => o.id))
+    for (const id of correct) if (!own.has(id)) error('answer-unknown-option', q.id, { option: id })
+    // One choice can never hold two options, so a key naming two could never be right.
+    const single = q.type === 'choice.single' || (q.type === 'choice.dropdown' && !q.multiple)
+    if (single && new Set(correct).size > 1) error('answer-never-right', q.id)
+  }
+  if (def.marking) {
+    const total = totalPoints(def)
+    if (total === 0) problems.push({ level: 'warning', code: 'marking-no-answers', at: 'form:end' })
+    if (def.marking.passMark !== undefined && def.marking.passMark > total) error('pass-mark-over', 'form:end', { total: String(total) })
+  }
+
   // ---- what can never be reached or shown (warnings: they do not stop a publish) ----
   for (const u of unreached(def)) problems.push({ level: 'warning', code: u.why === 'route' ? 'never-reached' : u.required ? 'required-never-shown' : 'never-shown', at: u.at })
 
@@ -300,4 +345,22 @@ export function checkDefinition(def: Definition, options: CheckOptions = {}): Pr
 }
 
 /** Whether a definition may be published: it has no error. Warnings do not block. */
+/** The system moves that can lead back to where they started (AT3), which the builder refuses: each could go round for ever. */
+function systemLoop(transitions: readonly Transition[]): string[] {
+  const system = transitions.filter(t => t.who === 'system' && t.from !== t.to)
+  const leadsBack = (start: string, first: Transition): boolean => {
+    const seen = new Set<string>()
+    const queue = [first.to]
+    while (queue.length) {
+      const at = queue.shift()!
+      if (at === start) return true
+      if (seen.has(at)) continue
+      seen.add(at)
+      queue.push(...system.filter(t => t.from === at).map(t => t.to))
+    }
+    return false
+  }
+  return system.filter(t => leadsBack(t.from, t)).map(t => t.key)
+}
+
 export const publishable = (problems: Problem[]): boolean => !problems.some(p => p.level === 'error')
