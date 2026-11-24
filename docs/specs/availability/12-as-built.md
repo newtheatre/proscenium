@@ -62,7 +62,7 @@ Tests: `layers/availability/tests/integration/gate.test.ts` (through the routes 
 - **Rooms (F5)** come from the occupancy service, so Availability now requires `occupancy` (a support module, on while Availability is on). A slot overlapping a taken stretch is not a best time unless "Room optional" is ticked; the side panel says what holds the room where the reader may see it.
 - **Commitments (F4).** Availability requires `person-busy` too. One `personsBusy` read covers everyone in the find over its dates; Availability's own stated busy rows are dropped (its meetings are kept), and each other row is laid over the person's day where it is worse than what they said (`overlay` in `shared/find.ts`): firm as busy, not firm as maybe. Such a stretch carries the row's translation key, and "Who" shows it in place of a reason.
 - **Stated busy time (AV-07)** is contributed to `core.person-busy` (`server/contributions/core.person-busy/availability.ts`): busy stretches only, kind `unavailable`, label `availability.unavailable`, never firm, never a reason. Arranged meetings add theirs (below); imports will when built.
-- **Not yet:** under-18 warnings (F6, after C-74) and "Turn into…" (AV-17).
+- **Not yet:** "Turn into…" (AV-17).
 - The gallery fixture contributes a "Gallery company" group so the browser test can plan for someone.
 
 ## Polls (AV-15, AV-16, S8, S9), 24 November 2026
@@ -82,10 +82,17 @@ Tests: `layers/availability/tests/integration/gate.test.ts` (through the routes 
 - **Answers (M2)** are going or not going, a conditional write while the meeting is arranged and not over. **Changing (M3)** a time sets every answer back to pending, announces `availability.meeting.moved` and tells everyone; other changes tell people only when "Tell people" is ticked. **Cancelling (M4)** takes an optional reason and tells everyone. Notices: `availability.meeting-invited`, `-moved`, `-changed`, `-cancelled`.
 - **Busy (M5).** Each invitee not saying not going is busy, firm, kind `meeting`, label `availability.meeting`, with the meeting as the record, through the same `core.person-busy` contribution.
 - **Retention.** The daily task deletes meetings that ended longer ago than `retention.history`, with their invitees, and clears a poll's link to them.
-- **Not yet:** the calendar feed (M6, C-70: keyed by the meeting id alone so a move keeps the UID, public-safe titles, cancelled meetings sent as cancelled; waits for lane A's calendar-feed module), the production schedule entry, and under-18 warnings.
+- **Not yet:** the calendar feed (M6, C-70: keyed by the meeting id alone so a move keeps the UID, public-safe titles, cancelled meetings sent as cancelled; waits for lane A's calendar-feed module), and the production schedule entry.
 
 ## Commitments on My availability (A5, S1), 24 November 2026
 
 - **Read.** `GET /api/availability/me` returns `commitments`, by date, from one `personsBusy` read over the days shown (`server/commitments.ts`, shared with Find a time). Availability's own stated busy rows are left out; its arranged meetings and every other module's rows stay in. Each carries its translation key and whether it is firm, never a record title.
 - **Shown.** The week grid draws each commitment over the levels as an outlined block, with a lock and its label where it starts, and each cell's accessible name adds "…, a commitment". The key gains "Held elsewhere" when the week has one. Painting still works underneath: it changes what the person states, never the commitment.
 - **From a meeting.** A meeting's page links to "See it on my week", which opens My availability on the meeting's date.
+
+## Under-18 warnings (AV-14, F6), 24 November 2026
+
+- **Read.** `server/safeguarding.ts` asks core's `ageStatuses` only (A9, R3-25): who is under 18 on each date of a find, asking again only for those still under 18 as the dates go on, and whether the people are exactly one adult and one under-18. Unknown is never taken as adult.
+- **Find a time.** The result carries `under18`: the latest finish in minutes from `core.under-18.latest-finish` (null while unset, so no late warning), the under-18 people on each date, and `oneToOne`. `lateFor` in `shared/find.ts` names who a slot keeps past the latest finish. Best times show a warning triangle; the slot panel names the people; a one-to-one find shows one line above the best times.
+- **Meetings.** The organiser's view of a meeting carries `under18` for everyone not saying not going, on its day and end time; invitees never see it. Nothing blocks.
+- **Setting.** `availability.safeguarding.one-to-one` (on by default, Matt's answer 9), under the settings heading "Under-18s".

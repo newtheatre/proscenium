@@ -2,8 +2,10 @@
 // tickets and who came, then each ticket let in without its requirement being checked again (its
 // source was off, failing or not open to the steward) and each one admitted anyway with a reason, so
 // the duty manager can follow them up. A ticket is listed by its booking reference and type, with
-// the time it came in and, for an override, the reason chosen. Compiled at sign-off.
+// the time it came in and, for an override, the reason chosen. Where the door counter was used, its
+// walk-ups and peak inside follow, beside admitted and never added to it (BO-73). Compiled at sign-off.
 import { all, first, useSetting } from '#kit'
+import { headcountFor } from '../../headcount'
 
 interface Admission { reference: string, type_name: string, scanned_at: number, reason: string | null }
 
@@ -27,11 +29,20 @@ export default {
     const tickets = Number(counts?.tickets ?? 0)
     const admitted = Number(counts?.admitted ?? 0)
     const ticket = (a: Admission) => `${a.reference} · ${a.type_name}`
+    const counted = (await headcountFor([performanceId]))[performanceId]!
+    const counter = counted.in || counted.out
+      ? [
+          { label: 'box-office.report.walk-ups', value: counted.walkUps },
+          ...counted.out ? [{ label: 'box-office.report.counted-out', value: counted.out }] : [],
+          { label: 'box-office.report.peak-inside', value: counted.peak },
+        ]
+      : []
     return [
       { label: 'box-office.report.tickets', value: tickets },
       { label: 'box-office.report.admitted', value: admitted },
       { label: 'box-office.report.not-in', value: tickets - admitted },
       { label: 'box-office.report.complimentary', value: Number(counts?.comps ?? 0) },
+      ...counter,
       { label: 'box-office.report.unchecked', value: unchecked.length },
       ...unchecked.map(a => ({ label: ticket(a), value: clock.format(a.scanned_at) })),
       { label: 'box-office.report.overridden', value: overridden.length },

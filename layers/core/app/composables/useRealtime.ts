@@ -12,6 +12,8 @@
 // account's room, issued by a module (the till's link code). A page holds one socket for each room
 // it listens in.
 import type { Ref } from 'vue'
+import { isPracticePath } from '../../shared/practice'
+import { withPracticeMark } from '../utils/practice'
 
 const HEARTBEAT = 25_000 // not-policy: keeps the socket from being dropped as idle
 const RETRY_FROM = 1000 // not-policy: the first wait before connecting again
@@ -184,12 +186,16 @@ export function useRealtime(channel: string, on: Listener, options: { grant?: Re
   if (!import.meta.client) return shared
 
   const { $api } = useNuxtApp()
+  // A practice page's rooms are the practice session's own (O5): its socket is never shared with a
+  // real page's, and reconnecting asks for a practice ticket even after the page has changed.
+  const practising = isPracticePath(useRoute().path)
   function roomFor(grant: string | null): Connection {
-    const key = grant ?? ''
+    const key = `${practising ? 'practice:' : ''}${grant ?? ''}`
     if (!rooms.has(key)) {
       rooms.set(key, connection(async () => {
         try {
-          return await $api<Ticket>('/api/core/realtime/ticket', { method: 'POST', body: grant ? { grant } : {} })
+          const request = { method: 'POST' as const, body: grant ? { grant } : {} }
+          return await $api<Ticket>('/api/core/realtime/ticket', practising ? withPracticeMark(request) : request)
         }
         catch (error) {
           // A grant that no longer reads is refused for good; anything else is tried again.

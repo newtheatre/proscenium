@@ -6,7 +6,7 @@ import { requestEmailSignIn } from '../../../identity/email-sign-in'
 import { requireChallengeSecret } from '../../../identity/challenge'
 import { safeNext } from '../../../identity/web'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   public: true,
   rateLimit: 'sign-in-network',
   protect: 'turnstile',

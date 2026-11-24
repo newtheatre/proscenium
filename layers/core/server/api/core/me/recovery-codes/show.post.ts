@@ -6,7 +6,7 @@ import { defineRoute } from '#kit'
 import { requireFresh, sessionOf } from '../../../../identity/guards'
 import { myRecoveryCodes } from '../../../../identity/passkeys'
 
-export default defineRoute({ ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { unit, actor }) => {
+export default defineRoute({ practice: 'refuse', ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { unit, actor }) => {
   const session = await sessionOf(event)
   await requireFresh(actor)
   const codes = await myRecoveryCodes(session.accountId)
