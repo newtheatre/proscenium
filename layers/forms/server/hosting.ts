@@ -112,6 +112,55 @@ export async function slotRespondents(slotId: string, subjectId: string): Promis
   return out
 }
 
+export interface SlotQuestion { key: string, label: string, type: QuestionType, dataClass: DataClass, options: { id: string, label: string }[] }
+
+/** The questions of the published form attached to one record in a slot, for a host to name its roles. Answers are not read. */
+export async function slotQuestions(slotId: string, subjectId: string): Promise<SlotQuestion[]> {
+  const slot = await slotIn(slotId, 'submission')
+  for (const place of await attachedTo(slot.id, subjectId)) {
+    const form = await getForm(place.formId)
+    const version = form && form.status !== 'draft' && form.status !== 'archived' ? await getVersion(form.liveVersionId) : null
+    if (!version) continue
+    return questionsOf(JSON.parse(version.definition) as Definition).filter(q => !q.group).map(({ question: q }) => ({
+      key: q.key, label: q.label, type: q.type, dataClass: q.dataClass, options: (q.options ?? []).map(o => ({ id: o.id, label: o.label })),
+    }))
+  }
+  return []
+}
+
+export interface KeyedAnswer { value: Value, other: string | null }
+
+/**
+ * Each respondent's answers to some questions, by question key, from their latest sent response
+ * (as slotRespondents). `special` opens special-category answers; a host asks for them only for a
+ * count or under an ability that may see them, and audits a read by name itself.
+ */
+export async function slotAnswers(slotId: string, subjectId: string, keys: string[], options: { special: boolean }): Promise<Map<string, Record<string, KeyedAnswer>>> {
+  const out = new Map<string, Record<string, KeyedAnswer>>()
+  const respondents = [...(await slotRespondents(slotId, subjectId)).values()]
+  if (!respondents.length || !keys.length) return out
+  const versions = await all<{ id: string, version_id: string }>('SELECT id, version_id FROM forms_responses WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(respondents.map(r => r.responseId)))
+  const byVersion = new Map<string, string[]>()
+  for (const v of versions) byVersion.set(v.version_id, [...(byVersion.get(v.version_id) ?? []), v.id])
+  const personOf = new Map(respondents.map(r => [r.responseId, r.personId]))
+  for (const [versionId, responseIds] of byVersion) {
+    const version = await getVersion(versionId)
+    if (!version) continue
+    const questions = questionsOf(JSON.parse(version.definition) as Definition).filter(q => !q.group && keys.includes(q.question.key)).map(q => q.question)
+    const keyOf = new Map(questions.map(q => [q.id, q.key]))
+    const read = await readAnswers(responseIds, new Map(questions.map(q => [q.id, q.type])), options.special)
+    for (const [responseId, answers] of read) {
+      const keyed: Record<string, KeyedAnswer> = {}
+      for (const a of answers) {
+        const key = keyOf.get(a.questionId)
+        if (key && !a.restricted) keyed[key] = { value: a.value, other: a.other }
+      }
+      out.set(personOf.get(responseId)!, keyed)
+    }
+  }
+  return out
+}
+
 /**
  * Sends a response to a form attached to the host's record, in the host's unit of work, with every
  * check POST /api/forms/open/:slug/responses makes: the engine runs again on the answers, hidden

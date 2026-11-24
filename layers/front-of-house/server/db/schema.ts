@@ -157,6 +157,40 @@ export const crewCalls = defineTable('front_of_house_crew_calls', {
   ],
 })
 
+export const HANDOUT_ITEMS = ['tshirt', 'meal'] as const
+
+/**
+ * A T-shirt or meal handed to someone on a crew call (FH-50). Earned perks are worked out, never
+ * stored (CC4); a handout is the fact. An undo is a new row naming the one it reverses (HO1).
+ */
+export const handouts = defineTable('front_of_house_handouts', {
+  id: col.id(),
+  crewCallId: col.ref('front_of_house_crew_calls'),
+  accountId: col.account('account_id', { role: 'subject' }),
+  item: col.internal(text('item', { enum: HANDOUT_ITEMS }).notNull()),
+  // Required for a meal, empty for a T-shirt.
+  day: col.localDate('day'),
+  // The size handed over, which may differ from the one asked for.
+  size: col.personal(text('size'), { erase: 'clear' }),
+  reversesId: col.ref('front_of_house_handouts', { nullable: true }),
+  handedBy: col.account('handed_by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'hnd',
+  realm: 'members',
+  subject: 'account_id',
+  appendOnly: true,
+  // Counted from the call's end by the module's own sweep, which clears the size.
+  retention: 'front-of-house.retention.assignments',
+  extra: t => [
+    index('front_of_house_handouts_call').on(t.crewCallId, t.accountId, t.item, t.day),
+    uniqueIndex('front_of_house_handouts_reverses').on(t.reversesId).where(sql`reverses_id IS NOT NULL`),
+    check('front_of_house_handouts_item', sql`${t.item} IN (${list(HANDOUT_ITEMS)})`),
+    check('front_of_house_handouts_day', sql`(${t.item} = 'meal') = (${t.day} IS NOT NULL)`),
+    check('front_of_house_handouts_size', sql`${t.size} IS NULL OR length(${t.size}) <= 20`),
+  ],
+})
+
 /** One person on one shift. "Shift" is the job; "assignment" is a person doing it. */
 export const assignments = defineTable('front_of_house_assignments', {
   id: col.id(),
@@ -553,4 +587,4 @@ export const calendarFeeds = defineTable('front_of_house_calendar_feeds', {
   ],
 })
 
-export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, crewCalls, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates, calendarFeeds }
+export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, crewCalls, handouts, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates, calendarFeeds }
