@@ -87,7 +87,9 @@ export default defineModule({
   abilities: defineAbilities('training', {
     'course.view': ability({ grantAt: ['site'] }),
     'course.manage': ability({ on: 'training.course', implies: ['course.view'] }),
-    'sign-off.record': ability({ on: 'training.course', implies: ['course.view', 'core.account.find'] }),
+    'sign-off.record': ability({ on: 'training.course', implies: ['course.view', 'core.account.find', 'teaching.view'] }),
+    // The trainer's own pages (M7 to M9): comes with signing off or running sessions on any one course.
+    'teaching.view': ability({ impliable: true, implies: ['course.view'] }),
     // A person sees their own training records by ownership; every other read is audited.
     'record.view': ability({ on: 'training.record', owner: 'grants', audit: 'read', implies: ['course.view', 'core.account.find'] }),
     'record.award': ability({ on: 'training.course', risk: 'privileged', implies: ['record.view'] }),
@@ -96,7 +98,7 @@ export default defineModule({
     'competency.manage': ability({ on: 'training.competency', risk: 'privileged', implies: ['course.view'] }),
     'session.manage': ability({ on: 'training.course', implies: ['course.view'] }),
     // Marking attendance, a walk-in and closing; mapped to the course-trainer fact by default.
-    'session.run': ability({ on: 'training.course', implies: ['course.view', 'core.account.find'] }),
+    'session.run': ability({ on: 'training.course', implies: ['course.view', 'core.account.find', 'teaching.view'] }),
     'place.book': ability({ grantAt: ['site'], implies: ['course.view'] }),
     'place.manage': ability({ on: 'training.course', implies: ['course.view', 'core.account.find'] }),
     // Open evidence and verify or reject it; never one's own (S4). Does not imply record.view.
@@ -255,6 +257,7 @@ export default defineModule({
     // Part 5, "Navigation entries": each is added with its screens.
     'core.navigation': [
       { id: 'training.home', menu: 'members', to: '/members/training', icon: 'i-lucide-graduation-cap', ability: 'training.course.view', order: 50 },
+      { id: 'training.teach', menu: 'members', to: '/members/training/teaching', icon: 'i-lucide-presentation', ability: 'training.teaching.view', order: 51 },
     ],
     'core.record-resolver': [
       { id: 'training.course', file: 'course' },
