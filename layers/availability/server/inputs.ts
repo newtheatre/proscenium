@@ -53,3 +53,16 @@ export const withdrawInput = z.object({ accountId: z.string().min(1).max(40) }).
 export const onBehalfInput = exceptionInput.extend({ accountId: z.string().min(1).max(40) }).strict() // not-policy: an id's length
 
 export const personQuery = z.object({ accountId: z.string().min(1).max(40) }) // not-policy: an id's length
+
+export const findInput = z.object({
+  groupIds: z.array(z.string().max(200)).max(20), // not-policy: shape bound
+  accountIds: z.array(z.string().max(40)).max(200), // not-policy: rule F1's ceiling
+  must: z.array(z.string().max(40)).max(30), // not-policy: rule F1's ceiling on must-have people
+  from: date,
+  to: date,
+  hoursFrom: clock,
+  hoursTo: clock,
+  length: z.number().int().min(1).max(1440), // not-policy: minutes in a day
+  spaceIds: z.array(z.string().max(40)).max(30), // not-policy: occupancy's ceiling on spaces (O3)
+  roomOptional: z.boolean(),
+}).strict()

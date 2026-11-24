@@ -10,6 +10,8 @@ const change = 'availability.settings.manage'
 export default defineModule({
   id: 'availability',
   manifest: 1,
+  // Find a time shows when the chosen rooms are taken (F5).
+  requires: ['occupancy'],
   since: '0.1.0',
   stability: 'experimental',
 
@@ -35,6 +37,8 @@ export default defineModule({
     // Entering one's own needs only a sign-in (A1). Reaches every member's time, so it is audited
     // on read; it never shows a reason (A7).
     'find.anyone': ability({ risk: 'privileged', audit: 'read' }),
+    // Find a time for groups one plans for; the group check does the real work (F1).
+    'find.use': ability({}),
     'request.send': ability({}),
     // A8: busy or maybe for a member of a group one plans for; the group check limits it.
     'entry.on-behalf': ability({}),
@@ -58,7 +62,8 @@ export default defineModule({
   contributes: {
     'core.navigation': [
       { id: 'availability.mine', menu: 'members', to: '/members/availability', icon: 'i-lucide-calendar-check', order: 45 },
-      { id: 'availability.requests', menu: 'members', to: '/members/find-a-time/requests', icon: 'i-lucide-send', ability: 'availability.request.send', order: 46 },
+      { id: 'availability.find', menu: 'members', to: '/members/find-a-time', icon: 'i-lucide-calendar-search', ability: 'availability.find.use', order: 46 },
+      { id: 'availability.requests', menu: 'members', to: '/members/find-a-time/requests', icon: 'i-lucide-send', ability: 'availability.request.send', order: 47 },
     ],
     'core.record-resolver': [{ id: 'availability.request', file: 'request' }],
     'core.notification-type': [{
