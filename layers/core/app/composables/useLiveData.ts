@@ -4,6 +4,7 @@
 // was made. It fetches again when the connection returns, and every `every` milliseconds if given. Copies older than `keepFor` are dropped
 // when any live screen opens, so names and codes do not linger on a shared device.
 import { useOnline } from '@vueuse/core'
+import { isPracticePath, practiceKey } from '../../shared/practice'
 
 interface Copy<T> { at: number, data: T }
 
@@ -25,8 +26,10 @@ function forgetOld(keepFor: number) {
   }
 }
 
-export function useLiveData<T>(key: string, url: MaybeRefOrGetter<string>, options: { keepFor?: number, every?: number } = {}) {
+export function useLiveData<T>(name: string, url: MaybeRefOrGetter<string>, options: { keepFor?: number, every?: number } = {}) {
   const { $api } = useNuxtApp()
+  // A practice tab keeps its copy apart, so practice data never shows on the real screen (O5).
+  const key = practiceKey(name, isPracticePath(useRoute().path))
   const online = useOnline()
   const data = ref<T | null>(null) as Ref<T | null>
   /** When the copy shown was fetched; null before there is one. */
