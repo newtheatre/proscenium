@@ -79,6 +79,7 @@ export default defineModule({
       { id: 'core.access-scheme-queue', menu: 'console', group: 'people', section: 'everyday', to: '/console/people/access-scheme', icon: 'i-lucide-accessibility', ability: 'core.access-scheme.read', order: 60, count: 'core.access-scheme-waiting' },
       { id: 'core.productions', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/productions', icon: 'i-lucide-drama', ability: 'core.production.view', order: 10 },
       { id: 'core.calendar', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/calendar', icon: 'i-lucide-calendar-days', ability: 'core.production.view', order: 15 },
+      { id: 'core.collections', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/collections', icon: 'i-lucide-library', ability: 'core.production.view', order: 12 },
       { id: 'core.seasons', menu: 'admin', group: 'modules', to: '/admin/modules/core/seasons', icon: 'i-lucide-calendar-range', ability: 'core.season.manage', order: 20, settingsIn: ['core.productions'] },
       { id: 'core.run-presets', menu: 'admin', group: 'modules', to: '/admin/modules/core/run-presets', icon: 'i-lucide-calendar-clock', ability: 'core.programme.configure', order: 25, settingsIn: ['core.productions'] },
       { id: 'core.modules', menu: 'admin', group: 'modules', to: '/admin/modules', icon: 'i-lucide-blocks', ability: ['core.modules.manage', 'core.health.view'], order: 10 },
