@@ -3,7 +3,7 @@
 // docs/specs/training). Whether a person is trained is worked out from rows and dates when asked.
 // This file grows with the build; it declares what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, point, setting, task } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 import { SIGN_OFF_KINDS } from './shared/states'
 
@@ -112,9 +112,14 @@ export default defineModule({
 
   tables,
 
+  jobs: {
+    // Tells holders a retraining version cut their training short, a page at a time (V6).
+    'training.notify-holders': job({ payload: z.object({ courseId: z.string(), versionId: z.string(), after: z.string().nullable() }), lane: 'bulk' }),
+  },
+
   tasks: {
     'training.send-reminders': task({ every: '30m' }),
-    // Reads step sources again for people with progress on an activity step (H2).
+    // Warns of expiry, announces lapses (L3) and reads step sources again (H2).
     'training.sweep-records': task({ dailyAt: '06:00' }),
   },
 
@@ -152,6 +157,51 @@ export default defineModule({
         'en-GB': {
           subject: 'You have completed {{ course }}',
           body: 'Your training record for **{{ course }}** has been awarded. You can see it, and when it runs until, on your training page.',
+          action: 'See my training',
+        },
+      },
+    }, {
+      id: 'training.record-expiring',
+      category: 'optional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      topic: 'training.records',
+      link: '/members/training',
+      variables: { course: 'text' as const, until: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your training for {{ course }} runs out on {{ until }}',
+          body: 'Your training record for **{{ course }}** runs out on {{ until }}. To keep it, renew it before then; your training page shows how.',
+          action: 'See my training',
+        },
+      },
+    }, {
+      id: 'training.record-lapsed',
+      category: 'optional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      topic: 'training.records',
+      link: '/members/training',
+      variables: { course: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your training for {{ course }} has run out',
+          body: 'Your training record for **{{ course }}** has run out, so it no longer counts. Your training page shows how to take it again.',
+          action: 'See my training',
+        },
+      },
+    }, {
+      // It changes when their training stops counting, so it cannot be switched off.
+      id: 'training.record-cut-short',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/training',
+      variables: { course: 'text' as const, until: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: '{{ course }} has changed: retrain by {{ until }}',
+          body: 'The course **{{ course }}** has changed enough that everyone must retrain. Your training for it now counts until {{ until }}.',
           action: 'See my training',
         },
       },
@@ -221,6 +271,10 @@ export default defineModule({
       'training.sign-off.voided': event({ version: 1, payload: z.object({ signOffId: z.string(), accountId: z.string(), courseId: z.string() }), internal: true }),
       'training.record.awarded': event({ version: 1, payload: z.object({ ...record, expiresAt: z.number().int().nullable() }), internal: true }),
       'training.record.revoked': event({ version: 1, payload: z.object(record), internal: true }),
+      // Announced by the daily task, so up to a day late: nothing may decide on them (part 4).
+      'training.record.expiring': event({ version: 1, payload: z.object({ ...record, expiresAt: z.number().int() }), internal: true }),
+      'training.record.lapsed': event({ version: 1, payload: z.object(record), internal: true }),
+      'training.record.cut-short': event({ version: 1, payload: z.object({ ...record, expiresAt: z.number().int() }), internal: true }),
       // Who holds the competency may have changed; listeners ask core.requirement again.
       'training.session.published': event({ version: 1, payload: session, internal: false }),
       'training.session.changed': event({ version: 1, payload: session, internal: false }),
