@@ -30,7 +30,7 @@ let slug = ''
 test.beforeAll(async ({ playwright }) => {
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', extraHTTPHeaders: as(manager) })
   await ok(api, 'put', '/api/core/settings', { changes: [{ key: 'core.locale.time-zone', value: 'Europe/London' }, { key: 'core.rate-limits.default', value: { count: 10000, per: '1m' } }], confirm: true })
-  for (const id of ['forms', 'occupancy', 'training']) await ok(api, 'put', `/api/core/modules/${id}`, { on: true })
+  await ok(api, 'put', '/api/core/modules/training', { on: true })
   const { courseId } = await ok(api, 'post', '/api/training/courses', { title, summary: 'Taking payments on the till.', expires: true, validFor: 365 * 86_400 })
   await ok(api, 'put', `/api/training/courses/${courseId}/steps`, { steps: [{ kind: 'session', title: 'Come to a till session' }, { kind: 'reading', title: 'Read the till guide', materialUrl: 'https://example.org/till' }] })
   await ok(api, 'post', `/api/training/courses/${courseId}/publish`, {})
