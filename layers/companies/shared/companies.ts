@@ -35,3 +35,11 @@ export type Move = keyof typeof MOVES
 
 // The columns' bounds (part 2), checked by the routes before the tables' own checks.
 export const LIMITS = { name: 160, legalName: 200, registration: 60, taxNumber: 30, address: 400, postcode: 12, website: 300, description: 600, notes: 4000, role: 80, phone: 30, title: 160, reason: 500, personName: 120, email: 254, places: 50 } // not-policy: the columns' bounds
+
+/** Rule G1's near match: letters and digits only, accents and a leading or trailing "The" dropped. */
+export function nameKey(name: string): string {
+  const words = name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/&/g, ' and ').split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+  if (words[0] === 'the') words.shift()
+  if (words.length > 1 && words.at(-1) === 'the') words.pop()
+  return words.join(' ')
+}

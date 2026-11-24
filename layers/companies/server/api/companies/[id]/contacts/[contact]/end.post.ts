@@ -1,7 +1,8 @@
 // Rule G4 and CO-05: ends a contact; their access through companies.contact-of ends with this batch.
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
-import { endContact, endInput, requireCompany } from '../../../../../contacts'
+import { requireCompany } from '../../../../../companies'
+import { endContact, endInput } from '../../../../../contacts'
 
 export default defineRoute({
   ability: 'companies.contact.manage',

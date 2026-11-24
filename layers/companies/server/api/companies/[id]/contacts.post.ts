@@ -1,7 +1,8 @@
 // Rules G2 and G4: adds a person who acts for the company; the first is its primary contact.
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
-import { addContact, contactInput, requireCompany } from '../../../contacts'
+import { requireCompany } from '../../../companies'
+import { addContact, contactInput } from '../../../contacts'
 
 export default defineRoute({
   ability: 'companies.contact.manage',

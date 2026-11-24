@@ -80,6 +80,9 @@ export default defineModule({
   },
 
   contributes: {
+    'core.navigation': [
+      { id: 'companies.companies', menu: 'console', group: 'programme', section: 'everyday', to: '/console/companies', match: '/console/companies', icon: 'i-lucide-building-2', ability: 'companies.company.view', order: 30 },
+    ],
     // Part 2, "Ledger accounts": made locked when the module is switched on.
     'finance.system-account': [
       { id: 'company-share', name: 'Company shares', kind: 'expense' },
