@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "469533ba-1e8c-443e-913e-9c53680a381c",
+  "id": "4d74b8f1-0f26-4c0a-a8a4-4b89cebeea5a",
   "prevIds": [
     "253a73f7-3dc8-4fca-8c87-bdcbf1975c1d",
     "27eee593-bbbf-4646-8a7c-179f088b6b30",
@@ -12945,6 +12945,16 @@
       "entityType": "columns"
     },
     {
+      "table": "core_term_groups",
+      "name": "key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_terms",
       "name": "id",
       "type": "text",
@@ -24687,6 +24697,24 @@
       ],
       "isUnique": true,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_term_groups",
+      "name": "core_term_groups_key",
+      "columns": [
+        {
+          "value": "vocabulary_key",
+          "isExpression": false
+        },
+        {
+          "value": "key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"core_term_groups\".\"key\" IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },

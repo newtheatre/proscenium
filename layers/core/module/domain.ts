@@ -269,6 +269,8 @@ export const points = {
       termClass: z.enum(['public', 'internal']).optional(),
       // Headings, in order, for a grouped vocabulary: every term then names the heading it sits under.
       groups: z.array(z.string().min(1).max(80)).optional(), // not-policy: the label's bounds
+      // A fixed key for a heading code reads by, by its label: core.department's kinds (R3-07).
+      groupKeys: z.record(z.string(), z.string().regex(/^[a-z][a-z0-9-]*$/)).optional(),
       terms: z.array(z.object({
         slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
         label: z.string().min(1).max(80), // not-policy: the label's bounds
@@ -413,8 +415,12 @@ export const contributes = {
   // The vocabularies core ships (part 2, group 3). Labels are the theatre's to change afterwards.
   'core.vocabulary': [
     { id: 'core.production-category', label: 'Production categories', terms: terms(['play', 'Play'], ['musical', 'Musical'], ['comedy', 'Comedy'], ['dance', 'Dance'], ['music', 'Music'], ['workshop', 'Workshop'], ['social', 'Social'], ['other', 'Other']) },
-    // The parts of a theatre that hold a yearly budget or stock (Budgets, Inventory; Integration's ruling, 23 November 2026).
-    { id: 'core.department', label: 'Departments', terms: terms(['technical', 'Technical'], ['publicity', 'Publicity'], ['front-of-house', 'Front of house'], ['bar', 'Bar'], ['social', 'Social'], ['general', 'General']) },
+    // One list of departments (R3-07, Matt 24 November): a production's, under Production, and the
+    // organisation's, under Organisation. Budgets offers the second; Productions and Inventory read either.
+    { id: 'core.department', label: 'Departments', groups: ['Production', 'Organisation'], groupKeys: { Production: 'production', Organisation: 'organisation' }, terms: [
+      ...terms(['creative', 'Creative'], ['cast', 'Cast'], ['stage-management', 'Stage management'], ['lighting', 'Lighting'], ['sound', 'Sound'], ['video', 'Video'], ['set', 'Set'], ['props', 'Props'], ['costume', 'Costume'], ['hair-and-make-up', 'Hair and make-up'], ['music', 'Music'], ['production', 'Production']).map(t => ({ ...t, group: 'Production' })),
+      ...terms(['technical', 'Technical'], ['publicity', 'Publicity'], ['front-of-house', 'Front of house'], ['bar', 'Bar'], ['social', 'Social'], ['general', 'General']).map(t => ({ ...t, group: 'Organisation' })),
+    ] },
     { id: 'core.credit-section', label: 'Credit sections', terms: terms(['cast', 'Cast'], ['creative-team', 'Creative team'], ['production-team', 'Production team'], ['crew', 'Crew'], ['band', 'Band']) },
     { id: 'core.advisory', label: 'Content warnings', description: 'What a story is about that someone may want to know first: shown on a production\'s page behind a "show" control.', groups: ['Violence and harm', 'Sexual content and abuse', 'Death and loss', 'Mental health', 'Discrimination and hate', 'Language and substances', 'Crime, war and conflict', 'Family and relationships', 'Medical and bodily'], terms: [
       { slug: 'violence', label: 'Violence', description: 'Physical fights, assault or brutality.', group: 'Violence and harm' },

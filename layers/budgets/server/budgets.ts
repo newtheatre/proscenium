@@ -196,6 +196,9 @@ export const budgetFields = z.object({
   parentLineId: z.string().max(40).nullable().optional(), // not-policy: ids are short
 })
 
+/** A department budget is for one of the organisation's departments, not a production's (R3-07). */
+export const ORGANISATION = "group_id IN (SELECT id FROM core_term_groups WHERE vocabulary_key = 'core.department' AND key = 'organisation')"
+
 /** What a new budget is about, its default name and the finance year it falls in. */
 export async function subjectOf(input: z.infer<typeof budgetFields> | Omit<z.infer<typeof budgetFields>, 'name'>): Promise<{ name: string | null, yearStartsOn: string }> {
   const yearOf = async (date: string) => (await financeYearOf(date)).startsOn
@@ -213,7 +216,7 @@ export async function subjectOf(input: z.infer<typeof budgetFields> | Omit<z.inf
       return { name: row.name, yearStartsOn: given ?? await yearOf(row.startsOn) }
     }
     case 'department': {
-      const row = input.departmentTermId ? await first<{ label: string }>("SELECT label FROM core_terms WHERE id = ? AND vocabulary_key = 'core.department' AND retired_at IS NULL", input.departmentTermId) : null
+      const row = input.departmentTermId ? await first<{ label: string }>(`SELECT label FROM core_terms WHERE id = ? AND vocabulary_key = 'core.department' AND retired_at IS NULL AND ${ORGANISATION}`, input.departmentTermId) : null
       if (!row) return field('departmentTermId', 'budgets.budget.department', 'Choose the department this budget is for.')
       const yearStartsOn = given ?? await yearOf(await today())
       return { name: `${row.label} ${yearStartsOn.slice(0, 4)}`, yearStartsOn }

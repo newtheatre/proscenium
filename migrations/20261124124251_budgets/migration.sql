@@ -78,6 +78,7 @@ CREATE TABLE `budgets_lines` (
 	CONSTRAINT "budgets_lines_category" CHECK("kind" = 'income' OR "category_id" IS NOT NULL)
 );
 --> statement-breakpoint
+ALTER TABLE `core_term_groups` ADD `key` text;--> statement-breakpoint
 CREATE UNIQUE INDEX `budgets_budgets_production` ON `budgets_budgets` (`production_id`) WHERE production_id IS NOT NULL AND state <> 'closed';--> statement-breakpoint
 CREATE UNIQUE INDEX `budgets_budgets_season` ON `budgets_budgets` (`season_id`) WHERE season_id IS NOT NULL AND state <> 'closed';--> statement-breakpoint
 CREATE UNIQUE INDEX `budgets_budgets_department` ON `budgets_budgets` (`department_term_id`,`year_starts_on`) WHERE department_term_id IS NOT NULL AND state <> 'closed';--> statement-breakpoint
@@ -87,7 +88,8 @@ CREATE UNIQUE INDEX `budgets_categories_slug` ON `budgets_categories` (`slug`);-
 CREATE UNIQUE INDEX `budgets_categories_name` ON `budgets_categories` (`name`) WHERE archived_at IS NULL;--> statement-breakpoint
 CREATE INDEX `budgets_line_amounts_line` ON `budgets_line_amounts` (`line_id`,`stage`,`set_at`);--> statement-breakpoint
 CREATE UNIQUE INDEX `budgets_lines_name` ON `budgets_lines` (`budget_id`,`name`) WHERE archived_at IS NULL;--> statement-breakpoint
-CREATE INDEX `budgets_lines_budget` ON `budgets_lines` (`budget_id`,`sort_order`);
+CREATE INDEX `budgets_lines_budget` ON `budgets_lines` (`budget_id`,`sort_order`);--> statement-breakpoint
+CREATE UNIQUE INDEX `core_term_groups_key` ON `core_term_groups` (`vocabulary_key`,`key`) WHERE "core_term_groups"."key" IS NOT NULL;
 --> statement-breakpoint
 DROP TRIGGER IF EXISTS `budgets_line_amounts_append_only_delete`;
 --> statement-breakpoint

@@ -17,6 +17,8 @@ export interface VocabularyDecl {
   termClass?: 'public' | 'internal'
   /** Headings, in order. A grouped vocabulary keeps its terms under them, and each term names its heading. */
   groups?: string[]
+  /** A fixed key for a heading code reads by, by the heading's label, such as { Production: 'production' }. */
+  groupKeys?: Record<string, string>
   terms: { slug: string, label: string, description?: string, icon?: string, group?: string }[]
 }
 
@@ -130,7 +132,7 @@ export async function ensureVocabularies(moduleId?: string): Promise<number> {
     unit.add(sql`INSERT INTO core_vocabularies (key, owner, label, description, ordering, locked, term_class, grouped)
       VALUES (${decl.id}, ${module}, ${decl.label}, ${decl.description ?? null}, ${decl.ordering ?? 'manual'}, ${decl.locked ? 1 : 0}, ${decl.termClass ?? 'public'}, ${decl.groups ? 1 : 0})`)
     const groupIds = new Map((decl.groups ?? []).map(label => [label, newId('tgr')]))
-    if (groupIds.size) unit.insertSet(termGroups, [...groupIds].map(([label, id], sort) => ({ id, vocabularyKey: decl.id, label, sort })))
+    if (groupIds.size) unit.insertSet(termGroups, [...groupIds].map(([label, id], sort) => ({ id, vocabularyKey: decl.id, label, sort, key: decl.groupKeys?.[label] ?? null })))
     unit.insertSet(terms, decl.terms.map((t, sort) => ({ vocabularyKey: decl.id, slug: t.slug, label: t.label, description: t.description ?? null, icon: t.icon ?? null, sort, seeded: true, groupId: t.group ? groupIds.get(t.group) ?? null : null })))
   }
   try {
@@ -180,7 +182,7 @@ async function adoptHeadings(declared: { module: string, decl: VocabularyDecl }[
     if (own) labels.push('Other')
     const groupIds = new Map(labels.map(label => [label, newId('tgr')]))
     unit.add(sql`UPDATE core_vocabularies SET grouped = 1 WHERE key = ${decl.id}`)
-    unit.insertSet(termGroups, [...groupIds].map(([label, id], sort) => ({ id, vocabularyKey: decl.id, label, sort })))
+    unit.insertSet(termGroups, [...groupIds].map(([label, id], sort) => ({ id, vocabularyKey: decl.id, label, sort, key: decl.groupKeys?.[label] ?? null })))
     await topUpTerms(unit, decl, groupIds)
     if (own) unit.add(sql`UPDATE core_terms SET group_id = ${groupIds.get('Other')!} WHERE vocabulary_key = ${decl.id} AND group_id IS NULL`)
   }
@@ -458,12 +460,13 @@ export async function reorderTermGroups(unit: UnitView, vocabularyKey: string, i
   unit.audit({ action: 'update', record: ['core.vocabulary', vocabularyKey], detail: { reorderedGroups: ids.length } })
 }
 
-/** Removes an empty heading. One with terms under it, live or retired, stays until they are moved. */
+/** Removes an empty heading. One with terms under it, live or retired, stays until they are moved; one with a key always stays. */
 export async function removeTermGroup(unit: UnitView, vocabularyKey: string, id: string): Promise<void> {
   const vocabulary = await groupedOrRefuse(vocabularyKey)
   if (vocabulary.locked) LOCKED()
   if (!await first('SELECT 1 FROM core_term_groups WHERE id = ? AND vocabulary_key = ?', id, vocabularyKey)) GROUP_NOT_FOUND()
-  unit.add(sql`DELETE FROM core_term_groups WHERE id = ${id} AND vocabulary_key = ${vocabularyKey} AND NOT EXISTS (SELECT 1 FROM core_terms WHERE group_id = ${id})`)
+  if (await first('SELECT 1 FROM core_term_groups WHERE id = ? AND key IS NOT NULL', id)) refuse('core.term-group.keyed', 'Other parts of the site sort terms by this heading, so it stays.', { status: 409, remedy: 'Rename it instead.' })
+  unit.add(sql`DELETE FROM core_term_groups WHERE id = ${id} AND vocabulary_key = ${vocabularyKey} AND key IS NULL AND NOT EXISTS (SELECT 1 FROM core_terms WHERE group_id = ${id})`)
     .expect(1, { code: 'core.term-group.not-empty', reason: 'Terms still sit under this heading.', remedy: 'Move them to another heading first.' })
   unit.audit({ action: 'delete', record: ['core.vocabulary', vocabularyKey], detail: { groupId: id } })
 }
