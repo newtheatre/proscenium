@@ -220,7 +220,7 @@ export async function voidClaim(unit: UnitView, actor: Actor, claim: Claim, inpu
   }).expect(1, changed())
   if (claim.requestId) {
     unit.add({
-      sql: `UPDATE budgets_spending_requests SET fulfilled_minor = max(0, fulfilled_minor - ?1), state = CASE WHEN state = 'fulfilled' THEN 'approved' ELSE state END, updated_at = ?2 WHERE id = ?3`, // not-policy: numbered parameters
+      sql: 'UPDATE budgets_spending_requests SET fulfilled_minor = max(0, fulfilled_minor - ?1), state = CASE WHEN state = \'fulfilled\' THEN \'approved\' ELSE state END, updated_at = ?2 WHERE id = ?3', // not-policy: numbered parameters
       params: [claim.approvedMinor ?? 0, at, claim.requestId],
     })
   }

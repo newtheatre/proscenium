@@ -301,7 +301,7 @@ export async function submit(unit: UnitView, actor: Actor, claim: Claim, input: 
   if (Object.keys(problems).length) refuse('budgets.claim.incomplete', 'Finish the claim before submitting it.', { status: 422, fields: problems })
   const at = nowMs()
   const number = claim.number ?? await takeNumber(unit)
-  unit.add({ sql: `UPDATE budgets_claims SET number = ? WHERE id = ? AND number IS NULL`, params: [number, claim.id] })
+  unit.add({ sql: 'UPDATE budgets_claims SET number = ? WHERE id = ? AND number IS NULL', params: [number, claim.id] })
   // A returned claim is decided afresh: approvals from before go.
   unit.add({ sql: `UPDATE budgets_claim_items SET approved_minor = NULL, part_reason = NULL WHERE ${whileEditable}`, params: [claim.id] })
   unit.add({

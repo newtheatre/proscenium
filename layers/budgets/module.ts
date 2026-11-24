@@ -15,11 +15,11 @@ export default defineModule({
   requires: ['finance'],
 
   records: defineRecords('budgets', {
-    budget: { table: 'budgets_budgets' },
-    line: { table: 'budgets_lines', parent: 'budgets.budget' },
-    category: { table: 'budgets_categories' },
-    request: { table: 'budgets_spending_requests', parent: 'budgets.line' },
-    claim: { table: 'budgets_claims' },
+    'budget': { table: 'budgets_budgets' },
+    'line': { table: 'budgets_lines', parent: 'budgets.budget' },
+    'category': { table: 'budgets_categories' },
+    'request': { table: 'budgets_spending_requests', parent: 'budgets.line' },
+    'claim': { table: 'budgets_claims' },
     'claim-item': { table: 'budgets_claim_items', parent: 'budgets.claim' },
   }),
   abilities: defineAbilities('budgets', {
