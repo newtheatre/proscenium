@@ -8,7 +8,7 @@ import { getForm, getVersion } from '../../../forms'
 import { readAnswers, toAnswers } from '../../../responses'
 import { responseByChangeLink } from '../../../changes'
 import type { Definition } from '../../../../shared/engine'
-import { questionsOf, withoutWorkflow } from '../../../../shared/engine'
+import { questionsOf, publicDefinition, withoutWorkflow } from '../../../../shared/engine'
 import { ownStatus } from '../../../stages'
 
 export default defineRoute({ public: true, rateLimit: 'presented-value', tokens: ['token'] }, async (event) => {
@@ -24,7 +24,7 @@ export default defineRoute({ public: true, rateLimit: 'presented-value', tokens:
     values: progress?.canChange ? toAnswers(definition, answers) : null,
     response: { reference: response.reference, submittedAt: response.submittedAt },
     form: { title: form.title },
-    definition: withoutWorkflow(definition),
+    definition: publicDefinition(withoutWorkflow(definition)),
     answers,
     progress,
     expiresAt,

@@ -32,9 +32,6 @@ export function normalisePassCode(typed: string): string {
   return plain.startsWith(PREFIX) && plain.length === PREFIX.length + CODE_LENGTH ? plain.slice(PREFIX.length) : plain
 }
 
-/** Whether what was typed has the shape of a pass code, so the desk's find box can tell one from a name. */
-export const looksLikePassCode = (typed: string) => /^PASS[-\s]?[A-Za-z0-9]{4}[-\s]?[A-Za-z0-9]{4}$/i.test(typed.trim()) // not-policy: the shape of a code, PASS-XXXX-XXXX
-
 /** The hash of a code from another system as it scans, kept beside a pass brought in from there. */
 export const aliasHashOf = (text: string) => hashOf(text.trim().toUpperCase())
 

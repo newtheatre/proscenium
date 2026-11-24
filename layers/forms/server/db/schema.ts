@@ -202,6 +202,10 @@ export const responses = defineTable('forms_responses', {
   uniqueKey: col.personal(text('unique_key'), { erase: 'clear' }),
   // What the form's calculations came to when it was sent.
   calculated: col.personal(text('calculated'), { erase: 'clear' }),
+  // What it scored against the answered version's correct answers (FB-513); null where it has none.
+  score: col.personal(integer('score'), { erase: 'clear' }),
+  outOf: col.internal(integer('out_of')),
+  passed: col.personal(integer('passed', { mode: 'boolean' }), { erase: 'clear' }),
   isTest: col.internal(integer('is_test', { mode: 'boolean' }).notNull().default(false)),
   submittedAt: col.timestamp('submitted_at'),
   decidedAt: col.timestamp('decided_at'),

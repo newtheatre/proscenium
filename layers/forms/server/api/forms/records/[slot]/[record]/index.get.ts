@@ -4,6 +4,7 @@ import { getRouterParam } from 'h3'
 import { defineRoute, isRefusal, today } from '#kit'
 import { fieldsOf, mayEdit } from '../../../../../records'
 import { requireSlot } from '../../../../../slots'
+import { publicDefinition } from '../../../../../../shared/engine'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (event, { actor }) => {
   const slot = await requireSlot(getRouterParam(event, 'slot'))
@@ -14,5 +15,5 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     throw error
   })
   const sets = await fieldsOf(slot, recordId)
-  return { today: day, sets: sets.map(s => ({ formId: s.formId, title: s.title, version: s.version, definition: s.definition, answers: s.answers, revision: s.revision, updatedAt: s.updatedAt })) }
+  return { today: day, sets: sets.map(s => ({ formId: s.formId, title: s.title, version: s.version, definition: publicDefinition(s.definition), answers: s.answers, revision: s.revision, updatedAt: s.updatedAt })) }
 })

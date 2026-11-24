@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "nuxt": { "type": "http", "url": "https://nuxt.com/mcp" },
+    "nuxt-ui": { "type": "http", "url": "https://ui.nuxt.com/mcp" },
+    "cloudflare-docs": { "type": "http", "url": "https://docs.mcp.cloudflare.com/mcp" },
+    "playwright": { "command": "bunx", "args": ["@playwright/mcp@latest", "--headless"] }
+  }
+}

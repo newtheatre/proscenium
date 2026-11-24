@@ -19,6 +19,8 @@ const props = defineProps<{
   calculated?: Record<string, Figure> | null
   /** Only the calculations the person answering was shown on a page, as on their own copy. */
   placedOnly?: boolean
+  /** How each marked question was marked, by question id, for staff reading a quiz (FB-513). */
+  marks?: Record<string, { correct: boolean, points: number, outOf: number }> | null
 }>()
 const { t } = useT()
 const { day, dateTime } = useDates()
@@ -53,6 +55,7 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
       entry: item.kind === 'group' ? { name: item.label, n: a.repeatIndex + 1 } : null,
       restricted: a.restricted,
       changed: !!props.changed?.includes(q.id),
+      mark: item.kind === 'group' ? null : props.marks?.[q.id] ?? null,
       text: a.restricted ? '' : words(q, a),
       // A file answer reads as links to the files, which open for whoever may read the response.
       files: !a.restricted && q.type === 'file' && Array.isArray(a.value) ? a.value as FileRef[] : null,
@@ -101,6 +104,11 @@ const pages = computed(() => props.definition.pages.map((page, i) => ({
               v-if="row.changed"
               tone="info"
               :label="t('forms.screens.answers.changed')"
+            />
+            <StatusBadge
+              v-if="row.mark"
+              :tone="row.mark.correct ? 'success' : 'danger'"
+              :label="t('forms.screens.marking.points', { points: row.mark.points, outOf: row.mark.outOf })"
             />
           </dt>
           <dd class="whitespace-pre-wrap break-words">

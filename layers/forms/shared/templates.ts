@@ -123,6 +123,70 @@ const feedbackSurvey: Definition = {
   presentation: { confirmation: 'Thank you. Your answers help us do better.' },
 }
 
+// A quiz (FB-515): correct answers, points and a pass mark, marked on the server when it is sent.
+const quiz: Definition = {
+  format: FORMAT,
+  pages: [
+    {
+      id: 'page-quiz',
+      title: 'Questions',
+      items: [
+        q('exits', 'choice.single', 'How many fire exits does the auditorium have?', {
+          options: [{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }, { id: 'three', label: 'Three' }],
+          answer: { correct: ['two'], feedback: { wrong: 'Walk the auditorium and count them before your next shift.' } },
+        }),
+        q('alarm', 'choice.multiple', 'When the fire alarm sounds, what do you do?', {
+          help: 'Choose every one that applies.',
+          options: [
+            { id: 'stop', label: 'Stop the show and bring the house lights up' },
+            { id: 'guide', label: 'Guide the audience to the nearest exit' },
+            { id: 'bags', label: 'Wait while people collect their coats' },
+            { id: 'count', label: 'Report to the duty manager at the assembly point' },
+          ],
+          answer: { correct: ['stop', 'guide', 'count'], points: 2, feedback: { right: 'Exactly right.', wrong: 'Nobody waits for their belongings.' } },
+        }),
+        q('lifts', 'yesno', 'Should the audience use the lift in an evacuation?', { answer: { correct: false } }),
+        q('capacity', 'number', 'How many people may the auditorium hold?', { answer: { correct: { min: 200, max: 200 } } }), // not-policy: an example answer the theatre replaces
+        q('point', 'text.short', 'Where is the assembly point?', { answer: { correct: ['car park', 'the car park'] } }),
+      ],
+    },
+  ],
+  marking: { passMark: 5, show: 'score-and-feedback' }, // not-policy: an example pass mark the theatre edits
+}
+
+// Signing up as crew (FB-515, for crew calls, FH-49): asked once, with dietary needs held sealed.
+const crewSignUp: Definition = {
+  format: FORMAT,
+  pages: [
+    {
+      id: 'page-crew',
+      title: 'About you',
+      items: [
+        q('t-shirt', 'choice.dropdown', 'What size T-shirt do you wear?', {
+          dataClass: 'personal',
+          options: ['XS', 'S', 'M', 'L', 'XL', 'XXL'].map(size => ({ id: size.toLowerCase(), label: size })),
+        }),
+        q('meal-days', 'choice.multiple', 'Which days would you like a crew meal?', {
+          dataClass: 'personal',
+          options: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => ({ id: day.toLowerCase(), label: day })),
+        }),
+        q('dietary', 'choice.multiple', 'Do you have any dietary needs?', {
+          help: 'Only the people who arrange crew meals see who asked for what.',
+          dataClass: 'special',
+          allowOther: true,
+          options: [
+            { id: 'vegetarian', label: 'Vegetarian' },
+            { id: 'vegan', label: 'Vegan' },
+            { id: 'gluten-free', label: 'Gluten free' },
+            { id: 'dairy-free', label: 'Dairy free' },
+            { id: 'nut-allergy', label: 'Nut allergy' },
+          ],
+        }),
+      ],
+    },
+  ],
+}
+
 export const SHIPPED_TEMPLATES: ShippedTemplate[] = [
   { key: 'forms.show-proposal', name: 'forms.templates.show-proposal.name', description: 'forms.templates.show-proposal.description', retentionDays: 730, // not-policy: a starting value the theatre edits
     definition: showProposal },
@@ -130,6 +194,10 @@ export const SHIPPED_TEMPLATES: ShippedTemplate[] = [
     definition: accessRequirements },
   { key: 'forms.feedback-survey', name: 'forms.templates.feedback-survey.name', description: 'forms.templates.feedback-survey.description', retentionDays: 365, // not-policy: a starting value the theatre edits
     anonymous: true, definition: feedbackSurvey },
+  { key: 'forms.quiz', name: 'forms.templates.quiz.name', description: 'forms.templates.quiz.description', retentionDays: 365, // not-policy: a starting value the theatre edits
+    definition: quiz },
+  { key: 'forms.crew-sign-up', name: 'forms.templates.crew-sign-up.name', description: 'forms.templates.crew-sign-up.description', retentionDays: 180, // not-policy: a starting value the theatre edits
+    definition: crewSignUp },
 ]
 
 /** A template another module ships, through the point forms.template (server/points/template.ts). */

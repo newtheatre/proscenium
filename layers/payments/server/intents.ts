@@ -2,10 +2,13 @@
 // to collect an amount; its parts say whom it is for. The parts are written in the same batch as the
 // intent, and a trigger refuses any part that would take them past the intent's amount, so after the
 // batch the sum cannot drift. A record has at most one open intent collecting for it.
-import { all, first, newId, nowMs, Refusal, runInContext, useContext, useSetting, usePoint, type UnitView } from '#kit'
+import { all, first, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
 import { intentParts } from './db/schema'
-import type { Part, Settlement } from './points/settlement'
+import type { Part } from './points/settlement'
 import { sessionChanged } from './sessions'
+import { settlements } from './settlements'
+
+export { settlements } from './settlements'
 
 export interface PartInput { owner: { module: string, record: string }, amountMinor: number }
 
@@ -34,29 +37,6 @@ export function asPart(row: PartRow, currency: string): Part {
 
 export function ownersOf(parts: PartRow[]): { moduleId: string, recordId: string }[] {
   return parts.map(p => ({ moduleId: p.owner_module, recordId: p.owner_record }))
-}
-
-/**
- * The settlement handlers of the modules that are on, by owner module. A handler is its owner's own
- * code, so it runs as its owner: the request is Payments', but what the handler signs or reads under
- * its module's name (a door code for a ticket it issues) is its own to use.
- */
-export async function settlements(): Promise<Map<string, Settlement>> {
-  const out = new Map<string, Settlement>()
-  for (const c of await usePoint<Settlement>('payments.settlement')) {
-    if (out.has(c.module)) throw new Error(`${c.module} contributes to payments.settlement twice; a module has one handler for all its parts`)
-    const as = <T>(fn: () => T): T => runInContext({ ...useContext(), module: c.module }, fn)
-    const { settle, refunded, release, describe, receiptLink, kept } = c.value
-    out.set(c.module, {
-      settle: (unit, part) => as(() => settle(unit, part)),
-      refunded: (unit, part, refund) => as(() => refunded(unit, part, refund)),
-      release: release && ((unit, part) => as(() => release(unit, part))),
-      describe: describe && (record => as(() => describe(record))),
-      receiptLink: receiptLink && ((unit, part, person) => as(() => receiptLink(unit, part, person))),
-      kept: kept && ((unit, part) => as(() => kept(unit, part))),
-    })
-  }
-  return out
 }
 
 /**
