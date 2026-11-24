@@ -15,7 +15,7 @@ Where the build departs from, or is narrower than, parts 1 to 11. The build is t
 - **Figures (BC-10).** Read, never stored. Spent is Finance's new `budgetLineTotals(lineIds)`: sealed entries tagged with the line, debits positive. Committed is, for now, only budgets funded from the line (BC-12): their approved expense total once approved or closed. Pending is 0 until claims and bills exist. An income line's actual is what its source accounts took for the budget's production (by `production_id`), or, for other budgets, over the season's dates or the finance year, plus any income entry tagged with the line.
 - **Revising below spent plus committed** is refused `budgets.line.below-spent` with the floor in `detail.floorMinor`; sending `confirm` sets it anyway.
 - **Closing (BC-13).** Close has nothing to wait for yet; requests, claims and awards will each add their guard. The `budgets.close.after` offer comes with the production tab. Reopening is refused `budgets.budget.taken` when another open budget has taken the same production, season or department and year.
-- **Not yet built from this release:** everything from BC-15 on.
+- **Not yet built from this release:** claims (BC-19 on), BC-18 and the awards.
 
 ## Holders, the production's Budget tab and the offer to close: BC-11, BC-14, BC-13 (24 November 2026)
 
@@ -24,3 +24,14 @@ Where the build departs from, or is narrower than, parts 1 to 11. The build is t
 - **The production lead.** Part 6's suggestion that a production lead holds their production's budget through `core.production-team` is not wired: the fact is about productions, not budgets. A theatre gives the lead the Budget holder role on the budget meanwhile.
 - **The production's Budget tab and fact (BC-11).** On `core.production`, for `budgets.budget.view`. They show the production's open budget (or its newest closed one) with its totals and lines, income lines with ticket and bar income to date, and a link to it. With no budget, a manager is offered to make one, which opens the new budget form on that production.
 - **The offer to close (BC-13).** Setting `budgets.close.after` (60 days, 7 days to a year, group `close`, changed with the new `budgets.settings.manage`). An approved production budget whose production's last performance ended longer ago than that says so on the budget page and the tab. Closing stays a person's choice.
+
+## Spending requests and Approvals: BC-15 to BC-17 (24 November 2026)
+
+- **Table.** `budgets_spending_requests` (prefix `bgr`) as part 2, with `updated_at` as the last event that retention counts from. The requester is aliased on a merge (reads go through the account scope), and a request with none is listed to staff.
+- **Abilities.** `budgets.request.make` (site), and `budgets.claim.approve-any` (privileged), declared now because it is what approves over budget (C3). What it implies (`claim.view-all`) comes with claims. The four-eyes rule is the service's, through the account scope, on the statement as well as before it.
+- **Asking (BC-15).** Members' area, Expenses, "Ask to spend": a live expense line of an approved budget, an amount, what for (up to 500 characters) and an optional needed-by date. The budget's holders are told by `budgets.request-to-approve`, a message type the spec's table lacks; it mirrors `budgets.claim-to-approve` and goes to whoever holds `budget.hold` on the budget, the requester left out.
+- **Deciding (BC-16).** Console, Approvals: requests on budgets the person holds, or every request for a holder of `claim.approve-any`, never their own, oldest first. The menu entry has no ability, because holders hold budgets one at a time; it shows to whoever has something waiting (`count` with `hideEmpty`). Approving over budget is refused `budgets.request.over-budget` with `detail.overMinor` unless the approver holds `claim.approve-any`; declining needs a note. Approval sets `lapses_on` from `budgets.requests.lapse-after` (60 days) and the requester is told by `budgets.request-decided`. An approved request's amount less what has fulfilled it counts as committed on its line.
+- **Withdrawing.** By the requester, a holder, or the treasurer, while nothing has fulfilled it.
+- **The daily task (BC-17).** `budgets.sweep-requests` at 04:50 lapses approved requests past `lapses_on` and, after `budgets.retention.requests` (2 years) from a request's last event, clears its requester, description and note.
+- **Closing.** Refused `budgets.budget.open-requests` while a request on the budget is waiting or approved.
+- **Not built: BC-18.** The licence-fee listener waits for the Productions module, which does not exist yet; the `source_*` columns and their unique index are in place for it. `fulfilRequest` comes with claims and bills.

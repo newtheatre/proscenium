@@ -125,4 +125,48 @@ export const lineSources = defineTable('budgets_line_sources', {
   extra: t => [primaryKey({ columns: [t.lineId, t.accountKey] })],
 })
 
-export const tables = { categories, budgets, lines, lineAmounts, lineSources }
+export const REQUEST_STATES = ['requested', 'approved', 'declined', 'withdrawn', 'fulfilled', 'lapsed'] as const
+
+/** Asking to spend on a line before spending (BC-15): once approved, it counts as committed until it is fulfilled or lapses. */
+export const requests = defineTable('budgets_spending_requests', {
+  id: col.id(),
+  // Null for a request a module made, such as a licence fee, and once retention has passed.
+  requestedBy: col.account('requested_by', { role: 'subject', onMerge: 'alias', nullable: true }),
+  lineId: col.ref('budgets_lines'),
+  amountMinor: col.minor('amount_minor').notNull(),
+  description: col.freeText(text('description').notNull()),
+  neededBy: col.localDate('needed_by'),
+  state: col.internal(text('state', { enum: REQUEST_STATES }).notNull()),
+  decidedBy: col.account('decided_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  decidedAt: col.timestamp('decided_at'),
+  // Seen by the requester; required when declining.
+  decisionNote: col.freeText(text('decision_note')),
+  fulfilledMinor: col.minor('fulfilled_minor').notNull().default(0),
+  lapsesOn: col.localDate('lapses_on'),
+  sourceModule: col.internal(text('source_module')),
+  sourceType: col.internal(text('source_type')),
+  sourceId: col.internal(text('source_id')),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bgr',
+  realm: 'members',
+  subject: { account: 'requested_by', unlinked: 'staff' },
+  // Counted from the decision by the module's daily task.
+  retention: 'budgets.retention.requests',
+  extra: t => [
+    index('budgets_spending_requests_line').on(t.lineId, t.state),
+    index('budgets_spending_requests_by').on(t.requestedBy, t.createdAt),
+    index('budgets_spending_requests_state').on(t.state, t.createdAt),
+    uniqueIndex('budgets_spending_requests_source').on(t.sourceModule, t.sourceType, t.sourceId).where(sql`source_id IS NOT NULL`),
+    check('budgets_spending_requests_amount', sql`${t.amountMinor} > 0`),
+    check('budgets_spending_requests_fulfilled', sql`${t.fulfilledMinor} BETWEEN 0 AND ${t.amountMinor}`),
+    check('budgets_spending_requests_description', sql`length(${t.description}) <= 500`),
+    check('budgets_spending_requests_note', sql`${t.decisionNote} IS NULL OR length(${t.decisionNote}) <= 500`),
+    check('budgets_spending_requests_state', sql`${t.state} IN ('requested', 'approved', 'declined', 'withdrawn', 'fulfilled', 'lapsed')`),
+    check('budgets_spending_requests_declined', sql`${t.state} <> 'declined' OR ${t.decisionNote} IS NOT NULL`),
+    check('budgets_spending_requests_source', sql`(${t.sourceModule} IS NULL) = (${t.sourceId} IS NULL) AND (${t.sourceType} IS NULL) = (${t.sourceId} IS NULL)`),
+  ],
+})
+
+export const tables = { categories, budgets, lines, lineAmounts, lineSources, requests }
