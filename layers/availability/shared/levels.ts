@@ -15,6 +15,10 @@ export type PollState = typeof POLL_STATES[number]
 /** A poll answer (F7): never changes the person's availability. */
 export const VOTES = ['yes', 'if-need-be', 'no'] as const
 export type Vote = typeof VOTES[number]
+export const MEETING_STATES = ['arranged', 'cancelled'] as const
+export type MeetingState = typeof MEETING_STATES[number]
+export const RESPONSES = ['pending', 'going', 'not-going'] as const
+export type Response = typeof RESPONSES[number]
 
 const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/
 
