@@ -7,6 +7,7 @@ import type { UnitView } from '#kit'
 import { createProduction as createProductionAs, updateProduction, type ProductionInput } from './service'
 import { createPerformance as createPerformanceAs, type MadeProduction, type PerformanceInput } from './performances'
 import { movePerformance as movePerformanceAs } from './performances-update'
+import { joinCollections } from './collections'
 import { insertCredit, removeCredit as removeCreditOf, updateCredit as updateCreditOf, type CreditInput } from './credits'
 
 export { schedulePerformances } from './performances'
@@ -15,6 +16,8 @@ export type { ScheduleRefusal } from './performances'
 export interface NewProduction extends Pick<ProductionInput, 'title' | 'kind' | 'seasonId' | 'summary' | 'categoryTermId' | 'companyName' | 'runningMinutes'> {
   /** Production-wide credits, made with it. */
   credits?: CreditInput[]
+  /** Collections it joins at once; a season-bound one only if it is of that season (CL1). */
+  collectionIds?: string[]
 }
 
 // The linked person is told with a link to their credits, so the origin is needed only then.
@@ -22,8 +25,9 @@ const actorId = () => useContext().actor.accountId ?? null
 
 /** A new production, always a draft, with any credits given. Returns its id. */
 export async function createProduction(unit: UnitView, input: NewProduction): Promise<string> {
-  const { credits = [], ...production } = input
+  const { credits = [], collectionIds = [], ...production } = input
   const id = await createProductionAs(unit, production, actorId())
+  await joinCollections(unit, id, production.seasonId ?? null, collectionIds)
   const origin = credits.some(c => c.accountId) ? await siteOrigin() : ''
   for (const credit of credits) await insertCredit(unit, { productionId: id, production: { title: input.title, state: 'draft' }, origin }, credit)
   return id
@@ -55,7 +59,7 @@ export async function setProductionCompanyName(unit: UnitView, productionId: str
 
 export interface NewCredit extends CreditInput { productionId: string }
 
-/** A production-wide credit. The linked person is told, as when staff add one. */
+/** A credit: production-wide, for one performance, or for one line-up item (LU4). The linked person is told, as when staff add one. */
 export async function addCredit(unit: UnitView, input: NewCredit): Promise<string> {
   const { productionId, ...credit } = input
   const production = await first<{ title: string, state: string }>('SELECT title, state FROM core_productions WHERE id = ?', productionId)

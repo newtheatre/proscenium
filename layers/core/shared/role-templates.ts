@@ -10,7 +10,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     id: 'producer',
     abilities: [
       'core.production.view', 'core.production.create', 'core.production.edit', 'core.production.publish',
-      'core.performance.schedule', 'core.season.manage',
+      'core.performance.schedule', 'core.season.manage', 'core.collection.manage',
       'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.order.view', 'box-office.report.view', 'box-office.comp.approve',
       'front-of-house.shift.view', 'front-of-house.night-report.view',
     ],
