@@ -88,6 +88,14 @@ test.describe('a member', () => {
     await expect(cell(page, 'Thu', '12:30')).toHaveAccessibleName(/Free$/)
   })
 
+  test('reads who can see their availability', async ({ page }) => {
+    await visit(page, WEEK)
+    await page.getByRole('link', { name: 'Who can see my availability' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Who can see my availability' })).toBeVisible()
+    await expect(page.getByText('Reasons you did not share.')).toBeVisible()
+    await noViolations(page)
+  })
+
   test('adds a change for some dates with a shared reason', async ({ page }) => {
     await visit(page, WEEK)
     await page.getByRole('button', { name: 'Add a change' }).click()

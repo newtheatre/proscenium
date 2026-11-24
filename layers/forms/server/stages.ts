@@ -4,17 +4,19 @@
 // moves their own response. The move, its history row, the audit entry and the event commit
 // together, and a second person making a move at the same moment is refused.
 import { all, can, newId, refuse, today, type Actor, type UnitView } from '#kit'
-import type { Answers, Definition, Stage, Transition } from '../shared/engine'
-import { evaluate, hasStages, isDecision, mark, resubmitMove, staffMoves, stageOf, statusOf, workflowOf } from '../shared/engine'
+import type { Answers, Definition, Marked, Stage, Transition } from '../shared/engine'
+import { evaluate, hasStages, isDecision, mark, movesFrom, questionsOf, resubmitMove, staffMoves, stageOf, statusOf, systemMove, workflowOf } from '../shared/engine'
 import { answers as answersTable } from './db/schema'
 import type { FormRow } from './forms'
 import { queueActions } from './actions'
 import { tellMoved } from './notices'
 import { closeRounds, conflicted, namedIn, openRound } from './review'
 import { attachFileAnswers, refuseFileProblems, settleFileAnswers } from './files'
-import { answerRows, markingColumns, owns, recordMove, refuseInvalid, retentionFrom, type ResponseRow } from './responses'
+import { answerRows, markingColumns, owns, readAnswers, recordMove, refuseInvalid, retentionFrom, toAnswers, type Arrived, type ResponseRow } from './responses'
 
 const CONFLICT = 409 // not-policy: HTTP status
+/** AT3: system moves made in one unit before the chain stops; the health check warns of a form that reaches it. */
+export const SYSTEM_CHAIN = 5 // not-policy: the spec's fixed bound on a loop
 
 /** The stage a response is in, as its own version names it. A stage a later version removed still reads by its key. */
 export function stageIn(def: Definition, response: { stageKey: string | null, stageKind: string | null }): Stage {
@@ -51,7 +53,7 @@ async function apply(unit: UnitView, input: { form: FormRow, response: ResponseR
   unit.audit({ action: 'state', record: ['forms.response', input.response.id], detail: { formId: input.form.id, from: input.response.stageKey, to: to.key, move: input.move.key, ...(decision ? { decision: to.kind } : {}) } })
   unit.announce('forms.response.moved', { responseId: input.response.id, formId: input.form.id, kind: to.kind, revision: input.revision }, { record: ['forms.response', input.response.id] })
   if (to.kind === 'approved' || to.kind === 'declined') unit.announce('forms.response.decided', { responseId: input.response.id, formId: input.form.id, outcome: to.kind }, { record: ['forms.response', input.response.id] })
-  // The person is told of a move staff made; their own they already know of.
+  // The person is told of a move staff made; their own they already know of, and the system's once its chain ends.
   if (input.move.who === 'staff') await tellMoved(unit, input.form, input.response, { from: stageOf(input.def, input.response.stageKey), to, key: input.move.key, at: input.at })
   // What other modules do about this move is asked for with it, and runs once it has committed.
   queueActions(unit, { response: input.response, move: input.move, revision: input.revision, actorId: input.actorId, at: input.at })
@@ -74,7 +76,59 @@ export async function moveResponse(unit: UnitView, input: { form: FormRow, respo
     if (!await mayDecide(input.actor, input.form.id)) return refuse('forms.decision.not-allowed', 'You cannot make this decision.', { status: 403, remedy: 'Ask somebody who decides on this form.' }) // not-policy: HTTP status
     if (move.needsReason && !input.reason?.trim()) return refuse('forms.decision.no-reason', 'Give a reason for the record.', { status: 422, fields: { reason: 'forms.decision.no-reason' } }) // not-policy: HTTP status
   }
-  return apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: input.note, reason: input.reason?.trim() || null, revision: input.response.currentRevision })
+  const to = await apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: input.note, reason: input.reason?.trim() || null, revision: input.response.currentRevision })
+  return followSystemMoves(unit, { form: input.form, response: input.response, def: input.def, stage: to, revision: input.response.currentRevision, at: input.at })
+}
+
+export interface Arrival { form: FormRow, response: ResponseRow, def: Definition, stage: Stage, revision: number, at: number, answers?: Answers, marking?: Pick<Marked, 'score' | 'outOf' | 'passed'> | null }
+
+/**
+ * The moves the system makes once a response arrives in a stage (FB-514, AT2): the first system
+ * move from there whose condition holds, in the same unit, with no actor, and again from where
+ * that leads, up to SYSTEM_CHAIN moves (AT3). Answers and marking are read back when not given.
+ */
+export async function followSystemMoves(unit: UnitView, input: Arrival): Promise<Stage> {
+  let stage = input.stage
+  if (!workflowOf(input.def).transitions.some(t => t.who === 'system')) return stage
+  const answers = input.answers ? unsealed(input.def, input.answers) : await storedAnswers(input.def, input.response.id, input.revision)
+  const marked = input.marking === undefined ? markingOfRow(input.response) : input.marking
+  const context = { today: await today(), marking: marked ? { score: marked.score, outOf: marked.outOf, passed: marked.passed } : null }
+  const next = () => movesFrom(input.def, stage.key, 'system').length ? systemMove(input.def, stage.key, answers, context) : undefined
+  let last: Transition | undefined
+  for (let made = 0, move = next(); move; move = next()) {
+    // A loop stops here; the health check names the form while the version that looped is live.
+    if (made++ === SYSTEM_CHAIN) {
+      unit.audit({ action: 'state', record: ['forms.response', input.response.id], detail: { formId: input.form.id, loop: true } })
+      break
+    }
+    const from = { ...input.response, stageKey: stage.key, stageKind: stage.kind, currentRevision: input.revision }
+    // Each move a millisecond on, so the history reads in the order they were made.
+    stage = await apply(unit, { form: input.form, response: from, def: input.def, move, actorId: null, at: input.at + made, note: null, revision: input.revision, answers })
+    last = move
+  }
+  // One message for the whole chain, about where it ended.
+  if (last) await tellMoved(unit, input.form, input.response, { from: input.stage, to: stage, key: last.key, at: input.at })
+  return stage
+}
+
+/** A response just sent takes the system's moves from its first stage, in the unit that stored it. */
+export async function arrive(unit: UnitView, form: FormRow, sent: { arrived?: Arrived }, at: number): Promise<void> {
+  if (sent.arrived) await followSystemMoves(unit, { form, ...sent.arrived, revision: 1, at })
+}
+
+const markingOfRow = (r: ResponseRow): Pick<Marked, 'score' | 'outOf' | 'passed'> | null => r.score === null || r.outOf === null ? null : { score: r.score, outOf: r.outOf, passed: r.passed === null ? null : !!r.passed }
+
+/** The system never reads a special-category answer, so a condition on one reads it as empty, as stored answers do. */
+function unsealed(def: Definition, answers: Answers): Answers {
+  const sealed = new Set(questionsOf(def).filter(q => q.question.dataClass === 'special').map(q => q.question.id))
+  if (!sealed.size) return answers
+  const open = <T extends object>(values: T): T => Object.fromEntries(Object.entries(values).filter(([id]) => !sealed.has(id))) as T
+  return Object.fromEntries(Object.entries(open(answers)).map(([id, v]) => [id, Array.isArray(v) && v.every(e => e && typeof e === 'object') ? (v as object[]).map(open) : v])) as Answers
+}
+
+async function storedAnswers(def: Definition, responseId: string, revision: number): Promise<Answers> {
+  const types = new Map(questionsOf(def).map(q => [q.question.id, q.question.type]))
+  return toAnswers(def, (await readAnswers([responseId], types, false, revision)).get(responseId) ?? [])
 }
 
 /**
@@ -91,11 +145,12 @@ export async function resubmit(unit: UnitView, input: { form: FormRow, response:
   const revision = input.response.currentRevision + 1
   const calculated = Object.keys(evaluation.calculated).length ? JSON.stringify(evaluation.calculated) : null
   // MK5: changed answers are marked again; the earlier score stays readable from the earlier revision.
-  const to = await apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: null, revision, calculated, marking: markingColumns(mark(input.def, evaluation)), answers: evaluation.answers })
+  const marked = mark(input.def, evaluation)
+  const to = await apply(unit, { form: input.form, response: input.response, def: input.def, move, actorId: input.actor.accountId ?? null, at: input.at, note: null, revision, calculated, marking: markingColumns(marked), answers: evaluation.answers })
   const rows = await answerRows(input.def, evaluation.answers, input.response.id, revision)
   if (rows.length) unit.insertSet(answersTable, rows as unknown as Record<string, unknown>[])
   attachFileAnswers(unit, input.response.id, fileIds, input.at)
-  return to
+  return followSystemMoves(unit, { form: input.form, response: input.response, def: input.def, stage: to, revision, at: input.at, answers: evaluation.answers, marking: marked })
 }
 
 export interface HistoryEntry { at: number, from: string | null, to: string, toKind: string, move: string, revision: number, by: string | null, note: string | null }
