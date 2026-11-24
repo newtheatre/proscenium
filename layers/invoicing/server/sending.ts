@@ -60,6 +60,7 @@ export async function afterIssue(unit: UnitView, input: { invoiceId: string, sen
 export async function sendByHand(unit: UnitView, invoice: Invoice, by: string): Promise<SendStep> {
   const sent = await first('SELECT id FROM invoicing_reminders WHERE invoice_id = ? AND step = \'sent\'', invoice.id)
   const step: SendStep = sent ? 'manual' : 'sent'
+  if (invoice.kind !== 'invoice') refuse('invoicing.invoice.not-sendable', 'Only an invoice is emailed from here.', { status: 409 })
   if (step === 'manual' && invoice.state !== 'open') refuse('invoicing.invoice.nothing-owed', 'Nothing is owed on this invoice, so there is nothing to remind them of.', { status: 409 })
   await sendInvoice(unit, invoice, step, by)
   return step
@@ -91,7 +92,7 @@ export async function sendReminders(unit: UnitView): Promise<number> {
   // Only invoices that went by email are chased; one marked to send by hand waits for a person.
   const open = await all<{ id: string, dueOn: string, steps: string | null }>(
     `SELECT i.id, i.due_on AS dueOn, (SELECT group_concat(r.step) FROM invoicing_reminders r WHERE r.invoice_id = i.id) AS steps
-      FROM invoicing_invoices i WHERE i.direction = 'out' AND i.state = 'open' AND i.reminders_on = 1 AND i.bill_to_email IS NOT NULL
+      FROM invoicing_invoices i WHERE i.direction = 'out' AND i.kind = 'invoice' AND i.state = 'open' AND i.reminders_on = 1 AND i.bill_to_email IS NOT NULL
       AND EXISTS (SELECT 1 FROM invoicing_reminders r WHERE r.invoice_id = i.id AND r.step = 'sent')`)
   let count = 0
   for (const row of open) {

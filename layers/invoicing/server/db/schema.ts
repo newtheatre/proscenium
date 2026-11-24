@@ -281,6 +281,8 @@ export const allocations = defineTable('invoicing_allocations', {
   disbursementId: col.internal(text('disbursement_id')),
   creditNoteId: col.internal(text('credit_note_id')),
   postingId: col.internal(text('posting_id')),
+  // A write-off's reason, a term of invoicing.write-off-reason.
+  reasonTerm: col.ref('core_terms', { nullable: true }),
   onDate: col.localDate('on_date').notNull(),
   by: col.account('by', { role: 'actor', onMerge: 'alias', nullable: true }),
   createdAt: col.createdAt(),

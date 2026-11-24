@@ -18,6 +18,8 @@ const rateOf = (bp: number) => `${bp / PERCENT}%`
 /** The document's content, from the frozen row only. */
 export async function documentOf(invoice: Invoice, lines: Line[]): Promise<PdfInvoice> {
   const vat = invoice.sellerTaxNumber !== null
+  const credit = invoice.kind === 'credit_note'
+  const against = credit ? (await first<{ number: string | null }>('SELECT number FROM invoicing_invoices WHERE id = ?', invoice.creditsId))?.number ?? null : null
   const money = (minor: number) => formatMoney(minor, invoice.currency)
   const totals: PdfInvoice['totals'] = []
   if (vat) {
@@ -27,12 +29,14 @@ export async function documentOf(invoice: Invoice, lines: Line[]): Promise<PdfIn
     for (const [bp, tax] of [...byRate].sort((a, b) => b[0] - a[0])) totals.push({ label: say('invoicing.pdf.vat-at', { rate: rateOf(bp) }), value: await money(tax) })
     totals.push({ label: say('invoicing.pdf.vat-total'), value: await money(invoice.taxMinor) })
   }
-  totals.push({ label: say('invoicing.pdf.total'), value: await money(invoice.totalMinor), strong: true })
+  totals.push({ label: say(credit ? 'invoicing.pdf.total-credited' : 'invoicing.pdf.total'), value: await money(invoice.totalMinor), strong: true })
   return {
+    title: say(credit ? 'invoicing.pdf.credit-note' : vat ? 'invoicing.pdf.vat-invoice' : 'invoicing.pdf.invoice'),
     number: invoice.number!,
+    against,
     vat,
     issueOn: await formatDay(invoice.issueOn!),
-    dueOn: await formatDay(invoice.dueOn!),
+    dueOn: credit ? null : await formatDay(invoice.dueOn!),
     suppliedOn: invoice.suppliedOn && invoice.suppliedOn !== invoice.issueOn ? await formatDay(invoice.suppliedOn) : null,
     reference: invoice.reference,
     seller: {
@@ -52,7 +56,7 @@ export async function documentOf(invoice: Invoice, lines: Line[]): Promise<PdfIn
       net: await money(l.netMinor),
     }))),
     totals,
-    bankDetails: await text('invoicing.pay.bank-details'),
+    bankDetails: credit ? null : await text('invoicing.pay.bank-details'),
     notes: invoice.notes,
   }
 }

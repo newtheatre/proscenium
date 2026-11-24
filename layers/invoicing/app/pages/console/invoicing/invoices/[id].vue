@@ -8,6 +8,7 @@ import type { InvoiceShown } from '../../../../composables/useInvoiceText'
 interface InvoiceView {
   invoice: {
     id: string
+    kind: 'invoice' | 'credit_note'
     number: string | null
     state: string
     label: InvoiceShown
@@ -42,6 +43,11 @@ interface InvoiceView {
   canEdit: boolean
   canIssue: boolean
   canRecordPayment: boolean
+  canCredit: boolean
+  canWriteOff: boolean
+  creditableMinor: number
+  creditNotes: { id: string, number: string, totalMinor: number, issueOn: string }[]
+  credits: { id: string, number: string } | null
 }
 
 const route = useRoute()
@@ -56,14 +62,18 @@ const text = useInvoiceText()
 const { data, status, error, refresh } = await useAPI<InvoiceView>(() => `/api/invoicing/invoices/${id.value}`, { key: `invoicing:invoice:${id.value}` })
 const invoice = computed(() => data.value?.invoice)
 const money = (minor: number) => text.money(minor, invoice.value?.currency ?? 'GBP')
-const title = computed(() => invoice.value?.number
-  ? t('invoicing.screens.invoices.numbered', { number: invoice.value.number, name: invoice.value.billToName })
-  : t('invoicing.screens.invoices.draft-title', { name: invoice.value?.billToName || t('invoicing.screens.invoices.untitled') }))
+const title = computed(() => invoice.value?.kind === 'credit_note'
+  ? t('invoicing.screens.credit.numbered', { number: invoice.value.number ?? '' })
+  : invoice.value?.number
+    ? t('invoicing.screens.invoices.numbered', { number: invoice.value.number, name: invoice.value.billToName })
+    : t('invoicing.screens.invoices.draft-title', { name: invoice.value?.billToName || t('invoicing.screens.invoices.untitled') }))
 const editing = computed(() => !!data.value?.canEdit && !!data.value.choices)
 const saved = computed(() => data.value ? { invoice: data.value.invoice, lines: data.value.lines } : undefined)
 const owed = computed(() => invoice.value ? invoice.value.totalMinor - invoice.value.allocatedMinor : 0)
 const issuing = ref(false)
 const paying = ref(false)
+const crediting = ref(false)
+const writingOff = ref(false)
 
 async function save(body: DraftBody) {
   await $api(`/api/invoicing/invoices/${id.value}`, { method: 'PUT', body: { ...body, version: invoice.value!.version } })
@@ -96,18 +106,20 @@ async function send() {
     toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
   }
 }
-async function recorded() {
-  toast.add({ title: t('invoicing.screens.payment.done'), color: 'success' })
+async function done(title: string) {
+  toast.add({ title, color: 'success' })
   await refresh()
 }
 
 const actions = computed(() => [
   ...(data.value?.canIssue ? [{ label: t('invoicing.screens.issue.title'), icon: 'i-lucide-send', onSelect: () => { issuing.value = true } }] : []),
   ...(data.value?.canRecordPayment ? [{ label: t('invoicing.screens.payment.title'), icon: 'i-lucide-banknote', onSelect: () => { paying.value = true } }] : []),
+  ...(data.value?.canCredit ? [{ label: t('invoicing.screens.credit.title'), icon: 'i-lucide-receipt', onSelect: () => { crediting.value = true } }] : []),
 ])
 const everSent = computed(() => !!data.value?.sends.some(s => s.step === 'sent'))
 const menu = computed(() => [
   ...(data.value?.canEdit ? [{ label: t('invoicing.screens.draft.delete'), icon: 'i-lucide-trash-2', onSelect: remove }] : []),
+  ...(data.value?.canWriteOff ? [{ label: t('invoicing.screens.write-off.title'), icon: 'i-lucide-circle-slash', onSelect: () => { writingOff.value = true } }] : []),
   ...(data.value?.pdfUrl ? [{ label: t('invoicing.screens.invoices.pdf'), icon: 'i-lucide-file-down', to: data.value.pdfUrl, external: true, target: '_blank' }] : []),
   ...(data.value?.canSend && (!everSent.value || invoice.value?.state === 'open') ? [{ label: t(everSent.value ? 'invoicing.screens.send.remind' : 'invoicing.screens.send.send'), icon: 'i-lucide-mail', onSelect: send }] : []),
 ])
@@ -117,7 +129,7 @@ const facts = computed(() => {
   return [
     { label: t('invoicing.screens.invoices.state'), value: text.overdue(i.overdueDays) ?? text.state(i.label).label },
     { label: t('invoicing.screens.invoices.total'), value: money(i.totalMinor) },
-    ...(i.state === 'open' ? [{ label: t('invoicing.screens.invoices.owed-label'), value: money(owed.value) }] : []),
+    ...(i.state === 'open' ? [{ label: t(i.kind === 'credit_note' ? 'invoicing.screens.credit.to-give-back' : 'invoicing.screens.invoices.owed-label'), value: money(owed.value) }] : []),
     ...(i.issueOn ? [{ label: t('invoicing.screens.invoices.issued-on'), value: day(i.issueOn) }] : []),
     ...(i.dueOn ? [{ label: t('invoicing.screens.invoices.due-on'), value: day(i.dueOn) }] : []),
   ]
@@ -183,6 +195,11 @@ const lineDescription = (l: InvoiceView['lines'][number]) => [
             </RecordListItem>
           </RecordList>
         </PageSection>
+        <InvoicingCreditNotes
+          :notes="data.creditNotes"
+          :credits="data.credits"
+          :currency="data.invoice.currency"
+        />
         <PageSection
           v-if="data.allocations.length"
           :title="t('invoicing.screens.invoices.payments')"
@@ -249,7 +266,24 @@ const lineDescription = (l: InvoiceView['lines'][number]) => [
       :outstanding-minor="owed"
       :currency="invoice.currency"
       :accounts="data.paymentAccounts"
-      @recorded="recorded"
+      @recorded="done(t('invoicing.screens.payment.done'))"
+    />
+    <InvoicingCreditDialog
+      v-if="invoice && data?.canCredit"
+      v-model:open="crediting"
+      :invoice-id="invoice.id"
+      :lines="data.lines"
+      :creditable-minor="data.creditableMinor"
+      :currency="invoice.currency"
+      @credited="number => done(t('invoicing.screens.credit.done', { number }))"
+    />
+    <InvoicingWriteOffDialog
+      v-if="invoice && data?.canWriteOff"
+      v-model:open="writingOff"
+      :invoice-id="invoice.id"
+      :outstanding-minor="owed"
+      :currency="invoice.currency"
+      @written="done(t('invoicing.screens.write-off.done'))"
     />
   </PageFrame>
 </template>

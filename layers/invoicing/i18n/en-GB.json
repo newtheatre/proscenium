@@ -45,5 +45,10 @@
   "invoicing.settings.rules.second-after-first": "The second overdue reminder goes later than the first.",
   "invoicing.abilities.bill.view.label": "See bills from suppliers",
   "invoicing.abilities.bill.log.label": "Log suppliers' bills with their invoice and submit them for approval",
-  "invoicing.abilities.bill.approve.label": "Approve or send back bills, which posts them to the ledger; never one's own"
+  "invoicing.abilities.bill.approve.label": "Approve or send back bills, which posts them to the ledger; never one's own",
+  "invoicing.abilities.invoice.credit.label": "Make credit notes against invoices; never against one you issued",
+  "invoicing.abilities.invoice.write-off.label": "Write off what is owed on an invoice long overdue; never one you issued",
+  "invoicing.settings-sections.write-off": "Writing off debts",
+  "invoicing.settings.write-off.min-overdue.label": "Overdue before a write-off",
+  "invoicing.settings.write-off.min-overdue.help": "How long past its due date an invoice must be before it can be written off."
 }

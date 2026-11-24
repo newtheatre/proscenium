@@ -8,10 +8,14 @@ const say = wordsFrom(catalogue)
 
 export interface PdfLine { description: string, quantity: string, price: string, rate: string | null, tax: string | null, net: string }
 export interface PdfInvoice {
+  /** Invoice, VAT invoice or credit note. */
+  title: string
   number: string
+  /** The invoice a credit note is against. */
+  against: string | null
   vat: boolean
   issueOn: string
-  dueOn: string
+  dueOn: string | null
   suppliedOn: string | null
   reference: string
   seller: { name: string, address: string, taxNumber: string | null, charityNumber: string | null, companyNumber: string | null }
@@ -60,7 +64,7 @@ function wrap(font: PDFFont, size: number, text: string, width: number): string[
 
 export async function renderInvoicePdf(doc: PdfInvoice): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
-  pdf.setTitle(`${doc.vat ? say('invoicing.pdf.vat-invoice') : say('invoicing.pdf.invoice')} ${doc.number}`)
+  pdf.setTitle(`${doc.title} ${doc.number}`)
   pdf.setCreationDate(new Date(`${doc.issueOn}T12:00:00Z`))
   pdf.setModificationDate(new Date(`${doc.issueOn}T12:00:00Z`))
   pdf.setProducer('Proscenium')
@@ -97,13 +101,14 @@ export async function renderInvoicePdf(doc: PdfInvoice): Promise<Uint8Array> {
   const leftEnd = pen.y
   pen.y = top
   const right = { x: PAGE.margin + width / 2, width: width / 2, right: true }
-  write(doc.vat ? say('invoicing.pdf.vat-invoice') : say('invoicing.pdf.invoice'), { ...right, font: bold, size: SIZE.heading })
+  write(doc.title, { ...right, font: bold, size: SIZE.heading })
   gap(4) // not-policy: the page's layout
   const facts: [string, string][] = [
     [say('invoicing.pdf.number'), doc.number],
     [say('invoicing.pdf.date'), doc.issueOn],
     ...(doc.suppliedOn ? [[say('invoicing.pdf.supplied'), doc.suppliedOn] as [string, string]] : []),
-    [say('invoicing.pdf.due'), doc.dueOn],
+    ...(doc.against ? [[say('invoicing.pdf.against'), doc.against] as [string, string]] : []),
+    ...(doc.dueOn ? [[say('invoicing.pdf.due'), doc.dueOn] as [string, string]] : []),
     ...(doc.reference ? [[say('invoicing.pdf.reference'), doc.reference] as [string, string]] : []),
   ]
   for (const [label, value] of facts) write(`${label}: ${value}`, right)

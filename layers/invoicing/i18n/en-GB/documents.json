@@ -25,5 +25,8 @@
   "invoicing.pdf.how-to-pay": "How to pay",
   "invoicing.pdf.pay-reference": "Please quote {number} with your payment.",
   "invoicing.pdf.notes": "Notes",
-  "invoicing.pdf.page": "Page {n} of {of}"
+  "invoicing.pdf.page": "Page {n} of {of}",
+  "invoicing.pdf.credit-note": "Credit note",
+  "invoicing.pdf.against": "Against invoice",
+  "invoicing.pdf.total-credited": "Total credited"
 }

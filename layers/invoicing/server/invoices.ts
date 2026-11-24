@@ -49,6 +49,8 @@ export interface Invoice {
   createdAt: number
   returnedNote: string
   pdfFileId: string | null
+  /** The kind of the last allocation that was not a reversal: what settled it, once closed. */
+  settledBy: 'payment' | 'credit' | 'write_off' | null
 }
 
 export interface Line {
@@ -72,7 +74,8 @@ export const COLUMNS = `i.id, i.direction, i.kind, i.credits_id AS creditsId, i.
   i.supplied_on AS suppliedOn, i.currency, i.net_minor AS netMinor, i.tax_minor AS taxMinor, i.total_minor AS totalMinor,
   i.allocated_minor AS allocatedMinor, i.state, i.notes, i.internal_note AS internalNote, i.source_module AS sourceModule,
   i.source_type AS sourceType, i.source_id AS sourceId, i.posting_id AS postingId, i.version, i.created_by AS createdBy,
-  i.issued_by AS issuedBy, i.issued_at AS issuedAt, i.created_at AS createdAt, i.returned_note AS returnedNote, i.pdf_file_id AS pdfFileId`
+  i.issued_by AS issuedBy, i.issued_at AS issuedAt, i.created_at AS createdAt, i.returned_note AS returnedNote, i.pdf_file_id AS pdfFileId,
+  (SELECT a.kind FROM invoicing_allocations a WHERE a.invoice_id = i.id AND a.kind <> 'reversal' ORDER BY a.created_at DESC, a.id DESC LIMIT 1) AS settledBy`
 
 const changed = { code: 'invoicing.invoice.changed', reason: 'Someone else changed this invoice a moment ago.', remedy: 'Reload it and try again.' }
 
@@ -200,10 +203,11 @@ export async function dueFrom(invoice: Invoice, issueOn: string): Promise<string
 }
 
 /** The shown state (part 3): draft, issued, part paid, paid, credited, written off or settled; overdue beside. */
-export function shownState(invoice: Pick<Invoice, 'state' | 'allocatedMinor' | 'totalMinor' | 'dueOn'>, on: string): { label: string, overdueDays: number } {
-  const overdueDays = invoice.state === 'open' && invoice.dueOn && invoice.dueOn < on ? daysBetween(invoice.dueOn, on) : 0
+export function shownState(invoice: Pick<Invoice, 'kind' | 'state' | 'allocatedMinor' | 'totalMinor' | 'dueOn' | 'settledBy'>, on: string): { label: string, overdueDays: number } {
+  const overdueDays = invoice.kind === 'invoice' && invoice.state === 'open' && invoice.dueOn && invoice.dueOn < on ? daysBetween(invoice.dueOn, on) : 0
   if (invoice.state === 'draft') return { label: 'draft', overdueDays: 0 }
-  if (invoice.state === 'closed') return { label: 'paid', overdueDays: 0 }
+  if (invoice.kind === 'credit_note') return { label: invoice.state === 'open' ? 'to-give-back' : 'credit-note', overdueDays: 0 }
+  if (invoice.state === 'closed') return { label: invoice.settledBy === 'write_off' ? 'written-off' : invoice.settledBy === 'credit' ? 'credited' : 'paid', overdueDays: 0 }
   return { label: invoice.allocatedMinor > 0 ? 'part-paid' : 'issued', overdueDays }
 }
 
@@ -234,7 +238,7 @@ export async function powersOn(actor: Actor, invoice: Invoice) {
   return {
     canEdit: invoice.state === 'draft' && (await can(actor, 'invoicing.invoice.draft')).allowed,
     canIssue: invoice.state === 'draft' && (await can(actor, 'invoicing.invoice.issue', on)).allowed,
-    canRecordPayment: invoice.state === 'open' && (await can(actor, 'invoicing.payment.record', on)).allowed,
-    canSend: invoice.direction === 'out' && (invoice.state === 'open' || invoice.state === 'closed') && !!invoice.billToEmail && (await can(actor, 'invoicing.invoice.issue', on)).allowed,
+    canRecordPayment: invoice.kind === 'invoice' && invoice.state === 'open' && (await can(actor, 'invoicing.payment.record', on)).allowed,
+    canSend: invoice.direction === 'out' && invoice.kind === 'invoice' && (invoice.state === 'open' || invoice.state === 'closed') && !!invoice.billToEmail && (await can(actor, 'invoicing.invoice.issue', on)).allowed,
   }
 }

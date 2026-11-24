@@ -170,3 +170,23 @@ the build differs from the parts above:
   all. The treasurer's role template gains log and approve; the producer's gains log.
 - Not yet: the `invoicing.bill-waiting` notification to approvers, paying a bill (IE-22, which needs
   Budgets' disbursement route), budget lines on bill lines (IE-24) and S5's creditors tab.
+
+## As built: credit notes and write-offs, slice 4 (IE-15, IE-27)
+
+Credit notes out and writing off a debt. Where the build differs from the parts above:
+
+- A credit note out has no draft: making one numbers it from the default credit note series, posts
+  it and allocates it in one batch. Its lines name the original's lines, each whole or for part of
+  its net; a part takes VAT at the rate copied onto the original line (a code's rate cannot change
+  once used, so the original rate and today's are the same). A predicate on the insert keeps credit
+  notes together within the original's total.
+- The posting is the reverse of issue with purpose `credit_note`. What is allocated is the least of
+  the credit and what is outstanding; a credit note with money left over stays `open`, shown "To give
+  back". Giving it back (IE-16) waits for Payments' refund and disbursement routes. Its PDF is made
+  by the after-issue job, titled "Credit note" with the invoice it is against; it is not emailed.
+- Line owners' credit handlers wait until another module raises invoices with owned lines.
+- A write-off records its reason as a term of `invoicing.write-off-reason` on the allocation
+  (`reason_term`, added by ALTER TABLE). It posts at once with purpose `write_off`.
+- An invoice's shown state gains Credited and Written off, from the last allocation that settled it.
+- Supplier credit notes (bill credit notes, approved like a bill) follow with paying bills.
+- The treasurer's role template gains `invoicing.invoice.credit`; write-off is left to the Owner.

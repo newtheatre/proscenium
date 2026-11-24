@@ -38,6 +38,8 @@ export default defineModule({
     'reminders.second-after': setting.duration({ default: '21d', min: '1d', max: '120d', change, audience: 'staff' }),
     // The theatre's local time the day's reminders go from.
     'reminders.send-at': setting.time({ default: '10:00', min: '07:00', max: '20:00', change, audience: 'staff' }),
+    // How long past its due date an invoice must be before it may be written off (I-26).
+    'write-off.min-overdue': setting.duration({ default: '90d', min: '0d', max: '730d', change, audience: 'staff' }),
     // How long an issued invoice keeps its party's details after the end of its finance year.
     'records.keep-for': setting.duration({ default: '2192d', min: '2192d', max: '3653d', change, audience: 'staff', onChange: 'confirm' }),
   }),
@@ -65,6 +67,10 @@ export default defineModule({
     // Bills in: whoever logs one sees bills; approving is never one's own, an Owner included (I-10, R3-17).
     'bill.view': ability({ on: 'invoicing.invoice', fresh: false, audit: 'read' }),
     'bill.log': ability({ implies: ['bill.view'] }),
+    // A credit note against an invoice or bill; never on one the actor issued, an Owner included (I-27, R3-17).
+    'invoice.credit': ability({ on: 'invoicing.invoice', risk: 'privileged', implies: ['invoice.view'] }),
+    // Writes off what is outstanding; never by whoever issued it, an Owner included (I-26).
+    'invoice.write-off': ability({ on: 'invoicing.invoice', risk: 'privileged', implies: ['invoice.view'] }),
     'bill.approve': ability({ on: 'invoicing.invoice', risk: 'privileged', implies: ['bill.view'] }),
   }),
 
@@ -75,6 +81,8 @@ export default defineModule({
       'invoicing.export.taken': event({ version: 1, payload: z.object({ runId: z.string(), profileId: z.string() }), internal: false }),
       'invoicing.invoice.issued': event({ version: 1, payload: z.object({ invoiceId: z.string(), kind: z.enum(['invoice', 'credit_note']), totalMinor: z.number().int() }), internal: false }),
       // Nothing left outstanding (I-23), carrying the source record so an owner can update its own.
+      'invoicing.invoice.credited': event({ version: 1, payload: z.object({ invoiceId: z.string(), creditNoteId: z.string(), amountMinor: z.number().int() }), internal: false }),
+      'invoicing.invoice.written-off': event({ version: 1, payload: z.object({ invoiceId: z.string(), amountMinor: z.number().int() }), internal: false }),
       'invoicing.bill.approved': event({ version: 1, payload: z.object({ invoiceId: z.string(), totalMinor: z.number().int() }), internal: false }),
       'invoicing.invoice.paid': event({ version: 1, payload: z.object({ invoiceId: z.string(), sourceModule: code().nullable(), sourceType: code().nullable(), sourceId: z.string().nullable() }), internal: false }),
     },
@@ -134,6 +142,16 @@ export default defineModule({
           body: 'This is a reminder that **{{ amount }}** is still to pay on invoice **{{ number }}** from {{ theatre }}, due by {{ due }}.\n\n[See the invoice and how to pay]({{ link }})\n\nIf you have paid in the last few days, thank you, and please ignore this message.',
         },
       },
+    }],
+    'core.vocabulary': [{
+      id: 'invoicing.write-off-reason',
+      label: 'Reasons for writing off a debt',
+      terms: [
+        { slug: 'customer-gone', label: 'Customer gone' },
+        { slug: 'disputed', label: 'Disputed and settled' },
+        { slug: 'too-small', label: 'Too small to chase' },
+        { slug: 'other', label: 'Other' },
+      ],
     }],
     'core.navigation': [
       { id: 'invoicing.invoices', menu: 'console', group: 'money', section: 'everyday', to: '/console/invoicing/invoices', icon: 'i-lucide-receipt-text', ability: 'invoicing.invoice.view', order: 88 },

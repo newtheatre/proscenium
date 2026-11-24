@@ -4,6 +4,7 @@ import { all, defineRoute, first, today } from '#kit'
 import { outsideAccounts } from '#modules/payments'
 import { fileUrl } from '#modules/core'
 import { draftChoices, linesOf, powersOn, requireInvoice, shownState } from '../../../invoices'
+import { creditPowers } from '../../../credits'
 
 async function pdfOf(invoiceId: string): Promise<string | null> {
   const row = await first<{ id: string | null }>('SELECT pdf_file_id AS id FROM invoicing_invoices WHERE id = ?', invoiceId)
@@ -26,5 +27,6 @@ export default defineRoute({
     choices: powers.canEdit || powers.canIssue ? await draftChoices() : null,
     paymentAccounts: powers.canRecordPayment ? await outsideAccounts() : [],
     ...powers,
+    ...(await creditPowers(actor, invoice)),
   }
 })
