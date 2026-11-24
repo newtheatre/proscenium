@@ -12,7 +12,7 @@ import { startSession } from './sessions'
 import { useEnrolmentLink } from './recovery'
 import { checkClaimable } from './claim'
 import { managedDomainProvider } from './providers'
-import { holdsPrivileged } from './me'
+import { holdsPrivileged } from './privileged'
 import { LIVE } from './grants'
 
 export interface TokenRow {
