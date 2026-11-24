@@ -7,6 +7,7 @@
 import { sql } from 'drizzle-orm'
 import { all, first, nowMs, refuse, type UnitView } from '#kit'
 import { accountLabel } from '#modules/core'
+import { defaultTaxCode } from '#modules/finance'
 import { payersOf, type OwnerEntry, type Part, type ReceiptPerson, type Settlement } from '#modules/payments'
 import { refundEntries, spread, tagged } from '../../cancel'
 import { confirmOrder } from '../../confirm'
@@ -14,6 +15,7 @@ import { exchangeOrder, isExchangeRecord, releaseExchange, settleExchange } from
 import { passPayers, passSalesMinor } from '../../pass-sales'
 import { liveLines, ORDER, type OrderRow } from '../../orders'
 import { deskReceiptLink } from '../../desk'
+import { codedLines } from '../../vat'
 
 const DEFERRED = { key: 'box-office.deferred-ticket-income' }
 const PASS_INCOME = { key: 'box-office.pass-income' }
@@ -29,11 +31,12 @@ const handler = {
     // In a sale split between people, a pass goes to whoever paid for it.
     const passHolders = await passPayers(unit, order.id, await payersOf(part.intentId, { module: 'box-office', record: order.id }))
     await confirmOrder(unit, { ...order, total_minor: part.amountMinor }, lines, { from: 'awaiting_payment', intentId: part.intentId, passHolders })
+    // By performance and by the tax code of each line's ticket type (BO-78).
     const totals = new Map<string, number>()
-    for (const line of lines) totals.set(line.performance_id, (totals.get(line.performance_id) ?? 0) + line.amount_minor)
+    for (const line of await codedLines(lines)) totals.set(line.performance_id, (totals.get(line.performance_id) ?? 0) + line.amount_minor)
     // Money for a pass is income when it is paid, in a line of its own, not shared between performances.
     const passMinor = await passSalesMinor(order.id)
-    return [...await tagged(DEFERRED, totals, -1), ...(passMinor ? [{ account: PASS_INCOME, amountMinor: -passMinor, performanceId: null }] : [])]
+    return [...await tagged(DEFERRED, totals, -1), ...(passMinor ? [{ account: PASS_INCOME, amountMinor: -passMinor, performanceId: null, taxCode: await defaultTaxCode() }] : [])]
   },
 
   // The till's receipt carries a desk sale's tickets: the booking joins the buyer and the receipt links to it.
@@ -86,11 +89,11 @@ const handler = {
       return handler.settle(unit, part)
     }
     // Lapsed or cancelled: the tickets it was for, live or not, say which performances earned it.
-    const lines = await all<{ performance_id: string, amount_minor: number }>(
-      "SELECT performance_id, amount_minor FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' ORDER BY (state = 'live') DESC, id", order.id)
+    const lines = await all<{ id: string, performance_id: string, amount_minor: number }>(
+      "SELECT id, performance_id, amount_minor FROM box_office_order_lines WHERE order_id = ? AND kind = 'ticket' ORDER BY (state = 'live') DESC, id", order.id)
     if (!lines.length) refuse('box-office.order.cannot-keep', 'This booking has no tickets to keep the money for, so it has to go back.', { status: 409 })
     unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { kept: part.amountMinor, intentId: part.intentId } })
-    return tagged(DEFERRED, spread(lines, part.amountMinor), -1)
+    return tagged(DEFERRED, spread(await codedLines(lines), part.amountMinor), -1)
   },
 
   // The order behind a part (an exchange's own order), by its reference and buyer, for money screens.
