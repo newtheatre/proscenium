@@ -16,6 +16,7 @@ import cancelPost from '../../server/api/availability/meetings/[id]/cancel.post'
 import pollPost from '../../server/api/availability/polls/index.post'
 import pollView from '../../server/api/availability/polls/[id]/index.get'
 import decidePost from '../../server/api/availability/polls/[id]/decide.post'
+import findPost from '../../server/api/availability/find/index.post'
 import { sweepOldMeetings } from '../../server/meetings'
 
 const app = server({
@@ -29,6 +30,7 @@ const app = server({
   'POST /api/availability/polls': pollPost,
   'GET /api/availability/polls/:id': pollView,
   'POST /api/availability/polls/:id/decide': decidePost,
+  'POST /api/availability/find': findPost,
 })
 
 const NOV_24 = Date.UTC(2026, 10, 24, 9)
@@ -83,6 +85,8 @@ describe('arranging and answering (M1, M2, M5, T-AV-23)', () => {
     expect(made.body.invited).toBe(2)
     expect(await told('availability.meeting-invited', ana)).toBe(1)
     expect(await busyOf(ana)).toEqual([expect.objectContaining({ from: at(18), to: at(19) + 30 * 60_000, firm: true, labelKey: 'availability.meeting', source: 'availability' })])
+    const found = await req(organiser, 'POST', '/api/availability/find', { groupIds: ['crews:meet'], accountIds: [], must: [], from: TUESDAY, to: TUESDAY, hoursFrom: '17:00', hoursTo: '22:00', length: 60, spaceIds: [], roomOptional: false })
+    expect(found.body.weeks[ana.accountId!][TUESDAY]).toContainEqual({ start: 1080, end: 1170, level: 'busy', commitment: 'availability.meeting' })
 
     expect((await req(ben, 'POST', `/api/availability/meetings/${id}/respond`, { response: 'not-going' })).status).toBe(200)
     expect(await busyOf(ben)).toEqual([])
