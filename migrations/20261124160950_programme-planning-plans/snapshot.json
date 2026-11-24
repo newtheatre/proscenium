@@ -1,13 +1,29 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "fa34856b-169c-493d-b402-28d1e4dffa78",
+  "id": "18948cd2-cd0d-4434-bd6a-10d8463c680f",
   "prevIds": [
-    "8b377ba6-2bf3-4377-adca-fccba078b30d"
+    "1ab3bd18-4373-4028-880d-0ebd7266b13e"
   ],
   "ddl": [
     {
       "name": "availability_exceptions",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_find_people",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_find_slots",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_find_votes",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_finds",
       "entityType": "tables"
     },
     {
@@ -978,6 +994,336 @@
     },
     {
       "table": "availability_exceptions",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_people",
+      "name": "find_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_people",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_people",
+      "name": "must_have",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_people",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_people",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_slots",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_slots",
+      "name": "find_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_slots",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_slots",
+      "name": "ends_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_slots",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_slots",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_votes",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_votes",
+      "name": "slot_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_votes",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_votes",
+      "name": "answer",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_votes",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_find_votes",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "length_minutes",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "group_refs",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "space_ids",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "context_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "target_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "created_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "answers_by",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'polling'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "decided_slot_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "outcome_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "abandoned_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_finds",
       "name": "updated_at",
       "type": "integer",
       "notNull": true,
@@ -23085,6 +23431,102 @@
       "entityType": "indexes"
     },
     {
+      "table": "availability_find_people",
+      "name": "availability_find_people_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_find_slots",
+      "name": "availability_find_slots_once",
+      "columns": [
+        {
+          "value": "find_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_find_votes",
+      "name": "availability_find_votes_once",
+      "columns": [
+        {
+          "value": "slot_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_find_votes",
+      "name": "availability_find_votes_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_finds",
+      "name": "availability_finds_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "answers_by",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_finds",
+      "name": "availability_finds_created_by",
+      "columns": [
+        {
+          "value": "created_by",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "availability_pattern_lines",
       "name": "availability_pattern_lines_pattern",
       "columns": [
@@ -28632,6 +29074,51 @@
       "entityType": "fks"
     },
     {
+      "table": "availability_find_people",
+      "name": "fk_availability_find_people_find_id_availability_finds_id_fk",
+      "columns": [
+        "find_id"
+      ],
+      "tableTo": "availability_finds",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "availability_find_slots",
+      "name": "fk_availability_find_slots_find_id_availability_finds_id_fk",
+      "columns": [
+        "find_id"
+      ],
+      "tableTo": "availability_finds",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "availability_find_votes",
+      "name": "fk_availability_find_votes_slot_id_availability_find_slots_id_fk",
+      "columns": [
+        "slot_id"
+      ],
+      "tableTo": "availability_find_slots",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "availability_pattern_lines",
       "name": "fk_availability_pattern_lines_pattern_id_availability_patterns_id_fk",
       "columns": [
@@ -32418,6 +32905,16 @@
       "entityType": "fks"
     },
     {
+      "table": "availability_find_people",
+      "name": "availability_find_people_pk",
+      "columns": [
+        "find_id",
+        "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "availability_profiles",
       "name": "availability_profiles_pk",
       "columns": [
@@ -32711,6 +33208,33 @@
     {
       "table": "availability_exceptions",
       "name": "availability_exceptions_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_find_slots",
+      "name": "availability_find_slots_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_find_votes",
+      "name": "availability_find_votes_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_finds",
+      "name": "availability_finds_pk",
       "columns": [
         "id"
       ],
@@ -34350,6 +34874,36 @@
       "table": "availability_exceptions",
       "name": "availability_exceptions_reason",
       "value": "\"reason\" IS NULL OR length(\"reason\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_find_slots",
+      "name": "availability_find_slots_order",
+      "value": "\"ends_at\" > \"starts_at\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_find_votes",
+      "name": "availability_find_votes_answer",
+      "value": "\"answer\" IN ('yes', 'if-need-be', 'no')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_finds",
+      "name": "availability_finds_title",
+      "value": "length(\"title\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_finds",
+      "name": "availability_finds_length",
+      "value": "\"length_minutes\" BETWEEN 15 AND 720",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_finds",
+      "name": "availability_finds_state_values",
+      "value": "\"state\" IN ('polling', 'decided', 'abandoned')",
       "entityType": "checks"
     },
     {
