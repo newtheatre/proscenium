@@ -6,6 +6,7 @@ import { all, first, localDate, newId, nowMs, Refusal, runInContext, useContext,
 import { postEntries, reversePosting, type EntryInput } from '#modules/finance'
 import type { DisbursementHandler, DisbursementMethod, DisbursementPart } from './points/disbursement'
 import { payeeFor, touchPayee, type MaskedPayee } from './payees'
+import { ownerEntries } from './owner-entries'
 
 export const DISBURSEMENT_METHODS: readonly DisbursementMethod[] = ['bank-transfer', 'cheque', 'theatre-card', 'petty-cash', 'parent-body']
 
@@ -67,7 +68,7 @@ export async function recordDisbursement(unit: UnitView, input: DisbursementInpu
   if (total !== input.amountMinor) throw new Refusal('payments.disbursement.owner-entries', `${input.owner.module} returned entries for ${total}, not the ${input.amountMinor} paid.`, { status: 500 })
 
   const entries: EntryInput[] = [
-    ...owned.map(e => ({ account: e.account, amountMinor: e.amountMinor, forModule: input.owner.module, productionId: e.productionId ?? null, performanceId: e.performanceId ?? null })),
+    ...await ownerEntries(owned, input.owner.module, 'input'),
     { account: { key: FROM[input.method] }, amountMinor: -input.amountMinor },
   ]
   const postingId = await postEntries(unit, {

@@ -44,6 +44,13 @@ async function saved(page: Page) {
   return ticketTypes.map(t => t.name).filter(n => names.includes(n))
 }
 
+// A drop settles before the next step: until its animation ends a new drag does not start, and a
+// frame later it hands focus back to the dropped row's handle, which would take the next key.
+async function settled(page: Page) {
+  await expect(page.locator('[data-dnd-dragging], [data-dnd-dropping]')).toHaveCount(0)
+  await page.evaluate(() => new Promise(requestAnimationFrame))
+}
+
 test('a ticket type is dragged by its handle, or moved from the keyboard, and the order is kept', async ({ page }) => {
   await visit(page)
   expect(await drawn(page)).toEqual(names)
@@ -62,6 +69,7 @@ test('a ticket type is dragged by its handle, or moved from the keyboard, and th
   await page.mouse.up()
   await expect.poll(() => drawn(page)).toEqual([names[0], names[2], names[1]])
   await expect.poll(() => saved(page)).toEqual([names[0], names[2], names[1]])
+  await settled(page)
 
   // From the keyboard, lifting with Space: that row goes back down one.
   await handle(names[2]!).focus()
@@ -70,6 +78,7 @@ test('a ticket type is dragged by its handle, or moved from the keyboard, and th
   await page.keyboard.press('Space')
   await expect.poll(() => drawn(page)).toEqual([names[0], names[1], names[2]])
   await expect.poll(() => saved(page)).toEqual([names[0], names[1], names[2]])
+  await settled(page)
 
   // The arrow keys on the handle, as before.
   await handle(names[1]!).focus()

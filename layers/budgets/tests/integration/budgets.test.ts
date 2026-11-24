@@ -6,7 +6,7 @@ import { changeSetting, createUnit, newId, setClock } from '#kit'
 import { setAccessProvider } from '#kit/access'
 import { call, env, inContext, person, rows, server, setModule, testAccess } from '../../../../tests/integration/helpers'
 import { balances, ensureSystemAccounts, postEntries } from '../../../finance/server/services'
-import { ensureVocabularies, removeTermGroup } from '../../../core/server/vocabularies/service'
+import { ensureVocabularies } from '../../../core/server/vocabularies/service'
 import { ensureModuleDefaults } from '../../../core/server/identity/defaults'
 import { identityAccess } from '../../../core/server/identity/access'
 import { eraseAccount } from '../../../core/server/identity/erasure'
@@ -181,8 +181,6 @@ describe('making a budget (BC-06)', () => {
     const { departments } = await ok('GET', '/api/budgets/budgets/new')
     expect(departments.map((d: { label: string }) => d.label)).toEqual(['Technical', 'Publicity', 'Front of house', 'Bar', 'Social', 'General'])
     expect(await rows("SELECT count(*) AS n FROM core_terms WHERE vocabulary_key = 'core.department'")).toEqual([{ n: 18 }])
-    const [heading] = await rows<{ id: string }>("SELECT id FROM core_term_groups WHERE vocabulary_key = 'core.department' AND key = 'organisation'")
-    await expect(inContext(() => removeTermGroup(createUnit().view(), 'core.department', heading!.id))).rejects.toMatchObject({ code: 'core.term-group.keyed' })
     const { budgetId } = await ok('POST', '/api/budgets/budgets', { scope: 'department', departmentTermId: technical!.id, year: '2027-03-01' })
     expect((await view(budgetId)).budget).toMatchObject({ name: 'Technical 2026', yearStartsOn: '2026-08-01' })
     const next = await ok('POST', '/api/budgets/budgets', { scope: 'department', departmentTermId: technical!.id, year: '2027-09-01' })

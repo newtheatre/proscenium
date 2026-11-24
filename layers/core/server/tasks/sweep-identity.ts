@@ -4,7 +4,7 @@
 // has passed (ID-12), and emergency contacts of people who no longer hold a standing are marked, and
 // deleted once kept long enough (ID-17). Last, holders and renewers of roles about to lapse are
 // told (ID-24). A merge or undo whose job stopped is started again, and merges whose undo window
-// has passed are closed.
+// has passed are closed. A day someone turns 18 is forgotten once it comes (C-74).
 import { defineTask, nowMs } from '#kit'
 import { sweepUnverifiedAddresses } from '../identity/my-addresses'
 import { sweepEmergencyContacts } from '../identity/emergency-contacts'
@@ -12,6 +12,7 @@ import { sweepAccessScheme } from '../identity/access-scheme'
 import { warnOfLapsingGrants } from '../identity/grant-warnings'
 import { restartStalledMerges } from '../identity/merge-move'
 import { closeMerges, restartStalledUndos } from '../identity/merge-undo'
+import { sweepAgeMarkers } from '../identity/age'
 
 export default defineTask(async (unit) => {
   const at = nowMs()
@@ -25,4 +26,5 @@ export default defineTask(async (unit) => {
   await restartStalledMerges(unit)
   await restartStalledUndos(unit)
   await closeMerges(unit)
+  await sweepAgeMarkers(unit)
 })

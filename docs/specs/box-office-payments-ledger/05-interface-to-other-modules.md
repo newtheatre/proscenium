@@ -63,7 +63,7 @@ Every service that writes takes the caller's unit of work and adds statements to
 | Point | Kind | A contribution is |
 | --- | --- | --- |
 | `payments.provider` | code | A payment provider. Contract below |
-| `payments.settlement` | code | An owner module's handlers for its parts: `settle(unit, part)` and `refunded(unit, part, refund)`. Each adds its own statements and returns its ledger entries. Box office contributes one for orders; Bar and Membership fees contribute their own |
+| `payments.settlement` | code | An owner module's handlers for its parts: `settle(unit, part)` and `refunded(unit, part, refund)`. Each adds its own statements and returns its ledger entries; an entry may name the tax code its amount includes (`taxCode`), and Payments splits the VAT out (FIN-07). Box office contributes one for orders; Bar and Membership fees contribute their own |
 | `payments.desk-basket` | code | A module's panel in the till, with `prepare` and an optional `attach`. Contract under "One payment with several owners" below |
 | `payments.disbursement` | code | An owner module's handlers for money paid out against its records (P-A1): `settle(unit, part)` marks the record paid and returns its debits totalling the amount, `reversed(unit, part)` marks it owed again, and an optional `payee(record)` names whom it pays. One per module; Budgets contributes one for claims and Invoices one for bills |
 | `finance.system-account` | data | A ledger account a module posts to: `{ key, name, kind, taxCode? }`. Finance creates it locked, keyed `<module>.<key>` |

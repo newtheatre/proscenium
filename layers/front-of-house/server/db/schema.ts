@@ -97,6 +97,12 @@ export const shifts = defineTable('front_of_house_shifts', {
   briefing: col.internal(text('briefing')),
   state: col.internal(text('state', { enum: ['draft', 'published', 'completed', 'cancelled'] }).notNull().default('draft')),
   cancelledReason: col.internal(text('cancelled_reason')),
+  // The space it is worked in, copied from the performance or chosen on the rota grid (FH-48).
+  spaceId: col.internal(text('space_id')),
+  // The crew call it belongs to (FH-49): set on an occasion shift, or joined from the call's season.
+  crewCallId: col.ref('front_of_house_crew_calls', { nullable: true }),
+  // The batch the rota grid made it in (FH-48), so the batch can be removed together.
+  batchId: col.ref('front_of_house_shift_batches', { nullable: true }),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
 }, {
@@ -106,12 +112,120 @@ export const shifts = defineTable('front_of_house_shifts', {
   extra: t => [
     uniqueIndex('front_of_house_shifts_duty').on(t.performanceId, t.dutyId).where(sql`performance_id IS NOT NULL`),
     index('front_of_house_shifts_window').on(t.state, t.windowClosesAt),
+    index('front_of_house_shifts_crew_call').on(t.crewCallId, t.callAt),
+    index('front_of_house_shifts_batch').on(t.batchId),
+    index('front_of_house_shifts_calendar').on(t.callAt, t.venueId),
     check('front_of_house_shifts_title', sql`(${t.performanceId} IS NOT NULL OR ${t.title} IS NOT NULL) AND (${t.title} IS NULL OR length(${t.title}) <= 80)`),
     check('front_of_house_shifts_places', sql`${t.places} BETWEEN 1 AND 50 AND ${t.placesTaken} BETWEEN 0 AND ${t.places}`),
     check('front_of_house_shifts_times', sql`${t.endsAt} > ${t.callAt} AND ${t.windowOpensAt} <= ${t.callAt} AND ${t.windowClosesAt} >= ${t.endsAt}`),
     check('front_of_house_shifts_briefing', sql`${t.briefing} IS NULL OR length(${t.briefing}) <= 1000`),
     check('front_of_house_shifts_state', sql`${t.state} IN ('draft', 'published', 'completed', 'cancelled')`),
     check('front_of_house_shifts_reason', sql`${t.cancelledReason} IS NULL OR length(${t.cancelledReason}) <= 200`),
+  ],
+})
+
+export const CREW_CALL_STATES = ['draft', 'open', 'closed', 'archived'] as const
+
+/**
+ * An invitation to crew a period, usually a festival (FH-49): its dates, the season whose shifts join
+ * it, and the perks rules. The sign-up questions are the form attached in the forms slot
+ * `front-of-house.crew-call`, which holds which form it is; `question_roles` names its questions.
+ */
+export const crewCalls = defineTable('front_of_house_crew_calls', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  seasonId: col.internal(text('season_id')),
+  startsOn: col.localDate('starts_on').notNull(),
+  endsOn: col.localDate('ends_on').notNull(),
+  // Question keys only: which is the T-shirt size, the meal days and the dietary need.
+  questionRoles: col.internal(text('question_roles').notNull().default('{}')),
+  tshirtMinShifts: col.internal(integer('tshirt_min_shifts')),
+  mealMinMinutes: col.internal(integer('meal_min_minutes')),
+  mealsOnRequest: col.internal(integer('meals_on_request', { mode: 'boolean' }).notNull().default(true)),
+  state: col.internal(text('state', { enum: CREW_CALL_STATES }).notNull().default('draft')),
+  createdBy: col.account('created_by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'crc',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_crew_calls_name').on(t.name).where(sql`state <> 'archived'`),
+    index('front_of_house_crew_calls_season').on(t.seasonId, t.state),
+    check('front_of_house_crew_calls_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
+    check('front_of_house_crew_calls_dates', sql`${t.endsOn} >= ${t.startsOn}`),
+    check('front_of_house_crew_calls_tshirt', sql`${t.tshirtMinShifts} IS NULL OR ${t.tshirtMinShifts} BETWEEN 1 AND 50`),
+    check('front_of_house_crew_calls_meal', sql`${t.mealMinMinutes} IS NULL OR ${t.mealMinMinutes} BETWEEN 30 AND 720`),
+    check('front_of_house_crew_calls_state', sql`${t.state} IN (${list(CREW_CALL_STATES)})`),
+  ],
+})
+
+export const BATCH_STATES = ['made', 'removed'] as const
+
+/** Shifts made together from the rota grid: one template applied to several days (FH-48). */
+export const shiftBatches = defineTable('front_of_house_shift_batches', {
+  id: col.id(),
+  crewCallId: col.ref('front_of_house_crew_calls', { nullable: true }),
+  templateId: col.ref('front_of_house_rota_templates'),
+  venueId: col.internal(text('venue_id').notNull()),
+  spaceId: col.internal(text('space_id')),
+  title: col.internal(text('title').notNull()),
+  // Local dates, as a JSON list.
+  days: col.internal(text('days').notNull()),
+  // Local wall-clock times; an end before the call runs past midnight.
+  callTime: col.internal(text('call_time').notNull()),
+  endTime: col.internal(text('end_time').notNull()),
+  made: col.internal(integer('made').notNull()),
+  state: col.internal(text('state', { enum: BATCH_STATES }).notNull().default('made')),
+  createdBy: col.account('created_by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'shb',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('front_of_house_shift_batches_call').on(t.crewCallId),
+    check('front_of_house_shift_batches_title', sql`length(${t.title}) BETWEEN 1 AND 80`),
+    check('front_of_house_shift_batches_days', sql`json_array_length(${t.days}) BETWEEN 1 AND 31`),
+    check('front_of_house_shift_batches_times', sql`${t.callTime} GLOB '[0-2][0-9]:[0-5][0-9]' AND ${t.endTime} GLOB '[0-2][0-9]:[0-5][0-9]'`),
+    check('front_of_house_shift_batches_made', sql`${t.made} >= 0`),
+    check('front_of_house_shift_batches_state', sql`${t.state} IN (${list(BATCH_STATES)})`),
+  ],
+})
+
+export const HANDOUT_ITEMS = ['tshirt', 'meal'] as const
+
+/**
+ * A T-shirt or meal handed to someone on a crew call (FH-50). Earned perks are worked out, never
+ * stored (CC4); a handout is the fact. An undo is a new row naming the one it reverses (HO1).
+ */
+export const handouts = defineTable('front_of_house_handouts', {
+  id: col.id(),
+  crewCallId: col.ref('front_of_house_crew_calls'),
+  accountId: col.account('account_id', { role: 'subject' }),
+  item: col.internal(text('item', { enum: HANDOUT_ITEMS }).notNull()),
+  // Required for a meal, empty for a T-shirt.
+  day: col.localDate('day'),
+  // The size handed over, which may differ from the one asked for.
+  size: col.personal(text('size'), { erase: 'clear' }),
+  reversesId: col.ref('front_of_house_handouts', { nullable: true }),
+  handedBy: col.account('handed_by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'hnd',
+  realm: 'members',
+  subject: 'account_id',
+  appendOnly: true,
+  // Counted from the call's end by the module's own sweep, which clears the size.
+  retention: 'front-of-house.retention.assignments',
+  extra: t => [
+    index('front_of_house_handouts_call').on(t.crewCallId, t.accountId, t.item, t.day),
+    uniqueIndex('front_of_house_handouts_reverses').on(t.reversesId).where(sql`reverses_id IS NOT NULL`),
+    check('front_of_house_handouts_item', sql`${t.item} IN (${list(HANDOUT_ITEMS)})`),
+    check('front_of_house_handouts_day', sql`(${t.item} = 'meal') = (${t.day} IS NOT NULL)`),
+    check('front_of_house_handouts_size', sql`${t.size} IS NULL OR length(${t.size}) <= 20`),
   ],
 })
 
@@ -511,4 +625,4 @@ export const calendarFeeds = defineTable('front_of_house_calendar_feeds', {
   ],
 })
 
-export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates, calendarFeeds }
+export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, crewCalls, handouts, shiftBatches, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates, calendarFeeds }

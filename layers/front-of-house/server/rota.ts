@@ -6,6 +6,7 @@ import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#ki
 import { getPerformance, holdersOf, notify, placeName } from '#modules/core'
 import { LIVE_STATES } from './db/schema'
 import { getShift, shiftTimes, type DutyInput, type Shift } from './shifts'
+import { getCrewCall } from './crew-calls'
 import { formatter, partFormatters, shiftDetails, shiftWords } from './words'
 
 const live = LIVE_STATES.map(s => `'${s}'`).join(', ')
@@ -48,18 +49,22 @@ export async function restoreDuty(unit: UnitView, id: string): Promise<void> {
 // ---------------------------------------------------------------------------------------------
 // Shifts not tied to a performance (FH-08): a get-in, a social, a bar opening. They confer rostered only.
 
-export interface OccasionInput { title: string, venueId?: string | null, dutyId: string, places: number, callAt: number, endsAt: number, briefing?: string | null, signUp?: boolean }
+export interface OccasionInput { title: string, venueId?: string | null, dutyId: string, places: number, callAt: number, endsAt: number, briefing?: string | null, signUp?: boolean, crewCallId?: string | null }
 
 export async function addOccasionShift(unit: UnitView, input: OccasionInput): Promise<string> {
+  const call = input.crewCallId ? await getCrewCall(input.crewCallId) : null
+  if (input.crewCallId && (!call || call.state === 'archived'))
+    refuse('front-of-house.crew-call.archived', 'That crew call is archived or does not exist.', { status: 422, fields: { crewCallId: 'Choose another crew call.' } }) // not-policy: HTTP status
   if (input.endsAt <= input.callAt) refuse('front-of-house.shift-times', 'A shift must end after its call time.', { status: 422, fields: { endsAt: 'Must be after the call time.' } })
   const times = await shiftTimes({ callAt: input.callAt, endsAt: input.endsAt, signUp: input.signUp ?? true })
   const id = newId('shf')
   const at = nowMs()
   unit.add({
-    sql: `INSERT INTO front_of_house_shifts (id, title, venue_id, duty_id, places, call_at, ends_at, window_opens_at, window_closes_at, sign_up_closes_at, briefing, state, created_at, updated_at)
-      SELECT ?, ?, ?, d.id, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ? FROM front_of_house_duties d WHERE d.id = ? AND d.archived_at IS NULL`,
-    params: [id, input.title, input.venueId ?? null, input.places, times.callAt, times.endsAt, times.windowOpensAt, times.windowClosesAt, times.signUpClosesAt, input.briefing ?? null, at, at, input.dutyId],
+    sql: `INSERT INTO front_of_house_shifts (id, title, venue_id, duty_id, places, call_at, ends_at, window_opens_at, window_closes_at, sign_up_closes_at, briefing, state, crew_call_id, created_at, updated_at)
+      SELECT ?, ?, ?, d.id, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ? FROM front_of_house_duties d WHERE d.id = ? AND d.archived_at IS NULL`,
+    params: [id, input.title, input.venueId ?? null, input.places, times.callAt, times.endsAt, times.windowOpensAt, times.windowClosesAt, times.signUpClosesAt, input.briefing ?? null, input.crewCallId ?? null, at, at, input.dutyId],
   }).expect(1, { code: 'front-of-house.duty-archived', reason: 'That duty is archived or does not exist.', remedy: 'Choose another duty.' })
+
   unit.audit({ action: 'create', record: ['front-of-house.shift', id] })
   return id
 }
