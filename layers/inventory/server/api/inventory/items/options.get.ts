@@ -6,6 +6,7 @@ import { listCategories } from '../../../departments'
 import { listKinds } from '../../../kinds'
 import { listLocations } from '../../../locations'
 import { departmentsFor } from '../../../reading'
+import type { ItemOptions } from '../../../../shared/items'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (_event, { actor }) => {
   const departments = await departmentsFor(actor, 'inventory.item.edit')
@@ -19,5 +20,5 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
       .map(c => ({ id: c.id, name: c.name, departmentId: c.departmentId, kinds: c.kindIds.map(id => kindName.get(id) ?? '').filter(Boolean), requirements: c.requirements })),
     locations: locations.filter(l => l.state === 'active').map(l => ({ id: l.id, name: l.name, parentId: l.parentId })),
     tags: tags.map(t => ({ id: t.id, label: t.label })),
-  }
+  } satisfies ItemOptions
 })

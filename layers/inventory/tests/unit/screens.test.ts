@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { insideOf, locationTree } from '../../app/utils/location-tree'
+import { tagOf } from '../../app/utils/items'
 import type { Location } from '../../shared/setup'
 
 const at = (id: string, parentId: string | null, name = id): Location => ({ id, name, parentId, venueId: null, spaceId: null, state: 'active', items: 0, children: 0 })
@@ -14,5 +15,12 @@ describe('the locations tree as a list (INV-07)', () => {
   it('finds everything inside a location, which it may not be moved into', () => {
     expect([...insideOf(locations, 'store')].sort()).toEqual(['rail', 'store', 'top'])
     expect([...insideOf(locations, 'workshop')]).toEqual(['workshop'])
+  })
+})
+
+describe('tagOf', () => {
+  it('reads a tag from a label, typed in lower case or scanned as an address', () => {
+    expect(tagOf(' prp-0012 ')).toBe('PRP-0012')
+    expect(tagOf('https://example.org/kit/PRP-0012')).toBe('PRP-0012')
   })
 })

@@ -2,7 +2,7 @@
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
 import { categoryRow } from '../../../../departments'
-import { newItemsInput } from '../../../../inputs'
+import { newItemsInput } from '../../../../../shared/item-input'
 import { addItems } from '../../../../items'
 
 export default defineRoute({

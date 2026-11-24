@@ -1,6 +1,7 @@
 // Reading the catalogue (S1, S2): the items list a person may see, by the departments they hold
 // `inventory.item.view` on, and one item with its inspections, tags, contents and history.
-import { all, can, first, refuse, type Actor } from '#kit'
+import { all, can, first, nowMs, refuse, useSetting, type Actor } from '#kit'
+import { operatingDayOf } from '#modules/core'
 import type { ItemDetail, ItemRow } from '../shared/items'
 
 // The departments this person may see the items of, or edit, by a grant anywhere above them.
@@ -30,6 +31,14 @@ const toRow = (r: Row): ItemRow => ({
 export async function listItems(departmentIds: string[]): Promise<ItemRow[]> {
   const rows = await all<Row>(`${ITEM_SELECT} WHERE c.department_id IN (SELECT value FROM json_each(?)) ORDER BY i.state = 'disposed', i.tag`, JSON.stringify(departmentIds))
   return rows.map(toRow)
+}
+
+// Today's operating day, and the last day an inspection counts as due soon (inventory.inspections.remind-before).
+export async function dueWindow(): Promise<{ today: string, dueBy: string }> {
+  const days = Math.round((await useSetting('inventory.inspections.remind-before') as number) / 86_400) // not-policy: seconds in a day
+  const today = await operatingDayOf(nowMs())
+  const row = await first<{ due_by: string }>('SELECT date(?, \'+\' || ? || \' days\') AS due_by', today, days)
+  return { today, dueBy: row!.due_by }
 }
 
 export async function itemByTag(tag: string): Promise<{ id: string, departmentId: string } | null> {

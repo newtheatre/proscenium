@@ -40,3 +40,27 @@ export interface ItemDetail extends ItemRow {
   contents: { id: string, tag: string, name: string }[]
   history: { id: string, kind: string, at: number, condition: string | null, from: string | null, to: string | null }[]
 }
+
+interface Named { id: string, name: string }
+export interface Place extends Named { parentId: string | null }
+
+// Today's operating day, and the last day on which an inspection counts as due soon.
+interface DueWindow { today: string, dueBy: string }
+
+export interface ItemsList extends DueWindow {
+  items: ItemRow[]
+  departments: Named[]
+  // The departments this person may add items to and change items in.
+  editable: string[]
+  categories: (Named & { departmentId: string })[]
+  locations: Place[]
+}
+
+export interface ItemPage extends DueWindow { item: ItemDetail, editable: boolean }
+
+export interface ItemOptions {
+  departments: Named[]
+  categories: (Named & { departmentId: string, kinds: string[], requirements: string[] })[]
+  locations: Place[]
+  tags: { id: string, label: string }[]
+}

@@ -196,4 +196,16 @@ describe('who sees which kit (INV-13, INV-15, INV-16, I9)', () => {
     expect((await req('GET', `/api/inventory/items/${other}`, undefined, viewer)).status).toBe(403)
     expect((await req('GET', '/api/inventory/items', undefined, person([]))).status).toBe(403)
   })
+
+  it('says today and the last day an inspection counts as due soon, from inventory.inspections.remind-before', async () => {
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'inventory.inspections.remind-before', '7d', { reason: 'test' })
+      await unit.commit()
+    })
+    const list = ok(await req('GET', '/api/inventory/items'))
+    expect(list.today).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    const days = (Date.parse(list.dueBy) - Date.parse(list.today)) / 86_400_000
+    expect(days).toBe(7)
+  })
 })

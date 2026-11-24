@@ -2,12 +2,12 @@
 // where it is now, and moving it home clears that (I5). A container takes its contents with it (I6).
 import { all, newId, nowMs, refuse, type UnitView } from '#kit'
 
-const HELD = `SELECT 1 FROM inventory_loan_lines l WHERE l.item_id = i.id AND l.state IN ('promised', 'out')`
+const HELD = 'SELECT 1 FROM inventory_loan_lines l WHERE l.item_id = i.id AND l.state IN (\'promised\', \'out\')'
 
 export async function moveItems(unit: UnitView, itemIds: string[], locationId: string, actorId: string | null): Promise<number> {
   const ids = JSON.stringify(itemIds)
   // The items named, and what is in any of them, unless it is itself named.
-  const scope = `(i.id IN (SELECT value FROM json_each(?1)) OR i.container_id IN (SELECT value FROM json_each(?1)))`
+  const scope = '(i.id IN (SELECT value FROM json_each(?1)) OR i.container_id IN (SELECT value FROM json_each(?1)))'
   const moving = await all<{ id: string, tag: string, from: string, held: number, disposed: number, contained: number }>(
     `SELECT i.id, i.tag, coalesce(i.current_location_id, i.home_location_id) AS "from", EXISTS (${HELD}) AS held, i.state = 'disposed' AS disposed,
             (i.container_id IS NOT NULL AND i.container_id NOT IN (SELECT value FROM json_each(?1))) AS contained

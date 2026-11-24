@@ -3,7 +3,7 @@
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
 import { categoryRow } from '../../../../departments'
-import { itemInput } from '../../../../inputs'
+import { itemInput } from '../../../../../shared/item-input'
 import { itemCore, updateItem } from '../../../../items'
 
 export default defineRoute({
@@ -14,6 +14,6 @@ export default defineRoute({
   input: itemInput,
 }, async (event, { input, unit, actor }) => {
   const item = await itemCore(getRouterParam(event, 'id')!)
-  await updateItem(unit.view(), item, await categoryRow(input.categoryId), input, actor.accountId ?? null)
+  await updateItem(unit.view(), { item, category: await categoryRow(input.categoryId), input, actorId: actor.accountId ?? null })
   return { itemId: item.id }
 })

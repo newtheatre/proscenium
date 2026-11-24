@@ -3,7 +3,7 @@
 import { first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { operatingDayOf } from '#modules/core'
 import type { Category } from '../shared/setup'
-import type { ItemInput, NewItemsInput } from './inputs'
+import type { ItemInput, NewItemsInput } from '../shared/item-input'
 
 const ITEM_PLACE = { code: 'inventory.item.place', reason: 'Its category or department is archived, its home is archived, or its container cannot hold it.', remedy: 'Reload and choose again.' }
 const TAGS_GONE = { code: 'inventory.item.tag-gone', reason: 'One of the tags chosen is retired or no longer exists.', remedy: 'Reload and choose again.' }
@@ -20,7 +20,7 @@ const detailValues = (input: NewItemsInput | ItemInput) => [
 const DETAIL_SET = DETAIL_COLUMNS.map((c, i) => `${c} = ?${i + 6}`).join(', ') // not-policy: parameter numbers
 
 // A container is an individual item that is in no container itself (I6).
-const CONTAINER_OK = `(?3 IS NULL OR EXISTS (SELECT 1 FROM inventory_items k WHERE k.id = ?3 AND k.tracking = 'individual' AND k.container_id IS NULL AND k.state != 'disposed'))`
+const CONTAINER_OK = '(?3 IS NULL OR EXISTS (SELECT 1 FROM inventory_items k WHERE k.id = ?3 AND k.tracking = \'individual\' AND k.container_id IS NULL AND k.state != \'disposed\'))'
 
 export async function addItems(unit: UnitView, category: Category, input: NewItemsInput, actorId: string | null): Promise<string[]> {
   if (category.state !== 'active') refuse('inventory.category.archived', 'This category is archived.', { remedy: 'Restore it, or choose another.' })
@@ -47,7 +47,7 @@ export async function addItems(unit: UnitView, category: Category, input: NewIte
     params: [input.homeLocationId, input.condition, actorId, at, JSON.stringify(ids.map(item => ({ id: newId('kev'), item })))],
   })
   setTags(unit, ids, input.tagIds)
-  if (input.tracking === 'individual') await addDues(unit, ids, category.id, today)
+  if (input.tracking === 'individual') await addDues(unit, ids, { categoryId: category.id, today })
   unit.audit({ action: 'create', record: ['inventory.item', ids[0]!], detail: { count: String(count), tracking: input.tracking } })
   return ids
 }
@@ -65,7 +65,7 @@ function setTags(unit: UnitView, itemIds: string[], tagIds: string[]): void {
 }
 
 // N1 and N4: one due per kind the category needs, today or one interval on, by the setting.
-async function addDues(unit: UnitView, itemIds: string[], categoryId: string, today: string, revive = false): Promise<void> {
+async function addDues(unit: UnitView, itemIds: string[], { categoryId, today, revive = false }: { categoryId: string, today: string, revive?: boolean }): Promise<void> {
   const afterInterval = await useSetting('inventory.inspections.first-due') === 'after-interval'
   unit.add({
     sql: `INSERT INTO inventory_inspection_dues (item_id, kind_id, source, applies, next_due_on)
@@ -88,9 +88,11 @@ export async function itemCore(id: string): Promise<ItemCore> {
 }
 
 // I4: tracking is fixed once the item has been on a loan or inspected.
-const TRACKING_FREE = `(?2 = inventory_items.tracking OR (NOT EXISTS (SELECT 1 FROM inventory_loan_lines WHERE item_id = ?1) AND NOT EXISTS (SELECT 1 FROM inventory_inspections WHERE item_id = ?1)))`
+const TRACKING_FREE = '(?2 = inventory_items.tracking OR (NOT EXISTS (SELECT 1 FROM inventory_loan_lines WHERE item_id = ?1) AND NOT EXISTS (SELECT 1 FROM inventory_inspections WHERE item_id = ?1)))'
 
-export async function updateItem(unit: UnitView, item: ItemCore, category: Category, input: ItemInput, actorId: string | null): Promise<void> {
+interface ItemChange { item: ItemCore, category: Category, input: ItemInput, actorId: string | null }
+
+export async function updateItem(unit: UnitView, { item, category, input, actorId }: ItemChange): Promise<void> {
   if (item.state === 'disposed') refuse('inventory.item.disposed', 'This item has been disposed of.')
   if (category.departmentId !== item.departmentId) refuse('inventory.item.other-department', 'An item moves only between categories of its own department.', { remedy: 'Its tag stays; dispose of it and add it again to move it to another department.' })
   const at = nowMs()
@@ -117,8 +119,8 @@ export async function updateItem(unit: UnitView, item: ItemCore, category: Categ
 
 // I12: the new category's kinds apply; the old one's go if never inspected, else stay, not applying.
 async function recategorise(unit: UnitView, itemId: string, categoryId: string): Promise<void> {
-  const stale = `item_id = ?1 AND source = 'category' AND kind_id NOT IN (SELECT kind_id FROM inventory_category_inspections WHERE category_id = ?2)`
+  const stale = 'item_id = ?1 AND source = \'category\' AND kind_id NOT IN (SELECT kind_id FROM inventory_category_inspections WHERE category_id = ?2)'
   unit.add({ sql: `DELETE FROM inventory_inspection_dues WHERE ${stale} AND last_inspection_id IS NULL`, params: [itemId, categoryId] })
   unit.add({ sql: `UPDATE inventory_inspection_dues SET applies = 0, next_due_on = NULL WHERE ${stale}`, params: [itemId, categoryId] })
-  await addDues(unit, [itemId], categoryId, await operatingDayOf(nowMs()), true)
+  await addDues(unit, [itemId], { categoryId, today: await operatingDayOf(nowMs()), revive: true })
 }
