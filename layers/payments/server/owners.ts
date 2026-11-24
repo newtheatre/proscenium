@@ -3,7 +3,7 @@
 // that does not is named alone.
 import { all } from '#kit'
 import type { OwnerRecord } from './points/settlement'
-import { settlements } from './intents'
+import { settlements } from './settlements'
 
 export interface OwnerRef { module: string, record: string }
 export type DescribedOwner = OwnerRef & Partial<OwnerRecord>
