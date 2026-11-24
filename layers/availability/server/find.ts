@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm'
 import { refuse, theatreTimeZone, useDb, useSetting, type Actor } from '#kit'
 import { instantOfLocal, localDateOf, localParts, nowMs } from '#kit/clock'
 import { occupancy } from '#modules/occupancy'
-import { personsBusy } from '#modules/person-busy'
+import { personsBusy, type BusyRow } from '#modules/person-busy'
 import { addDays, DAY_MINUTES } from '../shared/grid'
 import { bestTimes, overlay, type Slot, type Span, type Week } from '../shared/find'
 import { minutesOf, type Unmarked } from '../shared/levels'
@@ -85,13 +85,16 @@ async function takenTimes(spaceIds: string[], dates: string[], zone: string, vie
   return out
 }
 
-/** F4: other modules' commitments over each person's days, firm as busy and tentative as maybe; our own rows are already there. */
+/** Our own contribution's stated busy time, which the levels already show (F4). */
+const stated = (row: BusyRow) => row.source === 'availability' && row.kind === 'unavailable'
+
+/** F4: commitments over each person's days, firm as busy and tentative as maybe; stated busy time is already there. */
 async function addCommitments(weeks: Record<string, Week>, ids: string[], dates: string[], zone: string): Promise<void> {
   if (!ids.length) return
   const from = instantOfLocal(dates[0]!, '00:00', zone)
   const to = instantOfLocal(addDays(dates.at(-1)!, 1), '00:00', zone)
   for (const row of await personsBusy(ids, from, to)) {
-    if (row.source === 'availability' || !weeks[row.accountId]) continue
+    if (stated(row) || !weeks[row.accountId]) continue
     for (const s of localSpans(Math.max(row.from, from), Math.min(row.to, to), zone)) {
       const week = weeks[row.accountId]!
       if (week[s.date]) week[s.date] = overlay(week[s.date]!, s, row.firm ? 'busy' : 'maybe', row.labelKey)
