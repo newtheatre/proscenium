@@ -52,12 +52,14 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   'lists': advanced,
   // Only the calendar feed's site marker, which nobody sets by hand (C-70).
   'calendar': advanced,
+  'measures': advanced,
   'programme': on('programme'),
   'grants': on('people'),
   'members-area': on('people'),
   'access-scheme': on('people'),
   'emergency-contacts': on('people'),
   'merge': on('people'),
+  'under-18': on('people'),
 }
 
 const change = 'core.settings.manage'
@@ -89,6 +91,8 @@ export const settings = defineSettings('core', {
 
   'external.timeout': setting.duration({ default: '15s', min: '1s', max: '60s', change }),
   'external.reconcile-after': setting.duration({ default: '5m', min: '1m', max: '1d', change }),
+  // How long one figure may take before a report shows it unavailable (Reports spec, R3-21).
+  'measures.read-budget': setting.duration({ default: '10s', min: '2s', max: '60s', change }),
 
   'access.fresh-within': setting.duration({ default: '10m', min: '1m', max: '1d', change }),
   'idempotency.keep-for': setting.duration({ default: '48h', min: '1h', max: '7d', change }),

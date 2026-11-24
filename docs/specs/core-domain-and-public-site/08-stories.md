@@ -132,3 +132,11 @@ The slice also changes four existing stories when it is built, and not before:
 | C-14 duplicate | Copies effects, content warnings, levels and age. |
 
 That makes 59 stories: 45 first, 14 later, of which two (C-53 and C-54) are the content warnings slice.
+
+## Third-round amendments
+
+Stories C-60 onwards are specified in [Festival-ready changes](../festival-ready-changes/) and, for C-65, [Programme planning](../programme-planning/). Amendments built here without a story number of their own:
+
+| Ruling | What is built |
+| --- | --- |
+| R3-07, one department list (Matt, 24 November 2026, integration Q3) | Core's vocabulary `core.department`, seeded with Productions' twelve production terms under the heading Production and Budgets' six organisation terms under Organisation. A term's kind is its heading's slug, kept in `core_term_groups.slug` from the declared label, so `listTerms('core.department', { group: 'production' })` narrows to one kind and still does after the theatre renames the heading. Theatres edit the list at Admin > Vocabularies. Inventory's kit departments may link to a term. |

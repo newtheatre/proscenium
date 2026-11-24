@@ -287,14 +287,14 @@ describe('the ways in a signed-out browser is offered', () => {
   it('offers only what would work: the code once the bot check has its secret, a provider once its secret is saved', async () => {
     const methods = async () => (await new Browser().get('/api/core/me')).body.signIn
     await saveKey('CORE_TURNSTILE_SECRET_KEY', null)
-    expect(await methods()).toMatchObject({ email: false, providers: [], managed: null })
+    expect(await methods()).toMatchObject({ email: false, providers: [], managed: [] })
     await saveKey('CORE_TURNSTILE_SECRET_KEY', 'turnstile-secret')
     await setSetting('core.sign-in.google', true)
     await setSetting('core.sign-in.google-client-id', CLIENT)
     await setSetting('core.sign-in.google-domains', ['example.org'])
     await setSetting('core.sign-in.managed-domains', ['staff.example.org'])
-    expect(await methods()).toMatchObject({ email: true, providers: [], managed: null })
+    expect(await methods()).toMatchObject({ email: true, providers: [], managed: [] })
     await saveKey('CORE_GOOGLE_CLIENT_SECRET', 'test-google-secret')
-    expect(await methods()).toMatchObject({ email: true, providers: [{ id: 'google', label: 'Google', domains: ['example.org'] }], managed: { domains: ['staff.example.org'], provider: 'google' } })
+    expect(await methods()).toMatchObject({ email: true, providers: [{ id: 'google', label: 'Google', domains: ['example.org'] }], managed: [{ domains: ['staff.example.org'], provider: 'google' }] })
   })
 })

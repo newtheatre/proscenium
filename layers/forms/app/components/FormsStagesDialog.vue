@@ -4,8 +4,8 @@
      like any other: it saves itself, can be undone, and is checked with the rest of the form. -->
 <script setup lang="ts">
 import { DragDropProvider } from '@dnd-kit/vue'
-import { MOVERS, STAGE_KINDS, reviewWorkflow } from '../../shared/engine'
-import type { Definition, Mover, Stage, StageKind, Transition, Workflow } from '../../shared/engine'
+import { MOVERS, STAGE_KINDS, questionsOf, reviewWorkflow } from '../../shared/engine'
+import type { Condition, Definition, Mover, Stage, StageKind, Transition, Workflow } from '../../shared/engine'
 
 const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{ reviewers?: { roles: { id: string, name: string }[], people: Record<string, string> } }>()
@@ -66,6 +66,7 @@ const setMove = (key: string, change: Partial<Transition>, merge?: string) => wr
   Object.assign(move, change)
   const to = f.stages.find(s => s.key === move.to)?.kind
   if (!move.needsReason || move.who !== 'staff' || (to !== 'approved' && to !== 'declined')) delete move.needsReason
+  if (move.who !== 'system' || !move.when) delete move.when
   if (!move.actions?.length) delete move.actions
 }, merge)
 /** A move staff make to an approved or declined stage is a decision, and may ask for a reason. */
@@ -73,7 +74,13 @@ const decides = (move: Transition) => move.who === 'staff' && ['approved', 'decl
 const removeMove = (key: string) => write((f) => { f.transitions = f.transitions.filter(m => m.key !== key) })
 
 const kinds = computed(() => STAGE_KINDS.map(value => ({ value, label: t(`forms.screens.stages.kind.${value}`) })))
-const movers = computed(() => MOVERS.map(value => ({ value, label: t(`forms.screens.stages.who.${value}`) })))
+// The system's own moves sit with marking (FB-514), so only somebody who may mark is offered them.
+const movers = computed(() => MOVERS.filter(m => m !== 'system' || builder.canMark).map(value => ({ value, label: t(`forms.screens.stages.who.${value}`) })))
+const whenQuestions = computed(() => [
+  ...questionsOf(builder.definition.value).filter(q => !q.group).map(q => q.question),
+  ...(builder.definition.value.marking ? formsMarkingQuestions() : []),
+])
+const setWhen = (key: string, when: Condition | undefined) => setMove(key, { when: formsMarkingFromEditor(when) ?? { all: [] } }, `move-when:${key}`)
 const stageItems = computed(() => (flow.value?.stages ?? []).map((s, i) => ({ value: s.key, label: s.name.trim() || t('forms.screens.stages.stage-n', { n: i + 1 }) })))
 const problemsAt = (at: string) => builder.problems.value.filter(p => p.at === at)
 </script>
@@ -284,6 +291,17 @@ const problemsAt = (at: string) => builder.problems.value.filter(p => p.at === a
                   @click="removeMove(move.key)"
                 />
               </div>
+              <UFormField
+                v-if="move.who === 'system'"
+                :label="t('forms.screens.stages.when')"
+                :help="t('forms.screens.stages.when-help')"
+              >
+                <FormsConditionEditor
+                  :model-value="formsMarkingToEditor(move.when)"
+                  :questions="whenQuestions"
+                  @update:model-value="setWhen(move.key, $event)"
+                />
+              </UFormField>
               <UCheckbox
                 v-if="decides(move)"
                 :model-value="!!move.needsReason"
