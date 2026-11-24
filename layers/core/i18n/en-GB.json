@@ -710,5 +710,8 @@
   "core.home-figures.performances.detail.one": "Across {count} production",
   "core.home-figures.performances.detail.other": "Across {count} productions",
   "core.home-figures.no-value": "None",
-  "core.home-figures.meter": "{value} of {max}"
+  "core.home-figures.meter": "{value} of {max}",
+  "core.settings.calendar.site-marker.label": "Calendar feed marker",
+  "core.settings.calendar.site-marker.help": "The site address the calendar feed was first served from. Every event in a feed is named with it, so a later change of address does not make calendar apps show events twice.",
+  "core.settings-sections.calendar": "Calendar feed"
 }

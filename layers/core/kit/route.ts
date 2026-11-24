@@ -43,6 +43,8 @@ export interface RouteDeclaration<I extends z.ZodType | undefined = undefined> {
    * of the log, error reports, the idempotency record, audit rows, events and job payloads.
    */
   tokens?: readonly string[]
+  /** For a route outside /api/<module>/, such as /calendar: the module that serves it. */
+  module?: string
 }
 
 export interface RouteContext<I> {
@@ -160,7 +162,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     }
     await ensureMigrated()
     const registry = useRegistry()
-    const module = moduleOfPath(event.path)
+    const module = moduleOfPath(event.path) ?? decl.module
     if (!module || !registry.modules.has(module)) throw new Refusal('core.not-found', 'There is nothing here.', { status: 404 })
     context.module = module
     if (!(await isEnabled(module))) throw new Refusal('core.not-found', 'There is nothing here.', { status: 404 })

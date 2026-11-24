@@ -50,6 +50,8 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   // Delivery limits, not day-to-day choices: the Webhooks screen is the list alone (Matt, 21 November 2026).
   'webhooks': advanced,
   'lists': advanced,
+  // Only the calendar feed's site marker, which nobody sets by hand (C-70).
+  'calendar': advanced,
   'programme': on('programme'),
   'grants': on('people'),
   'members-area': on('people'),

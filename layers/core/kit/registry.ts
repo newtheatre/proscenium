@@ -193,6 +193,10 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
         else if (!entry.handlers.contributions?.[name]?.[c.file ?? c.id]) {
           fail(entry, `contributes.${name}.${c.id}`, `the file ${entry.root}/server/contributions/${name}/${c.file ?? c.id}.ts does not exist`)
         }
+        if (declared!.decl.kind === 'code' && declared!.decl.publicSafe) {
+          const problem = publicSafeProblem(r, c.from)
+          if (problem) fail(entry, `contributes.${name}.${c.id}.from`, problem)
+        }
       }
     }
     placeSettings(r, entry, fail)
@@ -282,6 +286,20 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
 }
 
 /** The part of a job, task or call name after the module: `box-office.sweep-holds` → `sweep-holds`. */
+const ABOUT_A_PERSON = new Set(['personal', 'freeText', 'special', 'perRow'])
+
+/** Why a public-safe contribution's `from` (its <table>.<column> sources) is not safe, or null. */
+function publicSafeProblem(r: Registry, from: unknown): string | null {
+  if (!Array.isArray(from) || !from.length || !from.every(f => typeof f === 'string')) return 'lists the columns its titles and locations are read from, as <table>.<column>'
+  for (const source of from as string[]) {
+    const [table, column] = source.split('.')
+    const found = Object.values(r.tables.get(table ?? '')?.meta.columns ?? {}).find(c => c.sql === column)
+    if (!found) return `"${source}" is not a column any module declares`
+    if (ABOUT_A_PERSON.has(found.meta.class)) return `"${source}" is ${found.meta.class} data, and these words are shown to anyone holding the address: use a name, a title or a place`
+  }
+  return null
+}
+
 export function short(name: string): string {
   return name.slice(name.indexOf('.') + 1)
 }
