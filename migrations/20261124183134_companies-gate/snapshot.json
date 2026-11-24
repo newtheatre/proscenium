@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "6966ddfc-8c87-4e4a-91f4-d173589834bd",
+  "id": "6dbbfa71-7878-4d7b-a7b4-ee8808135ac2",
   "prevIds": [
-    "729c9681-eb33-47cd-9370-db341fc6f901"
+    "2a1ff70d-800e-4e89-bba5-d471a3ba1d81"
   ],
   "ddl": [
     {
@@ -280,6 +280,10 @@
     },
     {
       "name": "box_office_tickets",
+      "entityType": "tables"
+    },
+    {
+      "name": "calendar_feed_tokens",
       "entityType": "tables"
     },
     {
@@ -692,10 +696,6 @@
     },
     {
       "name": "front_of_house_assignments",
-      "entityType": "tables"
-    },
-    {
-      "name": "front_of_house_calendar_feeds",
       "entityType": "tables"
     },
     {
@@ -8527,6 +8527,46 @@
     {
       "table": "box_office_tickets",
       "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "token_hash",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "generation",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "created_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -18617,46 +18657,6 @@
     {
       "table": "front_of_house_assignments",
       "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "account_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "token_hash",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "generation",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "1",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "created_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -29673,6 +29673,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "calendar_feed_tokens",
+      "name": "calendar_feed_tokens_token",
+      "columns": [
+        {
+          "value": "token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "companies_agreement_responses",
       "name": "companies_agreement_responses_once",
       "columns": [
@@ -32062,20 +32076,6 @@
         }
       ],
       "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "front_of_house_calendar_feeds_token",
-      "columns": [
-        {
-          "value": "token_hash",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -38975,6 +38975,15 @@
       "entityType": "pks"
     },
     {
+      "table": "calendar_feed_tokens",
+      "name": "calendar_feed_tokens_pk",
+      "columns": [
+        "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_access_profiles",
       "name": "core_access_profiles_pk",
       "columns": [
@@ -39192,15 +39201,6 @@
       "name": "forms_response_drafts_pk",
       "columns": [
         "response_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "front_of_house_calendar_feeds_pk",
-      "columns": [
-        "account_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
