@@ -4,6 +4,7 @@
 import { all, first, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { canonicalAccount } from '#modules/core'
+import { slotQuiz } from '#modules/forms'
 import type { ChangeKind, CourseState, NeededFor, StepKind, VersionState } from '../shared/states'
 import type { CourseChange, CourseInput, StepInput } from './inputs'
 import { endOfLocalDay, theatreDay } from './days'
@@ -47,6 +48,11 @@ export interface Step {
   materialFileId: string | null
   evidenceExpiry: 'required' | 'optional' | 'none' | null
   evidenceFile: 'required' | 'optional' | 'forbidden' | null
+  formId: string | null
+  formVersionId: string | null
+  maxAttempts: number | null
+  retryAfter: number | null
+  showAnswers: 'never' | 'after-pass' | 'after-each' | null
   carriesStepId: string | null
 }
 
@@ -56,7 +62,10 @@ const VERSION = `SELECT id, course_id AS courseId, number, status, change_kind A
   published_at AS publishedAt FROM training_course_versions`
 const STEP = `SELECT id, version_id AS versionId, position, title, kind, needed_for AS neededFor, times_required AS timesRequired, guidance,
   material_url AS materialUrl, material_file_id AS materialFileId, evidence_expiry AS evidenceExpiry, evidence_file AS evidenceFile,
+  form_id AS formId, form_version_id AS formVersionId, max_attempts AS maxAttempts, retry_after AS retryAfter, show_answers AS showAnswers,
   carries_step_id AS carriesStepId FROM training_course_steps`
+
+const SECTION_COLUMNS = ['id', 'step_id', 'position', 'kind', 'title', 'body', 'video_url', 'video_id', 'video_caption_note', 'scenario_id', 'carries_section_id', 'created_at', 'updated_at']
 
 const course = (row: any): Course => ({ ...row, expires: !!row.expires, selfSignUp: !!row.selfSignUp })
 
@@ -155,35 +164,51 @@ export async function saveSteps(unit: UnitView, courseId: string, input: StepInp
   const version = await preparing(courseId)
   if (!version) refuse('training.version-published', 'This version is published, so it cannot be changed.', { status: 409, remedy: 'Start a new version to change the steps.' })
   const before = new Map((await stepsOf(version.id)).map(s => [s.id, s]))
-  const ids: string[] = []
-  const rows = input.map((step, i) => {
-    const old = step.id ? before.get(step.id) : undefined
-    if (step.id && !old) refuse('training.step.not-found', 'A step was changed by someone else while you were editing.', { status: 409, remedy: 'Reload the course and try again.' })
-    const timesRequired = step.kind === 'practical' ? step.timesRequired : 1
-    const keepsCarry = old && !step.changed && old.kind === step.kind && old.timesRequired === timesRequired
-    const id = old?.id ?? newId('tstp')
-    ids.push(id)
-    return {
-      id, position: i + 1, title: step.title, kind: step.kind, neededFor: step.neededFor, timesRequired,
-      guidance: step.guidance ?? null,
-      materialUrl: 'materialUrl' in step ? step.materialUrl ?? null : null,
-      materialFileId: 'materialFileId' in step ? step.materialFileId ?? null : null,
-      evidenceExpiry: step.kind === 'certificate' ? step.evidenceExpiry : null,
-      evidenceFile: step.kind === 'certificate' ? step.evidenceFile : null,
-      carriesStepId: keepsCarry ? old.carriesStepId : null,
-    }
-  })
+  const defaultAttempts = await useSetting('training.quizzes.default-max-attempts') as number | null
+  const defaultRetry = await useSetting('training.quizzes.retry-after') as number
+  const rows = input.map((step, i) => stepRowFor(step, i, { before, defaultAttempts, defaultRetry }))
+  const ids = rows.map(r => r.id)
+  // A lesson's sections go out with its step and come back if the step is kept as a lesson (O5).
+  const kept = new Set(rows.filter(r => r.kind === 'lesson').map(r => r.id))
+  const sections = (await all<{ step_id: string }>('SELECT * FROM training_lesson_sections WHERE step_id IN (SELECT id FROM training_course_steps WHERE version_id = ?)', version.id))
+    .filter(x => kept.has(x.step_id))
+  unit.add({ sql: 'DELETE FROM training_lesson_sections WHERE step_id IN (SELECT id FROM training_course_steps WHERE version_id = ?)', params: [version.id] })
   // One statement clears and one writes the set, whatever the number of steps (T4).
   unit.add({ sql: 'DELETE FROM training_course_steps WHERE version_id = ?', params: [version.id] })
   unit.add({
-    sql: `INSERT INTO training_course_steps (id, version_id, position, title, kind, needed_for, times_required, guidance, material_url, material_file_id, evidence_expiry, evidence_file, carries_step_id)
+    sql: `INSERT INTO training_course_steps (id, version_id, position, title, kind, needed_for, times_required, guidance, material_url, material_file_id, evidence_expiry, evidence_file,
+        form_id, max_attempts, retry_after, show_answers, carries_step_id)
       SELECT j.value ->> 'id', ?, j.value ->> 'position', j.value ->> 'title', j.value ->> 'kind', j.value ->> 'neededFor', j.value ->> 'timesRequired', j.value ->> 'guidance',
-        j.value ->> 'materialUrl', j.value ->> 'materialFileId', j.value ->> 'evidenceExpiry', j.value ->> 'evidenceFile', j.value ->> 'carriesStepId'
+        j.value ->> 'materialUrl', j.value ->> 'materialFileId', j.value ->> 'evidenceExpiry', j.value ->> 'evidenceFile',
+        j.value ->> 'formId', j.value ->> 'maxAttempts', j.value ->> 'retryAfter', j.value ->> 'showAnswers', j.value ->> 'carriesStepId'
       FROM json_each(?) j`,
     params: [version.id, JSON.stringify(rows)],
   }).expect(rows.length)
+  if (sections.length) unit.add({ sql: `INSERT INTO training_lesson_sections (${SECTION_COLUMNS.join(', ')}) SELECT ${SECTION_COLUMNS.map(c => `j.value ->> '${c}'`).join(', ')} FROM json_each(?) j`, params: [JSON.stringify(sections)] }).expect(sections.length)
   unit.audit({ action: 'update', record: ['training.course', courseId], detail: { version: version.number, steps: rows.length } })
   return ids
+}
+
+/** The row a step of the editor saves as; one kept from before keeps its id and, unless changed, what it carries from (V3). */
+function stepRowFor(step: StepInput, i: number, { before, defaultAttempts, defaultRetry }: { before: Map<string, Step>, defaultAttempts: number | null, defaultRetry: number }) {
+  const old = step.id ? before.get(step.id) : undefined
+  if (step.id && !old) refuse('training.step.not-found', 'A step was changed by someone else while you were editing.', { status: 409, remedy: 'Reload the course and try again.' })
+  const timesRequired = step.kind === 'practical' ? step.timesRequired : 1
+  const keepsCarry = old && !step.changed && old.kind === step.kind && old.timesRequired === timesRequired
+  const quiz = step.kind === 'quiz' ? step : null
+  return {
+    id: old?.id ?? newId('tstp'), position: i + 1, title: step.title, kind: step.kind, neededFor: step.neededFor, timesRequired,
+    guidance: step.guidance ?? null,
+    materialUrl: 'materialUrl' in step ? step.materialUrl ?? null : null,
+    materialFileId: 'materialFileId' in step ? step.materialFileId ?? null : null,
+    evidenceExpiry: step.kind === 'certificate' ? step.evidenceExpiry : null,
+    evidenceFile: step.kind === 'certificate' ? step.evidenceFile : null,
+    formId: quiz?.formId ?? null,
+    maxAttempts: quiz ? (quiz.maxAttempts === undefined ? defaultAttempts : quiz.maxAttempts) : null,
+    retryAfter: quiz ? quiz.retryAfter ?? defaultRetry : null,
+    showAnswers: quiz?.showAnswers ?? null,
+    carriesStepId: keepsCarry ? old.carriesStepId : null,
+  }
 }
 
 /** Starts the next version by copying the live one's steps, each carrying from the step it copies (V1). */
@@ -196,11 +221,24 @@ export async function startVersion(unit: UnitView, courseId: string): Promise<st
   unit.add({ sql: 'INSERT INTO training_course_versions (id, course_id, number, status, created_at) VALUES (?, ?, ?, \'in-preparation\', ?)', params: [versionId, courseId, latest.number + 1, nowMs()] })
   const steps = (await stepsOf(course.liveVersionId)).map(s => ({ ...s, newId: newId('tstp') }))
   unit.add({
-    sql: `INSERT INTO training_course_steps (id, version_id, position, title, kind, needed_for, times_required, guidance, material_url, material_file_id, evidence_expiry, evidence_file, carries_step_id)
-      SELECT j.value ->> 'newId', ?, s.position, s.title, s.kind, s.needed_for, s.times_required, s.guidance, s.material_url, s.material_file_id, s.evidence_expiry, s.evidence_file, s.id
+    sql: `INSERT INTO training_course_steps (id, version_id, position, title, kind, needed_for, times_required, guidance, material_url, material_file_id, evidence_expiry, evidence_file,
+        form_id, max_attempts, retry_after, show_answers, carries_step_id)
+      SELECT j.value ->> 'newId', ?, s.position, s.title, s.kind, s.needed_for, s.times_required, s.guidance, s.material_url, s.material_file_id, s.evidence_expiry, s.evidence_file,
+        s.form_id, s.max_attempts, s.retry_after, s.show_answers, s.id
       FROM json_each(?) j JOIN training_course_steps s ON s.id = j.value ->> 'id'`,
     params: [versionId, JSON.stringify(steps.map(s => ({ id: s.id, newId: s.newId })))],
   })
+  // Each lesson section is copied too, carrying from the one it copies (O5).
+  const sections = await all<{ id: string, stepId: string }>('SELECT id, step_id AS stepId FROM training_lesson_sections WHERE step_id IN (SELECT id FROM training_course_steps WHERE version_id = ?)', course.liveVersionId)
+  if (sections.length) {
+    const stepOf = new Map(steps.map(s => [s.id, s.newId]))
+    unit.add({
+      sql: `INSERT INTO training_lesson_sections (id, step_id, position, kind, title, body, video_url, video_id, video_caption_note, scenario_id, carries_section_id, created_at, updated_at)
+        SELECT j.value ->> 'newId', j.value ->> 'stepId', x.position, x.kind, x.title, x.body, x.video_url, x.video_id, x.video_caption_note, x.scenario_id, x.id, ?2, ?2
+        FROM json_each(?1) j JOIN training_lesson_sections x ON x.id = j.value ->> 'id'`,
+      params: [JSON.stringify(sections.map(x => ({ id: x.id, newId: newId('tlsc'), stepId: stepOf.get(x.stepId) }))), nowMs()],
+    }).expect(sections.length)
+  }
   unit.audit({ action: 'update', record: ['training.course', courseId], detail: { versionStarted: latest.number + 1 } })
   return versionId
 }
@@ -217,6 +255,7 @@ export async function publish(unit: UnitView, actor: Actor, courseId: string, in
   if (course.status === 'retired') refuse('training.course.retired', 'This course is retired.', { status: 409, remedy: 'Bring the course back first.' })
   const steps = await stepsOf(version.id)
   if (!steps.length) refuse('training.version.no-steps', 'A course needs at least one step before it is published.', { status: 422 })
+  const pins = await pinQuizzes(courseId, steps)
   const first = version.number === 1
   if (!first && !input.changeKind) refuse('training.version.change-kind', 'Say whether people who hold the course must retrain.', { status: 422, fields: { changeKind: 'Choose one.' } })
   const changeKind: ChangeKind = first ? 'records-stand' : input.changeKind!
@@ -233,6 +272,14 @@ export async function publish(unit: UnitView, actor: Actor, courseId: string, in
     params: [changeKind, input.changeNote ?? null, cutTo, actor.accountId ?? null, at, version.id],
   }).expect(1, { code: 'training.version-published', reason: 'Someone else published this version a moment ago.' })
   unit.add({ sql: 'UPDATE training_courses SET live_version_id = ?, status = CASE status WHEN \'unpublished\' THEN \'live\' ELSE status END, updated_at = ? WHERE id = ?', params: [version.id, at, courseId] }).expect(1)
+  if (pins.length) {
+    unit.add({
+      sql: 'UPDATE training_course_steps SET form_version_id = j.value ->> \'versionId\' FROM json_each(?) j WHERE training_course_steps.id = j.value ->> \'stepId\'',
+      params: [JSON.stringify(pins)],
+    }).expect(pins.length)
+  }
+  // Sessions not yet started move to the new version; one already started keeps its own (V7).
+  unit.add({ sql: 'UPDATE training_sessions SET version_id = ?, updated_at = ? WHERE course_id = ? AND starts_at > ? AND status IN (\'unpublished\', \'published\')', params: [version.id, at, courseId, at] })
   if (cutTo !== null) {
     // Every holder at once (V6). Telling each one is the job of the notifications slice.
     unit.add({
@@ -244,6 +291,21 @@ export async function publish(unit: UnitView, actor: Actor, courseId: string, in
   unit.announce('training.course.published', { courseId, versionId: version.id, number: version.number, changeKind }, { record: ['training.course', courseId] })
   unit.audit({ action: 'state', record: ['training.course', courseId], detail: { published: version.number, changeKind } })
   return { versionId: version.id, number: version.number, cutTo }
+}
+
+/**
+ * Each quiz step's form, pinned at its live version, which must have correct answers and a pass mark
+ * and be attached to the course in the slot training.quiz (Q1).
+ */
+async function pinQuizzes(courseId: string, steps: Step[]): Promise<{ stepId: string, versionId: string }[]> {
+  const out: { stepId: string, versionId: string }[] = []
+  for (const step of steps.filter(s => s.kind === 'quiz')) {
+    const quiz = await slotQuiz('training.quiz', courseId, step.formId!)
+    if (!quiz?.marked)
+      refuse('training.quiz.not-marked', `The quiz for "${step.title}" needs a published form, attached to this course, with correct answers and a pass mark.`, { status: 422, remedy: 'Set the answers and pass mark in the form, publish it, and attach it to the course.' })
+    out.push({ stepId: step.id, versionId: quiz.versionId })
+  }
+  return out
 }
 
 /** Retires a course: no new sessions, sign-offs or evidence; its records run to their dates (V8). */

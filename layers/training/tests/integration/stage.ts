@@ -45,6 +45,12 @@ import walkIn from '../../server/api/training/sessions/[id]/walk-ins.post'
 import closeSession from '../../server/api/training/sessions/[id]/close.post'
 import cancelPlace from '../../server/api/training/places/[id]/cancel.post'
 import myPlaces from '../../server/api/training/me/places.get'
+import putSections from '../../server/api/training/courses/[id]/steps/[step]/sections.put'
+import getLesson from '../../server/api/training/courses/[id]/steps/[step]/lesson.get'
+import reached from '../../server/api/training/courses/[id]/steps/[step]/sections/[section]/reached.post'
+import getQuiz from '../../server/api/training/courses/[id]/steps/[step]/quiz.get'
+import sendQuiz from '../../server/api/training/courses/[id]/steps/[step]/quiz.post'
+import allowance from '../../server/api/training/courses/[id]/steps/[step]/allowances.post'
 
 export const training = server({
   'GET /api/training/courses': listCourses,
@@ -88,6 +94,12 @@ export const training = server({
   'POST /api/training/sessions/:id/close': closeSession,
   'POST /api/training/places/:id/cancel': cancelPlace,
   'GET /api/training/me/places': myPlaces,
+  'PUT /api/training/courses/:id/steps/:step/sections': putSections,
+  'GET /api/training/courses/:id/steps/:step/lesson': getLesson,
+  'POST /api/training/courses/:id/steps/:step/sections/:section/reached': reached,
+  'GET /api/training/courses/:id/steps/:step/quiz': getQuiz,
+  'POST /api/training/courses/:id/steps/:step/quiz': sendQuiz,
+  'POST /api/training/courses/:id/steps/:step/allowances': allowance,
 })
 
 /** 24 November 2026, 10:00 in London. */

@@ -37,3 +37,15 @@ Where the build departs from, or is narrower than, this specification and the se
 - **Reminders** are sent by the task `training.send-reminders` every 30 minutes, once per place through the notification's dedupe key rather than a marker column. The reminder can be switched off under the topic `training.sessions`; every other session notice cannot.
 - **Not yet:** the overdue-attendance card for trainers (P8), telling a holder whether attending would renew (P6), refusing to delete a space with future sessions, and the screens.
 - **Abilities** added: `session.manage`, `session.run` (mapped by default to the course-trainer fact, beside `sign-off.record`), `place.book` and `place.manage`.
+
+## Online lessons and quizzes (TR-39, TR-40, TR-42 to TR-45), 24 November 2026
+
+- **Lesson sections** are saved on their own for a lesson step of the version in preparation (`PUT .../steps/<step>/sections`). Saving the course's steps keeps the sections of a step that stays a lesson. Starting a version copies every section, each carrying from the one it copies; ticking "changed" clears the carry (O5).
+- **Reaching** is one row per person and section; reaching again inside the window changes nothing, and a reach from before the progress window or the last award is renewed. Progress on a section counts for the sections that carry from it. Reaching the last unreached section writes the `lesson` sign-off and evaluates the award in the same unit (O2). A practice section is reached the same way, by "I've tried it" (O3).
+- **Video** in a section is an `https` address for now. The allowed hosts and uploaded video come with the video slice.
+- **Quizzes.** A quiz step names a form attached to the course in the Forms slot `training.quiz`. Publishing the version pins each quiz step to its form's live version, and refuses `training.quiz.not-marked` unless that version has correct answers and a pass mark (Q1). For this, Forms gained one read in its services, `slotQuiz`.
+- **Taking a quiz** sends the answers to Forms' `addResponse` with the pinned version in the same unit, inserts the attempt with the failed count as the statement's predicate (`training.quiz.limit`), and on a pass writes the `quiz` sign-off and evaluates the award (Q2, Q3). A refused attempt leaves no response in Forms.
+- **What the person sees** is the score and pass or fail always, and which questions were right with their feedback as the step's `show_answers` allows. The correct answers themselves are not sent yet.
+- **A passed quiz** is refused `training.quiz.passed` while it still counts towards completing the course; once a training record is awarded, taking it again counts towards renewal (A2).
+- **Allowances** need `training.sign-off.record` at the course and are refused for oneself (`training.own-allowance`).
+- **Sessions on a new version.** Publishing a version moves sessions not yet started onto it (V7).

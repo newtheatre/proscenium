@@ -1,7 +1,7 @@
 // What Training's routes accept. Limits are the schema's (part 2); a step kind is accepted here once
 // the slice that delivers it is built.
 import { z } from 'zod'
-import { EVIDENCE_EXPIRY, EVIDENCE_FILE, NEEDED_FOR, REVOKE_CODES, ROUTE_STATES, SIGN_UP } from '../shared/states'
+import { EVIDENCE_EXPIRY, EVIDENCE_FILE, NEEDED_FOR, REVOKE_CODES, ROUTE_STATES, SECTION_KINDS, SHOW_ANSWERS, SIGN_UP } from '../shared/states'
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/ // not-policy: the shape of a date
 export const day = z.string().regex(DAY, 'Give the date as a day, month and year.')
@@ -38,6 +38,17 @@ export const stepInput = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('practical'), ...common, ...material, timesRequired: z.number().int().min(1).max(20).default(1) }), // not-policy: the schema's limit (part 2)
   z.object({ kind: z.literal('reading'), ...common, ...material }),
   z.object({ kind: z.literal('certificate'), ...common, evidenceExpiry: z.enum(EVIDENCE_EXPIRY), evidenceFile: z.enum(EVIDENCE_FILE) }),
+  // A lesson's teaching is its sections, saved on their own (O5), so it carries no guidance.
+  z.object({ kind: z.literal('lesson'), ...common, guidance: z.null().optional() }),
+  z.object({
+    kind: z.literal('quiz'),
+    ...common,
+    formId: z.string().min(1),
+    // Null is no limit (Q3); left out, the step takes training.quizzes.default-max-attempts.
+    maxAttempts: z.number().int().min(1).max(20).nullable().optional(), // not-policy: the schema's limit (part 2)
+    retryAfter: z.number().int().positive().optional(),
+    showAnswers: z.enum(SHOW_ANSWERS).default('after-pass'),
+  }),
 ])
 export type StepInput = z.infer<typeof stepInput>
 export const stepsInput = z.object({ steps: z.array(stepInput).min(1).max(20) }) // not-policy: the schema's limit (part 2)
@@ -108,6 +119,23 @@ export const walkInInput = z.union([
   z.object({ accountId: z.string().min(1) }),
   z.object({ name: z.string().trim().min(1).max(120), address: z.string().trim().email().max(254).nullable().optional() }), // not-policy: the account's limits
 ])
+
+export const sectionsInput = z.object({
+  sections: z.array(z.object({
+    id: z.string().optional(),
+    kind: z.enum(SECTION_KINDS),
+    title: z.string().trim().min(1).max(120), // not-policy: the schema's limit (part 2)
+    body: optionalText(20000), // not-policy: the schema's limit (part 2)
+    videoUrl: z.string().trim().url().startsWith('https://').max(500).nullable().optional(), // not-policy: an address's length
+    videoCaptionNote: optionalText(200), // not-policy: the schema's limit (part 2)
+    scenarioId: z.string().trim().min(1).max(120).nullable().optional(), // not-policy: an id's length
+    // The author says the section has changed, so people part-way through must reach it again (O5).
+    changed: z.boolean().optional(),
+  })).min(1).max(30), // not-policy: the schema's limit (part 2)
+})
+
+export const quizInput = z.object({ answers: z.record(z.string(), z.unknown()) })
+export const allowanceInput = z.object({ accountId: z.string().min(1), note: optionalText(300) }) // not-policy: the schema's limit (part 2)
 
 /** A route that takes no body. */
 export const noInput = z.object({}).strict()

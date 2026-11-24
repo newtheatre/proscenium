@@ -124,6 +124,8 @@ export default defineModule({
       { id: 'training.sessions', side: 'members' as const, order: 71 },
     ],
     'core.space-busy': [{ id: 'training' }],
+    // A marked form on a course, for its quiz steps (Q1).
+    'forms.slot': [{ id: 'training.quiz', subject: 'training.course', attach: 'training.course.manage', label: 'training.forms.quiz.label' }],
     // Two places on one session after an account merge: the stronger is kept.
     'core.merge-handler': [{ id: 'training.places', file: 'places' }],
     'core.notification-type': [{
@@ -184,6 +186,7 @@ export default defineModule({
       'training.place.booked': event({ version: 1, payload: z.object({ ...place, state: z.enum(['booked', 'waiting', 'attended']) }), internal: true }),
       'training.place.promoted': event({ version: 1, payload: z.object(place), internal: true }),
       'training.place.cancelled': event({ version: 1, payload: z.object(place), internal: true }),
+      'training.quiz.attempted': event({ version: 1, payload: z.object({ attemptId: z.string(), accountId: z.string(), courseId: z.string(), stepId: z.string(), passed: z.boolean() }), internal: true }),
       'training.competency.routes-changed': event({ version: 1, payload: z.object({ competencyId: z.string() }), internal: false }),
     },
   },
