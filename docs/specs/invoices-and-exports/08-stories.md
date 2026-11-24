@@ -75,3 +75,18 @@ The VAT stories are not in the cut order: VAT is in the first release by decisio
 | IE-39 | The point `invoicing.export-format` for a fork's own parent body layout | Custom columns cover the known cases |
 | IE-40 | Purchase orders the theatre raises, matched to bills | A bigger process than a society runs |
 | IE-43 | Sending VAT returns to HMRC through Making Tax Digital | Needs HMRC's API and credentials in-app; the report (IE-41) is enough to file by hand |
+
+## As built: the gate (IE-01 to IE-06)
+
+Built in layer `layers/invoicing`. Where the build differs from the parts above:
+
+- Only the three export tables exist so far (profiles, codes, runs); the invoice tables, schedules and `invoicing.exports.keep-files-for` arrive with their stories (IE-07 onwards, IE-30). Runs carry `file_id` for kept copies, still unused.
+- Switching on makes the five ledger accounts and one profile. Presets are not applied at run time yet, so the `student-society` preset works through the setting `invoicing.exports.starter`; S10 can also make the union profile at any time.
+- Formats `journal` and `custom` only; the package formats are IE-21.
+- `signs` gains `credit` (one amount, credits positive), so the union return keeps sales positive and refunds negative while the ledger is double entry. The total line is always money in positive.
+- The union return has one row per ledger entry, so each sale shows twice: once on its money account (tender "Money") and once on its income account ("Not money"). Filtering the tender column on "Not money" gives the old file's rows. Categories come from `kind_labels`; the ledger no longer tells a collected ticket from a walk-up, so both read "Ticket sale".
+- The source column is the posting's source record (type and id) and the reference the posting id, rather than a title from `core.record-resolver`: resolving every source of a year's file would take more queries than one Worker request may make.
+- A code is letters and digits joined by dots, dashes or underscores, so it can be written to the audit row (E-14).
+- Taking an export and checking a past run are GET routes, as Finance's own export is: `invoicing.export.take` skips the fresh sign-in, which the kit allows only for reads. The run row is the audited record of the read.
+- Coverage counts entries through Finance's new `entryCounts`; Finance also exports `rangeOf`, `rangeClosed`, `listPeriods` and `ledgerAccounts` for the exports.
+- E-07's refusal at 50,000 entries is in place but not exercised by a test, which would need 50,001 entries.

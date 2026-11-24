@@ -7,6 +7,7 @@ export interface RequestView {
   request: { id: string, title: string, message: string | null, from: string, to: string, dueOn: string, open: boolean, module: boolean, remindedAt: number | null }
   mine: AskedState | null
   organiser: boolean
+  onBehalf: boolean
   counts: Record<AskedState, number>
   people?: { accountId: string, name: string, state: AskedState, answeredAt: number | null }[]
 }

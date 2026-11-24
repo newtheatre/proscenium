@@ -199,12 +199,26 @@ Any module may import core's services without listing core: `import { notifyAddr
   training session, a pencil) contributes to `core.space-busy` a file whose `busy({ spaceIds, from,
   to }, actor)` answers `{ spaceId, kind, from, to, yields, record, label }` items, the label null
   where the reader may not see it (contract in `layers/core/server/points/space-busy.ts`).
+- Busy elsewhere (C-66): `personBusy(accountId, from, to)` and `personsBusy(accountIds, from, to)`
+  from the support module `person-busy` (require it, import `#modules/person-busy`) merge every
+  `core.person-busy` contribution overlapping `[from, to)` into `{ accountId, kind, from, to, firm,
+  labelKey, record, source }` rows, sorted by person then time; `source` is the contributing module's
+  id, so a caller leaves out its own. Advisory: it warns and decides no write. A module that holds
+  people (a shift, a rehearsal call, a stated busy time) contributes a file whose `busy({ accountIds,
+  from, to })` answers `PersonBusyItem`s about those accounts only, with a translation key and never
+  words (contract in `layers/core/server/points/person-busy.ts`). Core calls it with at most 90
+  accounts at a time, drops and logs any row about someone not asked, leaves out a contributor that
+  throws, and refuses a window over 400 days. Core's own entry makes a credited person busy for each
+  scheduled (firm) or draft performance of the production, from doors or the start to the end.
 - `getBrand()`: the theatre's name, logos and colour tokens for light and dark.
 - Vocabularies, the shared lists of options such as production categories and advisories. Declare
   yours, with its starting terms, as a contribution to `core.vocabulary` (`id` is
   `<module>.<name>`); it is made the first time the module is on and from then on its terms are the
   theatre's. A record stores the term's id in a `col.ref('core_terms')` column, never the label.
-  `listTerms(key, { includeRetired? })` gives a picker's options in order; `getTerm(id)` gives a
+  `listTerms(key, { includeRetired?, group? })` gives a picker's options in order; `group` narrows
+  to the terms under one declared heading by its slug (made from the declared label, and kept when
+  the theatre renames the heading), which is how `core.department`'s kinds, `production` and
+  `organisation`, are read (R3-07); `getTerm(id)` gives a
   label for any term, retired or merged ones too; `assertTerm(id, key)` is the predicate to put on
   your own insert or update, then `.expect(1)`, so a retired term or one from another vocabulary
   is refused. Staff edit a module's terms on the Lists tab of its page in Admin
@@ -314,6 +328,31 @@ and audits the read. A met answer may also carry `holderAccountId`, the account 
 presented value belongs to (R-34). It is for the host's server code only: the property is not
 enumerable, so an answer turned into JSON (a route returning it, a summary, an event or job
 payload) leaves it out, and it is dropped from any verdict that is not met.
+
+## Figures
+
+A module answers figures about its own records through `core.measure`, one file per figure in
+`server/contributions/core.measure/<name>.ts`, listed in the manifest as
+`{ id: '<module>.<name>', file: '<name>' }`:
+`export default defineMeasure({ label, unit, combine, by, filters?, ability, read })`. `unit` is
+count, money, minutes or percent; `combine` is sum, distinct or level; `by` lists the breakdowns it
+answers, the shared ones (`performance`, `production`, `season`, `collection`, `venue`, `space`,
+`day`, `week`, `month`, `committee-year`) or the module's own `<module>.<noun>`; `filters` the keys
+it narrows by. `read(query)` answers `{ rows: [{ keys, value, currency? }] }` or `'unsupported'`.
+A ratio has no read: `ratio: { of, over }` names two figures and core divides them group by group,
+leaving out a group with nothing under it. The registry refuses a figure not named under its module,
+an ability nobody declares, another module's own key, and a ratio of a figure that does not exist or
+does not break down as the ratio does.
+
+Read a figure only through `readMeasure(id, { from, to, scope?, by, filter? }, actor?)` from
+`#modules/core`. It refuses an unknown figure, an undeclared breakdown or filter, more than two
+breakdowns, a filter of no values or more than twenty, and a reader without the figure's ability
+site-wide or on the scope record, all before the module is asked. It answers `{ state: 'ok', rows }`,
+`{ state: 'unsupported' }` or `{ state: 'unavailable', reason }`: the module is off, the read threw,
+it outlasted `core.measures.read-budget`, or its answer held anything but asked keys and numbers (an
+account id, a stray field, money without a currency, a count with one). A bad answer is logged with
+the rule it broke, never the row. Unavailable is shown as unavailable, never as nought.
+`listMeasures(actor?)` lists the figures a reader may read somewhere.
 
 ## Email outcomes
 
@@ -629,6 +668,15 @@ markup only where Nuxt UI has nothing suitable. The core layer registers the mod
 (`layers/core/app/assets/css/main.css`) and the shared component defaults (`app.config.ts`).
 Icons are bundled at build time, so nothing is fetched from Iconify while the Worker runs.
 Shells, page types and the navigation declaration are in [interface.md](interface.md).
+
+## Practice stores
+
+`PracticeStore` (`#kit/practice/store`) is a SQLite-backed Durable Object, one per person, made from
+the same migration bundle as D1. `storeDatabase(stub)` (`#kit/practice/database`) wraps its stub as
+a D1Database: `prepare`, `bind`, `run`, `all`, `first`, `raw` and `batch` behave as D1's, `batch`
+commits whole or not at all, and results carry D1's `meta`, `changes` included. Run the kit against
+a store by putting it in the context's env as `DB`. `destroy()` deletes everything the store holds.
+Proof P-PM-1 is in `tests/integration/practice-store.test.ts`.
 
 ## Testing
 
