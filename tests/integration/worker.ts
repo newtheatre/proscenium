@@ -2,6 +2,7 @@
 // Durable Object classes the bindings name.
 export { RateLimitCounter } from '../../layers/core/server/rate-counter'
 export { RealtimeHub } from '../../layers/core/server/realtime-hub'
+export { PracticeStore } from '../../layers/core/kit/practice/store'
 
 export default {
   async fetch() {
