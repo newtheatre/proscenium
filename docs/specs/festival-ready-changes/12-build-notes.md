@@ -34,3 +34,11 @@ What the build settled that the parts above leave open, and where it differs fro
 - **Removing a batch.** One statement cancels the batch's shifts with no places taken, judged on the row, so a sign-up racing the removal keeps its shift. Shifts with people on them stay and are listed back for a manager to deal with one by one. A removed batch leaves the Batches list.
 - **Copy to other days.** A shift not tied to a performance copies to other nights at the same local times, as drafts outside any batch. A performance's shift refuses `front-of-house.copy.performance`.
 - **Not done.** The Availability soft use (maybe, busy, unknown in the grid and the assign dialog) waits for Availability's first release: no `availability.levels` exists yet.
+
+## C-67: a season's own public words
+
+- **Where it lives.** The contract in `layers/core/server/points/public-wording.ts`; `publicWordingFor` and the clash check in `layers/core/server/programme/wording.ts`; the health check `core.public-wording`. On the public site, `usePublicWords` and the `public-site.words.*` defaults. `docs/kit/interface.md` ("A season's own public words") is the guide.
+- **What changes.** The production page (the about heading, the access and effects lines of a date, the "has no warnings" sentences) and the season page's empty state take the words. The public production and season answers carry `wording`.
+- **Emails and the feed.** No booking email names any of the eight words today (they say the show's title and date), so none changes. The calendar feed (C-70, lane A) should call `publicWordingFor` when it lands.
+- **Failing contributors** count as not applying.
+- **Tests.** `layers/public-site/tests/integration/public-wording.test.ts`, through the `worded` fixture module.

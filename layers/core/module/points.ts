@@ -156,6 +156,8 @@ export const points = {
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),
   }),
   'core.health-check': point({ kind: 'code', contract: 'health-check' }),
+  // A season's own public words (C-67), such as a festival's "event" for production.
+  'core.public-wording': point({ kind: 'code', contract: 'public-wording' }),
   // The per-record credentials a record in use lacks, for its module's "Set up" card.
   'core.credential-use': point({ kind: 'code', contract: 'credential-use' }),
   // A role made the first time its module is switched on, so a fresh install has the usual ones. The

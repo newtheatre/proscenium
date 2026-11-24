@@ -643,6 +643,20 @@ office's "Tickets held 8:41" while a basket is held. It names a global component
 nothing when it has nothing to say. On a phone, while such an item shows a link, it takes the place of
 the signed-out Sign in icon, which the menu repeats.
 
+## A season's own public words
+
+A module may give a season its own public words (C-67), such as a festival calling its productions
+"events". It contributes to `core.public-wording` (`{ appliesTo(seasonId), terms }`, the contract in
+`layers/core/server/points/public-wording.ts`), where `terms` maps any of production, productions,
+performance, performances, season, seasons, company and companies to a translation key holding the
+word in lower case. `publicWordingFor(seasonId)` from `#modules/core` answers the first applying
+contributor's terms, or null; the public production and season answers carry it as `wording`.
+
+On a public page, `usePublicWords(() => answer.wording)` gives `word(term)` and `Word(term)` (to open
+a sentence); a string that names one of these words takes it as a parameter, such as
+`"About the {production}"`. Staff screens never use them. Two contributors applying to one season
+give a health warning, and the first in manifest order is used.
+
 ## Seams for Identity
 
 Until Identity lands, `layers/core/server/interface/viewer.ts` describes the viewer from the
