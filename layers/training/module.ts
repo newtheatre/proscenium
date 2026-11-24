@@ -254,13 +254,15 @@ export default defineModule({
       },
     }, ...SESSION_NOTICES],
     'core.requirement': [{ id: 'training', file: 'training' }],
-    'core.count': [{ id: 'training.sessions-unmarked', file: 'sessions-unmarked' }],
+    'core.count': [{ id: 'training.sessions-unmarked', file: 'sessions-unmarked' }, { id: 'training.evidence-waiting', file: 'evidence-waiting' }],
     // Part 5, "Navigation entries": each is added with its screens.
     'core.navigation': [
       { id: 'training.home', menu: 'members', to: '/members/training', icon: 'i-lucide-graduation-cap', ability: 'training.course.view', order: 50 },
       { id: 'training.teach', menu: 'members', to: '/members/training/teaching', icon: 'i-lucide-presentation', ability: 'training.teaching.view', order: 51 },
       { id: 'training.courses', menu: 'console', group: 'training', section: 'everyday', to: '/console/training/courses', match: '/console/training/courses', icon: 'i-lucide-graduation-cap', ability: 'training.course.manage', order: 10 },
       { id: 'training.sessions', menu: 'console', group: 'training', section: 'everyday', to: '/console/training/sessions', match: '/console/training/sessions', icon: 'i-lucide-calendar-days', ability: ['training.session.manage', 'training.place.manage'], order: 20, count: 'training.sessions-unmarked' },
+      { id: 'training.evidence', menu: 'console', group: 'training', section: 'everyday', to: '/console/training/evidence', match: '/console/training/evidence', icon: 'i-lucide-file-check', ability: 'training.evidence.verify', order: 40, count: 'training.evidence-waiting' },
+      { id: 'training.competencies', menu: 'console', group: 'training', section: 'setup', to: '/console/training/competencies', match: '/console/training/competencies', icon: 'i-lucide-badge-check', ability: 'training.competency.manage', order: 50 },
     ],
     'core.record-resolver': [
       { id: 'training.course', file: 'course' },

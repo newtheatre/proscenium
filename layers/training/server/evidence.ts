@@ -270,6 +270,8 @@ export async function withdrawEvidence(unit: UnitView, actor: Actor, evidenceId:
 }
 
 export interface EvidenceView extends Evidence {
+  /** Whose evidence it is, by their account's name. */
+  person: string | null
   course: string
   step: string
   /** A certificate naming a qualification the step does not list (E7). */
@@ -286,9 +288,11 @@ async function view(rows: Evidence[]): Promise<EvidenceView[]> {
   for (const e of rows) {
     const step = await getStep(e.stepId)
     const course = await first<{ title: string }>('SELECT title FROM training_courses WHERE id = ?', e.courseId)
+    const person = await first<{ name: string | null }>('SELECT name FROM core_accounts WHERE id = ?', e.accountId)
     const listed = step?.qualifications ?? []
     out.push({
       ...e,
+      person: person?.name ?? null,
       course: course?.title ?? '',
       step: step?.title ?? '',
       notOnList: e.kind === 'certificate' && !!e.qualification && listed.length > 0 && !listed.some(q => q.title === e.qualification),

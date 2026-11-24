@@ -1,7 +1,7 @@
 // Training's declared lists (training-records part 5, "Console"): what a manager can filter, sort and
 // search by. The sources in server/lists bind each key to the table.
 import { defineList } from '#kit/list-declaration'
-import { COURSE_STATES, SESSION_STATES } from './states'
+import { COMPETENCY_STATES, COURSE_STATES, SESSION_STATES } from './states'
 
 /** K1: every course with its state, live version, holders and those lapsing soon. */
 export const coursesList = defineList('training.courses', {
@@ -54,4 +54,27 @@ export const sessionsList = defineList('training.sessions', {
   },
   defaultView: 'upcoming',
   defaultSort: { key: 'starts', order: 'asc' },
+})
+
+/** K8: competencies with the courses their routes name, how many routes and how many hold each now. */
+export const competenciesList = defineList('training.competencies', {
+  filters: {
+    status: { kind: 'choices', label: 'State', options: COMPETENCY_STATES.map(value => ({ value, label: value })) },
+  },
+  sorts: {
+    title: { label: 'Title', type: 'text', natural: 'asc' },
+  },
+  columns: {
+    title: { label: 'Title', sort: 'title', always: true },
+    courses: { label: 'Courses', card: true },
+    holders: { label: 'Holders', card: true },
+    status: { label: 'State', card: true },
+  },
+  views: {
+    active: { label: 'Active', filters: { status: 'active' } },
+    retired: { label: 'Retired', filters: { status: 'retired' } },
+    all: { label: 'All' },
+  },
+  defaultView: 'active',
+  defaultSort: { key: 'title', order: 'asc' },
 })
