@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "3176977a-2de1-4dce-abf6-94f8034b68c1",
+  "id": "006248f6-b7bc-4043-86e2-0da8da81c6ac",
   "prevIds": [
-    "1ab3bd18-4373-4028-880d-0ebd7266b13e"
+    "e0e3daf9-2b7a-40df-bbb9-846200ee7777"
   ],
   "ddl": [
     {
@@ -24,6 +24,14 @@
     },
     {
       "name": "availability_finds",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_meeting_invitees",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_meetings",
       "entityType": "tables"
     },
     {
@@ -855,6 +863,74 @@
       "entityType": "tables"
     },
     {
+      "name": "training_competencies",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_competency_routes",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_course_steps",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_course_trainers",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_course_versions",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_courses",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_evidence",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_lesson_progress",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_lesson_sections",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_quiz_attempts",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_records",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_route_items",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_session_places",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_session_trainers",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_sessions",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_sign_offs",
+      "entityType": "tables"
+    },
+    {
+      "name": "training_videos",
+      "entityType": "tables"
+    },
+    {
       "table": "availability_exceptions",
       "name": "id",
       "type": "text",
@@ -1316,6 +1392,216 @@
     },
     {
       "table": "availability_finds",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "meeting_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "response",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'pending'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "responded_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "ends_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "place",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "space_booking_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "context_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "notes",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "arranged_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "find_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'arranged'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "cancelled_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_meetings",
       "name": "updated_at",
       "type": "integer",
       "notNull": true,
@@ -23065,6 +23351,2096 @@
       "entityType": "columns"
     },
     {
+      "table": "training_competencies",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competencies",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competencies",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competencies",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competencies",
+      "name": "status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'retired'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competencies",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competencies",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "competency_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "position",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "label",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "version_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "position",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "needed_for",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'both'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "times_required",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "guidance",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "material_url",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "material_file_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "evidence_expiry",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "evidence_file",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "form_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "form_version_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "max_attempts",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "retry_after",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "show_answers",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "source_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "source_params",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "qualifications",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "other_qualification",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "carries_step_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_trainers",
+      "name": "course_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_trainers",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_trainers",
+      "name": "added_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_trainers",
+      "name": "added_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "course_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "number",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'in-preparation'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "change_kind",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "change_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "cut_to",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "published_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "published_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "summary",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "category_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "expires",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "valid_for",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "self_sign_up",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'unpublished'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "live_version_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "created_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_courses",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "course_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "step_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "issuer",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "reference",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "issued_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "expires_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "qualification",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "statement",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "organisation",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "done_from",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "done_to",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "link_url",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "referee",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "response_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "file_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "seen_only",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'submitted'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "submitted_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "decided_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "reject_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "retention_due_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_evidence",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_progress",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_progress",
+      "name": "section_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_progress",
+      "name": "step_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_progress",
+      "name": "reached_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "step_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "position",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "body",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "video_url",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "video_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "video_caption_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "scenario_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "carries_section_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "course_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "step_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "response_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "form_version_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "score",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "out_of",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "passed",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "allowed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "course_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "version_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "origin",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "sign_off_ids",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "awarded_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "awarded_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "direct_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "expires_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "natural_expires_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "cut_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'awarded'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "ended_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "superseded_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "revoked_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "revoke_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "revoke_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "warned_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "lapse_announced_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "retention_due_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_records",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_route_items",
+      "name": "route_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_route_items",
+      "name": "position",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_route_items",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_route_items",
+      "name": "course_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_route_items",
+      "name": "requirement_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_route_items",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "session_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "counted",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "waiting_since",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "added_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "cancelled_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "cancel_kind",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "marked_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "marked_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_places",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_trainers",
+      "name": "session_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_trainers",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_session_trainers",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "course_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "version_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "title",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "ends_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "place_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "capacity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "places_taken",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "sign_up",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'open'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'unpublished'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "cancel_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "attendance_closed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "created_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sessions",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "course_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "step_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "signed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "occurred_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "place_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "evidence_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "attempt_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "source_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "source_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "confirmed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "voids_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_videos",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_videos",
+      "name": "course_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_videos",
+      "name": "stream_uid",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_videos",
+      "name": "status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'uploading'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_videos",
+      "name": "failed_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_videos",
+      "name": "duration_seconds",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_videos",
+      "name": "uploaded_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_videos",
+      "name": "uploaded_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_videos",
+      "name": "ready_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "training_videos",
+      "name": "deleted_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "availability_exceptions",
       "name": "availability_exceptions_account",
       "columns": [
@@ -23170,6 +25546,74 @@
       "columns": [
         {
           "value": "created_by",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "availability_meeting_invitees_once",
+      "columns": [
+        {
+          "value": "meeting_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "availability_meeting_invitees_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "response",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_time",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_arranged_by",
+      "columns": [
+        {
+          "value": "arranged_by",
           "isExpression": false
         }
       ],
@@ -28669,6 +31113,544 @@
       "entityType": "indexes"
     },
     {
+      "table": "training_competencies",
+      "name": "training_competencies_slug",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "training_competency_routes_position",
+      "columns": [
+        {
+          "value": "competency_id",
+          "isExpression": false
+        },
+        {
+          "value": "position",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_position",
+      "columns": [
+        {
+          "value": "version_id",
+          "isExpression": false
+        },
+        {
+          "value": "position",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_carries",
+      "columns": [
+        {
+          "value": "carries_step_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_course_trainers",
+      "name": "training_course_trainers_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "training_course_versions_number",
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false
+        },
+        {
+          "value": "number",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "training_course_versions_preparing",
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "status = 'in-preparation'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_courses",
+      "name": "training_courses_slug",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_courses",
+      "name": "training_courses_status",
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false
+        },
+        {
+          "value": "title",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_evidence",
+      "name": "training_evidence_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "course_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_evidence",
+      "name": "training_evidence_queue",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_lesson_progress",
+      "name": "training_lesson_progress_step",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "step_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "training_lesson_sections_position",
+      "columns": [
+        {
+          "value": "step_id",
+          "isExpression": false
+        },
+        {
+          "value": "position",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "training_quiz_attempts_response",
+      "columns": [
+        {
+          "value": "response_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "response_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "training_quiz_attempts_step",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "step_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_awarded",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "course_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "status = 'awarded'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_course",
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false
+        },
+        {
+          "value": "status",
+          "isExpression": false
+        },
+        {
+          "value": "expires_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_expiry",
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false
+        },
+        {
+          "value": "expires_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_route_items",
+      "name": "training_route_items_course",
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_session_places",
+      "name": "training_session_places_once",
+      "columns": [
+        {
+          "value": "session_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "state != 'cancelled'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_session_places",
+      "name": "training_session_places_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_session_places",
+      "name": "training_session_places_waiting",
+      "columns": [
+        {
+          "value": "session_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "waiting_since",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_session_trainers",
+      "name": "training_session_trainers_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_course",
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_space",
+      "columns": [
+        {
+          "value": "space_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_status",
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_progress",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "course_id",
+          "isExpression": false
+        },
+        {
+          "value": "step_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_voids",
+      "columns": [
+        {
+          "value": "voids_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "voids_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_activity_once",
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "source_id",
+          "isExpression": false
+        },
+        {
+          "value": "source_ref",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "kind = 'activity'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_videos",
+      "name": "training_videos_stream",
+      "columns": [
+        {
+          "value": "stream_uid",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "training_videos",
+      "name": "training_videos_course",
+      "columns": [
+        {
+          "value": "course_id",
+          "isExpression": false
+        },
+        {
+          "value": "status",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "availability_exceptions",
       "name": "fk_availability_exceptions_request_id_availability_requests_id_fk",
       "columns": [
@@ -28720,6 +31702,36 @@
         "slot_id"
       ],
       "tableTo": "availability_find_slots",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "fk_availability_meeting_invitees_meeting_id_availability_meetings_id_fk",
+      "columns": [
+        "meeting_id"
+      ],
+      "tableTo": "availability_meetings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "fk_availability_meetings_find_id_availability_finds_id_fk",
+      "columns": [
+        "find_id"
+      ],
+      "tableTo": "availability_finds",
       "columnsTo": [
         "id"
       ],
@@ -32455,6 +35467,606 @@
       "entityType": "fks"
     },
     {
+      "table": "training_competency_routes",
+      "name": "fk_training_competency_routes_competency_id_training_competencies_id_fk",
+      "columns": [
+        "competency_id"
+      ],
+      "tableTo": "training_competencies",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "fk_training_course_steps_version_id_training_course_versions_id_fk",
+      "columns": [
+        "version_id"
+      ],
+      "tableTo": "training_course_versions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "fk_training_course_steps_material_file_id_core_files_id_fk",
+      "columns": [
+        "material_file_id"
+      ],
+      "tableTo": "core_files",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "fk_training_course_steps_form_id_forms_forms_id_fk",
+      "columns": [
+        "form_id"
+      ],
+      "tableTo": "forms_forms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "fk_training_course_steps_form_version_id_forms_versions_id_fk",
+      "columns": [
+        "form_version_id"
+      ],
+      "tableTo": "forms_versions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "fk_training_course_steps_carries_step_id_training_course_steps_id_fk",
+      "columns": [
+        "carries_step_id"
+      ],
+      "tableTo": "training_course_steps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_course_trainers",
+      "name": "fk_training_course_trainers_course_id_training_courses_id_fk",
+      "columns": [
+        "course_id"
+      ],
+      "tableTo": "training_courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "fk_training_course_versions_course_id_training_courses_id_fk",
+      "columns": [
+        "course_id"
+      ],
+      "tableTo": "training_courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_courses",
+      "name": "fk_training_courses_category_term_id_core_terms_id_fk",
+      "columns": [
+        "category_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_courses",
+      "name": "fk_training_courses_live_version_id_training_course_versions_id_fk",
+      "columns": [
+        "live_version_id"
+      ],
+      "tableTo": "training_course_versions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "fk_training_evidence_course_id_training_courses_id_fk",
+      "columns": [
+        "course_id"
+      ],
+      "tableTo": "training_courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "fk_training_evidence_step_id_training_course_steps_id_fk",
+      "columns": [
+        "step_id"
+      ],
+      "tableTo": "training_course_steps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "fk_training_evidence_response_id_forms_responses_id_fk",
+      "columns": [
+        "response_id"
+      ],
+      "tableTo": "forms_responses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "fk_training_evidence_file_id_core_files_id_fk",
+      "columns": [
+        "file_id"
+      ],
+      "tableTo": "core_files",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_lesson_progress",
+      "name": "fk_training_lesson_progress_section_id_training_lesson_sections_id_fk",
+      "columns": [
+        "section_id"
+      ],
+      "tableTo": "training_lesson_sections",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_lesson_progress",
+      "name": "fk_training_lesson_progress_step_id_training_course_steps_id_fk",
+      "columns": [
+        "step_id"
+      ],
+      "tableTo": "training_course_steps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "fk_training_lesson_sections_step_id_training_course_steps_id_fk",
+      "columns": [
+        "step_id"
+      ],
+      "tableTo": "training_course_steps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "fk_training_lesson_sections_video_id_training_videos_id_fk",
+      "columns": [
+        "video_id"
+      ],
+      "tableTo": "training_videos",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "fk_training_lesson_sections_carries_section_id_training_lesson_sections_id_fk",
+      "columns": [
+        "carries_section_id"
+      ],
+      "tableTo": "training_lesson_sections",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "fk_training_quiz_attempts_course_id_training_courses_id_fk",
+      "columns": [
+        "course_id"
+      ],
+      "tableTo": "training_courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "fk_training_quiz_attempts_step_id_training_course_steps_id_fk",
+      "columns": [
+        "step_id"
+      ],
+      "tableTo": "training_course_steps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "fk_training_quiz_attempts_response_id_forms_responses_id_fk",
+      "columns": [
+        "response_id"
+      ],
+      "tableTo": "forms_responses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "fk_training_quiz_attempts_form_version_id_forms_versions_id_fk",
+      "columns": [
+        "form_version_id"
+      ],
+      "tableTo": "forms_versions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_records",
+      "name": "fk_training_records_course_id_training_courses_id_fk",
+      "columns": [
+        "course_id"
+      ],
+      "tableTo": "training_courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_records",
+      "name": "fk_training_records_version_id_training_course_versions_id_fk",
+      "columns": [
+        "version_id"
+      ],
+      "tableTo": "training_course_versions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_records",
+      "name": "fk_training_records_superseded_by_training_records_id_fk",
+      "columns": [
+        "superseded_by"
+      ],
+      "tableTo": "training_records",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_route_items",
+      "name": "fk_training_route_items_route_id_training_competency_routes_id_fk",
+      "columns": [
+        "route_id"
+      ],
+      "tableTo": "training_competency_routes",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_route_items",
+      "name": "fk_training_route_items_course_id_training_courses_id_fk",
+      "columns": [
+        "course_id"
+      ],
+      "tableTo": "training_courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_session_places",
+      "name": "fk_training_session_places_session_id_training_sessions_id_fk",
+      "columns": [
+        "session_id"
+      ],
+      "tableTo": "training_sessions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_session_trainers",
+      "name": "fk_training_session_trainers_session_id_training_sessions_id_fk",
+      "columns": [
+        "session_id"
+      ],
+      "tableTo": "training_sessions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "fk_training_sessions_course_id_training_courses_id_fk",
+      "columns": [
+        "course_id"
+      ],
+      "tableTo": "training_courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "fk_training_sessions_version_id_training_course_versions_id_fk",
+      "columns": [
+        "version_id"
+      ],
+      "tableTo": "training_course_versions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "fk_training_sessions_space_id_core_spaces_id_fk",
+      "columns": [
+        "space_id"
+      ],
+      "tableTo": "core_spaces",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "fk_training_sign_offs_course_id_training_courses_id_fk",
+      "columns": [
+        "course_id"
+      ],
+      "tableTo": "training_courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "fk_training_sign_offs_step_id_training_course_steps_id_fk",
+      "columns": [
+        "step_id"
+      ],
+      "tableTo": "training_course_steps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "fk_training_sign_offs_place_id_training_session_places_id_fk",
+      "columns": [
+        "place_id"
+      ],
+      "tableTo": "training_session_places",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "fk_training_sign_offs_evidence_id_training_evidence_id_fk",
+      "columns": [
+        "evidence_id"
+      ],
+      "tableTo": "training_evidence",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "fk_training_sign_offs_attempt_id_training_quiz_attempts_id_fk",
+      "columns": [
+        "attempt_id"
+      ],
+      "tableTo": "training_quiz_attempts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "fk_training_sign_offs_voids_id_training_sign_offs_id_fk",
+      "columns": [
+        "voids_id"
+      ],
+      "tableTo": "training_sign_offs",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "training_videos",
+      "name": "fk_training_videos_course_id_training_courses_id_fk",
+      "columns": [
+        "course_id"
+      ],
+      "tableTo": "training_courses",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "availability_find_people",
       "name": "availability_find_people_pk",
       "columns": [
@@ -32746,6 +36358,46 @@
       "entityType": "pks"
     },
     {
+      "table": "training_course_trainers",
+      "name": "training_course_trainers_pk",
+      "columns": [
+        "course_id",
+        "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_lesson_progress",
+      "name": "training_lesson_progress_pk",
+      "columns": [
+        "account_id",
+        "section_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_route_items",
+      "name": "training_route_items_pk",
+      "columns": [
+        "route_id",
+        "position"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_session_trainers",
+      "name": "training_session_trainers_pk",
+      "columns": [
+        "session_id",
+        "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "availability_exceptions",
       "name": "availability_exceptions_pk",
       "columns": [
@@ -32775,6 +36427,24 @@
     {
       "table": "availability_finds",
       "name": "availability_finds_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "availability_meeting_invitees_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_pk",
       "columns": [
         "id"
       ],
@@ -34366,6 +38036,123 @@
       "entityType": "pks"
     },
     {
+      "table": "training_competencies",
+      "name": "training_competencies_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "training_competency_routes_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "training_course_versions_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_courses",
+      "name": "training_courses_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "training_evidence_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "training_lesson_sections_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "training_quiz_attempts_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_session_places",
+      "name": "training_session_places_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "training_videos",
+      "name": "training_videos_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_files",
       "name": "core_files_object_key_unique",
       "columns": [
@@ -34435,6 +38222,48 @@
       "table": "availability_finds",
       "name": "availability_finds_state_values",
       "value": "\"state\" IN ('polling', 'decided', 'abandoned')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meeting_invitees",
+      "name": "availability_meeting_invitees_response",
+      "value": "\"response\" IN ('pending', 'going', 'not-going')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_title",
+      "value": "length(\"title\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_length",
+      "value": "\"ends_at\" > \"starts_at\" AND \"ends_at\" - \"starts_at\" <= 86400000",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_place",
+      "value": "\"place\" IS NULL OR length(\"place\") <= 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_notes",
+      "value": "\"notes\" IS NULL OR length(\"notes\") <= 2000",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_reason",
+      "value": "\"cancelled_reason\" IS NULL OR length(\"cancelled_reason\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_meetings",
+      "name": "availability_meetings_state_values",
+      "value": "\"state\" IN ('arranged', 'cancelled')",
       "entityType": "checks"
     },
     {
@@ -36973,6 +40802,492 @@
       "table": "spaces_purposes",
       "name": "spaces_purposes_limits",
       "value": "(\"max_length_minutes\" IS NULL OR \"max_length_minutes\" > 0) AND (\"max_ahead_days\" IS NULL OR \"max_ahead_days\" > 0) AND (\"min_notice_minutes\" IS NULL OR \"min_notice_minutes\" >= 0)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_competencies",
+      "name": "training_competencies_status",
+      "value": "\"status\" IN ('active', 'retired')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_competencies",
+      "name": "training_competencies_title",
+      "value": "length(\"title\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_competencies",
+      "name": "training_competencies_description",
+      "value": "\"description\" IS NULL OR length(\"description\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "training_competency_routes_position_from_one",
+      "value": "\"position\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "training_competency_routes_status",
+      "value": "\"status\" IN ('active', 'retired')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_competency_routes",
+      "name": "training_competency_routes_label",
+      "value": "length(\"label\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_position_range",
+      "value": "\"position\" BETWEEN 1 AND 20",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_kind",
+      "value": "\"kind\" IN ('session', 'practical', 'activity', 'reading', 'lesson', 'quiz', 'certificate', 'declaration')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_needed_for",
+      "value": "\"needed_for\" IN ('first', 'renewal', 'both')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_title",
+      "value": "length(\"title\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_times",
+      "value": "\"times_required\" BETWEEN 1 AND 20 AND (\"times_required\" = 1 OR \"kind\" IN ('practical', 'activity'))",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_guidance",
+      "value": "\"guidance\" IS NULL OR length(\"guidance\") <= 2000",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_evidence",
+      "value": "(\"kind\" = 'certificate') = (\"evidence_expiry\" IS NOT NULL) AND (\"kind\" IN ('certificate', 'declaration')) = (\"evidence_file\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_form",
+      "value": "(\"kind\" = 'quiz' AND \"form_id\" IS NOT NULL) OR \"kind\" = 'declaration' OR (\"form_id\" IS NULL AND \"form_version_id\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_quiz",
+      "value": "\"kind\" = 'quiz' OR (\"max_attempts\" IS NULL AND \"retry_after\" IS NULL AND \"show_answers\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_attempts",
+      "value": "\"max_attempts\" IS NULL OR \"max_attempts\" BETWEEN 1 AND 20",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_source",
+      "value": "(\"kind\" = 'activity') = (\"source_id\" IS NOT NULL) AND (\"kind\" = 'activity' OR \"source_params\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_qualifications",
+      "value": "\"kind\" = 'certificate' OR (\"qualifications\" IS NULL AND \"other_qualification\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_steps",
+      "name": "training_course_steps_lesson",
+      "value": "\"kind\" != 'lesson' OR (\"guidance\" IS NULL AND \"material_url\" IS NULL AND \"material_file_id\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "training_course_versions_number_from_one",
+      "value": "\"number\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "training_course_versions_status",
+      "value": "\"status\" IN ('in-preparation', 'live', 'replaced')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "training_course_versions_change",
+      "value": "(\"status\" = 'in-preparation') = (\"change_kind\" IS NULL) AND (\"change_kind\" IS NULL OR \"change_kind\" IN ('records-stand', 'retraining-required'))",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "training_course_versions_first",
+      "value": "\"number\" > 1 OR \"change_kind\" IS NULL OR \"change_kind\" = 'records-stand'",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_course_versions",
+      "name": "training_course_versions_note",
+      "value": "\"change_note\" IS NULL OR length(\"change_note\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_courses",
+      "name": "training_courses_status_values",
+      "value": "\"status\" IN ('unpublished', 'live', 'retired')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_courses",
+      "name": "training_courses_title",
+      "value": "length(\"title\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_courses",
+      "name": "training_courses_summary",
+      "value": "\"summary\" IS NULL OR length(\"summary\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_courses",
+      "name": "training_courses_valid_for",
+      "value": "(\"expires\" = 1 AND \"valid_for\" > 0) OR (\"expires\" = 0 AND \"valid_for\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_courses",
+      "name": "training_courses_live",
+      "value": "(\"status\" = 'unpublished') = (\"live_version_id\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "training_evidence_kind",
+      "value": "\"kind\" IN ('certificate', 'declaration')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "training_evidence_state",
+      "value": "\"state\" IN ('submitted', 'verified', 'rejected', 'withdrawn')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "training_evidence_certificate",
+      "value": "\"kind\" != 'certificate' OR (\"issuer\" IS NOT NULL AND \"issued_on\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "training_evidence_declaration",
+      "value": "\"kind\" != 'declaration' OR \"statement\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "training_evidence_lengths",
+      "value": "(\"issuer\" IS NULL OR length(\"issuer\") <= 120) AND (\"reference\" IS NULL OR length(\"reference\") <= 80) AND (\"qualification\" IS NULL OR length(\"qualification\") <= 120)\n      AND (\"statement\" IS NULL OR length(\"statement\") <= 2000) AND (\"organisation\" IS NULL OR length(\"organisation\") <= 120) AND (\"link_url\" IS NULL OR length(\"link_url\") <= 500)\n      AND (\"referee\" IS NULL OR length(\"referee\") <= 200) AND (\"reject_reason\" IS NULL OR length(\"reject_reason\") <= 300)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "training_evidence_days",
+      "value": "(\"issued_on\" IS NULL OR \"issued_on\" GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]') AND (\"expires_on\" IS NULL OR (\"expires_on\" GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]' AND (\"issued_on\" IS NULL OR \"expires_on\" > \"issued_on\")))\n      AND (\"done_from\" IS NULL OR \"done_from\" GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]') AND (\"done_to\" IS NULL OR (\"done_to\" GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]' AND (\"done_from\" IS NULL OR \"done_to\" >= \"done_from\")))",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_evidence",
+      "name": "training_evidence_seen_only",
+      "value": "\"seen_only\" = 0 OR \"file_id\" IS NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "training_lesson_sections_position_range",
+      "value": "\"position\" BETWEEN 1 AND 30",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "training_lesson_sections_kind",
+      "value": "\"kind\" IN ('content', 'practice')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "training_lesson_sections_title",
+      "value": "length(\"title\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "training_lesson_sections_body",
+      "value": "\"body\" IS NULL OR length(\"body\") <= 20000",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "training_lesson_sections_one_video",
+      "value": "\"video_url\" IS NULL OR \"video_id\" IS NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "training_lesson_sections_caption",
+      "value": "\"video_caption_note\" IS NULL OR length(\"video_caption_note\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_lesson_sections",
+      "name": "training_lesson_sections_scenario",
+      "value": "(\"kind\" = 'practice') = (\"scenario_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "training_quiz_attempts_kind",
+      "value": "\"kind\" IN ('attempt', 'allowance')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "training_quiz_attempts_attempt",
+      "value": "\"kind\" != 'attempt' OR (\"response_id\" IS NOT NULL AND \"form_version_id\" IS NOT NULL AND \"score\" IS NOT NULL AND \"out_of\" IS NOT NULL AND \"passed\" IS NOT NULL AND \"score\" BETWEEN 0 AND \"out_of\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "training_quiz_attempts_allowance",
+      "value": "\"kind\" != 'allowance' OR (\"allowed_by\" IS NOT NULL AND \"response_id\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_quiz_attempts",
+      "name": "training_quiz_attempts_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_origin",
+      "value": "\"origin\" IN ('steps', 'direct', 'import')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_status",
+      "value": "\"status\" IN ('awarded', 'superseded', 'revoked')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_direct",
+      "value": "\"origin\" != 'direct' OR (\"direct_reason\" IS NOT NULL AND \"awarded_by\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_ended",
+      "value": "(\"status\" = 'awarded') = (\"ended_at\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_superseded",
+      "value": "(\"status\" = 'superseded') = (\"superseded_by\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_revoked",
+      "value": "(\"status\" = 'revoked') = (\"revoke_code\" IS NOT NULL) AND (\"revoke_code\" IS NULL OR \"revoke_code\" IN ('entered-in-error', 'no-longer-competent', 'left', 'other'))",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_cut",
+      "value": "(\"cut_reason\" IS NULL) = (\"natural_expires_at\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_records",
+      "name": "training_records_lengths",
+      "value": "(\"direct_reason\" IS NULL OR length(\"direct_reason\") <= 500) AND (\"revoke_note\" IS NULL OR length(\"revoke_note\") <= 500)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_route_items",
+      "name": "training_route_items_position_from_one",
+      "value": "\"position\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_route_items",
+      "name": "training_route_items_one_kind",
+      "value": "(\"kind\" = 'course' AND \"course_id\" IS NOT NULL AND \"requirement_ref\" IS NULL) OR (\"kind\" = 'recognised' AND \"course_id\" IS NULL AND \"requirement_ref\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_route_items",
+      "name": "training_route_items_not_training",
+      "value": "\"requirement_ref\" IS NULL OR (\"requirement_ref\" NOT LIKE 'training:%' AND \"requirement_ref\" NOT LIKE 'fact:training.%' AND length(\"requirement_ref\") <= 200)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_session_places",
+      "name": "training_session_places_state",
+      "value": "\"state\" IN ('booked', 'waiting', 'cancelled', 'attended', 'absent')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_session_places",
+      "name": "training_session_places_counted",
+      "value": "\"counted\" = (CASE WHEN \"state\" IN ('booked', 'attended', 'absent') THEN 1 ELSE 0 END)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_session_places",
+      "name": "training_session_places_waiting_since",
+      "value": "(\"state\" = 'waiting') <= (\"waiting_since\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_session_places",
+      "name": "training_session_places_cancel",
+      "value": "(\"state\" = 'cancelled') = (\"cancel_kind\" IS NOT NULL) AND (\"cancel_kind\" IS NULL OR \"cancel_kind\" IN ('self', 'staff', 'session-cancelled', 'merge'))",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_session_places",
+      "name": "training_session_places_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_times",
+      "value": "\"ends_at\" > \"starts_at\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_capacity",
+      "value": "\"capacity\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_full",
+      "value": "\"places_taken\" BETWEEN 0 AND \"capacity\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_sign_up",
+      "value": "\"sign_up\" IN ('open', 'invited')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_status_values",
+      "value": "\"status\" IN ('unpublished', 'published', 'cancelled', 'completed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_title",
+      "value": "\"title\" IS NULL OR length(\"title\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_note",
+      "value": "\"place_note\" IS NULL OR length(\"place_note\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sessions",
+      "name": "training_sessions_reason",
+      "value": "\"cancel_reason\" IS NULL OR length(\"cancel_reason\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_kind",
+      "value": "\"kind\" IN ('trainer', 'attendance', 'self', 'lesson', 'quiz', 'activity', 'evidence', 'void')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_day",
+      "value": "\"occurred_on\" GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]'",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_void",
+      "value": "(\"kind\" = 'void') = (\"voids_id\" IS NOT NULL) AND (\"kind\" != 'void' OR \"note\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_attendance",
+      "value": "(\"kind\" = 'attendance') = (\"place_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_evidence",
+      "value": "(\"kind\" = 'evidence') = (\"evidence_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_quiz",
+      "value": "(\"kind\" = 'quiz') = (\"attempt_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_activity",
+      "value": "(\"kind\" = 'activity') = (\"source_id\" IS NOT NULL AND \"source_ref\" IS NOT NULL) AND (\"source_ref\" IS NULL OR length(\"source_ref\") <= 64)",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_sign_offs",
+      "name": "training_sign_offs_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_videos",
+      "name": "training_videos_status",
+      "value": "\"status\" IN ('uploading', 'processing', 'ready', 'failed', 'deleted')",
+      "entityType": "checks"
+    },
+    {
+      "table": "training_videos",
+      "name": "training_videos_reason",
+      "value": "\"failed_reason\" IS NULL OR length(\"failed_reason\") <= 200",
       "entityType": "checks"
     }
   ],
