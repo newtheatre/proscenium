@@ -90,6 +90,12 @@ import rotaGet from '../../server/api/front-of-house/rota.get'
 import performanceRotaGet from '../../server/api/front-of-house/performances/[id]/rota.get'
 import peopleSearch from '../../server/api/front-of-house/incident-people/index.get'
 import personRedact from '../../server/api/front-of-house/incident-people/[id]/redact.post'
+import crewCallsGet from '../../server/api/front-of-house/crew-calls/index.get'
+import crewCallsPost from '../../server/api/front-of-house/crew-calls/index.post'
+import crewCallGet from '../../server/api/front-of-house/crew-calls/[id]/index.get'
+import crewCallPatch from '../../server/api/front-of-house/crew-calls/[id]/index.patch'
+import crewCallState from '../../server/api/front-of-house/crew-calls/[id]/state.post'
+import crewCallMine from '../../server/api/front-of-house/crew-calls/[id]/mine.get'
 import { call, inContext, person, rows, saveKey, server, setModule } from '../../../../tests/integration/helpers'
 
 export const handle = server({
@@ -180,6 +186,12 @@ export const handle = server({
   'POST /api/front-of-house/incidents/:id/actions/:actionId/resolve': actionResolve,
   'POST /api/front-of-house/incidents/:id/close': incidentClose,
   'POST /api/front-of-house/incidents/:id/reopen': incidentReopen,
+  'GET /api/front-of-house/crew-calls': crewCallsGet,
+  'POST /api/front-of-house/crew-calls': crewCallsPost,
+  'GET /api/front-of-house/crew-calls/:id': crewCallGet,
+  'PATCH /api/front-of-house/crew-calls/:id': crewCallPatch,
+  'POST /api/front-of-house/crew-calls/:id/state': crewCallState,
+  'GET /api/front-of-house/crew-calls/:id/mine': crewCallMine,
 })
 
 export type Person = ReturnType<typeof person>

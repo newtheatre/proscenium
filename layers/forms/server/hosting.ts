@@ -85,6 +85,33 @@ export async function slotDecides(slotId: string, subjectId: string): Promise<bo
   return false
 }
 
+/** Whether a record's slot has any published form to answer, so a host can ask for answers first. */
+export async function slotAsks(slotId: string, subjectId: string): Promise<boolean> {
+  const slot = await slotIn(slotId, 'submission')
+  for (const place of await attachedTo(slot.id, subjectId)) {
+    const form = await getForm(place.formId)
+    if (form && form.liveVersionId && form.status !== 'draft' && form.status !== 'archived') return true
+  }
+  return false
+}
+
+export interface Respondent { personId: string, responseId: string, submittedAt: number }
+
+/**
+ * Who has sent a response to the forms attached to one record in a submission slot, each person's
+ * latest. Withdrawn responses, working copies and tests are left out. Reads no answers.
+ */
+export async function slotRespondents(slotId: string, subjectId: string): Promise<Map<string, Respondent>> {
+  const slot = await slotIn(slotId, 'submission')
+  const rows = await all<{ person_id: string, id: string, submitted_at: number }>(
+    `SELECT r.person_id, r.id, r.submitted_at FROM forms_responses r JOIN forms_placements p ON p.id = r.placement_id
+      WHERE p.slot_key = ? AND p.subject_type = ? AND p.subject_id = ? AND r.person_id IS NOT NULL AND r.state IN ('submitted', 'awaiting_payment') AND (r.stage_kind IS NULL OR r.stage_kind <> 'declined') AND r.is_test = 0
+      ORDER BY r.submitted_at`, slot.id, slot.subject, subjectId)
+  const out = new Map<string, Respondent>()
+  for (const r of rows) out.set(r.person_id, { personId: r.person_id, responseId: r.id, submittedAt: Number(r.submitted_at) })
+  return out
+}
+
 /**
  * Sends a response to a form attached to the host's record, in the host's unit of work, with every
  * check POST /api/forms/open/:slug/responses makes: the engine runs again on the answers, hidden
