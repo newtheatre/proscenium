@@ -74,7 +74,13 @@ export const detailsInput = z.object({
 export const requestInput = askInput.extend(detailsInput.shape).strict()
 
 // The form sends what it has so far; only the time, place and purpose are checked.
-export const checkInput = askInput.extend({ title: z.string().max(120).optional(), notes: z.string().max(1000).nullish(), attendees: z.number().int().nullish() }).strict() // not-policy: shape bound
+export const checkInput = askInput.extend({ title: z.string().max(120).optional(), notes: z.string().max(1000).nullish(), attendees: z.number().int().nullish(), replaces: z.string().min(1).max(40).nullish() }).strict() // not-policy: shape bound
+
+// X2 and X3: a booking to another time or room; the purpose, production and details stay.
+export const moveInput = z.object({ bookableId: askInput.shape.bookableId, startsAt: when, endsAt: when, overrideReason: note(300) }).strict() // not-policy: shape bound
+
+// X6: the no-show mark on a completed booking.
+export const noShowInput = z.object({ noShow: z.boolean() }).strict()
 
 const localDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/) // not-policy: a date's shape
 

@@ -3,7 +3,7 @@
 // module id and the addresses say spaces. This file grows with the build; it declares what the code
 // so far uses.
 import { z } from 'zod'
-import { ability, code, defineAbilities, defineModule, defineRecords, defineSettings, event, setting, task } from '#kit'
+import { ability, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'spaces.settings.manage'
@@ -16,6 +16,7 @@ export default defineModule({
   since: '0.5.0',
   stability: 'experimental',
   uses: ['forms'],
+  requires: ['occupancy'],
 
   // Part 6. Every setting holds one value for the whole theatre; a value that varies by purpose or
   // by bookable is a column on that record that falls back to the setting.
@@ -119,6 +120,20 @@ export default defineModule({
         },
       },
     }, {
+      id: 'spaces.booking-bumped',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/spaces/book',
+      variables: { room: 'text' as const, date: 'text' as const, when: 'text' as const, title: 'text' as const, note: 'text' as const, contact: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your room booking has been moved aside: {{ room }}, {{ date }}',
+          body: 'Your booking of **{{ room }}** on {{ date }}, {{ when }}, for {{ title }}, can no longer go ahead. {{ note }}\n\nIf you need to talk about it, contact {{ contact }}. You can book another time straight away.',
+          action: 'Book again',
+        },
+      },
+    }, {
       id: 'spaces.request-confirmed',
       category: 'transactional' as const,
       side: 'members' as const,
@@ -191,6 +206,9 @@ export default defineModule({
     }],
     'core.count': [{ id: 'spaces.requests-waiting', file: 'requests-waiting' }],
     'core.health-check': [{ id: 'spaces.no-approver', file: 'no-approver' }],
+    'core.space-busy': [{ id: 'spaces.room-bookings', file: 'room-bookings' }],
+    'core.erasure-handler': [{ id: 'spaces.bookings', file: 'bookings' }],
+    'core.change-impact': [{ id: 'spaces.room-bookings', file: 'room-bookings' }],
     // The room manager and read-only oversight of part 6's presets; a theatre's own role of the same key is kept.
     'core.role-preset': [
       { id: 'spaces.technical-manager', key: 'technical-manager', name: 'Technical manager', description: 'Looks after the rooms: sets them up, decides booking requests and manages anyone\'s booking.', abilities: ['spaces.booking.view', 'spaces.booking.decide', 'spaces.booking.manage', 'spaces.bookable.manage'], opensMembersArea: true },
@@ -225,8 +243,24 @@ export default defineModule({
       'core.space.managed-changed': 'follow-managed',
       'core.space.archived': 'follow-archived',
       'core.venue.archived': 'follow-archived',
+      'core.performance.scheduled': 'displace-for-performance',
+      'core.performance.rescheduled': 'displace-for-performance',
+      'core.performance.moved': 'displace-for-performance',
+      'core.closure.created': 'displace-for-closure',
       'spaces.booking.requested': 'tell-approvers',
     },
+  },
+
+  jobs: {
+    // The rest of a displacement (L1, L2, L4) past the set limit, soonest first, until none is left.
+    'spaces.clear-window': job({
+      payload: z.union([
+        z.object({ reason: z.literal('performance'), performanceId: z.string() }),
+        z.object({ reason: z.literal('closure'), closureId: z.string() }),
+        z.object({ reason: z.literal('bookable-removed'), spaceId: z.string().optional(), venueId: z.string().optional() }),
+      ]),
+      lane: 'bulk',
+    }),
   },
 
   presets: {

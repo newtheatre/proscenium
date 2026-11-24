@@ -12,7 +12,7 @@ Where the build departs from, or is narrower than, parts 1 to 9. The build is th
 - **Audience** `members` in part 6 is the kit's `signed-in`.
 - **Cascades.** The kit's references take no `ON DELETE`, so removing a bookable's hours or purpose rows is done by the code that archives it, not by the database.
 - **Abilities** are declared with the first route that needs them, as the conformance check requires; the gate declares only `spaces.settings.manage`.
-- **Occupancy.** Spaces will list the support module `occupancy` under `requires` (R3-03, Matt 2026-11-23) once lane A's module is on `next`, and contributes its bookings to core's `core.space-busy` then.
+- **Occupancy.** Spaces lists the support module `occupancy` under `requires` (R3-03, Matt 2026-11-23); see the Occupancy section below.
 
 Proof runs P-1 to P-5 and P-7 are integration tests in `layers/spaces/tests/integration/gate.test.ts`, run in workerd against local D1 with every attempt fired at once. P-6 (a series saved whole or not at all) follows with series. The deployed run against a real D1 is still owed.
 
@@ -62,3 +62,40 @@ Integration tests: `layers/spaces/tests/integration/approval.test.ts`.
 - **Cancelling (R6, R7).** A booking in a series offers Cancel this date, Cancel this and later dates, and Cancel every date to come (`POST /api/spaces/series/<id>/cancel` with `from`, or without it). Past dates never change, requests still waiting are withdrawn rather than cancelled, and cancelling every date ends the series. Changing the time of a series is part of the change and priority slice.
 
 Integration tests: `layers/spaces/tests/integration/series.test.ts`; unit tests: `layers/spaces/tests/unit/series.test.ts`.
+
+## Occupancy (R3-03, rule C1a), 24 November 2026
+
+- **Needs occupancy.** `requires: ['occupancy']`, so the occupancy view is on whenever room bookings are, and Admin > Modules lists Room bookings under occupancy's "Needed by".
+- **What Spaces reports.** A contribution to `core.space-busy` (`room-bookings`) gives each Confirmed booking of a space's bookable, kind `room-booking`, always yielding. Its label follows K2: the title to the booker, to holders of `spaces.booking.view` on the room and when `spaces.calendar.show-details` is `full`; the purpose's name when it is `purpose`; nothing for `busy` and for a reader of null. Resources take no space and are not reported.
+- **Other modules' uses (C1a).** `server/uses.ts` reads `core.space-busy` leaving out Spaces' own contribution. A use is a fourth blocker for a space (`kind: 'use'`, never named on the form: "In use for something else"); the check refuses with C1 and offers the nearest free time around it. Confirming a request, one or a whole series, reads the uses again just before the write and refuses `spaces.clash` if one now overlaps. A use cannot sit on the write's statement, so a use reported between that read and the write is not caught; the module taking the space asks `isSpaceFree` itself, which sees the bookings.
+- **The calendar** draws uses in the room's column with a double edge, labelled as the reporting module allows, or "In use".
+
+Integration tests: `layers/spaces/tests/integration/occupancy.test.ts`; the occupancy module's own test now expects Room bookings among the modules that need it.
+
+## Changes, no-shows and erasure (SP-19, SP-35, SP-36), 24 November 2026
+
+- **Moving a booking (X2, X3).** A Confirmed booking not yet started offers "Change time or room" to its booker and to holders of `spaces.booking.manage`: a dialog with the room, day and times and the same live check as Book a room, leaving the booking's own time out (`replaces` on `POST /api/spaces/bookings/check`). `POST /api/spaces/bookings/<id>/move` runs every rule from P1 against the new time with the booking's purpose, production and booker. With no decision needed it moves in one statement carrying the clash condition; otherwise it makes a request with `replaces_id`, and the booking keeps its time. Confirming that request cancels the old booking first, in the same unit, so its time is free for the new one; declining it, or letting it lapse, loses nothing. One change waits at a time (`spaces.booking.change-waiting`). A date of a series can be moved on its own; moving a whole series is not built.
+- **What people see.** The booking shows "A change to ... is waiting for a decision" with a link; the request shows the booking it would replace; the requests page marks it "Moves an existing booking".
+- **No-shows (X6).** On a Completed booking, holders of `spaces.booking.manage` mark or clear a no-show for 14 days after it ends (`POST /api/spaces/bookings/<id>/no-show`), each once; it feeds the booker's record in the requests queue and nothing else.
+- **Erasure (SP-36).** A `core.erasure-handler` contribution cancels the erased person's future Confirmed bookings and withdraws their open requests, set-wise, before the registry anonymises `booked_for` and redacts the free text. Past bookings keep their time, room and purpose. The data download needs nothing from Spaces: the registry finds bookings by `booked_for`.
+
+Integration tests: `layers/spaces/tests/integration/change.test.ts`.
+
+## When other things change (SP-33, SP-34; rules L1, L2, L4, B4), 24 November 2026
+
+- **Performances (L1).** Spaces listens to `core.performance.scheduled`, `.rescheduled` and `.moved`. Confirmed bookings ahead in the performance's space that overlap it become Bumped with reason `performance`; requests that overlap are Declined with a standard note.
+- **Closures (L2).** On `core.closure.created` for a blocking closure, the same with reason `closure`, for space bookables in the closure's spaces and resources kept at its venue (or anywhere, for the whole theatre's). The scope is core's new statement fragment `closureSpaces(closureId)`, with `closureSpaceIds(closureId)` as its read; both are exported from core's services. A public holiday or a closure that does not block performances does nothing.
+- **Rooms taken away (L4).** When a space or venue is archived its bookables are archived and bookings ahead Cancelled with reason `bookable-removed`; requests are Declined. Archiving a bookable directly still waits until nothing is booked ahead.
+- **Set-wise (I-33).** Each displacement reads the bookings in the way by a predicate on the statement, never a list of ids from the event; then one guarded update per state, one insert of history rows, one set of events and one set of messages. Past `core.units.set-rows-limit` the soonest are done and the job `spaces.clear-window` (bulk lane) repeats until none is left.
+- **Telling people (B4).** A bumped booker gets `spaces.booking-bumped` with the reason, who to contact (`spaces.bumping.contact`, else "the theatre") and a Book again button to the request form; a cancelled one `spaces.booking-cancelled`; a declined request `spaces.request-declined`. The form is not yet filled with the old details.
+- **Seeing it first (SP-34).** A `core.change-impact` contribution counts the bookings a rescheduled or moved performance would move aside and the requests it would decline, and, for a space the theatre stops running, the bookings that will need placing with the owner (C6). Core shows these lines on its confirmation. Scheduling a new performance and creating a closure have no confirmation step in core yet, so those counts are not shown.
+
+Integration tests: `layers/spaces/tests/integration/displace.test.ts`.
+
+## Priority bumping by request (SP-32; rules C5, B1 to B3, B5), 24 November 2026
+
+- **Asking (C5).** `checkRequest` reads each confirmed booking in the way with its purpose's `can_be_bumped`. When every blocker is a booking of a strictly lower tier (a larger number) that may be bumped, `spaces.bumping.enabled` is on and each starts at least `spaces.bumping.notice` ahead, the outcome is `request` with `bumps: true` and the blockers listed, whatever the purpose's approval says. An equal tier (B5), a purpose that may not be bumped, bumping switched off, or a performance, closure or other module's use in the way is refused `spaces.clash` as before.
+- **Inside the notice (B3).** The same clash inside the notice is refused `spaces.bump.notice` (rule `B3`); a holder of `spaces.booking.override` who gives a reason passes it, and `B3` is listed in `overridden`. Book a room and the move dialog show the reason box for it as for P5 to P9.
+- **Deciding (B2).** `decideConfirm` on a request with `bumps` reads the blockers again: if any can no longer be bumped it refuses `spaces.bump.not-now` and writes nothing; if the notice has run out since, it refuses `spaces.bump.notice` unless the decider holds `spaces.booking.override` and gives a reason (stored on the request if it had none, and audited). Otherwise one update moves the bookings in the way to Bumped with reason `higher-tier` and `bumped_by_id` set to the request, by predicate, guarded on the count read, before the request is confirmed in the same unit. Each booker gets `spaces.booking-bumped`.
+- **Requests screen.** A request that bumps carries a "Moves n bookings aside" badge, and its Confirm dialog lists each booking in the way with its booker before asking once. The queue row's `bumps` lists them as they stand now.
+- **Series.** A date of a series that would bump is refused `spaces.series.would-bump`: bumping is for one booking at a time.
