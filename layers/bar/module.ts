@@ -181,6 +181,26 @@ export default defineModule({
     // Drinks paid for at the till, alone or on the same payment as tickets (tab 4).
     'payments.settlement': [{ id: 'bar' }],
     'payments.desk-basket': [{ id: 'bar' }],
+    // Practice mode (BAR-59): the till on a stocked bar outlet, with a float and the practice card reader.
+    // Bar tabs are not built yet, so the spec's tab task waits for them.
+    'core.practice-scenario': [{
+      id: 'bar.till',
+      version: 1,
+      label: 'bar.practice.till',
+      summary: 'bar.practice.till-summary',
+      minutes: 10,
+      needs: ['bar', 'payments'],
+      samples: ['core.tonight', 'payments.float', 'bar.stocked'],
+      start: '/live/till',
+      routes: ['/live/till'],
+      abilities: ['payments.session.open', 'payments.session.view', 'payments.attempt.attest', 'bar.sale.sell', 'bar.opening.manage'],
+      tasks: [
+        { id: 'recipe-drink', label: 'bar.practice.recipe-drink' },
+        { id: 'refuse-age', label: 'bar.practice.refuse-age', when: 'ageCheck' },
+      ],
+    }],
+    'core.practice-sample': [{ id: 'bar.stocked', file: 'stocked' }],
+    'core.practice-check': [{ id: 'bar.till', file: 'till' }],
     // Products, as something a promotion can take money off (the unified promotions design).
     'promotions.target': [{ id: 'bar.item', file: 'item' }],
     // Bar income, in full on the day the money is taken (tab 3, "What is posted to the ledger").
