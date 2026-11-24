@@ -9,4 +9,4 @@ export default defineRoute({
   record: event => ['training.course', getRouterParam(event, 'id')],
   rateLimit: 'write',
   input: z.object({}).strict(),
-}, (event, { record, actor, unit }) => reachSection(unit.view(), actor, record!.id, getRouterParam(event, 'step')!, getRouterParam(event, 'section')!))
+}, (event, { record, actor, unit }) => reachSection(unit.view(), actor, { courseId: record!.id, stepId: getRouterParam(event, 'step')!, sectionId: getRouterParam(event, 'section')! }))

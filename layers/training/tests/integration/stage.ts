@@ -147,9 +147,11 @@ export async function ready(): Promise<void> {
   })
 }
 
-export interface Answer<T = any> { status: number, body: T }
+// A body read as an object of loosely typed fields, so a test reads it without a cast.
+export type Body = Record<string, any>
+export interface Answer<T = Body> { status: number, body: T }
 
-export async function req<T = any>(actor: Actor, method: string, path: string, body?: unknown): Promise<Answer<T>> {
+export async function req<T = Body>(actor: Actor, method: string, path: string, body?: unknown): Promise<Answer<T>> {
   const response = await call(training, method, path, { actor, body, headers: { 'idempotency-key': newId('req') } })
   return { status: response.status, body: await response.json() as T }
 }

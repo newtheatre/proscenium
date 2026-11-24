@@ -114,7 +114,7 @@ export async function lessonFor(actor: Actor, courseId: string, stepId: string):
  * The signed-in person reaches a section (O1, O2): it must be open to them; reaching is recorded
  * once, and reaching the last unreached section writes the lesson sign-off and evaluates the award.
  */
-export async function reachSection(unit: UnitView, actor: Actor, courseId: string, stepId: string, sectionId: string): Promise<{ done: boolean, signOffId: string | null, recordId: string | null }> {
+export async function reachSection(unit: UnitView, actor: Actor, { courseId, stepId, sectionId }: { courseId: string, stepId: string, sectionId: string }): Promise<{ done: boolean, signOffId: string | null, recordId: string | null }> {
   if (!actor.accountId) refuse('core.auth.required', 'Sign in first.', { status: 401 })
   const course = await courseOrRefuse(courseId)
   if (course.status !== 'live') refuse('training.course.not-live', 'Only a live course takes sign-offs.', { status: 409 })
