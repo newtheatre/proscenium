@@ -101,6 +101,8 @@ export const shifts = defineTable('front_of_house_shifts', {
   spaceId: col.internal(text('space_id')),
   // The crew call it belongs to (FH-49): set on an occasion shift, or joined from the call's season.
   crewCallId: col.ref('front_of_house_crew_calls', { nullable: true }),
+  // The batch the rota grid made it in (FH-48), so the batch can be removed together.
+  batchId: col.ref('front_of_house_shift_batches', { nullable: true }),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
 }, {
@@ -111,6 +113,8 @@ export const shifts = defineTable('front_of_house_shifts', {
     uniqueIndex('front_of_house_shifts_duty').on(t.performanceId, t.dutyId).where(sql`performance_id IS NOT NULL`),
     index('front_of_house_shifts_window').on(t.state, t.windowClosesAt),
     index('front_of_house_shifts_crew_call').on(t.crewCallId, t.callAt),
+    index('front_of_house_shifts_batch').on(t.batchId),
+    index('front_of_house_shifts_calendar').on(t.callAt, t.venueId),
     check('front_of_house_shifts_title', sql`(${t.performanceId} IS NOT NULL OR ${t.title} IS NOT NULL) AND (${t.title} IS NULL OR length(${t.title}) <= 80)`),
     check('front_of_house_shifts_places', sql`${t.places} BETWEEN 1 AND 50 AND ${t.placesTaken} BETWEEN 0 AND ${t.places}`),
     check('front_of_house_shifts_times', sql`${t.endsAt} > ${t.callAt} AND ${t.windowOpensAt} <= ${t.callAt} AND ${t.windowClosesAt} >= ${t.endsAt}`),
@@ -154,6 +158,40 @@ export const crewCalls = defineTable('front_of_house_crew_calls', {
     check('front_of_house_crew_calls_tshirt', sql`${t.tshirtMinShifts} IS NULL OR ${t.tshirtMinShifts} BETWEEN 1 AND 50`),
     check('front_of_house_crew_calls_meal', sql`${t.mealMinMinutes} IS NULL OR ${t.mealMinMinutes} BETWEEN 30 AND 720`),
     check('front_of_house_crew_calls_state', sql`${t.state} IN (${list(CREW_CALL_STATES)})`),
+  ],
+})
+
+export const BATCH_STATES = ['made', 'removed'] as const
+
+/** Shifts made together from the rota grid: one template applied to several days (FH-48). */
+export const shiftBatches = defineTable('front_of_house_shift_batches', {
+  id: col.id(),
+  crewCallId: col.ref('front_of_house_crew_calls', { nullable: true }),
+  templateId: col.ref('front_of_house_rota_templates'),
+  venueId: col.internal(text('venue_id').notNull()),
+  spaceId: col.internal(text('space_id')),
+  title: col.internal(text('title').notNull()),
+  // Local dates, as a JSON list.
+  days: col.internal(text('days').notNull()),
+  // Local wall-clock times; an end before the call runs past midnight.
+  callTime: col.internal(text('call_time').notNull()),
+  endTime: col.internal(text('end_time').notNull()),
+  made: col.internal(integer('made').notNull()),
+  state: col.internal(text('state', { enum: BATCH_STATES }).notNull().default('made')),
+  createdBy: col.account('created_by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'shb',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('front_of_house_shift_batches_call').on(t.crewCallId),
+    check('front_of_house_shift_batches_title', sql`length(${t.title}) BETWEEN 1 AND 80`),
+    check('front_of_house_shift_batches_days', sql`json_array_length(${t.days}) BETWEEN 1 AND 31`),
+    check('front_of_house_shift_batches_times', sql`${t.callTime} GLOB '[0-2][0-9]:[0-5][0-9]' AND ${t.endTime} GLOB '[0-2][0-9]:[0-5][0-9]'`),
+    check('front_of_house_shift_batches_made', sql`${t.made} >= 0`),
+    check('front_of_house_shift_batches_state', sql`${t.state} IN (${list(BATCH_STATES)})`),
   ],
 })
 
@@ -587,4 +625,4 @@ export const calendarFeeds = defineTable('front_of_house_calendar_feeds', {
   ],
 })
 
-export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, crewCalls, handouts, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates, calendarFeeds }
+export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, crewCalls, handouts, shiftBatches, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates, calendarFeeds }
