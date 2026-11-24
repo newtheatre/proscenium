@@ -248,7 +248,7 @@
   "availability.find.start-help": "Choose groups and dates, then find times. Nothing is sent to anyone.",
   "availability.find.hidden": "{count} people are left out because you do not plan for them.",
   "availability.find.best": "Best times",
-  "availability.find.best-help": "Ranked by most people free, then fewest maybes. Everyone marked as must come is free in each.",
+  "availability.find.best-help": "Ranked by most people free, then fewest maybes. Everyone marked as must come is free in each. Confirmed commitments elsewhere count as busy, pencilled ones as maybe.",
   "availability.find.best-line": "{free} of {total} free · {maybe} maybe · {unknown} not known",
   "availability.find.no-best": "No time works for everyone who must come",
   "availability.find.no-best-help": "Try more dates, wider hours, a shorter length, or fewer people who must come.",
@@ -317,5 +317,6 @@
   "availability.poll.picked-one": "In the poll",
   "availability.poll.asked-of-me": "Polls",
   "availability.poll.asked-line": "Please answer by {due}",
-  "availability.poll.asked-answered": "Answered. You can change your answers until {due}."
+  "availability.poll.asked-answered": "Answered. You can change your answers until {due}.",
+  "availability.unavailable": "Said they are unavailable"
 }

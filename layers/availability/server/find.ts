@@ -1,11 +1,12 @@
 // Find a time (S7, rules F1 to F5): the people of the chosen groups the viewer plans for, each one's
-// levels per day, the chosen rooms' taken times, and the best times. Nothing is stored (part 2).
+// levels per day with commitments elsewhere, the chosen rooms' taken times, and the best times.
 import { sql } from 'drizzle-orm'
 import { refuse, theatreTimeZone, useDb, useSetting, type Actor } from '#kit'
 import { instantOfLocal, localDateOf, localParts, nowMs } from '#kit/clock'
 import { occupancy } from '#modules/occupancy'
+import { personsBusy } from '#modules/person-busy'
 import { addDays, DAY_MINUTES } from '../shared/grid'
-import { bestTimes, type Slot, type Span, type Week } from '../shared/find'
+import { bestTimes, overlay, type Slot, type Span, type Week } from '../shared/find'
 import { minutesOf, type Unmarked } from '../shared/levels'
 import { resolveDay } from './levels'
 import { PEOPLE_MAX, plannable } from './planning'
@@ -53,6 +54,20 @@ export async function peopleOf(viewer: Actor, input: Pick<FindInput, 'groupIds' 
   return { ids: [...ids], hidden, reasons }
 }
 
+/** An instant range cut at local midnights into each date's stretch, in local minutes. */
+function localSpans(from: number, to: number, zone: string): (Span & { date: string })[] {
+  const out: (Span & { date: string })[] = []
+  for (let at = from; at < to;) {
+    const date = localDateOf(at, zone)
+    const next = instantOfLocal(addDays(date, 1), '00:00', zone)
+    const end = Math.min(to, next)
+    const [p, e] = [localParts(at, zone), localParts(end, zone)]
+    out.push({ date, start: p.hour * 60 + p.minute, end: end === next ? DAY_MINUTES : e.hour * 60 + e.minute }) // not-policy: minutes in an hour
+    at = next
+  }
+  return out
+}
+
 /** F5: each date's stretches where a chosen space is taken, in local minutes. */
 async function takenTimes(spaceIds: string[], dates: string[], zone: string, viewer: Actor): Promise<FindResult['taken']> {
   const out: FindResult['taken'] = {}
@@ -63,19 +78,25 @@ async function takenTimes(spaceIds: string[], dates: string[], zone: string, vie
     const to = instantOfLocal(addDays(chunk.at(-1)!, 1), '00:00', zone)
     for (const space of await occupancy({ spaceIds, from, to }, viewer)) {
       for (const item of space.items) {
-        for (let at = Math.max(item.from, from); at < Math.min(item.to, to);) {
-          const date = localDateOf(at, zone)
-          const next = instantOfLocal(addDays(date, 1), '00:00', zone)
-          const p = localParts(at, zone)
-          const end = Math.min(item.to, next)
-          const e = localParts(end, zone)
-          ;(out[date] ??= []).push({ start: p.hour * 60 + p.minute, end: end === next ? DAY_MINUTES : e.hour * 60 + e.minute, label: item.label }) // not-policy: minutes in an hour
-          at = next
-        }
+        for (const s of localSpans(Math.max(item.from, from), Math.min(item.to, to), zone)) (out[s.date] ??= []).push({ start: s.start, end: s.end, label: item.label })
       }
     }
   }
   return out
+}
+
+/** F4: other modules' commitments over each person's days, firm as busy and tentative as maybe; our own rows are already there. */
+async function addCommitments(weeks: Record<string, Week>, ids: string[], dates: string[], zone: string): Promise<void> {
+  if (!ids.length) return
+  const from = instantOfLocal(dates[0]!, '00:00', zone)
+  const to = instantOfLocal(addDays(dates.at(-1)!, 1), '00:00', zone)
+  for (const row of await personsBusy(ids, from, to)) {
+    if (row.source === 'availability' || !weeks[row.accountId]) continue
+    for (const s of localSpans(Math.max(row.from, from), Math.min(row.to, to), zone)) {
+      const week = weeks[row.accountId]!
+      if (week[s.date]) week[s.date] = overlay(week[s.date]!, s, row.firm ? 'busy' : 'maybe', row.labelKey)
+    }
+  }
 }
 
 export async function findTime(viewer: Actor, input: FindInput): Promise<FindResult> {
@@ -97,6 +118,7 @@ export async function findTime(viewer: Actor, input: FindInput): Promise<FindRes
     const mayRead = id === viewer.accountId || reasons.has(id)
     weeks[id] = Object.fromEntries(dates.map(d => [d, resolveDay(d, r.lines, r.exceptions, r.unmarked ?? fallback, e => id === viewer.accountId || (mayRead && e.reasonShared))]))
   }
+  await addCommitments(weeks, ids, dates, zone)
   const names = ids.length
     ? await useDb().all<{ id: string, name: string | null }>(sql`SELECT id, name FROM core_accounts WHERE id IN (SELECT value FROM json_each(${JSON.stringify(ids)}))`)
     : []

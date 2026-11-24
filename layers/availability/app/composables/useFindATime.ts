@@ -76,13 +76,13 @@ export async function useFindATime() {
   }
 
   /** Who is at each level over a stretch, with any reason the organiser may read (A7). */
-  function at(date: string, start: number, end: number): Record<ShownLevel, { name: string, reason?: string }[]> {
-    const out: Record<ShownLevel, { name: string, reason?: string }[]> = { free: [], maybe: [], busy: [], unknown: [] }
+  function at(date: string, start: number, end: number): Record<ShownLevel, { name: string, reason?: string, commitment?: string }[]> {
+    const out: Record<ShownLevel, { name: string, reason?: string, commitment?: string }[]> = { free: [], maybe: [], busy: [], unknown: [] }
     for (const p of found.value?.people ?? []) {
       const pieces: Piece[] = found.value!.weeks[p.id]?.[date] ?? []
       const level = worstBetween(pieces, start, end)
-      const reason = pieces.find(x => x.start < end && start < x.end && x.level === level && x.reason)?.reason
-      out[level].push({ name: p.name, reason })
+      const here = pieces.filter(x => x.start < end && start < x.end && x.level === level)
+      out[level].push({ name: p.name, reason: here.find(x => x.reason)?.reason, commitment: here.find(x => x.commitment)?.commitment })
     }
     return out
   }

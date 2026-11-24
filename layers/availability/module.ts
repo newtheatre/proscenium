@@ -10,8 +10,8 @@ const change = 'availability.settings.manage'
 export default defineModule({
   id: 'availability',
   manifest: 1,
-  // Find a time shows when the chosen rooms are taken (F5).
-  requires: ['occupancy'],
+  // Find a time shows when the chosen rooms are taken (F5) and where people are committed elsewhere (F4).
+  requires: ['occupancy', 'person-busy'],
   since: '0.1.0',
   stability: 'experimental',
 
@@ -67,6 +67,8 @@ export default defineModule({
       { id: 'availability.find', menu: 'members', to: '/members/find-a-time', icon: 'i-lucide-calendar-search', ability: 'availability.find.use', order: 46 },
       { id: 'availability.requests', menu: 'members', to: '/members/find-a-time/requests', icon: 'i-lucide-send', ability: 'availability.request.send', order: 47 },
     ],
+    // Stated busy time, so other modules warn about it (part 4).
+    'core.person-busy': [{ id: 'availability' }],
     'core.record-resolver': [{ id: 'availability.request', file: 'request' }, { id: 'availability.find', file: 'find' }],
     'core.notification-type': [{
       id: 'availability.request-opened',

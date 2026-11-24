@@ -26,6 +26,22 @@ export function worstBetween(pieces: Piece[], start: number, end: number): Shown
   return WORST[worst]!
 }
 
+/** F4: a commitment laid over a person's day where it is worse than what they said; the rest is untouched. */
+export function overlay(pieces: Piece[], span: Span, level: 'busy' | 'maybe', commitment: string): Piece[] {
+  const out: Piece[] = []
+  for (const p of pieces) {
+    if (p.end <= span.start || span.end <= p.start) {
+      out.push(p)
+      continue
+    }
+    if (p.start < span.start) out.push({ ...p, end: span.start })
+    const mid = { start: Math.max(p.start, span.start), end: Math.min(p.end, span.end) }
+    out.push(WORST.indexOf(level) > WORST.indexOf(p.level) ? { ...mid, level, commitment } : { ...p, ...mid })
+    if (span.end < p.end) out.push({ ...p, start: span.end })
+  }
+  return out
+}
+
 /** Counts by level of a stretch, everyone at their worst over it. */
 export function tally(people: string[], weeks: Record<string, Week>, date: string, start: number, end: number): Omit<Slot, 'date' | 'start' | 'end'> {
   const out = { free: 0, maybe: 0, unknown: 0, busy: 0 }
