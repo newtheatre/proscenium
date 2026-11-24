@@ -14,7 +14,12 @@ import { rememberEnv } from '#kit/route'
 export default defineNitroPlugin((nitroApp) => {
   installRegistry(registry)
   installMigrations(migrations, release)
-  nitroApp.hooks.hook('request', (event) => { rememberEnv(event.context.cloudflare?.env as KitEnv | undefined) })
+  nitroApp.hooks.hook('request', (event) => {
+    // Nitro v3 keeps the platform on the request, not on event.context.
+    const cf = (event as unknown as { req?: { runtime?: { cloudflare?: unknown } } }).req?.runtime?.cloudflare
+    if (cf && !event.context.cloudflare) (event.context as Record<string, unknown>).cloudflare = cf
+    rememberEnv(event.context.cloudflare?.env as KitEnv | undefined)
+  })
   if (!import.meta.dev) return
 
   let env: KitEnv | undefined
