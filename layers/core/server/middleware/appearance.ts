@@ -2,6 +2,7 @@
 // core.appearance.let-people-choose; the rule is modeToApply in shared/appearance.ts). The mode is
 // written to the colour-mode cookie on the response, which the browser has stored by the time the
 // page's first script reads it, and into this request's own cookies, so the server render agrees.
+import { bindings } from '#kit/bindings'
 import { defineEventHandler, getCookie, getHeader, getRequestURL, setCookie } from 'h3'
 import { runInContext, useSetting, type KitEnv } from '#kit'
 import { requestCache } from '#kit/route'
@@ -13,7 +14,7 @@ const NOT_A_PAGE = /^\/(api|files|_nuxt|__nuxt|_ipx|cdn-cgi)(\/|$)|\.\w+$/
 export default defineEventHandler(async (event) => {
   if (event.method !== 'GET' || NOT_A_PAGE.test(getRequestURL(event).pathname)) return
   if (!(getHeader(event, 'accept') ?? '').includes('text/html')) return
-  const env = (event.context as { cloudflare?: { env?: KitEnv } }).cloudflare?.env
+  const env = bindings(event)
   if (!env?.DB) return // prerendering: no settings to read, so the browser's own cookie stands
   const mode = await runInContext({ env, cache: requestCache(event) }, async () => modeToApply({
     start: await useSetting('core.appearance.default'),

@@ -1,6 +1,7 @@
 // The sitemap search engines read (public site; C-47): the theatre's own pages from
 // site/content/pages (less those kept from search engines), what's on and the archive, and every public production, venue and season.
 // Past shows leave it while they are not public; with the public site off it is not found.
+import { bindings } from '#kit/bindings'
 import { defineEventHandler, getHeader, getRequestURL, setResponseHeaders, setResponseStatus } from 'h3'
 import { queryCollection } from '@nuxt/content/server'
 import { runInContext } from '#kit/context'
@@ -10,7 +11,7 @@ import { publicProgrammePaths } from '#modules/core'
 const escape = (text: string) => text.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
 
 export default defineEventHandler(async (event) => {
-  const env = (event.context as any).cloudflare?.env
+  const env = bindings(event)
   if (!env?.DB) throw new Error('No DB binding on this request')
   return runInContext({ env, requestId: getHeader(event, 'cf-ray') ?? crypto.randomUUID(), requestOrigin: getRequestURL(event).origin }, async () => {
     if (!await isEnabled('public-site')) {

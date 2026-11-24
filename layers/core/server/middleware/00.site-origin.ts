@@ -3,6 +3,7 @@
 // on the origin, so nobody browses a second host and then finds every change refused there; the
 // change itself is refused by identity's origin check. Not redirected: the platform's health probe,
 // a provider's webhook and first-run setup. Before an origin is recorded nothing is redirected.
+import { bindings } from '#kit/bindings'
 import { defineEventHandler, sendRedirect } from 'h3'
 import { runInContext, type KitEnv } from '#kit'
 import { requestCache } from '#kit/route'
@@ -16,7 +17,7 @@ export default defineEventHandler(async (event) => {
   if (method !== 'GET' && method !== 'HEAD') return
   const url = requestUrl(event)
   if (HEALTH_PROBE.test(url.pathname) || NOT_HOST_CHECKED.test(url.pathname)) return
-  const env = (event.context as { cloudflare?: { env?: KitEnv } }).cloudflare?.env
+  const env = bindings(event)
   if (!env?.DB) return // prerendering: there is no other host to leave
   const configured = await runInContext({ env, cache: requestCache(event) }, () => configuredOrigin())
   if (!configured || configured.origin === url.origin) return

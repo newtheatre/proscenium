@@ -14,6 +14,7 @@ import { useRegistry } from './registry'
 import { verifyTurnstile } from './turnstile'
 import { nowMs } from './clock'
 import { requestUrl } from './origin'
+import { bindings, waitUntilOf } from './bindings'
 import { withoutTokens } from './tokens'
 import { useSetting } from './settings-store'
 import { ensureMigrated } from './migrations'
@@ -77,27 +78,16 @@ async function sha256(text: string): Promise<string> {
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-// A page's server render calls the API through Nitro's local fetch, and those calls carry the
-// Cloudflare context of the request they belong to. One kind does not: when a page fails, Nitro
-// renders the error page with a local fetch of its own that carries no context, and the error page
-// draws the same shell (the brand, the viewer). The bindings are the same for every request in an
-// isolate, so the kit plugin remembers them from a request that arrived from outside, for that case.
-let remembered: KitEnv | undefined
-export function rememberEnv(env: KitEnv | undefined): void {
-  if (env?.DB) remembered = env
-}
-
 function envOf(event: H3Event): KitEnv {
-  const env = (event.context as any).cloudflare?.env ?? remembered
-  if (!env?.DB) throw new Error('No DB binding on this request. Run under wrangler, nuxt dev with the Cloudflare preset, or a test worker')
+  const env = bindings(event)
+  if (!env) throw new Error('No DB binding on this request. Run under wrangler, nuxt dev with the Cloudflare preset, or a test worker')
   return env
 }
 
 // A page's server render calls several routes through Nitro's local fetch (the viewer, the brand,
 // the menu, the page's own data). Each is a request of its own here, but they all belong to the one
-// request that arrived from outside, and Nitro hands every one of them the same platform object. So
-// what a request reads once (settings, module states, the session) is kept against that object and
-// read once for the whole render, not once for each call.
+// request that arrived from outside, so what a request reads once (settings, module states, the
+// session) is kept against the outside request's platform object and read once for the whole render.
 const renderCaches = new WeakMap<object, KitContext['cache']>()
 
 /** The per-request cache, shared by every internal call made while serving the same outside request. */
@@ -117,14 +107,7 @@ function moduleOfPath(path: string): string | undefined {
  * Declares an API route. A route with neither `ability` nor `public: true` fails the build (F-04);
  * a refused request gets the standard body `{ code, reason, remedy?, fields? }`.
  */
-/**
- * The body as text. On Cloudflare, Nitro hands h3 a body only for POST, PUT and PATCH, so for a
- * DELETE h3 would wait for one that never arrives and the Worker is cancelled as hung. The body of
- * a DELETE is read from the request the Worker was given instead.
- */
-async function bodyText(event: H3Event, method: string): Promise<string> {
-  const given = (event.context as { _platform?: { cloudflare?: { request?: Request } } })._platform?.cloudflare?.request
-  if (method === 'DELETE' && given) return given.bodyUsed ? '' : await given.text()
+async function bodyText(event: H3Event): Promise<string> {
   return (await readRawBody(event, 'utf8')) ?? ''
 }
 
@@ -135,7 +118,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
   checkRouteDeclaration(decl)
   const routeHandler = defineEventHandler(async (event) => {
     const env = envOf(event)
-    const waitUntil = (event.context as any).cloudflare?.context?.waitUntil?.bind((event.context as any).cloudflare.context)
+    const waitUntil = waitUntilOf(event)
     return runInContext({ env, waitUntil, requestId: getHeader(event, 'cf-ray') ?? crypto.randomUUID(), cache: requestCache(event) }, async () => {
       try {
         return await handle(event)
@@ -177,14 +160,14 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     const rateClass = decl.rateLimit === 'default' && actor.accountId && actor.grants?.length ? 'staff' : decl.rateLimit
     const rate = await countAgainstRate(rateClass, who)
     if (!rate.allowed) {
-      setResponseHeader(event, 'Retry-After', String(rate.retryAfter))
+      setResponseHeader(event, 'Retry-After', rate.retryAfter)
       throw new Refusal('core.rate-limit.reached', 'Too many requests. Please slow down.', { status: 429, remedy: waitRemedy(rate.retryAfter) })
     }
 
     const method = event.method.toUpperCase()
     const reads = method === 'GET' || method === 'HEAD'
     const binary = decl.body === 'binary'
-    const rawBody = reads || binary ? '' : await bodyText(event, method)
+    const rawBody = reads || binary ? '' : await bodyText(event)
 
     if (decl.protect === 'turnstile') {
       const token = getHeader(event, 'cf-turnstile-response')

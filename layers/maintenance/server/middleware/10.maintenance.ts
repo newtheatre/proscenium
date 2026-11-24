@@ -7,6 +7,7 @@
 // A new site is closed from its first deploy: until first-run setup switches the module on (or
 // anybody switches it either way), it counts as on while the site has no Owner, and the holding
 // page points whoever is installing it to setup.
+import { bindings } from '#kit/bindings'
 import { defineEventHandler, getRequestURL, setResponseHeader, setResponseStatus } from 'h3'
 import { isEnabled, runInContext, usePoint, type KitEnv } from '#kit'
 import { everSwitched } from '#kit/modules-store'
@@ -21,7 +22,7 @@ const SERVICE_UNAVAILABLE = 503 // not-policy: HTTP's status for a site closed f
 export default defineEventHandler(async (event) => {
   const path = getRequestURL(event).pathname
   if (isOpenAddress(path)) return
-  const env = (event.context as { cloudflare?: { env?: KitEnv } }).cloudflare?.env
+  const env = bindings(event)
   if (!env?.DB) return // prerendering: nothing is closed while the site is built
   const answer = await runInContext({ env, cache: requestCache(event) }, async () => {
     const firstRun = !(await isEnabled('maintenance')) && !(await everSwitched('maintenance')) && await setupNeeded()

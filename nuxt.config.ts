@@ -1,8 +1,7 @@
 // Upstream-owned. The theatre's `site/` folder is the Nuxt project's source (srcDir and serverDir),
 // so anything there outranks every layer; upstream's code lives in `layers/`, which Nuxt registers
 // on its own, and a theatre's own modules in `site/layers/x-*`.
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const r = (path: string) => fileURLToPath(new URL(path, import.meta.url))
@@ -28,7 +27,6 @@ export default defineNuxtConfig({
   // Nuxt UI before Nuxt Content, so content pages use Nuxt UI's prose components.
   modules: ['@nuxt/ui', '@nuxt/content', '@nuxt/eslint'],
 
-  $production: { nitro: { entry: r('./layers/core/server/entry.ts') } },
   devtools: { enabled: false },
   content: { database: { type: 'd1', bindingName: 'DB' }, experimental: { sqliteConnector: 'native' } },
   // Fonts and icons are bundled: nothing loads from a third party (UI-24, Part B).
@@ -38,8 +36,24 @@ export default defineNuxtConfig({
   serverDir: 'site/server',
   compatibilityDate: COMPATIBILITY_DATE,
 
+  hooks: {
+    // The prerenderer (Nuxt Content's pages) builds its own Nitro from this config and runs it in Node,
+    // so it must not get the Worker's server entry, which imports `cloudflare:workers`.
+    'nitro:init'(nitro) {
+      nitro.hooks.hook('prerender:config', (config) => {
+        config.serverEntry = false
+      })
+    },
+  },
+
+  // `nuxt dev` runs the Worker's bindings in Miniflare, with local state in .wrangler/state. Migrations apply
+  // on the first request; jobs and the scheduler run in-process (layers/core/server/plugins/01.kit.ts).
+  $development: { nitro: { cloudflare: { wrangler: { vars: { PROSCENIUM_AUTO_MIGRATE: '1' } } } } },
+
   nitro: {
     preset: 'cloudflare_module',
+    // The Worker's Durable Objects and its socket route (layers/core/server/entry.ts).
+    serverEntry: { handler: r('./layers/core/server/entry.ts'), format: 'web' },
     experimental: { asyncContext: true },
     cloudflare: {
       deployConfig: true,
@@ -77,35 +91,6 @@ export default defineNuxtConfig({
     },
   },
 
-  hooks: {
-    // The prerenderer (Nuxt Content's pages) builds its own Nitro from this config; it must keep
-    // Nitro's entry rather than the Worker's.
-    'nitro:init'(nitro) {
-      nitro.hooks.hook('prerender:config', (config) => {
-        delete config.entry
-      })
-    },
-    // `nuxt dev` emulates the bindings with wrangler's platform proxy, which needs a config file.
-    // Local state lives in .wrangler/state, shared with `bun run preview`. Migrations apply on the
-    // first request; jobs and the scheduler run in-process (layers/core/server/plugins/01.kit.ts).
-    'nitro:config'(config) {
-      if (!config.dev) return
-      const path = r('./.nuxt/wrangler.dev.json')
-      mkdirSync(dirname(path), { recursive: true })
-      writeFileSync(path, JSON.stringify({
-        name,
-        compatibility_date: COMPATIBILITY_DATE,
-        compatibility_flags: ['nodejs_compat'],
-        vars: { PROSCENIUM_AUTO_MIGRATE: '1' },
-        d1_databases: [{ binding: 'DB', database_name: `${name}-db`, database_id: 'local' }],
-        r2_buckets: [{ binding: 'FILES', bucket_name: `${name}-files` }],
-        kv_namespaces: [{ binding: 'CACHE', id: 'local' }],
-        send_email: [{ name: 'EMAIL' }],
-        queues: { producers: [{ binding: 'JOBS_PROMPT', queue: queue.prompt }, { binding: 'JOBS_BULK', queue: queue.bulk }, { binding: 'EMAIL_EVENTS', queue: queue.emailEvents }] },
-      }, null, 2))
-      config.cloudflare = { ...config.cloudflare, dev: { ...config.cloudflare?.dev, configPath: path, persistDir: r('./.wrangler/state') } }
-    },
-  },
   eslint: { config: { stylistic: true } },
   // Icons named in TypeScript (a module's menu entries, groups and cards in module.ts) are scanned too:
   // with no fallback to the Iconify API, an icon left out of the bundle would not show at all.

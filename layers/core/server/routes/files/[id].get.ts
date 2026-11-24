@@ -1,6 +1,7 @@
 // Serves a stored file at /files/<id> (C-23, C-25). Only a ready file is served. Public files are
 // cached; anything else answers "not found" to anyone who may not see it, so its existence does not
 // leak. An SVG is served with a policy that stops it running anything, even after cleaning.
+import { bindings } from '#kit/bindings'
 import { defineEventHandler, getHeader, getRouterParam, setResponseHeaders, setResponseStatus } from 'h3'
 import { runInContext } from '#kit/context'
 import { useAccessProvider } from '#kit/access'
@@ -8,7 +9,7 @@ import { first, isId, nowMs, files as store } from '#kit'
 import { mayReadRecordFile } from '../../files/service'
 
 export default defineEventHandler(async (event) => {
-  const env = (event.context as any).cloudflare?.env
+  const env = bindings(event)
   if (!env?.DB) throw new Error('No DB binding on this request')
   return runInContext({ env, requestId: getHeader(event, 'cf-ray') ?? crypto.randomUUID() }, async () => {
     const id = getRouterParam(event, 'id') ?? ''
