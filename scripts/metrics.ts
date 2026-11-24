@@ -13,7 +13,13 @@ const mode = process.argv[2] === 'worker' ? 'worker' : 'source'
 const update = process.argv.includes('--update')
 
 async function cycles(): Promise<number> {
-  const graph = await madge(['layers', 'scripts'], { fileExtensions: ['ts'], tsConfig: '.nuxt/tsconfig.server.json', excludeRegExp: [/\/tests\//] })
+  // Runtime imports only: a type-only import cannot change the order modules load in.
+  const graph = await madge(['layers', 'scripts'], {
+    fileExtensions: ['ts'],
+    tsConfig: '.nuxt/tsconfig.server.json',
+    excludeRegExp: [/\/tests\//, /\.vue$/],
+    detectiveOptions: { ts: { skipTypeImports: true }, tsx: { skipTypeImports: true } },
+  })
   const found = graph.circular()
   for (const cycle of found) console.log(`  cycle: ${cycle.join(' -> ')}`)
   return found.length
