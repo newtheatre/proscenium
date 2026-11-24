@@ -3,6 +3,7 @@
 // own income account where it names one, otherwise to bar.income, each with the opening's production
 // and performance. When the payment ends without the money, the sale is open again with its lines.
 import { all, first, nowMs, refuse, type UnitView } from '#kit'
+import { defaultTaxCode } from '#modules/finance'
 import type { OwnerEntry, Part, Settlement } from '#modules/payments'
 import { refunded } from '../../refunds'
 import { moveForSale } from '../../stock'
@@ -18,16 +19,16 @@ const saleFor = (part: Part) => first<SaleRow>(
   part.record,
 )
 
-/** The sale's income by account, as credits. */
+/** The sale's income by account and tax code, as credits, VAT included (BAR-60). */
 async function income(sale: SaleRow): Promise<OwnerEntry[]> {
   const where = { productionId: sale.production_id, performanceId: sale.performance_id }
-  const rows = await all<{ account: string | null, amount: number }>(
-    `SELECT c.income_account_id AS account, sum(l.amount_minor) AS amount FROM bar_sale_lines l
+  const rows = await all<{ account: string | null, code: string, amount: number }>(
+    `SELECT c.income_account_id AS account, coalesce(p.tax_code, ?) AS code, sum(l.amount_minor) AS amount FROM bar_sale_lines l
        JOIN bar_variants v ON v.id = l.variant_id JOIN bar_products p ON p.id = v.product_id JOIN bar_categories c ON c.id = p.category_id
-      WHERE l.sale_id = ? GROUP BY c.income_account_id ORDER BY c.income_account_id`,
-    sale.id,
+      WHERE l.sale_id = ? GROUP BY c.income_account_id, code ORDER BY c.income_account_id, code`,
+    await defaultTaxCode(), sale.id,
   )
-  return rows.filter(r => r.amount > 0).map(r => ({ account: r.account ?? INCOME, amountMinor: -r.amount, ...where }))
+  return rows.filter(r => r.amount > 0).map(r => ({ account: r.account ?? INCOME, amountMinor: -r.amount, taxCode: r.code, ...where }))
 }
 
 export default {

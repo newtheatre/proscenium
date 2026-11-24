@@ -128,6 +128,8 @@ export default defineModule({
     'core.space-busy': [{ id: 'training' }],
     // A marked form on a course, for its quiz steps (Q1).
     'forms.slot': [{ id: 'training.quiz', subject: 'training.course', attach: 'training.course.manage', label: 'training.forms.quiz.label' }],
+    // Two places on one session after an account merge: the stronger is kept.
+    'core.merge-handler': [{ id: 'training.places', file: 'places' }],
     'core.notification-type': [{
       id: 'training.record-awarded',
       category: 'optional' as const,
