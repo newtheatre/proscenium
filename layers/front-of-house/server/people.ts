@@ -8,6 +8,7 @@ import { holdersOf, notify } from '#modules/core'
 import { LIVE_STATES } from './db/schema'
 import { confirmed, eligibility, type Eligibility } from './assignments'
 import { getShift, type Shift } from './shifts'
+import { questionsWaiting, requireAnswered } from './crew-calls'
 import { shiftWords } from './words'
 
 const live = LIVE_STATES.map(s => `'${s}'`).join(', ')
@@ -77,7 +78,12 @@ export async function removePerson(unit: UnitView, id: string, by: string): Prom
   await notify(unit, 'front-of-house.shift-removed', { to: assignment.accountId, variables: await shiftWords(shift), dedupeKey: `removed:${id}` })
 }
 
-export interface AssignResult { assignmentId: string, warnings: Eligibility['unmet'] }
+export interface AssignResult {
+  assignmentId: string
+  warnings: Eligibility['unmet']
+  /** The crew call whose questions the person has not answered yet (CC1): a warning, never a refusal. */
+  crewQuestions: { crewCallId: string, name: string } | null
+}
 
 /**
  * A manager puts someone on a shift, confirmed. A requirement the person does not meet is a
@@ -104,7 +110,8 @@ export async function assignPerson(unit: UnitView, input: { shiftId: string, acc
   }).expect(1, { code: 'front-of-house.shift-overlaps', reason: 'This person is already on a shift at that time.', remedy: 'Take them off the other shift first.' })
   unit.audit({ action: 'create', record: ['front-of-house.assignment', id], detail: { state: 'confirmed', source: 'assigned', override: !verdict.met } })
   await confirmed(unit, { assignmentId: id, shift, accountId: input.accountId, by: input.by })
-  return { assignmentId: id, warnings: verdict.unmet }
+  const waiting = await questionsWaiting(shift, input.accountId)
+  return { assignmentId: id, warnings: verdict.unmet, crewQuestions: waiting ? { crewCallId: waiting.id, name: waiting.name } : null }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -163,6 +170,7 @@ export async function takeCover(unit: UnitView, id: string, accountId: string): 
   if (await own(id, accountId)) refuse('front-of-house.own-place', 'This is your own place.', { remedy: 'Keep it instead.' })
   const verdict = await eligibility(accountId, shift)
   if (!verdict.met) refuse('front-of-house.not-eligible', verdict.reasons[0] ?? 'You do not meet what this duty needs.', { remedy: 'Ask the front-of-house manager what the duty needs.' })
+  await requireAnswered(shift, accountId)
   const taker = newId('asg')
   const at = nowMs()
   move(unit, assignment, { from: ['release_requested'], to: 'released', by: accountId, free: false, refusal: { code: 'front-of-house.cover-taken', reason: 'Someone has just taken this place.' } })

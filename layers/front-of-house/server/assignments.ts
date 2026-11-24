@@ -6,6 +6,7 @@ import { newId, nowMs, refuse, requirements, useSetting, type UnitView } from '#
 import { accountScopeSql } from '#kit/accounts'
 import { LIVE_STATES } from './db/schema'
 import { getDuty, getShift, type Shift } from './shifts'
+import { requireAnswered } from './crew-calls'
 import { calendarLink, shiftDetails, shiftWords } from './words'
 import { accountLabel, notify } from '#modules/core'
 
@@ -49,6 +50,7 @@ export async function signUp(unit: UnitView, input: { shiftId: string, accountId
     refuse('front-of-house.shift-closed', 'Sign-up for this shift has closed.', { remedy: 'Ask the front-of-house manager if they still need someone.' })
   const verdict = await eligibility(input.accountId, shift)
   if (!verdict.met) refuse('front-of-house.not-eligible', verdict.reasons[0] ?? 'You do not meet what this duty needs.', { remedy: 'Ask the front-of-house manager what the duty needs.' })
+  await requireAnswered(shift, input.accountId)
 
   const confirmation = await useSetting('front-of-house.shifts.confirmation')
   const state = confirmation === 'manager' ? 'requested' : 'confirmed'

@@ -97,6 +97,10 @@ export const shifts = defineTable('front_of_house_shifts', {
   briefing: col.internal(text('briefing')),
   state: col.internal(text('state', { enum: ['draft', 'published', 'completed', 'cancelled'] }).notNull().default('draft')),
   cancelledReason: col.internal(text('cancelled_reason')),
+  // The space it is worked in, copied from the performance or chosen on the rota grid (FH-48).
+  spaceId: col.internal(text('space_id')),
+  // The crew call it belongs to (FH-49): set on an occasion shift, or joined from the call's season.
+  crewCallId: col.ref('front_of_house_crew_calls', { nullable: true }),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
 }, {
@@ -106,12 +110,50 @@ export const shifts = defineTable('front_of_house_shifts', {
   extra: t => [
     uniqueIndex('front_of_house_shifts_duty').on(t.performanceId, t.dutyId).where(sql`performance_id IS NOT NULL`),
     index('front_of_house_shifts_window').on(t.state, t.windowClosesAt),
+    index('front_of_house_shifts_crew_call').on(t.crewCallId, t.callAt),
     check('front_of_house_shifts_title', sql`(${t.performanceId} IS NOT NULL OR ${t.title} IS NOT NULL) AND (${t.title} IS NULL OR length(${t.title}) <= 80)`),
     check('front_of_house_shifts_places', sql`${t.places} BETWEEN 1 AND 50 AND ${t.placesTaken} BETWEEN 0 AND ${t.places}`),
     check('front_of_house_shifts_times', sql`${t.endsAt} > ${t.callAt} AND ${t.windowOpensAt} <= ${t.callAt} AND ${t.windowClosesAt} >= ${t.endsAt}`),
     check('front_of_house_shifts_briefing', sql`${t.briefing} IS NULL OR length(${t.briefing}) <= 1000`),
     check('front_of_house_shifts_state', sql`${t.state} IN ('draft', 'published', 'completed', 'cancelled')`),
     check('front_of_house_shifts_reason', sql`${t.cancelledReason} IS NULL OR length(${t.cancelledReason}) <= 200`),
+  ],
+})
+
+export const CREW_CALL_STATES = ['draft', 'open', 'closed', 'archived'] as const
+
+/**
+ * An invitation to crew a period, usually a festival (FH-49): its dates, the season whose shifts join
+ * it, and the perks rules. The sign-up questions are the form attached in the forms slot
+ * `front-of-house.crew-call`, which holds which form it is; `question_roles` names its questions.
+ */
+export const crewCalls = defineTable('front_of_house_crew_calls', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  seasonId: col.internal(text('season_id')),
+  startsOn: col.localDate('starts_on').notNull(),
+  endsOn: col.localDate('ends_on').notNull(),
+  // Question keys only: which is the T-shirt size, the meal days and the dietary need.
+  questionRoles: col.internal(text('question_roles').notNull().default('{}')),
+  tshirtMinShifts: col.internal(integer('tshirt_min_shifts')),
+  mealMinMinutes: col.internal(integer('meal_min_minutes')),
+  mealsOnRequest: col.internal(integer('meals_on_request', { mode: 'boolean' }).notNull().default(true)),
+  state: col.internal(text('state', { enum: CREW_CALL_STATES }).notNull().default('draft')),
+  createdBy: col.account('created_by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'crc',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_crew_calls_name').on(t.name).where(sql`state <> 'archived'`),
+    index('front_of_house_crew_calls_season').on(t.seasonId, t.state),
+    check('front_of_house_crew_calls_name_length', sql`length(${t.name}) BETWEEN 1 AND 80`),
+    check('front_of_house_crew_calls_dates', sql`${t.endsOn} >= ${t.startsOn}`),
+    check('front_of_house_crew_calls_tshirt', sql`${t.tshirtMinShifts} IS NULL OR ${t.tshirtMinShifts} BETWEEN 1 AND 50`),
+    check('front_of_house_crew_calls_meal', sql`${t.mealMinMinutes} IS NULL OR ${t.mealMinMinutes} BETWEEN 30 AND 720`),
+    check('front_of_house_crew_calls_state', sql`${t.state} IN (${list(CREW_CALL_STATES)})`),
   ],
 })
 
@@ -511,4 +553,4 @@ export const calendarFeeds = defineTable('front_of_house_calendar_feeds', {
   ],
 })
 
-export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates, calendarFeeds }
+export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, crewCalls, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates, calendarFeeds }
