@@ -71,6 +71,67 @@ export interface LayOut {
   totalLabel: string
 }
 
+type Named = { label: string, sortBy: string | number }
+type CellFor = (column: number, group: string | null) => Shown
+
+const bySort = (a: Named, b: Named) => a.sortBy < b.sortBy ? -1 : a.sortBy > b.sortBy ? 1 : 0
+
+/** The values of `key` across these answers, first seen first, each named; a pivot's values may not be empty. */
+function collectNames(found: (FigureAnswer | null | undefined)[], key: string | undefined, allowEmpty: boolean, name: LayOut['name']): Map<string, Named> {
+  const out = new Map<string, Named>()
+  if (!key) return out
+  for (const a of found) {
+    if (a?.state !== 'ok') continue
+    for (const r of a.rows) {
+      const value = r.keys[key]
+      if (value === undefined || (!allowEmpty && !value) || out.has(value)) continue
+      out.set(value, name(key, value, a))
+    }
+  }
+  return out
+}
+
+/** What the cells need to know about the columns: whether each shows, its group set and its kind. */
+interface Shape { columns: ReportColumn[], shown: boolean[], groups: Group[], kinds: ColumnKind[] }
+
+function cellAt(shape: Shape, i: number, values: (Shown | undefined)[], cellFor: () => Shown): Shown {
+  const c = shape.columns[i]!
+  if (!shape.shown[i]) return { state: 'unavailable', reason: 'hidden' }
+  return c.kind === 'formula' ? formulaCell(c, values, shape.kinds, i) : cellFor()
+}
+
+function fillCells(shape: Shape, cellFor: CellFor): Record<string, Shown> {
+  const cells: Record<string, Shown> = {}
+  for (const g of shape.groups) {
+    const values: (Shown | undefined)[] = []
+    shape.columns.forEach((_, i) => {
+      const shown = cellAt(shape, i, values, () => cellFor(i, g.value))
+      values.push(shown)
+      cells[cellKey(i, g.value)] = shown
+    })
+  }
+  return cells
+}
+
+const answersOf = (c: ReportColumn, answers: Answers) => answers[(c as { id: string }).id]!
+
+function rowCellFor(columns: ReportColumn[], answers: Answers, how: LayOut, key: string): CellFor {
+  return (i, group) => {
+    const c = columns[i]!
+    const a = answersOf(c, answers)
+    if (group === null) return pick(how.acrossBy ? a.rowTotals : a.rows, c.unit, { [how.rowsBy!]: key })
+    return pick(a.rows, c.unit, { [how.rowsBy!]: key, [how.acrossBy!]: group })
+  }
+}
+
+function totalCellFor(columns: ReportColumn[], answers: Answers, how: LayOut): CellFor {
+  return (i, group) => {
+    const c = columns[i]!
+    const a = answersOf(c, answers)
+    return group === null ? toShown(a.total) : pick(a.groupTotals, c.unit, { [how.acrossBy!]: group })
+  }
+}
+
 /**
  * The table for `columns` from their answers. A figure that answered nothing for a row has nought
  * there, and one that could not answer says so, never nought (REP-08). Formulas are worked out
@@ -82,53 +143,16 @@ export function layOut(columns: ReportColumn[], answers: Answers, how: LayOut): 
   const figures = marked.filter(c => c.kind === 'figure') as Extract<typeof marked[number], { kind: 'figure' }>[]
 
   // The pivot's values, from every figure's answer by the pivot's key, in order.
-  const groupNames = new Map<string, { label: string, sortBy: string | number }>()
-  if (how.acrossBy) {
-    for (const f of figures) {
-      const a = answers[f.id]?.groupTotals
-      if (a?.state === 'ok') for (const r of a.rows) if (r.keys[how.acrossBy] && !groupNames.has(r.keys[how.acrossBy]!)) groupNames.set(r.keys[how.acrossBy]!, how.name(how.acrossBy, r.keys[how.acrossBy]!, a))
-    }
-  }
-  const groups: Group[] = [...[...groupNames.entries()].sort((a, b) => a[1].sortBy < b[1].sortBy ? -1 : a[1].sortBy > b[1].sortBy ? 1 : 0).map(([value, n]) => ({ value, label: n.label })), { value: null, label: how.totalLabel }]
+  const groupNames = collectNames(figures.map(f => answers[f.id]?.groupTotals), how.acrossBy, false, how.name)
+  const named = [...groupNames.entries()].sort((a, b) => bySort(a[1], b[1])).map(([value, n]) => ({ value, label: n.label }))
+  const groups: Group[] = [...named, { value: null, label: how.totalLabel }]
+  const rowNames = collectNames(figures.map(f => how.acrossBy ? answers[f.id]?.rowTotals : answers[f.id]?.rows), how.rowsBy, true, how.name)
 
-  const rowNames = new Map<string, { label: string, sortBy: string | number }>()
-  if (how.rowsBy) {
-    for (const f of figures) {
-      const a = how.acrossBy ? answers[f.id]?.rowTotals : answers[f.id]?.rows
-      if (a?.state === 'ok') for (const r of a.rows) if (r.keys[how.rowsBy] !== undefined && !rowNames.has(r.keys[how.rowsBy]!)) rowNames.set(r.keys[how.rowsBy]!, how.name(how.rowsBy, r.keys[how.rowsBy]!, a))
-    }
-  }
-
-  const fill = (cellFor: (column: number, group: string | null) => Shown): Record<string, Shown> => {
-    const cells: Record<string, Shown> = {}
-    for (const g of groups) {
-      const values: (Shown | undefined)[] = []
-      columns.forEach((c, i) => {
-        const shown = !marked[i]!.shown
-          ? { state: 'unavailable', reason: 'hidden' } as Shown
-          : c.kind === 'formula' ? formulaCell(c, values, kinds, i) : cellFor(i, g.value)
-        values.push(shown)
-        cells[cellKey(i, g.value)] = shown
-      })
-    }
-    return cells
-  }
-
-  const rows: ReportRow[] = [...rowNames.entries()].map(([key, n]) => ({
-    key, ...n,
-    cells: fill((i, group) => {
-      const c = columns[i]!
-      const a = answers[(c as { id: string }).id]!
-      if (group === null) return pick(how.acrossBy ? a.rowTotals : a.rows, c.unit, { [how.rowsBy!]: key })
-      return pick(a.rows, c.unit, { [how.rowsBy!]: key, [how.acrossBy!]: group })
-    }),
-  })).sort((a, b) => a.sortBy < b.sortBy ? -1 : a.sortBy > b.sortBy ? 1 : 0)
-
-  const totals = fill((i, group) => {
-    const c = columns[i]!
-    const a = answers[(c as { id: string }).id]!
-    return group === null ? toShown(a.total) : pick(a.groupTotals, c.unit, { [how.acrossBy!]: group })
-  })
+  const shape: Shape = { columns, shown: marked.map(c => c.shown), groups, kinds }
+  const rows: ReportRow[] = [...rowNames.entries()]
+    .map(([key, n]) => ({ key, ...n, cells: fillCells(shape, rowCellFor(columns, answers, how, key)) }))
+    .sort(bySort)
+  const totals = fillCells(shape, totalCellFor(columns, answers, how))
 
   return { columns: marked, groups, rows, totals, hidden: marked.filter(c => !c.shown).length }
 }

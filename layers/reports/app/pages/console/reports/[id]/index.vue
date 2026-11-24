@@ -65,7 +65,7 @@ const title = computed(() => view.value ? words(view.value.name) : t('reports.ti
 const questionText = useQuestionText()
 const question = computed(() => {
   const v = view.value
-  return v ? questionText(v.scope.title, v.period.from, v.period.to, by.value ? keyName(by.value, v.keyLabels) : undefined, v.acrossBy ? keyName(v.acrossBy, v.keyLabels) : undefined) : ''
+  return v ? questionText(v.scope.title, v.period, { by: by.value ? keyName(by.value, v.keyLabels) : undefined, across: v.acrossBy ? keyName(v.acrossBy, v.keyLabels) : undefined }) : ''
 })
 const filterChip = computed(() => {
   const f = view.value?.filter

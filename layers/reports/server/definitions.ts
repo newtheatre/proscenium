@@ -75,53 +75,60 @@ const FORMULA_FAULTS: Record<string, string> = {
   'units-divide': 'Divide money or a count by a count, a count by a count for a percentage, or anything by a number.',
 }
 
-/** Checks a saved report against every rule at once (B1 to B6, D1) and gives the columns to store. */
-export async function checkDefinition(input: DefinitionInput, actor: Actor): Promise<StoredColumn[]> {
-  const fields: Record<string, string> = {}
-  const max = await useSetting('reports.builder.max-columns') as number
-  if (input.columns.length > max) fields.columns = `A report has at most ${max} columns.`
-  const readable = new Map((await listMeasures(actor)).map(m => [m.id, m]))
-  const kinds: ColumnKind[] = []
-  const stored: StoredColumn[] = []
-  const figures: MeasureListing[] = []
-  input.columns.forEach((c, i) => {
-    if ('measure' in c) {
-      const m = readable.get(c.measure)
-      if (!m) fields[`columns.${i}`] = 'Choose a figure you can see.'
-      else figures.push(m)
-      kinds.push({ unit: m?.unit ?? 'count', combine: m?.combine ?? 'sum' })
-      stored.push({ measure: c.measure })
-      return
-    }
-    try {
-      const unit = formulaUnit(parseFormula(c.formula, i), kinds)
-      kinds.push({ unit, combine: 'sum' })
-      stored.push({ formula: c.formula.trim(), label: c.label, unit })
-    }
-    catch (error) {
-      if (!(error instanceof FormulaError)) throw error
-      const at = error.code.startsWith('units') || error.code === 'not-addable' || error.code === 'no-column' || error.code === 'empty' ? '' : ` (at character ${error.at})`
-      fields[`columns.${i}`] = `${(FORMULA_FAULTS[error.code] ?? 'This formula cannot be worked out.').replace(/\.$/, '')}${at}.`
-      kinds.push({ unit: 'count', combine: 'sum' })
-    }
-  })
-  if (!figures.length && !fields.columns) fields.columns = 'A report needs at least one figure.'
+interface ColumnCheck {
+  readable: Map<string, MeasureListing>
+  fields: Record<string, string>
+  kinds: ColumnKind[]
+  stored: StoredColumn[]
+  figures: MeasureListing[]
+}
+
+function checkMeasure(c: { measure: string }, i: number, run: ColumnCheck) {
+  const m = run.readable.get(c.measure)
+  if (!m) run.fields[`columns.${i}`] = 'Choose a figure you can see.'
+  else run.figures.push(m)
+  run.kinds.push({ unit: m?.unit ?? 'count', combine: m?.combine ?? 'sum' })
+  run.stored.push({ measure: c.measure })
+}
+
+const PLAIN_FAULTS = new Set(['not-addable', 'no-column', 'empty'])
+
+function formulaFault(error: FormulaError): string {
+  const at = error.code.startsWith('units') || PLAIN_FAULTS.has(error.code) ? '' : ` (at character ${error.at})`
+  return `${(FORMULA_FAULTS[error.code] ?? 'This formula cannot be worked out.').replace(/\.$/, '')}${at}.`
+}
+
+function checkFormula(c: { formula: string, label: string }, i: number, run: ColumnCheck) {
+  try {
+    const unit = formulaUnit(parseFormula(c.formula, i), run.kinds)
+    run.kinds.push({ unit, combine: 'sum' })
+    run.stored.push({ formula: c.formula.trim(), label: c.label, unit })
+  }
+  catch (error) {
+    if (!(error instanceof FormulaError)) throw error
+    run.fields[`columns.${i}`] = formulaFault(error)
+    run.kinds.push({ unit: 'count', combine: 'sum' })
+  }
+}
+
+/** The breakdown, pivot, chart and filter each need every figure to allow them (B2, B6). */
+function checkKeys(input: DefinitionInput, figures: MeasureListing[], fields: Record<string, string>) {
   const say = siteWords()
   const notBy = (key: string, list: 'by' | 'filters') => figures.find(m => !m[list].includes(key))
-  if (input.rowsBy) {
-    const odd = notBy(input.rowsBy, 'by')
-    if (odd) fields.rowsBy = `${say(odd.label)} cannot be broken down this way.`
-  }
+  const rowsOdd = input.rowsBy ? notBy(input.rowsBy, 'by') : undefined
+  if (rowsOdd) fields.rowsBy = `${say(rowsOdd.label)} cannot be broken down this way.`
   if (input.acrossBy) {
     const odd = notBy(input.acrossBy, 'by')
     if (input.acrossBy === input.rowsBy) fields.acrossBy = 'Choose a different key from the rows.'
     else if (odd) fields.acrossBy = `${say(odd.label)} cannot be broken down this way.`
     if (input.chart) fields.chart = 'A report with columns across the top has no chart.'
   }
-  if (input.filter) {
-    const odd = notBy(input.filter.key, 'filters')
-    if (odd) fields.filter = `${say(odd.label)} cannot be narrowed this way.`
-  }
+  const filterOdd = input.filter ? notBy(input.filter.key, 'filters') : undefined
+  if (filterOdd) fields.filter = `${say(filterOdd.label)} cannot be narrowed this way.`
+}
+
+/** The scope, role and starting report the report names must exist. */
+async function checkReferences(input: DefinitionInput, actor: Actor, fields: Record<string, string>) {
   if (input.scopeId) {
     const prefix = input.scopeKind === 'none' ? null : RECORD_PREFIX[input.scopeKind]
     if (!prefix || !input.scopeId.startsWith(prefix)) fields.scopeId = 'Choose one of the kind the report is about.'
@@ -129,8 +136,21 @@ export async function checkDefinition(input: DefinitionInput, actor: Actor): Pro
   }
   if (input.shareRole && !(await first('SELECT 1 AS one FROM core_roles WHERE id = ? AND archived_at IS NULL', input.shareRole))) fields.shareRole = 'Choose a role that exists.'
   if (input.basedOn && !(await readyMadeFor(actor)).some(r => r.report.id === input.basedOn)) fields.basedOn = 'There is no such report.'
+}
+
+/** Checks a saved report against every rule at once (B1 to B6, D1) and gives the columns to store. */
+export async function checkDefinition(input: DefinitionInput, actor: Actor): Promise<StoredColumn[]> {
+  const fields: Record<string, string> = {}
+  const max = await useSetting('reports.builder.max-columns') as number
+  if (input.columns.length > max) fields.columns = `A report has at most ${max} columns.`
+  const readable = new Map((await listMeasures(actor)).map(m => [m.id, m]))
+  const run: ColumnCheck = { readable, fields, kinds: [], stored: [], figures: [] }
+  input.columns.forEach((c, i) => 'measure' in c ? checkMeasure(c, i, run) : checkFormula(c, i, run))
+  if (!run.figures.length && !fields.columns) fields.columns = 'A report needs at least one figure.'
+  checkKeys(input, run.figures, fields)
+  await checkReferences(input, actor, fields)
   if (Object.keys(fields).length) refuse('reports.definition.invalid', 'Some of this report needs changing.', { status: 422, fields })
-  return stored
+  return run.stored
 }
 
 const params = (input: DefinitionInput, columns: StoredColumn[]) => [

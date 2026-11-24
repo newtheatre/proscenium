@@ -197,6 +197,25 @@ async function questionWords(question: RunQuestion): Promise<string[]> {
   return lines
 }
 
+interface CsvContext { table: ReportTable, say: ReturnType<typeof siteWords>, siteCurrency: string }
+interface CsvColumn { column: ReportColumn, key: string, currency: string | undefined, label: string }
+
+/** The currencies a cell key holds across the totals and rows, sorted; the site's own where there is none. */
+function currenciesIn(table: ReportTable, key: string, fallback: string): string[] {
+  const found = new Set<string>()
+  for (const shown of [table.totals[key], ...table.rows.map(r => r.cells[key])]) {
+    if (shown?.state !== 'ok') continue
+    for (const a of shown.amounts) if (a.currency) found.add(a.currency)
+  }
+  return found.size ? [...found].sort() : [fallback]
+}
+
+/** The CSV columns one table column gives: one, or one for each currency of a money column (M7). */
+function csvColumnsFor(ctx: CsvContext, c: ReportColumn, key: string, head: string): CsvColumn[] {
+  if (c.unit !== 'money') return [{ column: c, key, currency: undefined, label: c.unit === 'minutes' ? ctx.say('reports.csv.minutes', { figure: head }) : head }]
+  return currenciesIn(ctx.table, key, ctx.siteCurrency).map(currency => ({ column: c, key, currency, label: `${head} (${currency})` }))
+}
+
 /**
  * The CSV (REP-09): the question in words first, a note row for each figure that could not answer,
  * then the table and its totals. Money is in major units with one column for each currency (M7); a
@@ -205,16 +224,11 @@ async function questionWords(question: RunQuestion): Promise<string[]> {
 export async function csvOf(question: RunQuestion, table: ReportTable): Promise<string> {
   const say = siteWords()
   const siteCurrency = (await useSetting('core.locale.currency') as string | null) ?? 'GBP'
+  const ctx: CsvContext = { table, say, siteCurrency }
   const labelOf = (c: ReportColumn) => c.kind === 'formula' ? c.label : say(c.label)
   const columns = table.groups.flatMap(g => table.columns.flatMap((c, i) => {
     if (!c.shown) return []
-    const head = `${question.acrossBy ? `${g.label} ` : ''}${labelOf(c)}`
-    const keyOf = cellKey(i, g.value)
-    if (c.unit !== 'money') return [{ column: c, key: keyOf, currency: undefined as string | undefined, label: c.unit === 'minutes' ? say('reports.csv.minutes', { figure: head }) : head }]
-    const currencies = new Set<string>()
-    for (const shown of [table.totals[keyOf], ...table.rows.map(r => r.cells[keyOf])]) if (shown?.state === 'ok') for (const a of shown.amounts) if (a.currency) currencies.add(a.currency)
-    if (!currencies.size) currencies.add(siteCurrency)
-    return [...currencies].sort().map(currency => ({ column: c, key: keyOf, currency, label: `${head} (${currency})` }))
+    return csvColumnsFor(ctx, c, cellKey(i, g.value), `${question.acrossBy ? `${g.label} ` : ''}${labelOf(c)}`)
   }))
   const value = (c: ReportColumn, currency: string | undefined, shown: ReportTable['totals'][string] | undefined): string | number => {
     if (!shown || shown.state !== 'ok') return '–'
