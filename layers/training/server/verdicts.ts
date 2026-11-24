@@ -69,6 +69,72 @@ async function coursesHeld(accountIds: string[], courseIds: string[], at: number
 
 const dayOf = (ms: number, timeZone: string) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeZone }).format(ms)
 
+type Answer = { met: boolean, until: number | null }
+type Routes = Map<string, Map<string, RouteItem[]>>
+const NOT_MET: Answer = { met: false, until: null }
+const pairKey = (account: string | null, other: string | null) => `${account}\u0000${other}`
+
+function routesByCompetency(items: RouteItem[]): Routes {
+  const byCompetency: Routes = new Map()
+  for (const item of items) {
+    const routes = byCompetency.get(item.competencyId) ?? new Map<string, RouteItem[]>()
+    routes.set(item.routeId, [...routes.get(item.routeId) ?? [], item])
+    byCompetency.set(item.competencyId, routes)
+  }
+  return byCompetency
+}
+
+/** Recognised items, asked only where no route made of courses alone already holds (R8). */
+async function recognisedAnswers(accounts: string[], byCompetency: Routes, courseAnswer: (account: string, item: RouteItem) => Answer, at: number): Promise<Map<string, Answer>> {
+  const byCourses = (account: string, route: RouteItem[]) => route.every(i => i.kind === 'course' && courseAnswer(account, i).met)
+  const toAsk = new Map<string, Set<string>>()
+  for (const account of accounts) {
+    for (const routes of byCompetency.values()) {
+      if ([...routes.values()].some(route => byCourses(account, route))) continue
+      const refs = [...routes.values()].flat().filter(i => i.kind === 'recognised').map(i => i.ref!)
+      for (const ref of refs) toAsk.set(ref, (toAsk.get(ref) ?? new Set()).add(account))
+    }
+  }
+  const recognised = new Map<string, Answer>()
+  if (!toAsk.size) return recognised
+  const answers = await requirements.check({ accounts: [...new Set([...toAsk.values()].flatMap(set => [...set]))], refs: [...toAsk.keys()], at, whenUnavailable: 'not-met' })
+  for (const a of answers) recognised.set(pairKey(a.account, a.ref), { met: a.verdict === 'met' && !a.unavailable, until: a.until ?? null })
+  return recognised
+}
+
+/** A route's answers, whether it holds, and until when: as long as its shortest-lived item (R4). */
+function judgeRoute(route: RouteItem[], answer: (item: RouteItem) => Answer) {
+  const answers = route.map(i => ({ item: i, ...answer(i) }))
+  const met = answers.every(a => a.met)
+  const untils = answers.map(a => a.until).filter((u): u is number => u !== null)
+  const until = met && untils.length ? Math.min(...untils) : null
+  return { route, answers, met, until, done: answers.filter(a => a.met).length }
+}
+type Judged = ReturnType<typeof judgeRoute>
+
+interface VerdictContext { account: string, competencyId: string, title: string | null, help: string, timeZone: string, lapsed: Map<string, number> }
+
+function heldVerdict(held: Judged[], c: VerdictContext): Verdict {
+  // The latest-lasting held route decides until (R4); the first by position names it (R11).
+  const until = held.some(j => j.until === null) ? null : Math.max(...held.map(j => j.until!))
+  const by = held[0]!.route[0]!.label
+  return { account: c.account, competencyId: c.competencyId, met: true, until, heldBy: by, reason: null, summary: `${c.title}: current${until === null ? '' : ` until ${dayOf(until, c.timeZone)}`}, through ${by}.`, help: c.help }
+}
+
+function notHeldVerdict(judged: Judged[], c: VerdictContext): Verdict {
+  // Up to three routes, the nearest first, each with what it lacks (R5).
+  const offered = [...judged].sort((a, b) => b.done - a.done || a.route[0]!.position - b.route[0]!.position).slice(0, 3) // not-policy: R5 names at most three routes
+  const lacks = offered.map(({ route, answers }) => {
+    const missing = answers.filter(a => !a.met).map(({ item }) => {
+      if (item.kind === 'recognised') return 'not recorded'
+      const lapsedOn = c.lapsed.get(pairKey(c.account, item.courseId))
+      return lapsedOn ? `${item.courseTitle} lapsed on ${dayOf(lapsedOn, c.timeZone)}` : `${item.courseTitle} needed`
+    })
+    return `${route[0]!.label} (${missing.join('; ')})`
+  })
+  return { account: c.account, competencyId: c.competencyId, met: false, until: null, heldBy: null, reason: `Not met. You could hold ${c.title} by: ${lacks.join('; or ')}.`, summary: `${c.title}: not held.`, help: c.help }
+}
+
 /**
  * The verdict for every pair of account and competency at one instant (R8): two queries of
  * Training's own tables, plus one kit call per recognised source for pairs no course route holds.
@@ -80,73 +146,27 @@ export async function verdicts(accountIds: string[], competencyIds: string[], at
   const courseIds = [...new Set(items.filter(i => i.courseId).map(i => i.courseId!))]
   const { held, lapsed } = await coursesHeld(accounts, courseIds, at)
   const timeZone = await theatreTimeZone()
+  const byCompetency = routesByCompetency(items)
 
-  const byCompetency = new Map<string, Map<string, RouteItem[]>>()
-  for (const item of items) {
-    const routes = byCompetency.get(item.competencyId) ?? new Map<string, RouteItem[]>()
-    routes.set(item.routeId, [...routes.get(item.routeId) ?? [], item])
-    byCompetency.set(item.competencyId, routes)
+  const courseAnswer = (account: string, item: RouteItem): Answer => {
+    const key = pairKey(account, item.courseId)
+    return held.has(key) ? { met: true, until: held.get(key)! } : NOT_MET
   }
-
-  // A course item's answer, or undefined for a recognised one still to ask.
-  const courseAnswer = (account: string, item: RouteItem) => {
-    const key = `${account}\u0000${item.courseId}`
-    return held.has(key) ? { met: true, until: held.get(key)! } : { met: false, until: null }
-  }
-  const routeByCourses = (account: string, route: RouteItem[]) => route.every(i => i.kind === 'course' && courseAnswer(account, i).met)
-
-  // Recognised items, asked only where no route made of courses alone already holds (R8).
-  const toAsk = new Map<string, Set<string>>()
-  for (const account of accounts) {
-    for (const routes of byCompetency.values()) {
-      if ([...routes.values()].some(route => routeByCourses(account, route))) continue
-      for (const route of routes.values()) for (const i of route) if (i.kind === 'recognised') toAsk.set(i.ref!, (toAsk.get(i.ref!) ?? new Set()).add(account))
-    }
-  }
-  const recognised = new Map<string, { met: boolean, until: number | null }>()
-  if (toAsk.size) {
-    const answers = await requirements.check({ accounts: [...new Set([...toAsk.values()].flatMap(s => [...s]))], refs: [...toAsk.keys()], at, whenUnavailable: 'not-met' })
-    for (const a of answers) recognised.set(`${a.account}\u0000${a.ref}`, { met: a.verdict === 'met' && !a.unavailable, until: a.until ?? null })
-  }
-  const itemAnswer = (account: string, item: RouteItem) => item.kind === 'course' ? courseAnswer(account, item) : recognised.get(`${account}\u0000${item.ref}`) ?? { met: false, until: null }
+  const recognised = await recognisedAnswers(accounts, byCompetency, courseAnswer, at)
+  const itemAnswer = (account: string) => (item: RouteItem) => item.kind === 'course' ? courseAnswer(account, item) : recognised.get(pairKey(account, item.ref)) ?? NOT_MET
 
   const out: Verdict[] = []
   for (const account of accounts) {
     for (const competencyId of asked) {
       const routes = [...(byCompetency.get(competencyId)?.values() ?? [])]
-      const title = routes[0]?.[0]?.competencyTitle ?? null
-      const help = `/members/training/competencies/${routes[0]?.[0]?.slug ?? competencyId}`
+      const c: VerdictContext = { account, competencyId, title: routes[0]?.[0]?.competencyTitle ?? null, help: `/members/training/competencies/${routes[0]?.[0]?.slug ?? competencyId}`, timeZone, lapsed }
       if (!routes.length) {
-        out.push({ account, competencyId, met: false, until: null, heldBy: null, reason: 'This is not something anyone can hold at the moment.', summary: 'Not active.', help })
+        out.push({ account, competencyId, met: false, until: null, heldBy: null, reason: 'This is not something anyone can hold at the moment.', summary: 'Not active.', help: c.help })
         continue
       }
-      const judged = routes.map((route) => {
-        const answers = route.map(i => ({ item: i, ...itemAnswer(account, i) }))
-        const met = answers.every(a => a.met)
-        // A held route lasts as long as its shortest-lived item (R4).
-        const untils = answers.map(a => a.until)
-        const until = met ? (untils.includes(null) && untils.every(u => u === null) ? null : Math.min(...untils.filter((u): u is number => u !== null))) : null
-        return { route, answers, met, until, done: answers.filter(a => a.met).length }
-      })
+      const judged = routes.map(route => judgeRoute(route, itemAnswer(account)))
       const heldRoutes = judged.filter(j => j.met)
-      if (heldRoutes.length) {
-        // The latest-lasting held route decides until (R4); the first by position names it (R11).
-        const until = heldRoutes.some(j => j.until === null) ? null : Math.max(...heldRoutes.map(j => j.until!))
-        const by = heldRoutes[0]!.route[0]!.label
-        out.push({ account, competencyId, met: true, until, heldBy: by, reason: null, summary: `${title}: current${until === null ? '' : ` until ${dayOf(until, timeZone)}`}, through ${by}.`, help })
-        continue
-      }
-      // Not held: up to three routes, the nearest first, each with what it lacks (R5).
-      const offered = [...judged].sort((a, b) => b.done - a.done || a.route[0]!.position - b.route[0]!.position).slice(0, 3) // not-policy: R5 names at most three routes
-      const lacks = offered.map(({ route, answers }) => {
-        const missing = answers.filter(a => !a.met).map(({ item }) => {
-          if (item.kind === 'recognised') return 'not recorded'
-          const lapsedOn = lapsed.get(`${account}\u0000${item.courseId}`)
-          return lapsedOn ? `${item.courseTitle} lapsed on ${dayOf(lapsedOn, timeZone)}` : `${item.courseTitle} needed`
-        })
-        return `${route[0]!.label} (${missing.join('; ')})`
-      })
-      out.push({ account, competencyId, met: false, until: null, heldBy: null, reason: `Not met. You could hold ${title} by: ${lacks.join('; or ')}.`, summary: `${title}: not held.`, help })
+      out.push(heldRoutes.length ? heldVerdict(heldRoutes, c) : notHeldVerdict(judged, c))
     }
   }
   return out

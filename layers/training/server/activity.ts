@@ -9,6 +9,7 @@ import { canonicalAccount } from '#modules/core'
 import { getCourse } from './courses'
 import { addDays, theatreDay } from './days'
 import { addSignOff, evaluateAward, neededSteps, samePerson, type PendingSignOff } from './progress'
+import type { StepOccurrence } from './points/step-source'
 import { stepSources } from './sources'
 
 const DAY = 86_400 // not-policy: seconds in a day
@@ -29,6 +30,42 @@ async function liveActivitySteps(filter: { courseId?: string, sourceIds?: string
 
 export interface ActivityRead { signOffIds: string[], recordIds: string[] }
 
+type Sources = Map<string, Awaited<ReturnType<typeof stepSources>>[number]['source']>
+interface Reading { person: string, scope: string[], today: string, windowFrom: string, sources: Sources }
+type Occurrence = StepOccurrence
+
+/** Whether a reported occurrence counts (H3): the person's, inside the window, confirmed by someone else. */
+async function counts(o: Occurrence, r: Reading, from: string): Promise<boolean> {
+  if (!r.scope.includes(o.accountId) || o.on < from || o.on > r.today) return false
+  if (!o.occurrenceId || o.occurrenceId.length > REF_MAX || !o.confirmedBy) return false
+  return !await samePerson(o.confirmedBy, r.person)
+}
+
+/** The sign-offs one course's activity steps earn from what the sources report, once per occurrence. */
+async function readCourse(unit: UnitView, r: Reading, courseId: string, list: ActivityStep[]): Promise<{ pending: PendingSignOff[], recordId: string | null }> {
+  const course = await getCourse(courseId)
+  if (!course) return { pending: [], recordId: null }
+  const { steps: needed, since } = await neededSteps(course, r.person)
+  const wanted = new Set(needed.map(s => s.id))
+  const lastAward = since === null ? null : await theatreDay(since)
+  const from = lastAward && lastAward > r.windowFrom ? lastAward : r.windowFrom
+  const done = new Set((await all<{ key: string }>(
+    `SELECT source_id || ' ' || source_ref AS key FROM training_sign_offs WHERE course_id = ?1 AND kind = 'activity' AND account_id IN (${accountScopeSql('?2')})`,
+    courseId, r.person,
+  )).map(row => row.key))
+  const pending: PendingSignOff[] = []
+  for (const step of list.filter(x => r.sources.has(x.sourceId) && wanted.has(x.id))) {
+    const params = step.sourceParams ? JSON.parse(step.sourceParams) as Record<string, unknown> : {}
+    for (const o of await r.sources.get(step.sourceId)!.occurrences(r.scope, params, from)) {
+      const key = `${step.sourceId} ${o.occurrenceId}`
+      if (done.has(key) || !await counts(o, r, from)) continue
+      done.add(key)
+      pending.push(addSignOff(unit, { accountId: r.person, courseId, stepId: step.id, kind: 'activity', signedBy: null, occurredOn: o.on, source: { id: step.sourceId, ref: o.occurrenceId, confirmedBy: o.confirmedBy! } }))
+    }
+  }
+  return { pending, recordId: pending.length ? await evaluateAward(unit, course, r.person, pending) : null }
+}
+
 /**
  * Reads the step sources for one person and signs off what they report (H2, H3). Only confirmed
  * occurrences inside the progress window and since the last award count, never one the person
@@ -38,41 +75,20 @@ export async function readActivity(unit: UnitView, accountId: string, filter: { 
   const out: ActivityRead = { signOffIds: [], recordIds: [] }
   const steps = await liveActivitySteps(filter)
   if (!steps.length) return out
-  const sources = new Map((await stepSources()).map(x => [x.id, x.source]))
   const person = await canonicalAccount(accountId)
-  const scope = await accountScopeIds(person)
   const today = await theatreDay(nowMs())
-  const windowFrom = addDays(today, -Math.ceil((await useSetting('training.progress.complete-within') as number) / DAY))
+  const r: Reading = {
+    person,
+    scope: await accountScopeIds(person),
+    today,
+    windowFrom: addDays(today, -Math.ceil((await useSetting('training.progress.complete-within') as number) / DAY)),
+    sources: new Map((await stepSources()).map(x => [x.id, x.source])),
+  }
   const byCourse = new Map<string, ActivityStep[]>()
   for (const s of steps) byCourse.set(s.courseId, [...byCourse.get(s.courseId) ?? [], s])
   for (const [courseId, list] of byCourse) {
-    const course = await getCourse(courseId)
-    if (!course) continue
-    const { steps: needed, since } = await neededSteps(course, person)
-    const wanted = new Set(needed.map(s => s.id))
-    const lastAward = since === null ? null : await theatreDay(since)
-    const from = lastAward && lastAward > windowFrom ? lastAward : windowFrom
-    const done = new Set((await all<{ key: string }>(
-      `SELECT source_id || ' ' || source_ref AS key FROM training_sign_offs WHERE course_id = ?1 AND kind = 'activity' AND account_id IN (${accountScopeSql('?2')})`,
-      courseId, person,
-    )).map(r => r.key))
-    const pending: PendingSignOff[] = []
-    for (const step of list) {
-      const source = sources.get(step.sourceId)
-      if (!source || !wanted.has(step.id)) continue
-      const params = step.sourceParams ? JSON.parse(step.sourceParams) as Record<string, unknown> : {}
-      for (const o of await source.occurrences(scope, params, from)) {
-        if (!scope.includes(o.accountId) || o.on < from || o.on > today || !o.occurrenceId || o.occurrenceId.length > REF_MAX) continue
-        if (!o.confirmedBy || await samePerson(o.confirmedBy, person)) continue
-        const key = `${step.sourceId} ${o.occurrenceId}`
-        if (done.has(key)) continue
-        done.add(key)
-        pending.push(addSignOff(unit, { accountId: person, courseId, stepId: step.id, kind: 'activity', signedBy: null, occurredOn: o.on, source: { id: step.sourceId, ref: o.occurrenceId, confirmedBy: o.confirmedBy } }))
-      }
-    }
-    if (!pending.length) continue
+    const { pending, recordId } = await readCourse(unit, r, courseId, list)
     out.signOffIds.push(...pending.map(p => p.id))
-    const recordId = await evaluateAward(unit, course, person, pending)
     if (recordId) out.recordIds.push(recordId)
   }
   return out

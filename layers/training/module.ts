@@ -13,7 +13,7 @@ const session = z.object({ sessionId: z.string(), courseId: z.string() })
 const place = { placeId: z.string(), sessionId: z.string(), accountId: z.string() }
 
 // Session notices (second-round part 4). Only the reminder can be switched off.
-const sessionNotice = (id: string, subject: string, body: string, extra: Record<string, 'text'> = {}, optional = false) => ({
+const sessionNotice = (id: string, subject: string, body: string, { extra = {}, optional = false }: { extra?: Record<string, 'text'>, optional?: boolean } = {}) => ({
   id,
   category: optional ? 'optional' as const : 'transactional' as const,
   ...(optional ? { topic: 'training.sessions' } : {}),
@@ -26,9 +26,9 @@ const sessionNotice = (id: string, subject: string, body: string, extra: Record<
 const SESSION_NOTICES = [
   sessionNotice('training.place-booked', 'Your place on {{ session }}', 'You have a place on **{{ session }}**, {{ when }}.'),
   sessionNotice('training.place-promoted', 'A place has come up on {{ session }}', 'A place came up on **{{ session }}**, {{ when }}, and it is yours. If you cannot come after all, cancel it so the next person can have it.'),
-  sessionNotice('training.session-reminder', 'Reminder: {{ session }}', '**{{ session }}** is {{ when }}. Where: {{ where }}.', { where: 'text' }, true),
+  sessionNotice('training.session-reminder', 'Reminder: {{ session }}', '**{{ session }}** is {{ when }}. Where: {{ where }}.', { extra: { where: 'text' }, optional: true }),
   sessionNotice('training.session-changed', '{{ session }} has changed', '**{{ session }}** has moved. It is now {{ when }}.'),
-  sessionNotice('training.session-cancelled', '{{ session }} is cancelled', '**{{ session }}**, {{ when }}, is cancelled: {{ reason }}', { reason: 'text' }),
+  sessionNotice('training.session-cancelled', '{{ session }} is cancelled', '**{{ session }}**, {{ when }}, is cancelled: {{ reason }}', { extra: { reason: 'text' } }),
   sessionNotice('training.place-cancelled-by-staff', 'Your place on {{ session }} is cancelled', 'Your place on **{{ session }}**, {{ when }}, has been cancelled. If you think this is a mistake, talk to whoever runs training.'),
 ]
 

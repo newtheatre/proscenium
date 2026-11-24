@@ -66,7 +66,9 @@ export interface QuizResult {
  * Takes the person's answers to a quiz (Q2, Q3, Q5): marked by Forms in this unit against the pinned
  * version, the attempt counted against the limit by the statement, and a pass signing the step off.
  */
-export async function submitQuiz(unit: UnitView, actor: Actor, courseId: string, stepId: string, answers: Record<string, unknown>): Promise<QuizResult> {
+export interface StepAt { courseId: string, stepId: string }
+
+export async function submitQuiz(unit: UnitView, actor: Actor, { courseId, stepId }: StepAt, answers: Record<string, unknown>): Promise<QuizResult> {
   if (!actor.accountId) refuse('core.auth.required', 'Sign in first.', { status: 401 })
   const course = await courseOrRefuse(courseId)
   if (course.status !== 'live') refuse('training.course.not-live', 'Only a live course takes sign-offs.', { status: 409 })
@@ -104,7 +106,7 @@ export async function submitQuiz(unit: UnitView, actor: Actor, courseId: string,
 }
 
 /** Allows a person another try now (Q6): by someone who signs off on the course, never for oneself. */
-export async function allowAnotherTry(unit: UnitView, actor: Actor, courseId: string, stepId: string, input: { accountId: string, note?: string | null }): Promise<string> {
+export async function allowAnotherTry(unit: UnitView, actor: Actor, { courseId, stepId }: StepAt, input: { accountId: string, note?: string | null }): Promise<string> {
   await quizStepOrRefuse(courseId, stepId)
   if (await samePerson(actor.accountId, input.accountId)) refuse('training.own-allowance', 'You cannot allow yourself another try.', { status: 403, remedy: 'Ask another trainer of the course.' })
   const person = await canonicalAccount(input.accountId)

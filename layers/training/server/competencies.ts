@@ -88,24 +88,28 @@ function checkRef(ref: string): void {
 /** Whether a set of routes lets anyone hold the competency: an active route with an item (R1). */
 const holdable = (routes: { status: string, items: unknown[] }[]) => routes.some(r => r.status === 'active' && r.items.length > 0)
 
+/** Refuses routes that cannot be saved as given, and answers the routes saved now. */
+async function checkRoutes(competencyId: string, input: RouteInput[]) {
+  const competency = await competencyOrRefuse(competencyId)
+  for (const item of input.flatMap(r => r.items)) if (item.kind === 'recognised') checkRef(item.requirementRef)
+  if (competency.status === 'active' && !holdable(input))
+    refuse('training.competency.no-route', 'An active competency needs at least one active route with something in it.', { status: 422, remedy: 'Add a route, or retire the competency first.' })
+  const courseIds = [...new Set(input.flatMap(r => r.items.flatMap(i => i.kind === 'course' ? [i.courseId] : [])))]
+  const found = courseIds.length ? await all<{ id: string }>('SELECT id FROM training_courses WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(courseIds)) : []
+  if (found.length !== courseIds.length) refuse('training.course.not-found', 'A route names a course that does not exist.', { status: 422 })
+  const before = await routesOf(competencyId)
+  const known = new Set(before.map(r => r.id))
+  if (input.some(route => route.id && !known.has(route.id))) refuse('training.route.not-found', 'A route was changed by someone else while you were editing.', { status: 409, remedy: 'Reload and try again.' })
+  return before
+}
+
 /**
  * Replaces a competency's routes and their items in order (R9). Routes keep their ids where given;
  * a route left out of the list is retired, never deleted, so history still reads. Refused when it
  * would leave an active competency with nothing to hold it by (R1).
  */
 export async function saveRoutes(unit: UnitView, competencyId: string, input: RouteInput[]): Promise<void> {
-  const competency = await competencyOrRefuse(competencyId)
-  for (const route of input) for (const item of route.items) if (item.kind === 'recognised') checkRef(item.requirementRef)
-  if (competency.status === 'active' && !holdable(input))
-    refuse('training.competency.no-route', 'An active competency needs at least one active route with something in it.', { status: 422, remedy: 'Add a route, or retire the competency first.' })
-  const courseIds = [...new Set(input.flatMap(r => r.items.flatMap(i => i.kind === 'course' ? [i.courseId] : [])))]
-  if (courseIds.length) {
-    const found = await all<{ id: string }>('SELECT id FROM training_courses WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(courseIds))
-    if (found.length !== courseIds.length) refuse('training.course.not-found', 'A route names a course that does not exist.', { status: 422 })
-  }
-  const before = await routesOf(competencyId)
-  const known = new Set(before.map(r => r.id))
-  for (const route of input) if (route.id && !known.has(route.id)) refuse('training.route.not-found', 'A route was changed by someone else while you were editing.', { status: 409, remedy: 'Reload and try again.' })
+  const before = await checkRoutes(competencyId, input)
   const kept = new Set(input.filter(r => r.id).map(r => r.id!))
   const at = nowMs()
   const rows = [
@@ -137,13 +141,17 @@ export async function saveRoutes(unit: UnitView, competencyId: string, input: Ro
 }
 
 /** Makes a competency active, once it has a route to hold it by (R1), or retires it. */
-export async function setCompetencyStatus(unit: UnitView, competencyId: string, status: 'active' | 'retired'): Promise<void> {
+async function setCompetencyStatus(unit: UnitView, competencyId: string, status: 'active' | 'retired'): Promise<{ competencyId: string }> {
   if (status === 'active' && !holdable(await routesOf(competencyId)))
     refuse('training.competency.no-route', 'Add an active route with something in it before making the competency active.', { status: 422 })
   unit.add({ sql: 'UPDATE training_competencies SET status = ?, updated_at = ? WHERE id = ? AND status != ?', params: [status, nowMs(), competencyId, status] })
     .expect(1, { code: 'training.competency.unchanged', reason: status === 'active' ? 'This competency is already active.' : 'This competency is already retired.' })
   unit.audit({ action: 'state', record: ['training.competency', competencyId], detail: { status } })
+  return { competencyId }
 }
+
+export const activateCompetency = (unit: UnitView, competencyId: string) => setCompetencyStatus(unit, competencyId, 'active')
+export const retireCompetency = (unit: UnitView, competencyId: string) => setCompetencyStatus(unit, competencyId, 'retired')
 
 /** How many hold the competency now, for the screen to show beside a change (C5, R9). */
 export async function holderCount(competencyId: string): Promise<number> {

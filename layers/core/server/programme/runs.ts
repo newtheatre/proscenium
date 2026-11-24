@@ -174,7 +174,7 @@ function insertItems(unit: UnitView, productionId: string, input: Omit<RunInput,
   const s = sql`json_extract(r.value, '$.s')`
   const e = sql`json_extract(r.value, '$.e')`
   const guards: SQL[] = [spaceFits(input.venueId, input.spaceId), sql`EXISTS (SELECT 1 FROM core_productions WHERE id = ${productionId} AND state <> 'cancelled')`]
-  if (input.scheduled) guards.push(noClash(input.spaceId, s, e, null, gap), assertNoBlockingClosure(input.spaceId, s, e))
+  if (input.scheduled) guards.push(noClash(input.spaceId, s, e, { gap }), assertNoBlockingClosure(input.spaceId, s, e))
   if (runId) guards.push(sql`NOT EXISTS (SELECT 1 FROM core_performances x WHERE x.run_id = ${runId} AND x.starts_at = ${s})`)
   unit.add(sql`INSERT INTO core_performances (id, production_id, venue_id, space_id, starts_at, doors_at, ends_at, operating_day, interval_count, interval_minutes, capacity, label, external_booking_url, state, run_id, created_at)
     SELECT json_extract(r.value, '$.id'), ${productionId}, ${input.venueId}, ${input.spaceId}, ${s}, json_extract(r.value, '$.d'), ${e}, json_extract(r.value, '$.o'),
