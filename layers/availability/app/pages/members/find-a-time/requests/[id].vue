@@ -31,6 +31,15 @@ async function act(path: string, body: object, done: string) {
   }
 }
 
+const marking = ref<{ accountId: string, name: string } | null>(null)
+function actions(p: { accountId: string, name: string, state: AskedState }) {
+  const name = p.name || t('availability.sent.former')
+  return [
+    ...(data.value?.onBehalf ? [{ label: t('availability.behalf.add'), icon: 'i-lucide-calendar-x', onSelect: () => { marking.value = { accountId: p.accountId, name } } }] : []),
+    ...(data.value?.request.open && p.state !== 'withdrawn' ? [{ label: t('availability.sent.withdraw'), icon: 'i-lucide-user-minus', onSelect: () => withdraw(p) }] : []),
+  ]
+}
+
 const remind = () => act('remind', {}, t('availability.sent.reminded'))
 async function close() {
   if (!await confirm({ verb: t('availability.sent.close'), thing: r.value?.title ?? '', consequence: t('availability.sent.close-help') })) return
@@ -119,12 +128,12 @@ async function withdraw(p: { accountId: string, name: string }) {
                   :label="states.label(p.state)"
                 />
                 <template
-                  v-if="d.request.open && p.state !== 'withdrawn'"
+                  v-if="actions(p).length"
                   #trailing
                 >
                   <RowActions
                     :label="t('availability.sent.person-actions', { name: p.name || t('availability.sent.former') })"
-                    :items="[{ label: t('availability.sent.withdraw'), icon: 'i-lucide-user-minus', onSelect: () => withdraw(p) }]"
+                    :items="actions(p)"
                   />
                 </template>
               </RecordListItem>
@@ -145,5 +154,19 @@ async function withdraw(p: { accountId: string, name: string }) {
         </div>
       </template>
     </DataBoundary>
+    <USlideover
+      :open="!!marking"
+      :title="t('availability.behalf.title', { name: marking?.name ?? '' })"
+      :description="t('availability.behalf.description')"
+      @update:open="v => { if (!v) marking = null }"
+    >
+      <template #body>
+        <AvailabilityOnBehalf
+          v-if="marking"
+          :account-id="marking.accountId"
+          :name="marking.name"
+        />
+      </template>
+    </USlideover>
   </PageFrame>
 </template>

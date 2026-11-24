@@ -2,7 +2,7 @@
 // answers it stores and the key of the version they answered; nothing here reads a score from the
 // browser. A definition leaves the server only through `publicDefinition`, which drops the key.
 import { MARKABLE_TYPES, OTHER } from './types'
-import type { AnswerKey, Definition, Evaluation, Item, Question, Value } from './types'
+import type { AnswerKey, Definition, Evaluation, Item, Question, Transition, Value, Workflow } from './types'
 import { questionsOf } from './definition'
 import { fold, isEmpty } from './values'
 
@@ -140,6 +140,18 @@ export function keepAnswerKey(incoming: Definition, kept: Definition): Definitio
     if (it.kind === 'group') return { ...it, items: it.items.map(restore) }
     return it
   }
-  const { marking: _marking, ...rest } = incoming
-  return { ...rest, pages: incoming.pages.map(p => ({ ...p, items: p.items.map(item) })), ...(kept.marking ? { marking: kept.marking } : {}) }
+  const { marking: _marking, workflow, ...rest } = incoming
+  return {
+    ...rest,
+    pages: incoming.pages.map(p => ({ ...p, items: p.items.map(item) })),
+    ...(kept.marking ? { marking: kept.marking } : {}),
+    ...(workflow ? { workflow: { ...workflow, transitions: keptSystemMoves(workflow, kept) } } : {}),
+  }
+}
+
+/** System moves belong with marking (FB-514): the incoming ones are dropped and the kept ones stay while their stages do. */
+function keptSystemMoves(incoming: Workflow, kept: Definition): Transition[] {
+  const stages = new Set(incoming.stages.map(s => s.key))
+  const system = (kept.workflow?.transitions ?? []).filter(t => t.who === 'system' && stages.has(t.from) && stages.has(t.to))
+  return [...incoming.transitions.filter(t => t.who !== 'system'), ...system]
 }

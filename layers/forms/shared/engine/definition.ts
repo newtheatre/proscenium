@@ -2,7 +2,7 @@
 // Whether it makes sense to publish (a condition that points nowhere, a circle of calculations) is
 // `checkDefinition`'s job, so a draft may be saved while it still has problems.
 import { z } from 'zod'
-import { CALCULATION_TYPES, DATA_CLASSES, DEFAULT_LIMITS, FORMAT, FUNCTIONS, MARKING_SHOWS, MOVERS, OPERATORS, OTHER, PASS_MARKS, QUESTION_TYPES, REVIEW_MODES, RULES, STAGE_KINDS } from './types'
+import { CALCULATION_TYPES, DATA_CLASSES, DEFAULT_LIMITS, FORMAT, FUNCTIONS, MARKING_OPERANDS, MARKING_SHOWS, MOVERS, OPERATORS, OTHER, PASS_MARKS, QUESTION_TYPES, REVIEW_MODES, RULES, STAGE_KINDS } from './types'
 import type { Condition, Definition, Expression, Group, Limits, Question } from './types'
 
 const id = z.string().regex(/^[\w-]{1,64}$/)
@@ -28,6 +28,7 @@ const operand = z.union([
   z.strictObject({ today: z.literal(true) }),
   z.strictObject({ option: id }),
   z.strictObject({ value: literal }),
+  z.strictObject({ marking: z.enum(MARKING_OPERANDS) }),
 ])
 
 const comparison = z.strictObject({
@@ -126,7 +127,7 @@ const definition = z.strictObject({
   presentation: z.strictObject({ introduction: text.optional(), submitLabel: z.string().max(60).optional(), confirmation: text.optional(), progress: z.boolean().optional() }).optional(),
   workflow: z.strictObject({
     stages: z.array(z.strictObject({ key, name: z.string().max(100), kind: z.enum(STAGE_KINDS), status: z.string().max(100).optional(), review: review.optional() })).min(1).max(20),
-    transitions: z.array(z.strictObject({ key, from: key, to: key, label: z.string().max(100), who: z.enum(MOVERS), needsReason: z.boolean().optional(), actions: z.array(z.strictObject({ id: key, action: z.string().min(1).max(100), map: z.record(z.string().max(100), z.string().max(100)) })).max(10).optional() })).max(60),
+    transitions: z.array(z.strictObject({ key, from: key, to: key, label: z.string().max(100), who: z.enum(MOVERS), when: condition.optional(), needsReason: z.boolean().optional(), actions: z.array(z.strictObject({ id: key, action: z.string().min(1).max(100), map: z.record(z.string().max(100), z.string().max(100)) })).max(10).optional() })).max(60),
   }).optional(),
 }) satisfies z.ZodType<Definition>
 
@@ -183,6 +184,7 @@ export function conditionsOf(def: Definition): { condition: Condition, path: (st
     })
   })
   def.calculations?.forEach((c, i) => inExpression(c.expression, ['calculations', i, 'expression'], c.id))
+  def.workflow?.transitions.forEach((t, i) => t.when && out.push({ condition: t.when, path: ['workflow', 'transitions', i, 'when'], owner: `move:${t.key}` }))
   return out
 }
 

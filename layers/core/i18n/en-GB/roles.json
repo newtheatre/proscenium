@@ -104,5 +104,20 @@
   "core.roles.archived-list": "Archived roles",
   "core.roles.tabs.label": "Roles and automatic access",
   "core.roles.tabs.roles": "Roles",
-  "core.roles.tabs.automatic": "Automatic access"
+  "core.roles.tabs.automatic": "Automatic access",
+  "core.facts.pin.heading": "For one {type} only",
+  "core.facts.pin.none": "Nothing extra for any one {type}.",
+  "core.facts.pin.add": "Add for one {type}",
+  "core.facts.pin.add-for": "Add what “{fact}” gives for one {type}",
+  "core.facts.pin.choose": "Which one",
+  "core.facts.pin.choose-placeholder": "Choose a {type}",
+  "core.facts.pin.editing": "While this is true of {record}, people can:",
+  "core.facts.pin.change-for": "Change what {record} gives",
+  "core.facts.pin.remove": "Remove",
+  "core.facts.pin.remove-for": "Remove what {record} gives",
+  "core.facts.pin.broken": "Broken",
+  "core.facts.pin.broken-help": "This {type} no longer exists, so this gives nothing. Remove it.",
+  "core.facts.pin.saved": "Saved for {record}",
+  "core.facts.pin.removed": "Removed for {record}",
+  "core.facts.pin.record": "record"
 }

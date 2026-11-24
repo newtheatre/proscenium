@@ -412,6 +412,21 @@ One row for each purpose the person has agreed may see their access needs. No ro
 - A row whose purpose is no longer declared (its module is switched off) counts for nothing and is kept, so switching the module back on restores the person's choice.
 - On merge: rows move to the survivor; where both have the same purpose, one row remains.
 
+## core\_age\_markers
+
+The day a person under 18 turns 18 (C-74, third-round ruling R3-25), and nothing else: never a date of birth, and only for people who are under 18. The person says so on the welcome step or in My account; staff holding `core.age.record` record it after seeing ID. What staff recorded the person sees but cannot change. The hourly identity sweep deletes a row once its day comes, so nothing about age stays on an adult.
+
+| Column | Type | Rules | Class | On erasure |
+| --- | --- | --- | --- | --- |
+| `account_id` | id | Primary key | Internal | Row deleted |
+| `turns_18_on` | date | Not null; the theatre's local date | Personal | Row deleted |
+| `source` | enum | `self`, `staff` | Internal | Row deleted |
+| `recorded_by` | id | Not null; an account, as actor | Internal | Row deleted |
+| `recorded_at` | instant | Not null | Internal | Row deleted |
+
+- **On merge:** both columns are aliases; reads go through the account scope.
+- The audit says that the marker was recorded or cleared, never the date.
+
 ## What other modules declare about an account reference
 
 In the foundations formats this is written `col.account(name, { role: 'subject' | 'actor', onMerge: 'move' | 'alias' | 'handler' })` on the column, and `onErasure: 'keep-row' | 'delete-row'` on the table, with the `core.erasure-handler` point for anything else. A check forces `alias` on an append-only table.
