@@ -609,24 +609,4 @@ export const nightReportNotes = defineTable('front_of_house_night_report_notes',
   ],
 })
 
-/**
- * A person's private calendar feed: the address of a subscribable iCal file of their shifts. The
- * token is a keyed hash of the account and the generation, so the screen can work it out again
- * without it being kept; only the hash of the token is stored, to find the person. Making a new
- * address raises the generation.
- */
-export const calendarFeeds = defineTable('front_of_house_calendar_feeds', {
-  accountId: col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'One feed each is the primary key, which must name the surviving account.' }),
-  tokenHash: col.internal(text('token_hash').notNull()),
-  generation: col.internal(integer('generation').notNull().default(1)),
-  createdAt: col.createdAt(),
-}, {
-  realm: 'members',
-  subject: 'account_id',
-  extra: t => [
-    primaryKey({ columns: [t.accountId] }),
-    uniqueIndex('front_of_house_calendar_feeds_token').on(t.tokenHash),
-  ],
-})
-
-export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, crewCalls, handouts, shiftBatches, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates, calendarFeeds }
+export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, crewCalls, handouts, shiftBatches, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates }
