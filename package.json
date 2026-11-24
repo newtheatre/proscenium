@@ -17,6 +17,7 @@
     "check:conformance": "bun scripts/check.ts",
     "check:unused": "knip --include files,dependencies,unlisted,unresolved",
     "check:paths": "bun scripts/check-owned-paths.ts",
+    "check:changed": "bun scripts/check-changed.ts",
     "lint": "eslint .",
     "typecheck": "nuxt typecheck && vue-tsc --noEmit -p tests/types/tsconfig.json",
     "test": "vitest run",
