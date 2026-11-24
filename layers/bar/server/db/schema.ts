@@ -69,6 +69,8 @@ export const products = defineTable('bar_products', {
   // Selling it asks the age check. Ignored while ageFromCategory is set, when the category's answer applies.
   ageRestricted: col.internal(integer('age_restricted', { mode: 'boolean' }).notNull().default(false)),
   ageFromCategory: col.internal(integer('age_from_category', { mode: 'boolean' }).notNull().default(false)),
+  // The Finance tax code its prices include (BAR-60); null sells at finance.tax.default-code.
+  taxCode: col.internal(text('tax_code')),
   position: col.internal(integer('position').notNull()),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
   createdAt: col.createdAt(),

@@ -32,6 +32,11 @@ export type Operand
     | { today: true }
     | { option: string }
     | { value: Literal }
+    | { marking: MarkingOperand }
+
+/** What a marked response came to, for a system move's condition (FB-514): its score, its share of the total, and whether it passed. */
+export const MARKING_OPERANDS = ['score', 'percent', 'passed'] as const
+export type MarkingOperand = typeof MARKING_OPERANDS[number]
 
 export const OPERATORS = [
   'is', 'is-not', 'any-of', 'contains', 'not-contains', 'starts-with',
@@ -95,6 +100,8 @@ export interface Question {
   peopleInvolved?: boolean
   /** A `record` question anybody signed in may search while answering, whatever they may search elsewhere. The author's choice. */
   openSearch?: boolean
+  /** The correct answer, on a question that can be marked (FB-513). Never sent to anybody answering. */
+  answer?: AnswerKey
 }
 /** A repeating group: the questions are answered once per entry. */
 export interface Group {
@@ -158,8 +165,8 @@ export interface Ending { id: string, title: string, message?: string, submits: 
 
 export const STAGE_KINDS = ['pending', 'in_review', 'returned', 'approved', 'declined', 'closed'] as const
 export type StageKind = typeof STAGE_KINDS[number]
-/** Who may make a move: staff who may move this form's responses, or the person who sent the response. */
-export const MOVERS = ['staff', 'submitter'] as const
+/** Who may make a move: staff who may move this form's responses, the person who sent the response, or the system when its condition holds (FB-514). */
+export const MOVERS = ['staff', 'submitter', 'system'] as const
 export type Mover = typeof MOVERS[number]
 export interface Stage {
   key: string
@@ -186,6 +193,8 @@ export interface Transition {
   needsReason?: boolean
   /** What other modules do once a response has taken this move. Each runs once. */
   actions?: ActionUse[]
+  /** A system move's condition (AT1): required on one, refused on any other. */
+  when?: Condition
 }
 
 // ---- review (part 3, "Review rules"; change 1: a vote is a second kind of review) ----
@@ -215,12 +224,38 @@ export interface Review {
 /** A form's stages. A response starts in the first. A form with none has one stage, Received, which is closed. */
 export interface Workflow { stages: Stage[], transitions: Transition[] }
 
+// ---- marking (FB-513) ----
+
+/** The question types that can carry a correct answer. A choice is marked by its option ids; short text by the accepted texts. */
+export const MARKABLE_TYPES = ['choice.single', 'choice.multiple', 'choice.dropdown', 'yesno', 'number', 'text.short'] as const satisfies readonly QuestionType[]
+export const MARKING_SHOWS = ['score', 'score-and-feedback', 'score-feedback-and-answers'] as const
+export type MarkingShow = (typeof MARKING_SHOWS)[number]
+/**
+ * What is right: option ids (choice), true or false (yes or no), a range inclusive (number), or the
+ * accepted texts (short text), compared without regard to case or the spaces round them.
+ */
+export type Correct = string[] | boolean | { min?: number, max?: number }
+export interface AnswerKey {
+  correct: Correct
+  /** Whole points for getting it right, 0 to 100; 1 when left out. */
+  points?: number
+  feedback?: { right?: string, wrong?: string }
+}
+export interface Marking {
+  /** The least score that passes, in whole points. Without one, nobody passes or fails. */
+  passMark?: number
+  /** What the person is told once they have sent their answers. */
+  show: MarkingShow
+}
+
 export interface Definition {
   format: number
   pages: Page[]
   calculations?: Calculation[]
   endings?: Ending[]
   workflow?: Workflow
+  /** Answers are marked against their questions' correct answers. Present on a quiz. */
+  marking?: Marking
   presentation?: { introduction?: string, submitLabel?: string, confirmation?: string, progress?: boolean }
 }
 
@@ -241,6 +276,8 @@ export interface Context {
   facts?: Record<string, Literal | null>
   /** Attributes of the record the form is attached to. */
   attributes?: Record<string, Literal | null>
+  /** What the response scored, on the server only, for a system move's condition. */
+  marking?: { score: number, outOf: number, passed: boolean | null } | null
 }
 
 /** Why an answer is refused. `message` is the theatre's own wording where the rule carries one. */

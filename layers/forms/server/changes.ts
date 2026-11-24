@@ -5,7 +5,7 @@
 // and the note to them as often as they like, and sends their changes once: every move clears the
 // link, so the move their changes make spends it.
 import { first, linkTokens, siteUrl, useSetting, type UnitView } from '#kit'
-import { getResponse, type ResponseRow } from './responses'
+import { getResponse, type ResponseRow } from './response-rows'
 
 const SECOND = 1000 // not-policy: settings are whole seconds
 

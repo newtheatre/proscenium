@@ -3,7 +3,8 @@
 // calculated values and the route through the pages. The server runs it again on submission and
 // stores `answers` from its own result, never anything the browser worked out.
 import { otherKey } from './types'
-import type { Answers, Context, Definition, Ending, Entry, Evaluation, Issue, Question, Value } from './types'
+import type { Answers, Context, Definition, Ending, Entry, Evaluation, Issue, Question, Transition, Value } from './types'
+import { movesFrom } from './workflow'
 import { calculate } from './calculations'
 import type { Scope } from './conditions'
 import { holds } from './conditions'
@@ -161,6 +162,15 @@ export function evaluate(def: Definition, input: Answers, context: Context): Eva
   for (const id of index.calculations.keys()) calculated[id] = scope.calculated(id)
 
   return { visible: shown.visible, required, issues, calculated, route: shown.route, ending: shown.ending, answers, valid: Object.keys(issues).length === 0 }
+}
+
+/**
+ * The system move a response takes from a stage (AT2): the first, in definition order, whose
+ * condition holds over the stored answers and what they scored. None when no condition holds.
+ */
+export function systemMove(def: Definition, stage: string, answers: Answers, context: Context): Transition | undefined {
+  const scope = scopeFor(indexOf(def), answers, context)
+  return movesFrom(def, stage, 'system').find(t => !!t.when && holds(t.when, scope))
 }
 
 /** The paths on one page that have something wrong, for checking a page before moving on. */

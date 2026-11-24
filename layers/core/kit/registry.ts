@@ -290,11 +290,6 @@ export function short(name: string): string {
   return name.slice(name.indexOf('.') + 1)
 }
 
-/** The module that owns a table name, by its prefix. */
-export function moduleOfTable(name: string): string {
-  return name.split('_')[0]!
-}
-
 let installed: Registry | undefined
 
 /** Installs the registry the running Worker uses: the generated one, or a test's. */

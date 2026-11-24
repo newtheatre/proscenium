@@ -12,6 +12,7 @@ import { instantOfLocal } from '#kit/clock'
 import { dayRule, operatingDayOf } from '../calendar'
 import type { ChangeImpact, ProposedChange } from '../points/change-impact'
 import type { ChangeGuard, GuardAnswer } from '../points/change-guard'
+import type { SpaceBusy } from '../points/space-busy'
 import { latecomerRule, type LatecomerRule } from '../../shared/latecomers'
 
 export type PerformanceState = 'draft' | 'scheduled' | 'cancelled' | 'completed'
@@ -96,11 +97,6 @@ async function performanceRow(id: string): Promise<PerformanceRow> {
   const row = await first<PerformanceRow>('SELECT * FROM core_performances WHERE id = ?', id)
   if (!row) refuse('core.performance.not-found', 'There is no such performance.', { status: 404 })
   return row
-}
-
-/** The production a performance belongs to, for routes whose ability is on the production. */
-export async function productionOfPerformance(id: string): Promise<string> {
-  return (await performanceRow(id)).production_id
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -235,9 +231,20 @@ export function assertSpaceFree(spaceId: string | SQL, from: number | SQL, to: n
   return sql`(${noClash(spaceId, from, to, null, gap)} AND ${assertNoBlockingClosure(spaceId, from, to)})`
 }
 
-/** The same test as a read, for showing. Never for deciding a write: use assertSpaceFree. */
-export async function isSpaceFree(spaceId: string, from: number, to: number): Promise<boolean> {
-  return !!(await useDb().get<{ free: number }>(sql`SELECT ${assertSpaceFree(spaceId, from, to, await turnaroundMs())} AS free`))?.free
+/**
+ * The same test as a read, for showing and for a module checking just before its own write: no
+ * performance or blocking closure, and nothing another module reports to core.space-busy. `except`
+ * leaves out one module's own times (Spaces asking about its bookings' room). Never for deciding a
+ * core write: use assertSpaceFree.
+ */
+export async function isSpaceFree(spaceId: string, from: number, to: number, options: { except?: string } = {}): Promise<boolean> {
+  if (!(await useDb().get<{ free: number }>(sql`SELECT ${assertSpaceFree(spaceId, from, to, await turnaroundMs())} AS free`))?.free) return false
+  for (const { module, value } of await usePoint<SpaceBusy>('core.space-busy')) {
+    if (module === options.except) continue
+    const items = await value.busy({ spaceIds: [spaceId], from, to }, null)
+    if (items.some(i => i.spaceId === spaceId && i.from < to && i.to > from)) return false
+  }
+  return true
 }
 
 /** The space belongs to the venue, can hold performances and is not archived. */
