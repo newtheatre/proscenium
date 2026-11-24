@@ -6,12 +6,13 @@ import type { H3Event } from 'h3'
 import { all, first, newId, nowMs, refuse, useContext, useSetting, siteUrl, type UnitView } from '#kit'
 import { countAgainstRate, waitRemedy } from '#kit/ratelimit'
 import { digest, randomCode, randomToken, sealValue, sameText } from './crypto'
-import { addressRow, accountById, accountForProvenAddress, domainOf, normaliseAddress } from './accounts'
+import { addressRow, accountById, accountForProvenAddress, normaliseAddress } from './accounts'
 import { BROWSER_COOKIE, readCookie, setShortCookie } from './web'
 import { startSession } from './sessions'
 import { useEnrolmentLink } from './recovery'
 import { checkClaimable } from './claim'
-import { managedDomainProvider } from './providers'
+import { labelOf, managingProvider } from './providers'
+import { linkPendingIdentity } from './oidc'
 import { holdsPrivileged } from './me'
 import { LIVE } from './grants'
 
@@ -29,13 +30,7 @@ export interface TokenRow {
   used_at: number | null
 }
 
-export type RequestOutcome = { sent: true } | { provider: string, to: string }
-
-/** Is this address's domain one whose people sign in only through the provider? */
-export async function isManaged(address: string): Promise<boolean> {
-  const managed = await useSetting('core.sign-in.managed-domains') as string[]
-  return managed.includes(domainOf(address))
-}
+export type RequestOutcome = { sent: true } | { provider: string, label: string, to: string }
 
 /**
  * Asks for a link and code. Whatever happens, the caller shows the same "check your email" screen;
@@ -44,10 +39,10 @@ export async function isManaged(address: string): Promise<boolean> {
  */
 export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: { address: string, next: string | null }): Promise<RequestOutcome> {
   const address = normaliseAddress(input.address)
-  if (await isManaged(address)) {
+  const provider = await managingProvider(address)
+  if (provider) {
     const query = new URLSearchParams({ login_hint: address, ...(input.next ? { next: input.next } : {}) })
-    const provider = managedDomainProvider()
-    return { provider: provider.id, to: `/api/core/sign-in/${provider.id}?${query}` }
+    return { provider: provider.id, label: await labelOf(provider), to: `/api/core/sign-in/${provider.id}?${query}` }
   }
   const quiet = { sent: true } as const
   if (!(await useSetting('core.sign-in.email-link'))) return quiet
@@ -128,7 +123,8 @@ async function finish(unit: UnitView, event: H3Event, row: TokenRow, method: 'li
   }
   // Any other link or code still waiting for this address is spent too.
   unit.add({ sql: 'UPDATE core_account_tokens SET used_at = ? WHERE purpose = \'sign_in\' AND address = ? AND used_at IS NULL AND id <> ?', params: [nowMs(), address, row.id] })
-  const { accountId, created } = await accountForProvenAddress(unit, address, 'self')
+  const { accountId, created, emailId } = await accountForProvenAddress(unit, address, 'self')
+  await linkPendingIdentity(unit, event, { address, accountId, emailId })
   await startSession(unit, event, { accountId, methods: [method], assurance: 'basic' })
   unit.audit({ action: 'sign-in', record: ['core.account', accountId], detail: { method } })
   const account = await accountById(accountId)
