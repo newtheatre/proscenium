@@ -4,7 +4,7 @@ import { DeclarationError } from './refusal'
 import { DELIVERABLE, snake, type ModuleManifest, type SettingPlace, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl, type SigningDecl } from './manifest'
 import { tableMeta, type TableMeta } from './db'
 import type { ListSource } from './lists'
-import type { Measure } from './measures'
+import type { Measure, PersonMeasure } from './measures'
 import type { SettingEntry, SettingRule } from './settings'
 import { impliedAbility, type AbilityDecl, type FactDecl, type RecordDecl } from './abilities'
 import type { ModuleHandlers } from './handlers'
@@ -270,6 +270,7 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
   }
 
   checkMeasures(r, fail)
+  checkPersonMeasures(r, fail)
 
   // requires may not form a loop.
   const visiting = new Set<string>()
@@ -422,6 +423,24 @@ function checkMeasures(r: Registry, fail: (entry: ModuleEntry, field: string, me
       if (!found) fail(entry, `contributes.core.measure.${id}.ratio`, `"${part}" is not a declared figure`)
       else if (found.measure.ratio) fail(entry, `contributes.core.measure.${id}.ratio`, `"${part}" is itself a ratio`)
       else if (measure.by.some(k => !found.measure.by.includes(k))) fail(entry, `contributes.core.measure.${id}.ratio`, `"${part}" does not break down by every key the ratio offers`)
+    }
+  }
+}
+
+/** A figure per person: named for its module, a privileged ability audited on reading, and a purpose in the privacy record (R3-27). */
+function checkPersonMeasures(r: Registry, fail: (entry: ModuleEntry, field: string, message: string) => never): void {
+  const purposes = new Set<string>()
+  for (const entry of r.modules.values()) for (const c of entry.manifest.contributes?.['core.privacy-record'] ?? []) purposes.add(c.id)
+  for (const entry of r.modules.values()) {
+    for (const c of entry.manifest.contributes?.['core.person-measure'] ?? []) {
+      const where = `contributes.core.person-measure.${c.id}`
+      const measure = entry.handlers.contributions?.['core.person-measure']?.[c.file ?? c.id] as PersonMeasure | undefined
+      if (!measure) continue
+      if (!c.id.startsWith(`${entry.manifest.id}.`) || c.id.split('.').length !== 2) fail(entry, where, `is named ${entry.manifest.id}.<figure>`)
+      const ability = r.abilities.get(measure.ability)
+      if (!ability) fail(entry, `${where}.ability`, `"${measure.ability}" is not a declared ability`)
+      if (ability!.decl.risk !== 'privileged' || ability!.decl.audit !== 'read') fail(entry, `${where}.ability`, `"${measure.ability}" must be privileged with audit: 'read', as figures per person are personal data`)
+      if (!purposes.has(measure.purpose)) fail(entry, `${where}.purpose`, `"${measure.purpose}" is not a core.privacy-record entry; say why the theatre holds this figure`)
     }
   }
 }

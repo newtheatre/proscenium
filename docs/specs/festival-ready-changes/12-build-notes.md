@@ -64,3 +64,11 @@ What the build settled that the parts above leave open, and where it differs fro
 - **Unit size.** A chain of five fits the unit's fifty statements with room to spare only because the person is told once, at the end of the chain. A form whose system moves open review rounds or queue several actions at each step may come close; if one is ever refused as too large, the remedy is a shorter chain.
 - **The loop warning** is an audit entry (`detail.loop`) on the response; the health check joins it to the form's live version, so publishing a fixed version clears it.
 - **Not done.** Records' own fields (FB-508) never take system moves, since they have no stages.
+
+## C-67: a season's own public words
+
+- **Where it lives.** The contract in `layers/core/server/points/public-wording.ts`; `publicWordingFor` and the clash check in `layers/core/server/programme/wording.ts`; the health check `core.public-wording`. On the public site, `usePublicWords` and the `public-site.words.*` defaults. `docs/kit/interface.md` ("A season's own public words") is the guide.
+- **What changes.** The production page (the about heading, the access and effects lines of a date, the "has no warnings" sentences) and the season page's empty state take the words. The public production and season answers carry `wording`.
+- **Emails and the feed.** No booking email names any of the eight words today (they say the show's title and date), so none changes. The calendar feed (C-70, lane A) should call `publicWordingFor` when it lands.
+- **Failing contributors** count as not applying.
+- **Tests.** `layers/public-site/tests/integration/public-wording.test.ts`, through the `worded` fixture module.
