@@ -31,6 +31,8 @@ jobs:
       - run: bun run check:conformance
       # Import cycles, duplication, type coverage and ignore comments may not get worse than metrics.json.
       - run: bun run metrics
+      # No file, dependency or import that nothing uses (knip.json teaches it the registry's conventions).
+      - run: bun run check:unused
 
   test:
     name: Unit and integration tests

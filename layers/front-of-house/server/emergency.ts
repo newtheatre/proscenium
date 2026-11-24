@@ -10,10 +10,6 @@ export async function listCards(): Promise<EmergencyCard[]> {
   return rows.map(r => ({ venueId: r.venue_id, venueName: r.venue_name, body: r.body, reviewedOn: r.reviewed_on, updatedAt: r.updated_at }))
 }
 
-export async function getCard(venueId: string): Promise<EmergencyCard | null> {
-  return (await listCards()).find(c => c.venueId === venueId) ?? null
-}
-
 /**
  * Writes a venue's card. The review date becomes today only when the editor says they reviewed the
  * whole card, or when the card is new; a small fix leaves it as it was.

@@ -1471,15 +1471,20 @@
       "count": 1
     }
   },
-  "layers/forms/server/responses.ts": {
+  "layers/forms/server/response-rows.ts": {
     "complexity": {
-      "count": 2
-    },
-    "max-lines": {
       "count": 1
     },
     "max-params": {
-      "count": 2
+      "count": 1
+    }
+  },
+  "layers/forms/server/responses.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
     },
     "sonarjs/cognitive-complexity": {
       "count": 2
