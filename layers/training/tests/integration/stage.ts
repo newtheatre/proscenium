@@ -33,6 +33,18 @@ import activate from '../../server/api/training/competencies/[id]/activate.post'
 import retireCompetency from '../../server/api/training/competencies/[id]/retire.post'
 import myCompetencies from '../../server/api/training/me/competencies.get'
 import myCompetency from '../../server/api/training/me/competencies/[slug].get'
+import createSession from '../../server/api/training/courses/[id]/sessions.post'
+import listSessions from '../../server/api/training/sessions/index.get'
+import getSession from '../../server/api/training/sessions/[id]/index.get'
+import patchSession from '../../server/api/training/sessions/[id]/index.patch'
+import publishSession from '../../server/api/training/sessions/[id]/publish.post'
+import cancelSession from '../../server/api/training/sessions/[id]/cancel.post'
+import bookPlace from '../../server/api/training/sessions/[id]/places.post'
+import markAttendance from '../../server/api/training/sessions/[id]/attendance.put'
+import walkIn from '../../server/api/training/sessions/[id]/walk-ins.post'
+import closeSession from '../../server/api/training/sessions/[id]/close.post'
+import cancelPlace from '../../server/api/training/places/[id]/cancel.post'
+import myPlaces from '../../server/api/training/me/places.get'
 
 export const training = server({
   'GET /api/training/courses': listCourses,
@@ -64,6 +76,18 @@ export const training = server({
   'POST /api/training/competencies/:id/retire': retireCompetency,
   'GET /api/training/me/competencies': myCompetencies,
   'GET /api/training/me/competencies/:slug': myCompetency,
+  'POST /api/training/courses/:id/sessions': createSession,
+  'GET /api/training/sessions': listSessions,
+  'GET /api/training/sessions/:id': getSession,
+  'PATCH /api/training/sessions/:id': patchSession,
+  'POST /api/training/sessions/:id/publish': publishSession,
+  'POST /api/training/sessions/:id/cancel': cancelSession,
+  'POST /api/training/sessions/:id/places': bookPlace,
+  'PUT /api/training/sessions/:id/attendance': markAttendance,
+  'POST /api/training/sessions/:id/walk-ins': walkIn,
+  'POST /api/training/sessions/:id/close': closeSession,
+  'POST /api/training/places/:id/cancel': cancelPlace,
+  'GET /api/training/me/places': myPlaces,
 })
 
 /** 24 November 2026, 10:00 in London. */
@@ -74,6 +98,7 @@ export async function ready(): Promise<void> {
   setClock(NOV_24)
   resetRateLimits()
   await setModule('forms', true)
+  await setModule('occupancy', true)
   await setModule('training', true)
   await inContext(async () => {
     const unit = createUnit()
@@ -96,7 +121,7 @@ export async function someone(abilities: string[] = [], name = 'Sam Learner'): P
   return who
 }
 
-export const MANAGER = ['training.competency.manage', 'training.course.manage', 'training.course.view', 'training.record.view', 'training.sign-off.record', 'training.record.award', 'training.record.revoke']
+export const MANAGER = ['training.competency.manage', 'training.session.manage', 'training.session.run', 'training.place.manage', 'training.place.book', 'training.course.manage', 'training.course.view', 'training.record.view', 'training.sign-off.record', 'training.record.award', 'training.record.revoke']
 
 let n = 0
 /** A course published with the steps given (by default one practical step), valid for a year. */

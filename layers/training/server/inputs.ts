@@ -1,7 +1,7 @@
 // What Training's routes accept. Limits are the schema's (part 2); a step kind is accepted here once
 // the slice that delivers it is built.
 import { z } from 'zod'
-import { EVIDENCE_EXPIRY, EVIDENCE_FILE, NEEDED_FOR, REVOKE_CODES, ROUTE_STATES } from '../shared/states'
+import { EVIDENCE_EXPIRY, EVIDENCE_FILE, NEEDED_FOR, REVOKE_CODES, ROUTE_STATES, SIGN_UP } from '../shared/states'
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/ // not-policy: the shape of a date
 export const day = z.string().regex(DAY, 'Give the date as a day, month and year.')
@@ -86,3 +86,25 @@ export const routesInput = z.object({
     items: z.array(routeItem).max(10), // not-policy: a route of more than ten items is a different competency
   })).max(10), // not-policy: R5 offers three; ten keeps the screen readable
 })
+
+const instant = z.number().int().positive()
+export const sessionInput = z.object({
+  title: optionalText(120), // not-policy: the schema's limit (part 2)
+  startsAt: instant,
+  endsAt: instant,
+  spaceId: z.string().nullable().optional(),
+  placeNote: optionalText(200), // not-policy: the schema's limit (part 2)
+  capacity: z.number().int().min(1).max(500).optional(), // not-policy: the setting's own bounds
+  signUp: z.enum(SIGN_UP).optional(),
+  trainerIds: z.array(z.string().min(1)).max(20).optional(), // not-policy: a screen's worth of trainers
+})
+export const sessionChange = sessionInput.partial()
+export const cancelSessionInput = z.object({ reason: z.string().trim().min(1).max(300) }) // not-policy: the schema's limit (part 2)
+export const placeInput = z.object({ accountId: z.string().min(1).optional() })
+export const attendanceInput = z.object({
+  marks: z.array(z.object({ placeId: z.string().min(1), state: z.enum(['attended', 'absent']) })).min(1).max(500), // not-policy: the largest capacity
+})
+export const walkInInput = z.union([
+  z.object({ accountId: z.string().min(1) }),
+  z.object({ name: z.string().trim().min(1).max(120), address: z.string().trim().email().max(254).nullable().optional() }), // not-policy: the account's limits
+])
