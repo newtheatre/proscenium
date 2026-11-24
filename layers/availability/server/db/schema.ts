@@ -89,6 +89,7 @@ export const exceptions = defineTable('availability_exceptions', {
 }, {
   id: 'avex',
   realm: 'members',
+  retention: 'availability.retention.past',
   onErasure: 'delete-row',
   extra: t => [
     index('availability_exceptions_account').on(t.accountId, t.lastDate),
@@ -123,6 +124,7 @@ export const requests = defineTable('availability_requests', {
   id: 'avrq',
   realm: 'members',
   subject: 'none',
+  retention: 'availability.retention.history',
   extra: t => [
     uniqueIndex('availability_requests_source').on(t.sourceRef).where(sql`source_ref IS NOT NULL AND state = 'open'`),
     index('availability_requests_state').on(t.state, t.dueOn),
