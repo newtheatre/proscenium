@@ -2,7 +2,8 @@
      the side, a pivot across the top, one filter, and who else sees it. Moving a column renumbers the
      formulas that name it. The server checks every rule at once and each fault shows beside its part. -->
 <script setup lang="ts">
-import { PAGE_BREAKDOWNS, PERIOD_RULES, SCOPE_KINDS, isPageBreakdown, type PeriodRule, type ScopeKind } from '../../shared/reports'
+import type { ColumnEdit } from './ReportColumnDialog.vue'
+import { PAGE_BREAKDOWNS, isPageBreakdown, type PeriodRule, type ScopeKind } from '../../shared/reports'
 
 export interface BuilderColumn { measure?: string, formula?: string, label?: string }
 export interface BuilderForm {
@@ -73,12 +74,8 @@ const { data: filterValues } = useAPI<{ values: { value: string, label: string }
 })
 watch(() => form.filter?.key, (key) => { if (key && !isPageBreakdown(key)) void refreshNuxtData(`reports:key-values:${key}`) }, { immediate: true })
 
-const scopeItems = computed(() => SCOPE_KINDS.map(k => ({ value: k, label: t(`reports.builder.scope-kinds.${k}`) })))
-const periodItems = computed(() => PERIOD_RULES.filter(r => r !== 'scope' || form.scopeKind !== 'none').map(r => ({ value: r, label: t(`reports.periods.${r}`) })))
 const chartItems = computed(() => [{ value: 'none', label: t('reports.builder.chart-none') }, { value: 'bar', label: t('reports.builder.chart-bar') }, { value: 'line', label: t('reports.builder.chart-line') }])
 const chart = computed({ get: () => form.chart ?? 'none', set: v => form.chart = v === 'none' ? null : v as 'bar' | 'line' })
-const shareItems = computed(() => [{ value: 'none', label: t('reports.builder.share-none') }, ...(roles.value?.roles ?? []).map(r => ({ value: r.id, label: r.name }))])
-const share = computed({ get: () => form.shareRole ?? 'none', set: v => form.shareRole = v === 'none' ? null : v })
 const kindItems = computed(() => [{ value: 'figures', label: t('reports.builder.kind-figures') }, { value: 'people', label: t('reports.builder.kind-people') }])
 // A people report has none of the builder's extras (P3, P8), and its figures come from another list.
 watch(() => form.kind, () => {
@@ -120,7 +117,7 @@ function remove(i: number) {
 }
 
 // Adding or changing a column happens in a small dialog: a figure from the catalogue, or a formula.
-const editing = ref<{ at: number | null, kind: 'figure' | 'formula', measure: string | null, formula: string, label: string } | null>(null)
+const editing = ref<ColumnEdit | null>(null)
 const figureItems = computed(() => pool.value.map(f => ({ value: f.id, label: t(f.label), description: t(`${f.module}.module.name`) })))
 const earlier = computed(() => form.columns.slice(0, editing.value?.at ?? form.columns.length).map((c, i) => `C${i + 1} ${columnName(c)}`).join(', '))
 const addFigure = () => editing.value = { at: null, kind: 'figure', measure: null, formula: '', label: '' }
@@ -128,10 +125,6 @@ const addFormula = () => editing.value = { at: null, kind: 'formula', measure: n
 const edit = (i: number) => {
   const c = form.columns[i]!
   editing.value = { at: i, kind: c.formula ? 'formula' : 'figure', measure: c.measure ?? null, formula: c.formula ?? '', label: c.label ?? '' }
-}
-const validateColumn = () => {
-  const e = editing.value!
-  return e.kind === 'figure' ? needs({ measure: e.measure }) : needs({ label: e.label, formula: e.formula })
 }
 function keepColumn() {
   const e = editing.value!
@@ -252,56 +245,15 @@ async function save() {
             @click="addFormula"
           />
         </template>
-        <UFormField name="columns">
-          <p
-            v-if="!form.columns.length"
-            class="text-sm text-muted"
-          >
-            {{ t('reports.builder.no-columns') }}
-          </p>
-          <SortableList
-            v-else
-            :label="t('reports.builder.columns')"
-            @reorder="onReorder"
-          >
-            <SortableRow
-              v-for="(c, i) in form.columns"
-              :id="keys[i]!"
-              :key="keys[i]"
-              :index="i"
-              :name="`C${i + 1} · ${columnName(c)}`"
-              :description="columnLine(c)"
-            >
-              <template #leading>
-                <IconButton
-                  :data-drag-handle="keys[i]"
-                  icon="i-lucide-grip-vertical"
-                  size="sm"
-                  class="cursor-grab touch-none"
-                  :label="t('reports.builder.order-handle', { name: columnName(c) })"
-                  aria-describedby="reports-builder-order-help"
-                  @keydown="onHandleKey($event, i)"
-                />
-              </template>
-              <template
-                v-if="columnErrors[i]"
-                #below
-              >
-                <p class="text-sm text-error">
-                  {{ columnErrors[i] }}
-                </p>
-              </template>
-              <RowActions
-                :label="t('reports.builder.column-actions', { name: columnName(c) })"
-                :items="rowItems(i)"
-              />
-            </SortableRow>
-          </SortableList>
-          <span
-            id="reports-builder-order-help"
-            class="sr-only"
-          >{{ t('reports.builder.order-keys') }}</span>
-        </UFormField>
+        <ReportColumnList
+          :names="form.columns.map(columnName)"
+          :lines="form.columns.map(columnLine)"
+          :keys="keys"
+          :errors="columnErrors"
+          :items="rowItems"
+          @reorder="onReorder"
+          @handle-key="onHandleKey"
+        />
       </PageSection>
 
       <PageSection :title="t('reports.builder.layout')">
@@ -371,50 +323,14 @@ async function save() {
         </div>
       </PageSection>
 
-      <PageSection :title="t('reports.builder.question')">
-        <div class="grid gap-4 sm:grid-cols-2">
-          <UFormField
-            :label="t('reports.builder.scope-kind')"
-            name="scopeKind"
-          >
-            <USelect
-              v-model="form.scopeKind"
-              :items="scopeItems"
-            />
-          </UFormField>
-          <UFormField
-            v-if="form.scopeKind !== 'none'"
-            :label="t('reports.builder.scope-id', { kind: t(`reports.scopes.${form.scopeKind}`).toLowerCase() })"
-            :help="t('reports.builder.scope-id-help')"
-            name="scopeId"
-          >
-            <FieldRecord
-              v-model="form.scopeId"
-              :record="`core.${form.scopeKind}`"
-            />
-          </UFormField>
-          <UFormField
-            :label="t('reports.period')"
-            name="periodRule"
-          >
-            <USelect
-              v-model="form.periodRule"
-              :items="periodItems"
-            />
-          </UFormField>
-          <UFormField
-            v-if="!people"
-            :label="t('reports.builder.share')"
-            :help="t('reports.builder.share-help')"
-            name="shareRole"
-          >
-            <USelect
-              v-model="share"
-              :items="shareItems"
-            />
-          </UFormField>
-        </div>
-      </PageSection>
+      <ReportQuestionFields
+        v-model:scope-kind="form.scopeKind"
+        v-model:scope-id="form.scopeId"
+        v-model:period-rule="form.periodRule"
+        v-model:share-role="form.shareRole"
+        :people="people"
+        :roles="roles?.roles ?? []"
+      />
 
       <div class="flex gap-2">
         <UButton
@@ -431,67 +347,11 @@ async function save() {
       </div>
     </UForm>
 
-    <UModal
-      :open="!!editing"
-      :title="t(editing?.kind === 'formula' ? 'reports.builder.formula-title' : 'reports.builder.figure-title')"
-      @update:open="v => { if (!v) editing = null }"
-    >
-      <template #body>
-        <UForm
-          v-if="editing"
-          id="reports-column"
-          :attach="false"
-          :state="editing"
-          :validate="validateColumn"
-          class="space-y-4"
-          novalidate
-          @submit="keepColumn"
-        >
-          <UFormField
-            v-if="editing.kind === 'figure'"
-            :label="t('reports.builder.figure')"
-            name="measure"
-            required
-          >
-            <USelectMenu
-              :model-value="editing.measure ?? undefined"
-              :items="figureItems"
-              value-key="value"
-              @update:model-value="(v: string) => editing!.measure = v"
-            />
-          </UFormField>
-          <template v-else>
-            <UFormField
-              :label="t('reports.builder.formula-label')"
-              name="label"
-              required
-            >
-              <UInput
-                v-model="editing.label"
-              />
-            </UFormField>
-            <UFormField
-              :label="t('reports.formula')"
-              :help="t('reports.builder.formula-help', { columns: earlier })"
-              name="formula"
-              required
-            >
-              <UInput
-                v-model="editing.formula"
-                class="font-mono"
-                :placeholder="t('reports.builder.formula-example')"
-              />
-            </UFormField>
-          </template>
-        </UForm>
-      </template>
-      <template #footer>
-        <UButton
-          type="submit"
-          form="reports-column"
-          :label="t(editing?.at === null ? 'reports.builder.add' : 'reports.builder.keep')"
-        />
-      </template>
-    </UModal>
+    <ReportColumnDialog
+      v-model="editing"
+      :figure-items="figureItems"
+      :earlier="earlier"
+      @keep="keepColumn"
+    />
   </div>
 </template>

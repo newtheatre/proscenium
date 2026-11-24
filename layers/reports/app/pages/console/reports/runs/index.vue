@@ -9,7 +9,7 @@ const { t } = useT()
 const { dateTime } = useDates()
 const questionText = useQuestionText()
 const { words, keyName } = useReportWords()
-const questionOf = (q: RunListed['question']) => questionText(q.scope.title, q.period.from, q.period.to, q.rowsBy ? keyName(q.rowsBy, q.keyLabels) : undefined, q.acrossBy ? keyName(q.acrossBy, q.keyLabels) : undefined)
+const questionOf = (q: RunListed['question']) => questionText(q.scope.title, q.period, { by: q.rowsBy ? keyName(q.rowsBy, q.keyLabels) : undefined, across: q.acrossBy ? keyName(q.acrossBy, q.keyLabels) : undefined })
 const { badge } = useRunState()
 const { data, status, error, refresh } = await useAPI<{ runs: RunListed[] }>('/api/reports/runs', { key: 'reports:runs' })
 </script>

@@ -24,41 +24,42 @@ const MAX_NUMBER = 1_000_000 // not-policy: no constant in a report needs more
 
 type Token = { kind: 'number', value: number, at: number } | { kind: 'column', index: number, at: number } | { kind: 'op', op: '+' | '-' | '*' | '/', at: number } | { kind: '(' | ')', at: number }
 
+function readNumber(text: string, i: number): [Token, number] {
+  const at = i + 1
+  const digits = /^\d+/.exec(text.slice(i))![0]
+  if (text[i + digits.length] === '.' || text[i + digits.length] === ',') throw new FormulaError('whole-numbers', at + digits.length)
+  const value = Number(digits)
+  if (value > MAX_NUMBER) throw new FormulaError('number-too-large', at)
+  return [{ kind: 'number', value, at }, digits.length]
+}
+
+function readColumn(text: string, i: number): [Token, number] {
+  const at = i + 1
+  const digits = /^\d+/.exec(text.slice(i + 1))?.[0]
+  if (!digits) throw new FormulaError('column-number', at)
+  return [{ kind: 'column', index: Number(digits) - 1, at }, 1 + digits.length]
+}
+
+/** The token starting at `i` and how many characters it takes; null for white space. */
+function readToken(text: string, i: number): [Token | null, number] {
+  const c = text[i]!
+  const at = i + 1
+  if (/\s/.test(c)) return [null, 1]
+  if (OPERATORS[c]) return [{ kind: 'op', op: OPERATORS[c], at }, 1]
+  if (c === '(' || c === ')') return [{ kind: c, at }, 1]
+  if (/\d/.test(c)) return readNumber(text, i)
+  if (c === 'C' || c === 'c') return readColumn(text, i)
+  throw new FormulaError('unknown-character', at)
+}
+
 function tokens(text: string): Token[] {
   if (text.length > MAX_LENGTH) throw new FormulaError('too-long', MAX_LENGTH)
   const out: Token[] = []
   let i = 0
   while (i < text.length) {
-    const c = text[i]!
-    const at = i + 1
-    if (/\s/.test(c)) {
-      i++
-    }
-    else if (OPERATORS[c]) {
-      out.push({ kind: 'op', op: OPERATORS[c], at })
-      i++
-    }
-    else if (c === '(' || c === ')') {
-      out.push({ kind: c, at })
-      i++
-    }
-    else if (/\d/.test(c)) {
-      const digits = /^\d+/.exec(text.slice(i))![0]
-      if (text[i + digits.length] === '.' || text[i + digits.length] === ',') throw new FormulaError('whole-numbers', at + digits.length)
-      const value = Number(digits)
-      if (value > MAX_NUMBER) throw new FormulaError('number-too-large', at)
-      out.push({ kind: 'number', value, at })
-      i += digits.length
-    }
-    else if (c === 'C' || c === 'c') {
-      const digits = /^\d+/.exec(text.slice(i + 1))?.[0]
-      if (!digits) throw new FormulaError('column-number', at)
-      out.push({ kind: 'column', index: Number(digits) - 1, at })
-      i += 1 + digits.length
-    }
-    else {
-      throw new FormulaError('unknown-character', at)
-    }
+    const [token, length] = readToken(text, i)
+    if (token) out.push(token)
+    i += length
   }
   return out
 }
@@ -118,25 +119,32 @@ export interface ColumnKind { unit: Unit, combine: Combine }
 
 type Walked = { unit: Unit | 'number', addable: boolean }
 
+function addUnits(l: Walked, r: Walked): Walked {
+  if (!l.addable || !r.addable) throw new FormulaError('not-addable', 1)
+  if (l.unit !== r.unit || l.unit === 'percent') throw new FormulaError('units-differ', 1)
+  return l
+}
+
+function multiplyUnits(l: Walked, r: Walked): Walked {
+  if (l.unit === 'number') return r
+  if (r.unit === 'number') return l
+  throw new FormulaError('units-multiply', 1)
+}
+
+function divideUnits(l: Walked, r: Walked): Walked {
+  if (r.unit === 'number') return l
+  if (r.unit === 'count' && (l.unit === 'money' || l.unit === 'minutes')) return { unit: l.unit, addable: true }
+  if (l.unit === 'count' && r.unit === 'count') return { unit: 'percent', addable: false }
+  throw new FormulaError('units-divide', 1)
+}
+
 function walkUnits(f: Formula, columns: ColumnKind[]): Walked {
   if (f.kind === 'number') return { unit: 'number', addable: true }
   if (f.kind === 'column') return { unit: columns[f.index]!.unit, addable: columns[f.index]!.combine === 'sum' }
   const l = walkUnits(f.left, columns)
   const r = walkUnits(f.right, columns)
-  if (f.op === '+' || f.op === '-') {
-    if (!l.addable || !r.addable) throw new FormulaError('not-addable', 1)
-    if (l.unit !== r.unit || l.unit === 'percent') throw new FormulaError('units-differ', 1)
-    return l
-  }
-  if (f.op === '*') {
-    if (l.unit === 'number') return r
-    if (r.unit === 'number') return l
-    throw new FormulaError('units-multiply', 1)
-  }
-  if (r.unit === 'number') return l
-  if (r.unit === 'count' && (l.unit === 'money' || l.unit === 'minutes')) return { unit: l.unit, addable: true }
-  if (l.unit === 'count' && r.unit === 'count') return { unit: 'percent', addable: false }
-  throw new FormulaError('units-divide', 1)
+  if (f.op === '+' || f.op === '-') return addUnits(l, r)
+  return f.op === '*' ? multiplyUnits(l, r) : divideUnits(l, r)
 }
 
 /**
@@ -163,19 +171,26 @@ export function evaluate(formula: Formula, values: (Value | null)[], columns: Co
     if (f.kind === 'column') return values[f.index] ?? null
     const l = walk(f.left)
     const r = walk(f.right)
-    if (!l || !r) return null
-    if (l.currency && r.currency && l.currency !== r.currency) return null
-    const currency = f.op === '/' && l.currency && r.currency ? undefined : l.currency ?? r.currency
-    const money = currency ? { currency } : {}
-    if (f.op === '+') return { value: l.value + r.value, ...money }
-    if (f.op === '-') return { value: l.value - r.value, ...money }
-    if (f.op === '*') return { value: l.value * r.value, ...money }
-    if (r.value === 0) return null
-    const share = walkUnits(f.left, columns).unit === 'count' && walkUnits(f.right, columns).unit === 'count'
-    return { value: (l.value / r.value) * (share ? 100 : 1), ...money } // not-policy: a fraction as a percent
+    return l && r ? apply(f, l, r, columns) : null
   }
   const out = walk(formula)
   return out && out.currency ? { ...out, value: Math.round(out.value) } : out
+}
+
+const ARITHMETIC = {
+  '+': (a: number, b: number) => a + b,
+  '-': (a: number, b: number) => a - b,
+  '*': (a: number, b: number) => a * b,
+  '/': (a: number, b: number) => a / b,
+}
+
+function apply(f: Extract<Formula, { kind: 'op' }>, l: Value, r: Value, columns: ColumnKind[]): Value | null {
+  if (l.currency && r.currency && l.currency !== r.currency) return null
+  const currency = f.op === '/' && l.currency && r.currency ? undefined : l.currency ?? r.currency
+  const money = currency ? { currency } : {}
+  if (f.op === '/' && r.value === 0) return null
+  const share = f.op === '/' && walkUnits(f.left, columns).unit === 'count' && walkUnits(f.right, columns).unit === 'count'
+  return { value: ARITHMETIC[f.op](l.value, r.value) * (share ? 100 : 1), ...money } // not-policy: a fraction as a percent
 }
 
 /** The formula in words for its tooltip ("Bar takings ÷ Tickets sold"), naming columns by their labels. */

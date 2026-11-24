@@ -28,7 +28,7 @@ const { words, keyName } = useReportWords()
 const run = computed(() => data.value)
 const question = computed(() => {
   const q = run.value?.question
-  return q ? questionText(q.scope.title, q.period.from, q.period.to, q.rowsBy ? keyName(q.rowsBy, q.keyLabels) : undefined, q.acrossBy ? keyName(q.acrossBy, q.keyLabels) : undefined) : ''
+  return q ? questionText(q.scope.title, q.period, { by: q.rowsBy ? keyName(q.rowsBy, q.keyLabels) : undefined, across: q.acrossBy ? keyName(q.acrossBy, q.keyLabels) : undefined }) : ''
 })
 const filterChip = computed(() => {
   const q = run.value?.question

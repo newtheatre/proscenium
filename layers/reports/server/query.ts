@@ -20,6 +20,9 @@ export const periodParam = z.enum(PERIOD_RULES)
 /** A key down the side or across: a shared one the page can name, or a module's own. */
 export const keyParam = z.string().max(80).refine(k => isPageBreakdown(k) || MODULE_KEY.test(k), 'Not a breakdown.') // not-policy: a key's length
 
+/** What asking for a copy of a report names: the report and the question put to it. */
+export const copyAsk = z.object({ report: z.string().max(80), scope: scopeParam.optional(), period: periodParam.optional(), from: dateParam.optional(), to: dateParam.optional(), by: keyParam.optional() }) // not-policy: a report id's length
+
 /** One or two keys, comma-separated: the rows, then the pivot (M5 allows two). */
 export const byParam = z.string().max(170).transform((value, ctx) => { // not-policy: two keys
   const keys = value.split(',').filter(Boolean)

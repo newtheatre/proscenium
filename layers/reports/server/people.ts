@@ -7,27 +7,15 @@ import { accountLabels, listMeasures, listPersonMeasures, readPersonMeasure } fr
 import { readFigure, labelsFor } from './figures'
 import { measureScope, type ViewQuery } from './ready-made'
 import { savedView } from './definitions'
-import { keyName, runById, type Headline, type RunQuestion, type RunRow, type Unavailable } from './runs'
+import { keyName } from './keys'
+import { runById } from './run-rows'
+import type { Headline, RunQuestion, RunRow, Unavailable } from './runs'
 import type { FigureColumn, ReportView } from '../shared/reports'
 import type { Shown } from '../shared/table'
 import type { PeopleRow, PeopleTable } from '../shared/people'
 import { personRows } from './db/schema'
 
 const OWNER = 'reports.run'
-export const PEOPLE_MAX = 6 // not-policy: rule P8, figures side by side
-
-/** Person figure columns for measure ids, each marked readable or not, or gone when nobody offers it. */
-export async function personColumns(ids: string[], actor: Actor): Promise<FigureColumn[]> {
-  const all = new Map((await listPersonMeasures(null)).map(m => [m.id, m]))
-  const readable = new Set((await listPersonMeasures(actor)).map(m => m.id))
-  return ids.map((id) => {
-    const m = all.get(id)
-    return m
-      ? { kind: 'figure', id, label: m.label, unit: m.unit, combine: m.combine, by: m.by, filters: [], readable: readable.has(id) }
-      : { kind: 'figure', id, label: 'reports.figure-gone', unit: 'count', combine: 'sum', by: [], filters: [], readable: false, gone: true }
-  })
-}
-
 /** A saved people report as the reader sees it now; any other report is not found here. */
 export async function peopleView(id: string, actor: Actor, query: ViewQuery): Promise<ReportView> {
   const view = id.startsWith('rpd_') ? await savedView(id, actor, query) : null
@@ -41,38 +29,47 @@ function checkBy(view: ReportView, by: string | undefined): SharedBreakdown | un
   return by as SharedBreakdown | undefined
 }
 
+type PersonRead = Extract<Awaited<ReturnType<typeof readPersonMeasure>>, { state: 'ok' }>['rows']
+type PersonFound = { person: string, key?: string, values: (number | null)[] }
+
+/** One column's rows, its total and why it could not be read, if it could not. */
+async function readColumn(actor: Actor, c: FigureColumn, query: Parameters<typeof readPersonMeasure>[1], ctx: { offered: Set<string>, view: ReportView }): Promise<{ rows: PersonRead, total: Shown, fault?: Unavailable }> {
+  if (!c.readable) return { rows: [], total: { state: 'unavailable', reason: c.gone ? 'gone' : 'hidden' } }
+  const answer = await readPersonMeasure(c.id, query, actor)
+  if (answer.state === 'unsupported') return { rows: [], total: { state: 'unsupported' }, fault: { measure: c.id, reason: 'unsupported' } }
+  if (answer.state !== 'ok') return { rows: [], total: { state: 'unavailable', reason: answer.reason }, fault: { measure: c.id, reason: answer.reason } }
+  return { rows: answer.rows, total: ctx.offered.has(c.id) ? await totalOf(actor, c.id, ctx.view) : { state: 'unavailable', reason: 'no-total' } }
+}
+
+/** Adds one column's rows to each person's (and key's) line, in the column's place. */
+function addPersonRows(found: Map<string, PersonFound>, rows: PersonRead, place: number, shape: { key: SharedBreakdown | undefined, width: number }) {
+  for (const r of rows) {
+    const value = shape.key ? r.keys?.[shape.key] : undefined
+    const id = `${r.person}|${value ?? ''}`
+    const row = found.get(id) ?? { person: r.person, ...(value ? { key: value } : {}), values: Array.from({ length: shape.width }, () => null) }
+    row.values[place] = (row.values[place] ?? 0) + r.value
+    found.set(id, row)
+  }
+}
+
 /** Reads every figure per person the reader may see, and each total where its module offers one (P8). */
 export async function readPeople(actor: Actor, view: ReportView, by?: string): Promise<PeopleTable> {
   const key = checkBy(view, by)
   const query = { from: view.period.from, to: view.period.to, ...(view.scope.id ? { scope: measureScope({ kind: view.scope.kind, id: view.scope.id }) } : {}), ...(key ? { by: key } : {}) }
   const columns = view.columns as FigureColumn[]
-  const totalsOffered = new Set((await listMeasures(actor)).map(m => m.id))
+  const ctx = { offered: new Set((await listMeasures(actor)).map(m => m.id)), view }
   const unavailable: Unavailable[] = []
-  const found = new Map<string, { person: string, key?: string, values: (number | null)[] }>()
+  const found = new Map<string, PersonFound>()
   const totals: Shown[] = []
   for (const [i, c] of columns.entries()) {
-    if (!c.readable) {
-      totals.push({ state: 'unavailable', reason: c.gone ? 'gone' : 'hidden' })
-      continue
-    }
-    const answer = await readPersonMeasure(c.id, query, actor)
-    if (answer.state !== 'ok') {
-      unavailable.push({ measure: c.id, reason: answer.state === 'unsupported' ? 'unsupported' : answer.reason })
-      totals.push(answer.state === 'unsupported' ? { state: 'unsupported' } : { state: 'unavailable', reason: answer.reason })
-      continue
-    }
-    for (const r of answer.rows) {
-      const value = key ? r.keys?.[key] : undefined
-      const id = `${r.person}|${value ?? ''}`
-      const row = found.get(id) ?? { person: r.person, ...(value ? { key: value } : {}), values: columns.map(() => null) }
-      row.values[i] = (row.values[i] ?? 0) + r.value
-      found.set(id, row)
-    }
-    totals.push(totalsOffered.has(c.id) ? await totalOf(actor, c.id, view) : { state: 'unavailable', reason: 'no-total' })
+    const read = await readColumn(actor, c, query, ctx)
+    addPersonRows(found, read.rows, i, { key, width: columns.length })
+    totals.push(read.total)
+    if (read.fault) unavailable.push(read.fault)
   }
   const shown = columns.map(c => c.readable && !unavailable.some(u => u.measure === c.id))
   const rows = [...found.values()].map(r => ({ ...r, values: r.values.map((v, i) => shown[i] ? v ?? 0 : null) }))
-  return await named(columns, rows, totals, unavailable, key, view.keyLabels)
+  return await named(columns, rows, { totals, unavailable, key, keyLabels: view.keyLabels })
 }
 
 async function totalOf(actor: Actor, id: string, view: ReportView): Promise<Shown> {
@@ -82,7 +79,8 @@ async function totalOf(actor: Actor, id: string, view: ReportView): Promise<Show
 }
 
 /** Names each person and key today, and sorts by the first figure shown, most first (P8). */
-async function named(columns: FigureColumn[], rows: { person: string, key?: string, values: (number | null)[] }[], totals: Shown[], unavailable: Unavailable[], key: string | undefined, keyLabels: Record<string, string>): Promise<PeopleTable> {
+async function named(columns: FigureColumn[], rows: PersonFound[], how: { totals: Shown[], unavailable: Unavailable[], key: string | undefined, keyLabels: Record<string, string> }): Promise<PeopleTable> {
+  const { totals, unavailable, key, keyLabels } = how
   const names = await accountLabels(rows.map(r => r.person))
   const keys = key ? await labelsFor(key, rows.map(r => r.key)) : {}
   const first = rows[0]?.values.findIndex(v => v !== null) ?? -1
@@ -131,7 +129,7 @@ export async function peopleCopy(run: RunRow): Promise<PeopleTable | null> {
   const stored = await useDb().all<{ account_id: string, measure: string, breakdown_value: string | null, value: number }>(sql`SELECT account_id, measure, breakdown_value, value FROM reports_person_rows WHERE run_id = ${run.id}`)
   const unavailable = JSON.parse(run.unavailable) as Unavailable[]
   const shown = columns.map(c => c.readable && !unavailable.some(u => u.measure === c.id))
-  const found = new Map<string, { person: string, key?: string, values: (number | null)[] }>()
+  const found = new Map<string, PersonFound>()
   for (const s of stored) {
     const id = `${s.account_id}|${s.breakdown_value ?? ''}`
     const row = found.get(id) ?? { person: s.account_id, ...(s.breakdown_value ? { key: s.breakdown_value } : {}), values: columns.map((_, i) => shown[i] ? 0 : null) }
@@ -141,7 +139,7 @@ export async function peopleCopy(run: RunRow): Promise<PeopleTable | null> {
   }
   const headline = new Map((JSON.parse(run.headline ?? '[]') as Headline[]).map(h => [h.measure, h.value]))
   const totals: Shown[] = columns.map((c, i) => !shown[i] ? { state: 'unavailable', reason: c.gone ? 'gone' : 'hidden' } : headline.has(c.id) ? { state: 'ok', amounts: [{ value: headline.get(c.id)! }] } : { state: 'unavailable', reason: 'no-total' })
-  return await named(columns, [...found.values()], totals, unavailable, question.rowsBy, question.keyLabels)
+  return await named(columns, [...found.values()], { totals, unavailable, key: question.rowsBy, keyLabels: question.keyLabels })
 }
 
 const csvCell = (value: string | number | null | undefined) => {
