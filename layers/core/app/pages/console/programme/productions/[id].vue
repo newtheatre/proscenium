@@ -592,6 +592,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
           <ProductionPerformances
             :production-id="production!.id"
             :title="production!.title"
+            :credits-public="production!.creditsPublic"
             @changed="reload()"
           />
         </div>

@@ -5,7 +5,8 @@
 import { first, refuse, siteOrigin, useContext } from '#kit'
 import type { UnitView } from '#kit'
 import { createProduction as createProductionAs, updateProduction, type ProductionInput } from './service'
-import { createPerformance as createPerformanceAs, movePerformance as movePerformanceAs, type MadeProduction, type PerformanceInput } from './performances'
+import { createPerformance as createPerformanceAs, type MadeProduction, type PerformanceInput } from './performances'
+import { movePerformance as movePerformanceAs } from './performances-update'
 import { insertCredit, removeCredit as removeCreditOf, updateCredit as updateCreditOf, type CreditInput } from './credits'
 
 export { schedulePerformances } from './performances'
@@ -54,7 +55,7 @@ export async function setProductionCompanyName(unit: UnitView, productionId: str
 
 export interface NewCredit extends CreditInput { productionId: string }
 
-/** A production-wide credit. The linked person is told, as when staff add one. */
+/** A credit: production-wide, for one performance, or for one line-up item (LU4). The linked person is told, as when staff add one. */
 export async function addCredit(unit: UnitView, input: NewCredit): Promise<string> {
   const { productionId, ...credit } = input
   const production = await first<{ title: string, state: string }>('SELECT title, state FROM core_productions WHERE id = ?', productionId)

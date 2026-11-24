@@ -4,6 +4,7 @@ import { sql, type SQL } from 'drizzle-orm'
 import { first, refuse, useDb, usePoint, useSetting } from '#kit'
 import type { Actor } from '#kit'
 import { assertNoBlockingClosure, closuresBetween } from '../places/closures'
+import { operatingDayOf } from '../calendar'
 import type { ChangeImpact, ProposedChange } from '../points/change-impact'
 import type { ChangeGuard, GuardAnswer } from '../points/change-guard'
 import type { SpaceBusy } from '../points/space-busy'
@@ -98,4 +99,15 @@ export async function firstRefusal(change: ProposedChange, actor: Actor): Promis
 export async function runGuards(change: ProposedChange, actor: Actor): Promise<void> {
   const refusal = await firstRefusal(change, actor)
   if (refusal) refuse(refusal.code, refusal.reason, { status: 409, ...(refusal.link ? { remedy: refusal.link } : {}) })
+}
+
+export function checkTimes(startsAt: number, endsAt: number, doorsAt: number | null) {
+  if (endsAt <= startsAt) refuse('core.performance.times', 'A performance must end after it starts.', { status: 422, fields: { endsAt: 'The end must be after the start.' } })
+  if (doorsAt !== null && doorsAt > startsAt) refuse('core.performance.doors', 'Doors must open at or before the start.', { status: 422, fields: { doorsAt: 'Doors must open at or before the start.' } })
+}
+
+/** DI2: a drop-in opens and closes within one operating day; the caller has already cleared its doors and intervals. */
+export async function checkDropIn(startsAt: number, endsAt: number): Promise<void> {
+  if (await operatingDayOf(startsAt) !== await operatingDayOf(endsAt - 1))
+    refuse('core.performance.drop-in-one-day', 'A drop-in opens and closes on the same day.', { status: 422, fields: { endsAt: 'Close it the same day, or make one drop-in for each day.' } })
 }

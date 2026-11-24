@@ -73,3 +73,28 @@ production's running time, and is refused `core.performance.not-placed` if neith
 space can take it; and `updateCredit` takes no visibility at all. Per-performance and line-up
 credits, `collectionIds` and `shape` arrive with C-61, C-60 and C-62.
 
+C-62 (24 November 2026): `core_performances.shape` (`timed` or `drop-in`, migration
+`performance-shape`), set through `createPerformance` and the performance routes, changeable only
+while a draft (`core.performance.shape-fixed`). A drop-in is stored with no doors and no intervals and
+is refused `core.performance.drop-in-one-day` unless it opens and closes in one operating day. The
+public production page reads "Open 10:00 to 17:00"; what's on already keeps a performance listed
+until it ends (DI6). The console's performance window gains Timed or Drop-in, with "Open from" and
+"Open until". Owed elsewhere: booking emails' wording (Box office, DI4), the calendar feed (C-70,
+DI5) and runs of drop-ins.
+
+
+C-61 (24 November 2026): `core_performance_line_ups` (migration `performance-line-ups`) holds each
+performance's acts in order, and `core_production_credits` gains `performance_id` and `line_up_id`.
+The services are `lineUpsFor`, `addLineUpItem`, `updateLineUpItem`, `moveLineUpItem` and
+`removeLineUpItem` in `layers/core/server/programme/line-ups.ts`, exported from `#modules/core`, with
+routes under `/api/core/performances/:id/line-up` (ability `core.performance.schedule`); each write
+announces `core.line-up.changed`. LU1, LU2 and LU4 are predicates on the statements
+(`core.line-up.time-outside`, `core.line-up.already-in`, `core.credit.not-this-production`), and
+updating a performance shifts its acts' set times in the same unit. `addCredit` takes `performanceId`
+or `lineUpId`; `listCredits(productionId)` and the public production-wide credits now leave out
+per-performance credits, which `listCredits(productionId, { performanceId })` and each public date's
+`credits` carry. There is no performance page yet, so the console reaches a date's line-up and
+credits from "Line-up and credits" in its menu on the production's Dates tab. The public page lists
+announced acts under each date, that date's credits, and "Also appearing in" on an act's own page.
+Removing an act removes its credits; LU5 and LU6 needed no new code (the foreign keys cascade from a
+deleted draft, and `core.production-team` reads every credit).
