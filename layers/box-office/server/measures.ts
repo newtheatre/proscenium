@@ -19,22 +19,32 @@ const performanceKeys = (by: Breakdown[]) => by.filter(isPerformanceBreakdown)
 const groupAs = (i: number) => sql.raw(`g${i}`)
 const keysOf = (by: Breakdown[], row: Record<string, unknown>) => Object.fromEntries(by.map((k, i) => [k, row[`g${i}`] === null ? NONE : String(row[`g${i}`])]))
 
+/** Only the tables a read needs, so a count of tickets reads tickets alone (P-REP-1). */
+export const COMPLIMENTARY = sql`l.ticket_type_id IN (SELECT id FROM box_office_ticket_types WHERE kind = 'complimentary')`
+
+function joins(query: MeasureQuery, uses: ('line' | 'order')[]): SQL {
+  const keys = [...query.by, ...(query.filter ? [query.filter.key] : [])]
+  const order = uses.includes('order') || keys.includes('box-office.channel')
+  const line = order || uses.includes('line') || keys.includes('box-office.ticket-type')
+  return sql.join([
+    line ? sql` JOIN box_office_order_lines l ON l.id = t.order_line_id` : sql``,
+    order ? sql` JOIN box_office_orders o ON o.id = l.order_id` : sql``,
+  ], sql``)
+}
+
 /**
  * Counts valid tickets (or what `count` says of them) on performances in the period and scope,
  * where `where` holds, grouped by the asked keys. `unsupported` for a scope a performance cannot answer.
  */
-export async function countTickets(query: MeasureQuery, options: { where?: SQL, count?: SQL } = {}): Promise<{ rows: MeasureRow[] } | 'unsupported'> {
+export async function countTickets(query: MeasureQuery, options: { where?: SQL, count?: SQL, uses?: ('line' | 'order')[] } = {}): Promise<{ rows: MeasureRow[] } | 'unsupported'> {
   const performances = measuredPerformances(query, performanceKeys(query.by))
   if (!performances) return 'unsupported'
   const filter = query.filter ? sql` AND ${keySql(query.filter.key)} IN (SELECT value FROM json_each(${JSON.stringify(query.filter.values)}))` : sql``
   const columns = [...query.by.map((k, i) => sql`${keySql(k)} AS ${groupAs(i)}`), sql`${options.count ?? sql`count(*)`} AS value`]
   const rows = await useDb().all<Record<string, unknown>>(sql`
     SELECT ${sql.join(columns, sql`, `)}
-    FROM box_office_tickets t
-    JOIN box_office_order_lines l ON l.id = t.order_line_id
-    JOIN box_office_orders o ON o.id = l.order_id
-    JOIN box_office_ticket_types ty ON ty.id = l.ticket_type_id
-    JOIN (${performances}) mp ON mp.performance_id = t.performance_id
+    FROM (${performances}) mp
+    JOIN box_office_tickets t ON t.performance_id = mp.performance_id${joins(query, options.uses ?? [])}
     WHERE t.state = 'valid'${options.where ? sql` AND ${options.where}` : sql``}${filter}
     ${query.by.length ? sql`GROUP BY ${sql.join(query.by.map((_, i) => groupAs(i)), sql`, `)}` : sql``}`)
   return { rows: rows.map(r => ({ keys: keysOf(query.by, r), value: Number(r.value ?? 0) })) }

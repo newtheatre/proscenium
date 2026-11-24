@@ -10,5 +10,5 @@ export default defineMeasure({
   by: TICKET_KEYS,
   filters: TICKET_FILTERS,
   ability: ABILITY,
-  read: query => countTickets(query, { where: sql`o.state = 'confirmed'`, count: sql`count(DISTINCT o.account_id)` }),
+  read: query => countTickets(query, { where: sql`o.state = 'confirmed'`, count: sql`count(DISTINCT o.account_id)`, uses: ['order'] }),
 })
