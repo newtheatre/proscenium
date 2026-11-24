@@ -48,6 +48,8 @@ export default defineModule({
     'contact.manage': ability({ on: 'companies.company', implies: ['company.view'] }),
     'engagement.view': ability({ on: 'companies.engagement', implies: ['company.view'] }),
     'engagement.manage': ability({ on: 'companies.engagement', implies: ['engagement.view'] }),
+    'settlement.view': ability({ on: 'companies.engagement', implies: ['engagement.view'] }),
+    'settlement.approve': ability({ on: 'companies.settlement', risk: 'privileged', owner: 'refuses', implies: ['settlement.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
     'engagement.view-own': ability({ on: 'companies.engagement', audit: false }),
   }),
@@ -66,6 +68,7 @@ export default defineModule({
     announces: {
       'companies.contact.changed': event({ version: 1, payload: z.object({ companyId: z.string(), contactId: z.string() }), internal: true }),
       'companies.engagement.changed': event({ version: 1, payload: engagementMoved, internal: false }),
+      'companies.settlement.approved': event({ version: 1, payload: z.object({ settlementId: z.string(), engagementId: z.string() }), internal: false }),
     },
   },
 
@@ -83,6 +86,7 @@ export default defineModule({
     'core.record-resolver': [
       { id: 'companies.company', file: 'company' },
       { id: 'companies.engagement', file: 'engagement' },
+      { id: 'companies.settlement', file: 'settlement' },
     ],
   },
 

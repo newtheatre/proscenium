@@ -37,5 +37,7 @@
   "companies.abilities.settings.manage.label": "Change the companies settings",
   "companies.abilities.engagement.view-own.label": "See their own company's engagement",
   "companies.facts.contact-of.label": "Is a contact of the company",
-  "companies.navigation.groups.companies.label": "Companies"
+  "companies.navigation.groups.companies.label": "Companies",
+  "companies.abilities.settlement.view.label": "See settlements and their figures",
+  "companies.abilities.settlement.approve.label": "Approve a settlement someone else prepared"
 }
