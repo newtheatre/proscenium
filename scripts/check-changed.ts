@@ -20,7 +20,7 @@ if (code.length) {
 }
 else console.log('No changed code files')
 
-failed ||= (await $`bun scripts/check.ts`.nothrow()).exitCode !== 0
+failed ||= (await $`bun run check:conformance`.nothrow()).exitCode !== 0
 if (failed) {
   console.log('\ncheck:changed found problems; fix them before pushing. Run `bun run check` for the whole repo.')
   process.exit(1)
