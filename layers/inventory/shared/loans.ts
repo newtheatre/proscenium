@@ -64,5 +64,5 @@ export interface LoanDetail extends LoanRow {
   borrowerEmail: string | null
   declineNote: string | null
   lineList: LoanLine[]
-  can: { approve: boolean, edit: boolean, cancel: boolean }
+  can: { approve: boolean, edit: boolean, cancel: boolean, submit: boolean }
 }

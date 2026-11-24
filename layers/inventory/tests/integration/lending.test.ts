@@ -121,7 +121,7 @@ describe('who sees loans (S4, S5)', () => {
     expect(list.loans[0]).toMatchObject({ borrower: 'Albany Players', state: 'approved', lines: 1 })
     expect(list.lending).toEqual([])
     const seen = ok(await req('GET', `/api/inventory/loans/${loanId}`, undefined, viewer)).loan
-    expect(seen.can).toEqual({ approve: false, edit: false, cancel: false })
+    expect(seen.can).toEqual({ approve: false, edit: false, cancel: false, submit: false })
     expect((await req('GET', '/api/inventory/loans', undefined, person([]))).status).toBe(403)
   })
 })
