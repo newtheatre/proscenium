@@ -179,19 +179,21 @@ describe('SU-1, SU-2, SU-6, SU-7: what members see', () => {
   })
 })
 
-describe('SU-8: calendar feed', () => {
+describe('SU-8, C-70: calendar feed', () => {
   it('gives each person a private address that lists their shifts, and a new one retires the old', async () => {
     const p = await performance()
     const id = await shift(p.id, await duty('Steward'), 2)
     const eve = volunteer()
     await req('POST', `/api/front-of-house/shifts/${id}/sign-up`, {}, eve)
-    const first = (await req('POST', '/api/front-of-house/me/calendar', {}, eve)).body.url as string
-    expect(first).toMatch(/^https:\/\/theatre\.example\/api\/front-of-house\/calendar\/.+/)
-    expect((await req('POST', '/api/front-of-house/me/calendar', {}, eve)).body.url).toBe(first)
+    const first = (await req('POST', '/api/calendar-feed/me', {}, eve)).body.url as string
+    expect(first).toMatch(/^https:\/\/theatre\.example\/calendar\/.+\.ics$/)
+    expect((await req('POST', '/api/calendar-feed/me', {}, eve)).body.url).toBe(first)
     const feed = await call(handle, 'GET', new URL(first).pathname)
     expect(feed.status).toBe(200)
-    expect(await feed.text()).toContain('SUMMARY:Steward')
-    const second = (await req('POST', '/api/front-of-house/me/calendar/reset', {}, eve)).body.url as string
+    const text = await feed.text()
+    expect(text).toContain('SUMMARY:Steward')
+    expect(text).toMatch(/UID:front-of-house\.shifts\.asg_\S+@theatre\.example/)
+    const second = (await req('POST', '/api/calendar-feed/me/reset', {}, eve)).body.url as string
     expect(second).not.toBe(first)
     expect((await call(handle, 'GET', new URL(first).pathname)).status).toBe(404)
     expect((await call(handle, 'GET', new URL(second).pathname)).status).toBe(200)

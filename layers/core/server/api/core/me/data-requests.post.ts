@@ -7,7 +7,7 @@ import { requireFresh } from '../../../identity/guards'
 import { requestErasure } from '../../../identity/data-requests'
 import { requestExport } from '../../../identity/export'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   ability: 'signed-in',
   rateLimit: 'write',
   input: z.object({ kind: z.enum(['erasure', 'export']) }).strict(),

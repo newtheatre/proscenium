@@ -1,6 +1,7 @@
 // The ambient context of one request, job, task or test: the bindings, who is acting, the clock
 // and the per-request caches (settings and module states are read once per request).
 import { storage, currentContext } from './context-store'
+import type { PracticeSession } from './practice/gate'
 
 export interface KitEnv {
   DB: D1Database
@@ -16,6 +17,8 @@ export interface KitEnv {
   RATE_LIMITS?: DurableObjectNamespace
   /** The realtime rooms (RealtimeHub). Absent under nuxt dev, where pages keep asking instead. */
   REALTIME?: DurableObjectNamespace
+  /** Each person's practice store (PracticeStore). Practice mode is unavailable without it. */
+  PRACTICE?: DurableObjectNamespace
   CORE_SESSION_KEY?: string
   CORE_ENCRYPTION_KEY?: string
   CORE_TURNSTILE_SECRET_KEY?: string
@@ -77,6 +80,8 @@ export interface KitContext {
    * ability says; only a change does (Matt, 17 November). See `can`.
    */
   reads?: boolean
+  /** Set when the request runs in a practice store (Practice mode): the bindings are the store's. */
+  practice?: PracticeSession
 }
 
 export function runInContext<T>(context: Partial<KitContext> & { env: KitEnv }, fn: () => T): T {
@@ -86,6 +91,8 @@ export function runInContext<T>(context: Partial<KitContext> & { env: KitEnv }, 
     actor: context.actor ?? parent?.actor ?? ANONYMOUS,
     clock: context.clock ?? parent?.clock,
     waitUntil: context.waitUntil ?? parent?.waitUntil,
+    // A practice session goes with its store's bindings, never with any other.
+    practice: context.practice ?? (parent && context.env === parent.env ? parent.practice : undefined),
     cache: context.cache ?? {},
     ...context,
   } as KitContext

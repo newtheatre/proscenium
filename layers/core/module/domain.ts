@@ -83,6 +83,8 @@ export const settings = defineSettings('core', {
   // Sending email (C-27, C-28, C-32). verified-domain is written only by the verify route.
   'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, change: sender, onChange: 'confirm' }),
   'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, change: sender, managed: true, onChange: 'confirm' }),
+  // The host the calendar feed was first served from, so a later change of domain changes no UID (C-70, CF3).
+  'calendar.site-marker': setting.text({ unset: true, maxLength: 253, change: organisation, managed: true }),
   'notifications.email-footer': setting.text({ unset: true, maxLength: 500, multiline: true, change: 'core.template.edit' }),
   // The delivery pipeline (C-29), renamed from notifications.* so the engineering half sits on the
   // Advanced page. Each retry waits four times as long as the one before.
@@ -229,6 +231,11 @@ export const points = {
    * only for a reader who may see it. Read by isSpaceFree and the occupancy view (O1, O2).
    */
   'core.space-busy': point({ kind: 'code', contract: 'space-busy' }),
+  /**
+   * What a person is on, for their one private calendar feed (C-70): each contributor answers only for
+   * the account asked, with public-safe titles (CF4). Served by the calendar-feed module.
+   */
+  'core.calendar-feed': point({ kind: 'code', contract: 'calendar-feed', publicSafe: true }),
   /**
    * Whether people are committed elsewhere in a window (C-66): each contributor answers only about
    * the accounts asked, with a translation key rather than words. Read through the person-busy module.
@@ -402,7 +409,7 @@ export const contributes = {
   ],
   // Credited people are busy for each timed performance of the production (C-66).
   'core.person-busy': [{ id: 'core.credits', file: 'credits' }],
-  'core.record-resolver': ['performance', 'production', 'season', 'collection', 'venue', 'account'].map(n => ({ id: `core.${n}`, file: n })),
+  'core.record-resolver': ['performance', 'production', 'season', 'collection', 'venue', 'account', 'practice-scenario'].map(n => ({ id: `core.${n}`, file: n })),
   // What the command palette finds by name (H9): each type through its own list's search.
   'core.search-source': [
     { id: 'core.productions', record: 'core.production', ability: 'core.production.view', route: '/api/core/search/productions', shells: ['console' as const] },

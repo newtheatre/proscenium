@@ -16,6 +16,10 @@ const { t, te } = useT()
 const { time, dayBrief } = useDates()
 const { money, isCurrency } = useMoneyText()
 const { data: navigation } = await useNavigation('live')
+// The Practise button (PM-12): shown only to someone a training course opens a scenario to, and never inside practice.
+const { framed } = usePractising()
+const { data: practice } = usePracticeList()
+const canPractise = computed(() => !framed.value && !!practice.value?.enabled && practice.value.scenarios.length > 0)
 const tiles = computed(() => navigation.value?.items ?? [])
 const { data: tonight, refresh } = await useAPI<{ performances: Performance[], next?: { title: string, label: string | null, startsAt: number, venue: string } | null }>('/api/core/live/tonight', { key: 'core:live:tonight', default: () => ({ performances: [], next: null }) })
 // The figures move all night (sold, in, still to come), so the hub reads them again while open.
@@ -159,6 +163,16 @@ function valueOf(f: Figure): string {
         icon="i-lucide-moon"
         :title="t('core.live.empty.title')"
         :description="t('core.live.empty.description')"
+      />
+      <UButton
+        v-if="canPractise"
+        to="/practice"
+        icon="i-lucide-graduation-cap"
+        color="neutral"
+        variant="ghost"
+        size="xl"
+        class="self-start"
+        :label="t('core.practice.practise')"
       />
     </div>
   </PageLive>
