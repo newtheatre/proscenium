@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "eb2ad6ae-3717-4658-938f-60b510862240",
+  "id": "7cf5fe44-b9dc-49fd-8826-1d97028a6e3d",
   "prevIds": [
     "253a73f7-3dc8-4fca-8c87-bdcbf1975c1d",
     "27eee593-bbbf-4646-8a7c-179f088b6b30",
@@ -606,10 +606,6 @@
     },
     {
       "name": "front_of_house_checklists",
-      "entityType": "tables"
-    },
-    {
-      "name": "front_of_house_crew_calls",
       "entityType": "tables"
     },
     {
@@ -2515,6 +2511,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -6875,6 +6881,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "'all'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -15879,136 +15895,6 @@
       "entityType": "columns"
     },
     {
-      "table": "front_of_house_crew_calls",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "season_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "starts_on",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "ends_on",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "question_roles",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'{}'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "tshirt_min_shifts",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "meal_min_minutes",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "meals_on_request",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'draft'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "created_by",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
       "table": "front_of_house_duties",
       "name": "id",
       "type": "text",
@@ -17151,26 +17037,6 @@
     {
       "table": "front_of_house_shifts",
       "name": "cancelled_reason",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_shifts",
-      "name": "space_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_shifts",
-      "name": "crew_call_id",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -25149,38 +25015,6 @@
       "entityType": "indexes"
     },
     {
-      "table": "front_of_house_crew_calls",
-      "name": "front_of_house_crew_calls_name",
-      "columns": [
-        {
-          "value": "name",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "state <> 'archived'",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "front_of_house_crew_calls_season",
-      "columns": [
-        {
-          "value": "season_id",
-          "isExpression": false
-        },
-        {
-          "value": "state",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
       "table": "front_of_house_duties",
       "name": "front_of_house_duties_name",
       "columns": [
@@ -25438,24 +25272,6 @@
         },
         {
           "value": "window_closes_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "front_of_house_shifts",
-      "name": "front_of_house_shifts_crew_call",
-      "columns": [
-        {
-          "value": "crew_call_id",
-          "isExpression": false
-        },
-        {
-          "value": "call_at",
           "isExpression": false
         }
       ],
@@ -29326,21 +29142,6 @@
       "entityType": "fks"
     },
     {
-      "table": "front_of_house_shifts",
-      "name": "fk_front_of_house_shifts_crew_call_id_front_of_house_crew_calls_id_fk",
-      "columns": [
-        "crew_call_id"
-      ],
-      "tableTo": "front_of_house_crew_calls",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
       "table": "membership_fees_charges",
       "name": "fk_membership_fees_charges_membership_id_membership_memberships_id_fk",
       "columns": [
@@ -31395,15 +31196,6 @@
       "entityType": "pks"
     },
     {
-      "table": "front_of_house_crew_calls",
-      "name": "front_of_house_crew_calls_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "front_of_house_duties",
       "name": "front_of_house_duties_pk",
       "columns": [
@@ -33234,36 +33026,6 @@
       "table": "front_of_house_checklists",
       "name": "front_of_house_checklists_moment",
       "value": "\"moment\" IN ('pre-show', 'post-show', 'other')",
-      "entityType": "checks"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "front_of_house_crew_calls_name_length",
-      "value": "length(\"name\") BETWEEN 1 AND 80",
-      "entityType": "checks"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "front_of_house_crew_calls_dates",
-      "value": "\"ends_on\" >= \"starts_on\"",
-      "entityType": "checks"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "front_of_house_crew_calls_tshirt",
-      "value": "\"tshirt_min_shifts\" IS NULL OR \"tshirt_min_shifts\" BETWEEN 1 AND 50",
-      "entityType": "checks"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "front_of_house_crew_calls_meal",
-      "value": "\"meal_min_minutes\" IS NULL OR \"meal_min_minutes\" BETWEEN 30 AND 720",
-      "entityType": "checks"
-    },
-    {
-      "table": "front_of_house_crew_calls",
-      "name": "front_of_house_crew_calls_state",
-      "value": "\"state\" IN ('draft', 'open', 'closed', 'archived')",
       "entityType": "checks"
     },
     {
