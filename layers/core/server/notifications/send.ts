@@ -3,7 +3,7 @@
 // email delivery are written in the caller's unit, and core.send-notifications sends it after the
 // commit, with the same retries, sealed variables and delivery log.
 import { z } from 'zod'
-import { first, isEnabled, refuse, sealSpecial, useContext, usePoint, useSetting } from '#kit'
+import { first, isEnabled, isPractice, refuse, sealSpecial, useContext, usePoint, useSetting } from '#kit'
 import type { RecordRef, UnitView } from '#kit'
 import { checkVariables, type VariableKind } from './render'
 import { suppressedAddresses } from './suppression'
@@ -37,6 +37,8 @@ export interface Sender { key: string, name: string, email: string, replyTo?: st
 // The sending domain, once it is set and verified. Throws a retryable refusal otherwise (C-32).
 export async function sendingDomain(): Promise<string> {
   const domain = await useSetting('core.notifications.sending-domain') as string | null
+  // Practice writes to its outbox, which needs no verified domain (O3).
+  if (isPractice()) return domain ?? 'practice.invalid'
   const verified = await useSetting('core.notifications.verified-domain') as string | null
   if (!domain || domain !== verified) {
     refuse('core.notifications.domain-unverified', 'No email can be sent until the sending domain is set and verified.', {

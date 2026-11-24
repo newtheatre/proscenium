@@ -356,6 +356,13 @@ export async function createProduction(unit: UnitView, input: ProductionInput, a
  * its details, defaults, staging effects and content warnings come across; its season, dates,
  * credits, poster and photos do not, nor its state.
  */
+const notInBoundCollection = (productionId: string, seasonId: string | null) => sql`NOT EXISTS (SELECT 1 FROM core_collection_productions m JOIN core_collections c ON c.id = m.collection_id
+  WHERE m.production_id = ${productionId} AND c.season_id IS NOT NULL AND c.season_id IS NOT ${seasonId})`
+async function boundCollection(productionId: string, seasonId: string | null): Promise<string | null> {
+  return (await first<{ name: string }>(`SELECT c.name FROM core_collection_productions m JOIN core_collections c ON c.id = m.collection_id
+    WHERE m.production_id = ? AND c.season_id IS NOT NULL AND c.season_id IS NOT ? ORDER BY lower(c.name) LIMIT 1`, productionId, seasonId))?.name ?? null
+}
+
 export async function duplicateProduction(unit: UnitView, id: string, actorId: string | null): Promise<string> {
   const row = await productionRow(id)
   const copy = newId('prd')
@@ -370,6 +377,10 @@ export async function duplicateProduction(unit: UnitView, id: string, actorId: s
     SELECT ${copy}, term_id, level, level_assumed, detail FROM core_production_advisories WHERE production_id = ${id}`)
   unit.add(sql`INSERT INTO core_production_effects (production_id, term_id, detail)
     SELECT ${copy}, term_id, detail FROM core_production_effects WHERE production_id = ${id}`)
+  // CL4: the copy has no season, so it keeps only the standing collections.
+  unit.add(sql`INSERT INTO core_collection_productions (collection_id, production_id, sort)
+    SELECT m.collection_id, ${copy}, (SELECT coalesce(max(o.sort), -1) + 1 FROM core_collection_productions o WHERE o.collection_id = m.collection_id)
+      FROM core_collection_productions m JOIN core_collections c ON c.id = m.collection_id WHERE m.production_id = ${id} AND c.season_id IS NULL`)
   unit.audit({ action: 'create', record: ['core.production', copy], detail: { from: id } })
   return copy
 }
@@ -402,9 +413,14 @@ export async function updateProduction(unit: UnitView, id: string, input: Partia
   if (row.state === 'published' && input.effectsConfirmedNone === false && !await first('SELECT 1 FROM core_production_effects WHERE production_id = ?', id))
     refuse('core.production.effects-needed', 'A published production lists its staging effects or confirms it has none.', { status: 422 })
   const categoryGuard = input.categoryTermId && input.categoryTermId !== row.category_term_id ? assertTerm(input.categoryTermId, 'core.production-category') : sql`1`
+  // CL1: a production leaves a season-bound collection's season only once it has left the collection.
+  const seasonMoving = input.seasonId !== undefined && (input.seasonId ?? null) !== row.season_id
+  const seasonGuard = seasonMoving ? notInBoundCollection(id, input.seasonId ?? null) : sql`1`
+  const binding = seasonMoving ? await boundCollection(id, input.seasonId ?? null) : null
   if (slugChanged && row.published_at !== null)
     unit.add(sql`INSERT INTO core_production_slugs (slug, production_id, retired_at) VALUES (${row.slug}, ${id}, ${nowMs()})`)
-  unit.add(sql`UPDATE core_productions SET ${sql.join(sets, sql`, `)} WHERE id = ${id} AND state = ${row.state} AND ${categoryGuard}`).expect(1, CATEGORY_REFUSED)
+  unit.add(sql`UPDATE core_productions SET ${sql.join(sets, sql`, `)} WHERE id = ${id} AND state = ${row.state} AND ${categoryGuard} AND ${seasonGuard}`)
+    .expect(1, binding ? { code: 'core.production.in-season-collection', reason: `It is in ${binding}, which is for its present season only.`, remedy: `Remove it from ${binding} first.` } : CATEGORY_REFUSED)
   const fields = [...changed.filter(([, , pub]) => pub).map(([key]) => key as string), ...(slugChanged ? ['slug'] : [])]
   unit.audit({ action: 'update', record: ['core.production', id], detail: { fields } })
   if (row.state === 'published' && fields.length) unit.announce('core.production.updated', { productionId: id, fields }, { record: ['core.production', id] })

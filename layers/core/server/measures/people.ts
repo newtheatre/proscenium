@@ -74,7 +74,7 @@ export async function readPersonMeasure(id: string, query: PersonMeasureQuery, a
   const measure = found!.value
   if (query.by && !measure.by.includes(query.by)) refuse('core.measure.unknown-breakdown', `${id} cannot be broken down by ${query.by}.`, { status: 422, fields: { by: query.by } })
   if (!ISO_DATE.test(query.from) || !ISO_DATE.test(query.to) || query.to < query.from) refuse('core.measure.period', 'The period runs from one date to the same or a later one.', { status: 422, fields: { to: 'On or after the start.' } })
-  const allowed = (await can(actor, PEOPLE_VIEW as never)).allowed && (await can(actor, measure.ability as never, scopeRecord(query.scope))).allowed
+  const allowed = (await can(actor, 'reports.people.view' as never)).allowed && (await can(actor, measure.ability as never, scopeRecord(query.scope))).allowed
   if (!allowed) refuse('core.access.denied', 'You do not have permission to see this figure.', { status: 403, remedy: 'Ask an administrator for this permission.' })
 
   const answer = await readWithin(id, measure, query)

@@ -3,6 +3,7 @@
 // module or for one of its records (a scope). A credential is never read from the Worker (Matt, 19
 // November: nothing the site can hold is set on the Worker). Neither is ever logged or returned to a
 // browser. Special-category columns use the same key.
+import { isPractice } from './practice/gate'
 import { useContext } from './context'
 import { useRegistry } from './registry'
 import { nowMs } from './clock'
@@ -72,6 +73,8 @@ async function storedRows(moduleId: string, name: string, scope: string): Promis
  */
 export async function credential(name: string, scope = ''): Promise<string | null> {
   const manifest = ownerOf(name)
+  // No provider key, token or webhook secret reaches practice code (Practice mode, part 2).
+  if (isPractice()) return null
   if (manifest.secrets?.[name]) return workerSecret(name)
   const [row] = await storedRows(manifest.id, name, scope)
   if (!row) return null

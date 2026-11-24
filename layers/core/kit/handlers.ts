@@ -35,6 +35,11 @@ export interface CallHandler {
   outcome: (unit: UnitView, outcome: CallOutcome, attempt: CallAttempt) => Promise<void> | void
   /** Asks the provider what happened to an attempt with no outcome. 'unknown' tries again later. */
   reconcile: (attempt: CallAttempt) => Promise<CallOutcome | 'unknown'>
+  /**
+   * The answer in practice, recorded instead of making the call (O1): an outcome, or 'ask-trainee'
+   * to wait for the trainee's choice. Without it the call is refused in practice.
+   */
+  practice?: (attempt: CallAttempt) => Promise<CallOutcome | 'ask-trainee'> | CallOutcome | 'ask-trainee'
 }
 
 export const defineListener = (fn: Listener): Listener => fn

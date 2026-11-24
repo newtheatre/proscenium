@@ -24,6 +24,7 @@ export const accounts = defineTable('finance_accounts', {
   updatedAt: col.updatedAt(),
 }, {
   id: 'lac',
+  practice: 'copy',
   realm: 'operational',
   subject: 'none',
   extra: t => [
