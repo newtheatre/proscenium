@@ -89,6 +89,11 @@ async function saved() {
             color="neutral"
             variant="subtle"
           />
+          <AvailabilityUnder18Notes
+            v-if="d.under18"
+            :late="d.under18.late"
+            :one-to-one="d.under18.oneToOne"
+          />
           <FactStrip
             :facts="[
               { label: t('availability.meeting.when'), value: words.when(d.meeting) },
