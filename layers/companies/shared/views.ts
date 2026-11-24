@@ -43,6 +43,7 @@ export interface CompanyDetail {
   archived: boolean
   createdAt: number
   canManage: boolean
+  canOpenEngagement: boolean
   canManageContacts: boolean
   contacts: ContactRow[]
   engagements: EngagementRow[]
@@ -61,4 +62,34 @@ export interface MyEngagement {
   firstDate: number | null
   lastDate: number | null
   toDo: ToDo[]
+}
+
+export interface EngagementListRow {
+  id: string
+  title: string
+  kind: EngagementKind
+  state: EngagementState
+  productionId: string | null
+  companyId: string
+  company: string
+  firstDate: number | null
+  lastDate: number | null
+}
+
+export interface EngagementDetail {
+  id: string
+  title: string
+  kind: EngagementKind
+  state: EngagementState
+  cancelReason: string | null
+  productionId: string | null
+  production: string | null
+  seasonId: string | null
+  companyId: string
+  company: string
+  createdAt: number
+  firstDate: number | null
+  lastDate: number | null
+  canManage: boolean
+  history: { id: string, kind: string, fromState: EngagementState | null, toState: EngagementState | null, at: number, actor: string | null }[]
 }

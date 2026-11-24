@@ -3,7 +3,7 @@ import { all, can, first, refuse } from '#kit'
 import type { Actor } from '#kit'
 import { addressesFor } from '#modules/core'
 import type { EngagementKind, Receives } from '../shared/companies'
-import type { CompanyDetail, CompanyRow, ContactRow, EngagementRow } from '../shared/views'
+import type { CompanyDetail, CompanyRow, ContactRow, EngagementDetail, EngagementListRow, EngagementRow } from '../shared/views'
 
 const LAST_DATE = '(SELECT max(p.starts_at) FROM core_performances p WHERE p.production_id = e.production_id)'
 const PERSON = 'CASE WHEN a.anonymised_at IS NOT NULL THEN \'Former member\' ELSE coalesce(nullif(a.name, \'\'), \'Unnamed person\') END'
@@ -22,13 +22,14 @@ export async function listCompanies(): Promise<CompanyRow[]> {
 
 /** One company for its record page, with what the viewer may do. Contacts' addresses and phones only for someone who manages contacts. */
 export async function companyDetail(actor: Actor, id: string): Promise<CompanyDetail> {
-  const company = await first<Omit<CompanyDetail, 'archived' | 'individual' | 'canManage' | 'canManageContacts' | 'contacts' | 'engagements'> & { archivedAt: number | null, individual: number }>(`
+  const company = await first<Omit<CompanyDetail, 'archived' | 'individual' | 'canManage' | 'canOpenEngagement' | 'canManageContacts' | 'contacts' | 'engagements'> & { archivedAt: number | null, individual: number }>(`
     SELECT id, name, public_name AS publicName, legal_name AS legalName, registration, tax_number AS taxNumber, address, postcode,
       invoice_email AS invoiceEmail, website, description, notes, individual, archived_at AS archivedAt, created_at AS createdAt
     FROM companies_companies WHERE id = ? AND merged_into_id IS NULL`, id)
   if (!company) refuse('core.not-found', 'There is no such company.', { status: 404 })
-  const [canManage, manage, contacts, engagements] = await Promise.all([
+  const [canManage, canOpenEngagement, manage, contacts, engagements] = await Promise.all([
     can(actor, 'companies.company.manage', ['companies.company', id]).then(d => d.allowed),
+    can(actor, 'companies.engagement.manage', ['companies.company', id]).then(d => d.allowed),
     can(actor, 'companies.contact.manage', ['companies.company', id]).then(d => d.allowed),
     contactsOf(id),
     all<EngagementRow>(`SELECT e.id, e.title, e.kind, e.state, e.production_id AS productionId, ${LAST_DATE} AS lastDate
@@ -41,6 +42,7 @@ export async function companyDetail(actor: Actor, id: string): Promise<CompanyDe
     archived: archivedAt !== null,
     individual: !!individual,
     canManage,
+    canOpenEngagement,
     canManageContacts: manage,
     contacts: contacts.map(c => ({ ...c, email: emails.get(c.accountId) ?? null, dayPhone: manage ? c.dayPhone : null })),
     engagements,
@@ -53,4 +55,28 @@ async function contactsOf(companyId: string): Promise<ContactRow[]> {
     FROM companies_contacts k JOIN core_accounts a ON a.id = k.account_id
     WHERE k.company_id = ? AND k.ended_at IS NULL ORDER BY k.is_primary DESC, name COLLATE NOCASE`, companyId)
   return rows.map(({ receives, isPrimary, claimedAt, ...r }) => ({ ...r, isPrimary: !!isPrimary, receives: JSON.parse(receives) as Receives[], email: null, unclaimed: claimedAt === null }))
+}
+
+/** The Engagements list: every engagement with its company, production and dates, newest first. */
+export async function listEngagements(): Promise<EngagementListRow[]> {
+  return all<EngagementListRow>(`SELECT e.id, e.title, e.kind, e.state, e.production_id AS productionId, c.id AS companyId, c.name AS company,
+      (SELECT min(p.starts_at) FROM core_performances p WHERE p.production_id = e.production_id) AS firstDate, ${LAST_DATE} AS lastDate
+    FROM companies_engagements e JOIN companies_companies c ON c.id = e.company_id ORDER BY e.created_at DESC`)
+}
+
+/** One engagement for its staff page: the outline, the production, and its history newest first. */
+export async function engagementDetail(actor: Actor, id: string): Promise<EngagementDetail> {
+  const engagement = await first<Omit<EngagementDetail, 'history' | 'canManage'>>(`SELECT e.id, e.title, e.kind, e.state, e.cancel_reason AS cancelReason,
+      e.production_id AS productionId, p.title AS production, e.season_id AS seasonId, c.id AS companyId, c.name AS company, e.created_at AS createdAt,
+      (SELECT min(pf.starts_at) FROM core_performances pf WHERE pf.production_id = e.production_id) AS firstDate,
+      (SELECT max(pf.starts_at) FROM core_performances pf WHERE pf.production_id = e.production_id) AS lastDate
+    FROM companies_engagements e JOIN companies_companies c ON c.id = e.company_id LEFT JOIN core_productions p ON p.id = e.production_id WHERE e.id = ?`, id)
+  if (!engagement) refuse('core.not-found', 'There is no such engagement.', { status: 404 })
+  const [canManage, history] = await Promise.all([
+    can(actor, 'companies.engagement.manage', ['companies.engagement', id]).then(d => d.allowed),
+    all<EngagementDetail['history'][number]>(`SELECT v.id, v.kind, v.from_state AS fromState, v.to_state AS toState, v.at,
+        CASE WHEN v.actor_id IS NULL THEN NULL ELSE (SELECT ${PERSON} FROM core_accounts a WHERE a.id = v.actor_id) END AS actor
+      FROM companies_engagement_events v WHERE v.engagement_id = ? ORDER BY v.at DESC, v.id DESC`, id),
+  ])
+  return { ...engagement!, canManage, history }
 }

@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse } from '#kit'
 import type { Actor, UnitOfWork } from '#kit'
+import { setProductionCompanyName } from '#modules/core'
 import { LIMITS, nameKey } from '../shared/companies'
 
 export interface Company { id: string, name: string, publicName: string | null, archivedAt: number | null }
@@ -92,6 +93,15 @@ export async function updateCompany(unit: UnitOfWork, company: Company, input: z
     params: [...params, at, company.id, input.name ?? null, input.name ?? null],
   }).expect(1, { ...NAME_TAKEN, reason: `There is already a company called ${input.name ?? company.name}.` })
   unit.audit({ action: 'update', record: ['companies.company', company.id], detail: { fields } })
+  if (input.name !== undefined || input.publicName !== undefined)
+    await followRename(unit, company.id, (input.publicName === undefined ? company.publicName : input.publicName) ?? input.name ?? company.name)
+}
+
+/** Rule G3: each production linked through a live engagement carries the company's public name. */
+async function followRename(unit: UnitOfWork, companyId: string, publicName: string): Promise<void> {
+  const linked = await all<{ id: string }>(`SELECT p.id FROM companies_engagements e JOIN core_productions p ON p.id = e.production_id
+    WHERE e.company_id = ? AND e.state NOT IN ('cancelled', 'settled') AND p.state <> 'cancelled'`, companyId)
+  for (const production of linked) await setProductionCompanyName(unit, production.id, publicName)
 }
 
 /** Rule G6: a company with a live engagement cannot be archived; the statement checks it. */

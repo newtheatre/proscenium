@@ -83,6 +83,7 @@ export default defineModule({
     'core.navigation': [
       { id: 'companies.mine', menu: 'account', group: 'theatre', to: '/account/companies', match: '/account/companies', icon: 'i-lucide-building-2', ability: 'signed-in', order: 38, count: 'companies.mine', hideEmpty: true },
       { id: 'companies.companies', menu: 'console', group: 'programme', section: 'everyday', to: '/console/companies', match: '/console/companies', icon: 'i-lucide-building-2', ability: 'companies.company.view', order: 30 },
+      { id: 'companies.engagements', menu: 'console', group: 'programme', section: 'everyday', to: '/console/companies/engagements', match: '/console/companies/engagements', icon: 'i-lucide-handshake', ability: 'companies.engagement.view', order: 31 },
     ],
     // Part 2, "Ledger accounts": made locked when the module is switched on.
     'finance.system-account': [

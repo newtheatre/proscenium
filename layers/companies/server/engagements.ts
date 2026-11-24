@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import { first, newId, nowMs, refuse, useSetting } from '#kit'
 import type { Actor, UnitOfWork } from '#kit'
+import { setProductionCompanyName } from '#modules/core'
 import { ENGAGEMENT_KINDS, LIMITS, MOVES } from '../shared/companies'
 import type { EngagementKind, EngagementState, Move } from '../shared/companies'
 import type { Company } from './companies'
@@ -11,6 +12,7 @@ export interface Engagement {
   id: string
   companyId: string
   companyName: string
+  companyPublicName: string
   kind: EngagementKind
   productionId: string | null
   seasonId: string | null
@@ -25,10 +27,12 @@ export const engagementInput = z.object({
   seasonId: z.string().min(1).optional(),
 })
 
+export const linkInput = z.object({ productionId: z.string().min(1) })
+
 export const moveInput = z.object({ reason: z.string().trim().min(1).max(LIMITS.reason).optional() })
 export type MoveRequest = z.infer<typeof moveInput> & { move: Move }
 
-const COLUMNS = `e.id, e.company_id AS companyId, c.name AS companyName, e.kind, e.production_id AS productionId,
+const COLUMNS = `e.id, e.company_id AS companyId, c.name AS companyName, coalesce(c.public_name, c.name) AS companyPublicName, e.kind, e.production_id AS productionId,
   e.season_id AS seasonId, e.title, e.state`
 
 export async function requireEngagement(id: string): Promise<Engagement> {
@@ -70,9 +74,32 @@ export async function openEngagement(unit: UnitOfWork, actor: Actor, company: Co
     params: [id, company.id, input.kind, input.productionId ?? null, input.seasonId ?? null, title, await useSetting('core.locale.currency') as string, actor.accountId ?? null, at, at, input.productionId ?? null],
   }).expect(1, { code: 'companies.engagement.production-taken', reason: 'Someone opened an engagement for this production just now.', remedy: 'Reload the page to open it.' })
   history(unit, actor, { engagementId: id, kind: 'opened', from: null, to: 'enquiry', at })
+  if (input.productionId) await setProductionCompanyName(unit, input.productionId, company.publicName ?? company.name)
   unit.audit({ action: 'create', record: ['companies.engagement', id], detail: { companyId: company.id, kind: input.kind } })
   unit.announce('companies.engagement.changed', { engagementId: id, from: null, to: 'enquiry' }, { record: ['companies.engagement', id] })
   return id
+}
+
+/** CO-12, rules E6 and G3: links a production to an engagement that has none; the production then carries the company's public name. */
+export async function linkProduction(unit: UnitOfWork, actor: Actor, engagement: Engagement, productionId: string): Promise<void> {
+  if (engagement.productionId) refuse('companies.engagement.linked', 'This engagement already has a production.', { status: 409, remedy: 'Open a new engagement for another production.' })
+  if (['cancelled', 'settled'].includes(engagement.state)) refuse('companies.engagement.wrong-state', `This engagement is ${engagement.state}.`, { status: 409, remedy: 'Open a new engagement instead.' })
+  const title = await productionTitle(productionId)
+  const at = nowMs()
+  unit.add({
+    sql: `UPDATE companies_engagements SET production_id = ?, updated_at = ? WHERE id = ? AND production_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM companies_engagements o WHERE o.production_id = ? AND o.state <> 'cancelled')`,
+    params: [productionId, at, engagement.id, productionId],
+  }).expect(1, { code: 'companies.engagement.production-taken', reason: `Someone linked ${title} just now.`, remedy: 'Reload the page.' })
+  history(unit, actor, { engagementId: engagement.id, kind: 'linked', from: engagement.state, to: engagement.state, at })
+  unit.audit({ action: 'update', record: ['companies.engagement', engagement.id], detail: { productionId } })
+  await setProductionCompanyName(unit, productionId, engagement.companyPublicName)
+}
+
+/** Rule E5: cancelling releases the guest places and withdraws an agreement waiting for an answer; the production is left alone. */
+function cancelEffects(unit: UnitOfWork, engagementId: string, at: number): void {
+  unit.add({ sql: 'UPDATE companies_allocations SET state = \'released\', updated_at = ? WHERE engagement_id = ? AND state = \'open\'', params: [at, engagementId] })
+  unit.add({ sql: 'UPDATE companies_agreements SET state = \'withdrawn\' WHERE engagement_id = ? AND state = \'sent\'', params: [engagementId] })
 }
 
 /** Rule E3: what confirming needs beyond the agreed state, as conditions on the guarded update. */
@@ -104,6 +131,7 @@ export async function moveEngagement(unit: UnitOfWork, actor: Actor, engagement:
   }).expect(1, move === 'confirm' && extra
     ? { code: 'companies.engagement.not-ready', reason: 'This engagement cannot be confirmed yet, or someone changed it just now.', remedy: 'Check its agreement and calls, then reload and try again.' }
     : { code: 'companies.engagement.changed-elsewhere', reason: 'Someone changed this engagement just now.', remedy: 'Reload the page to see where it is now.' })
+  if (move === 'cancel') cancelEffects(unit, engagement.id, at)
   history(unit, actor, { engagementId: engagement.id, kind: move === 'cancel' ? 'cancelled' : 'moved', from: engagement.state, to, at })
   unit.audit({ action: 'state', record: ['companies.engagement', engagement.id], detail: { from: engagement.state, to } })
   unit.announce('companies.engagement.changed', { engagementId: engagement.id, from: engagement.state, to }, { record: ['companies.engagement', engagement.id] })
