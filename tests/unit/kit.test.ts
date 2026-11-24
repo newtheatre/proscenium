@@ -10,6 +10,7 @@ import { ability, defineAbilities, record, defineRecords } from '#kit/abilities'
 import { code, defineModule, event, job, task } from '#kit/manifest'
 import { col, columnMeta, defineTable } from '#kit/db'
 import { latestSlot } from '#kit/jobs'
+import { resolveOn } from '#kit/modules-store'
 import { instantOfLocal } from '#kit/clock'
 import { DeclarationError } from '#kit/refusal'
 import { buildRegistry, installRegistry, type ModuleEntry } from '#kit/registry'
@@ -506,5 +507,23 @@ describe('format additions of 16 November (fixed retention, erase clear, reserve
   it('reserves every settled module id', async () => {
     const { RESERVED_MODULE_IDS } = await import('../../layers/core/kit/registry')
     expect(RESERVED_MODULE_IDS).toEqual(expect.arrayContaining(['core', 'box-office', 'payments', 'finance', 'forms', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications']))
+  })
+})
+
+describe('support modules (C-65)', () => {
+  const m = (id: string, more: object = {}) => ({ id, ...more })
+  it('are on exactly while a module that is on requires them, through other support modules too', () => {
+    const modules = [m('core', { switchable: false }), m('occupancy', { support: true }), m('busy', { support: true, requires: ['occupancy'] }), m('spaces', { requires: ['busy'] }), m('rehearsals', { requires: ['occupancy'] })]
+    expect([...resolveOn(modules, () => false)].sort()).toEqual(['core'])
+    expect([...resolveOn(modules, id => id === 'spaces')].sort()).toEqual(['busy', 'core', 'occupancy', 'spaces'])
+    expect([...resolveOn(modules, id => id === 'rehearsals')].sort()).toEqual(['core', 'occupancy', 'rehearsals'])
+    // A stored row for a support module is ignored.
+    expect([...resolveOn(modules, id => id === 'occupancy')].sort()).toEqual(['core'])
+  })
+  it('have no switch of their own, so cannot also be always on or start on at setup', () => {
+    const base = { id: 'occupancy', manifest: 1 as const, since: '0.1.0' }
+    expect(() => defineModule({ ...base, support: true })).not.toThrow()
+    expect(() => defineModule({ ...base, support: true, switchable: false })).toThrow(/support/)
+    expect(() => defineModule({ ...base, support: true, onAtSetup: true })).toThrow(/onAtSetup/)
   })
 })

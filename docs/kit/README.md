@@ -184,6 +184,13 @@ Any module may import core's services without listing core: `import { notifyAddr
   once that passes, and it is not served after. A slot with `access: 'record'` is served only to
   someone your `core.file-access` contribution allows: key it by the owning record type and export
   `{ canRead(actor, record, file) }` (type `FileAccess` from `#modules/core`).
+- `isSpaceFree(spaceId, from, to, { except? })`: no scheduled performance or blocking closure, and
+  nothing another module reports to `core.space-busy`, overlaps the window; `except` leaves out one
+  module's own times. A read for showing and for a module's check just before its own write; a core
+  write uses the predicate `assertSpaceFree`. A module that takes a space (a room booking, a
+  training session, a pencil) contributes to `core.space-busy` a file whose `busy({ spaceIds, from,
+  to }, actor)` answers `{ spaceId, kind, from, to, yields, record, label }` items, the label null
+  where the reader may not see it (contract in `layers/core/server/points/space-busy.ts`).
 - `getBrand()`: the theatre's name, logos and colour tokens for light and dark.
 - Vocabularies, the shared lists of options such as production categories and advisories. Declare
   yours, with its starting terms, as a contribution to `core.vocabulary` (`id` is
@@ -245,6 +252,16 @@ switched-off module's jobs wait. Tasks are declared with `every`, `dailyAt` or `
 theatre's time zone (UTC until setup sets it); the cron trigger runs only the latest due slot, once.
 
 ## Modules, records, facts and pages
+
+A **support module** (`support: true`, C-65) is a shared part with no switch of its own, such as
+`occupancy`: it is on exactly while a module that is on requires it, directly or through another
+support module, and off otherwise (`resolveOn` in `#kit/modules-store`). Switching it is refused
+(`core.module.support`), a row stored for it is ignored, and it cannot also be `switchable: false`
+or `onAtSetup`. Its requirers list it under `requires` as usual, so they import its services
+without exception; switching a requirer on does not ask about it, and when the switch brings it on
+or off, `core.module.enabled` or `.disabled` is announced for it too. Its migrations run like any
+module's. Admin > Modules lists it under "Comes on with other modules", with its state and the
+modules that need it, and no switch.
 
 `uses` may name a module that is not written yet if the design has reserved its id
 (`RESERVED_MODULE_IDS` in the registry); listening to it or contributing to its points then does
