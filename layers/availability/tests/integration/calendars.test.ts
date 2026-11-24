@@ -17,6 +17,7 @@ import mine from '../../server/api/availability/me.get'
 import newException from '../../server/api/availability/exceptions/index.post'
 import findPost from '../../server/api/availability/find/index.post'
 import { refreshJob, syncCalendars } from '../../server/calendars'
+import { eraseAccount } from '../../../core/server/identity/erasure'
 
 const app = server({
   'GET /api/availability/calendars': list,
@@ -172,5 +173,16 @@ describe('refreshing, failing and disconnecting (I5, T-AV-35)', () => {
     expect(await blocksOf(id)).toEqual([])
     expect(await rows('SELECT id FROM availability_calendar_connections WHERE id = ?', id)).toEqual([])
     setClock(NOV_24)
+  })
+})
+
+describe('erasing a person (I5, staged erasure)', () => {
+  it('deletes their connections, sealed address included, and every imported block', async () => {
+    const eve = await account('Eve')
+    const { body: { connectionId: id } } = await plug(eve, { label: 'Lectures' })
+    expect((await blocksOf(id)).length).toBe(2)
+    await inContext(() => eraseAccount(eve.accountId!))
+    expect(await blocksOf(id)).toEqual([])
+    expect(await rows('SELECT id FROM availability_calendar_connections WHERE account_id = ?', eve.accountId)).toEqual([])
   })
 })
