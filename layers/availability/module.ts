@@ -2,7 +2,7 @@
 // who plan for them (docs/specs/availability). This file grows with the build; it declares what the
 // code so far uses.
 import { z } from 'zod'
-import { ability, code, defineAbilities, defineModule, defineRecords, defineSettings, event, point, setting, task } from '#kit'
+import { ability, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'availability.settings.manage'
@@ -27,6 +27,10 @@ export default defineModule({
     'requests.second-reminder': setting.duration({ default: '1d', min: '0d', max: '7d', units: ['day'], change, audience: 'staff' }),
     'safeguarding.one-to-one': setting.boolean({ default: true, change, audience: 'staff' }),
     'polls.abandon-after': setting.duration({ default: '14d', min: '1d', max: '60d', units: ['day'], change, audience: 'staff' }),
+    'import.ics': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
+    'import.window': setting.duration({ default: '90d', min: '14d', max: '366d', units: ['day'], change, audience: 'staff' }),
+    'import.refresh': setting.duration({ default: '1h', min: '15m', max: '24h', units: ['minute', 'hour'], change, audience: 'staff' }),
+    'import.max-connections': setting.integer({ default: 3, min: 1, max: 5, change, audience: 'staff' }),
     'retention.past': setting.duration({ default: '90d', min: '0d', max: '730d', units: ['day'], change, audience: 'staff', onChange: 'confirm' }),
     'retention.history': setting.duration({ default: '12mo', min: '3mo', max: '36mo', units: ['month'], change, audience: 'staff', onChange: 'confirm' }),
   }),
@@ -63,6 +67,13 @@ export default defineModule({
     'availability.sweep-requests': task({ dailyAt: '04:30' }),
     // Reminders before the due date (R3).
     'availability.send-reminders': task({ every: '1h' }),
+    // I5: queues a refresh for each live connection due one, and drops a broken one's blocks after a week.
+    'availability.calendar-sync': task({ every: '15m' }),
+  },
+
+  jobs: {
+    // I5: one connection's refresh, on the bulk lane so a slow calendar never holds up the prompt one.
+    'availability.refresh-calendar': job({ payload: z.object({ connectionId: z.string() }), retries: 1, lane: 'bulk' }),
   },
 
   contributes: {
@@ -226,6 +237,20 @@ export default defineModule({
           subject: 'Cancelled: {{ title }}',
           body: '**{{ title }}**, {{ when }}, has been cancelled.',
           action: 'See the meeting',
+        },
+      },
+    }, {
+      id: 'availability.calendar-broken',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/calendars',
+      variables: { label: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'We cannot read your calendar "{{ label }}"',
+          body: 'Your calendar **{{ label }}** has not answered three times in a row, so its busy times will stop updating. Check the address, or disconnect it and connect it again.',
+          action: 'See your calendars',
         },
       },
     }],

@@ -107,6 +107,21 @@ test.describe('a member', () => {
     await noViolations(page)
   })
 
+  test('opens Your calendars, reads what is kept, and is told an address must be https', async ({ page }) => {
+    await visit(page, WEEK)
+    await page.getByRole('link', { name: 'Your calendars' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Your calendars' })).toBeVisible()
+    await expect(page.getByText('No calendars connected')).toBeVisible()
+    await noViolations(page)
+    await page.getByRole('button', { name: 'Connect a calendar' }).first().click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('textbox', { name: /^Name/ }).fill('Uni timetable')
+    await dialog.getByRole('textbox', { name: /^Secret address/ }).fill('http://calendar.example.org/basic.ics')
+    await dialog.getByRole('button', { name: 'Connect a calendar' }).click()
+    await expect(dialog.getByText(/starts with https/)).toBeVisible()
+    await noViolations(page)
+  })
+
   test('adds a change for some dates with a shared reason', async ({ page }) => {
     await visit(page, WEEK)
     await page.getByRole('button', { name: 'Add a change' }).click()

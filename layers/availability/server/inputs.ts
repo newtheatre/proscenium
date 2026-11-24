@@ -1,6 +1,6 @@
 // The shapes the routes accept (spec parts 2 and 3). Rules that need the database live in the services.
 import { z } from 'zod'
-import { LEVELS, UNMARKED, VOTES } from '../shared/levels'
+import { LEVELS, TENTATIVE_AS, UNMARKED, VOTES } from '../shared/levels'
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/) // not-policy: YYYY-MM-DD
 const clock = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/) // not-policy: HH:MM
@@ -105,3 +105,8 @@ export const changeInput = z.object({ ...meetingTime, tell: z.boolean() }).stric
 export const respondInput = z.object({ response: z.enum(['going', 'not-going']) }).strict()
 
 export const cancelInput = z.object({ reason: z.string().trim().max(200).nullable() }).strict() // not-policy: as the table's CHECK
+
+/** S14: a calendar address and what its tentative events become (I1, I3). */
+const label = z.string().trim().min(1).max(40) // not-policy: as the table's CHECK
+export const connectInput = z.object({ label, url: z.string().trim().min(1).max(2000), tentativeAs: z.enum(TENTATIVE_AS) }).strict() // not-policy: the address's limit in part 2
+export const connectionInput = z.object({ label, tentativeAs: z.enum(TENTATIVE_AS) }).strict()

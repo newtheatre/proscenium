@@ -86,3 +86,5 @@ export type { PerformanceBreakdown } from './measures/performances'
 export { readPersonMeasure } from './measures/people'
 export type { PersonMeasureAnswer } from './measures/people'
 export type { MeasureAnswer, MeasureListing } from './measures/service'
+// A web address that is HTTPS and not on a private or local network (C-49), for any module that fetches one a person gave.
+export { refusedAddress } from './webhooks/address'

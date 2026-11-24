@@ -19,6 +19,15 @@ export const MEETING_STATES = ['arranged', 'cancelled'] as const
 export type MeetingState = typeof MEETING_STATES[number]
 export const RESPONSES = ['pending', 'going', 'not-going'] as const
 export type Response = typeof RESPONSES[number]
+/** Calendar imports (I1 to I5): where a connection reads from, what a tentative event becomes, and its health. */
+export const CONNECTION_KINDS = ['ics', 'google', 'microsoft'] as const
+export type ConnectionKind = typeof CONNECTION_KINDS[number]
+export const TENTATIVE_AS = ['maybe', 'busy', 'ignore'] as const
+export type TentativeAs = typeof TENTATIVE_AS[number]
+export const CONNECTION_STATES = ['active', 'failing', 'broken'] as const
+export type ConnectionState = typeof CONNECTION_STATES[number]
+export const IMPORTED_LEVELS = ['busy', 'maybe'] as const
+export type ImportedLevel = typeof IMPORTED_LEVELS[number]
 
 const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$|^24:00$/
 

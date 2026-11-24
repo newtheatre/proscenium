@@ -5,7 +5,7 @@ import { resolveDay, weekdayOf, type ExceptionRow, type LineRow } from '../../se
 const line = (fields: Partial<LineRow>): LineRow => ({ patternId: 'avpt_a', startsOn: '2027-01-01', endsOn: null, changedAt: 1, weekday: 2, from: '18:00', until: '22:00', level: 'busy', ...fields })
 const entry = (fields: Partial<ExceptionRow>): ExceptionRow => ({ id: 'avex_a', firstDate: '2027-01-12', lastDate: '2027-01-12', weekdays: null, from: null, until: null, level: 'free', reason: null, reasonShared: false, createdAt: 1, ...fields })
 const day = (lines: LineRow[], exceptions: ExceptionRow[] = [], show = true) =>
-  resolveDay('2027-01-12', lines, exceptions, 'unknown', () => show).map(p => [p.start / 60, p.end / 60, p.level, p.reason])
+  resolveDay('2027-01-12', { lines, exceptions }, { unmarked: 'unknown', showReason: () => show }).map(p => [p.start / 60, p.end / 60, p.level, p.reason])
 
 describe('resolveDay', () => {
   it('numbers Monday 1 to Sunday 7', () => {
@@ -36,5 +36,20 @@ describe('resolveDay', () => {
     const exam = entry({ level: 'busy', reason: 'Exam' })
     expect(day([], [exam])).toEqual([[0, 24, 'busy', 'Exam']])
     expect(day([], [exam], false)).toEqual([[0, 24, 'busy', undefined]])
+  })
+})
+
+describe('imported calendar time (A4, I3, T-AV-36)', () => {
+  const imported = { '2027-01-12': [{ start: 1080, end: 1200, level: 'busy' as const, label: 'Uni' }, { start: 1140, end: 1260, level: 'maybe' as const, label: 'Uni' }] }
+  const run = (exceptions: ExceptionRow[], own = false) => resolveDay('2027-01-12', { lines: [line({ from: '17:00', until: '23:00', level: 'free' })], exceptions, imported }, { unmarked: 'unknown', showReason: () => true, own })
+    .map(p => [p.start / 60, p.end / 60, p.level, p.imported])
+
+  it('beats the pattern, with busy over maybe where blocks overlap, and is labelled only for the person', () => {
+    expect(run([])).toEqual([[0, 17, 'unknown', undefined], [17, 18, 'free', undefined], [18, 20, 'busy', undefined], [20, 21, 'maybe', undefined], [21, 23, 'free', undefined], [23, 24, 'unknown', undefined]])
+    expect(run([], true)[2]).toEqual([18, 20, 'busy', 'Uni'])
+  })
+
+  it('gives way to an exception the person paints', () => {
+    expect(run([entry({ from: '19:00', until: '20:00', level: 'free' })]).slice(2, 4)).toEqual([[18, 19, 'busy', undefined], [19, 20, 'free', undefined]])
   })
 })
