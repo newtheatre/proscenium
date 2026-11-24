@@ -82,6 +82,21 @@ export async function entryRows(range: LedgerRange, options: { afterId?: string,
   }))
 }
 
+export interface EntryCount {
+  accountId: string
+  kind: PostingKind
+  entries: number
+}
+
+/** How many sealed entries the range holds, by account and posting kind: an export's coverage without reading every row. */
+export async function entryCounts(range: LedgerRange): Promise<EntryCount[]> {
+  const rows = await all<{ account_id: string, kind: PostingKind, n: number }>(
+    `SELECT e.account_id, p.kind, count(*) AS n FROM finance_entries e JOIN finance_postings p ON p.id = e.posting_id
+    WHERE p.occurred_at >= ? AND p.occurred_at < ? AND ${SEALED} GROUP BY e.account_id, p.kind ORDER BY e.account_id, p.kind`,
+    range.startsAt, range.endsAt)
+  return rows.map(r => ({ accountId: r.account_id, kind: r.kind, entries: r.n }))
+}
+
 export interface TaxTotal {
   taxCode: string
   /** The kind of account the entries are on: income for sales, expense or asset for purchases. */
