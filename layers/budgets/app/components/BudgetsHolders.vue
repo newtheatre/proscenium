@@ -1,8 +1,7 @@
-<!-- A budget's holders (BC-14): the people who approve spending on its lines, each given the Budget
-     holder role on this budget alone, ending at the role's own end. Whoever manages budgets adds and
-     removes them here; removing can be undone from the toast. -->
+<!-- A budget's holders (BC-14): the people who approve spending on its lines, within budget. Whoever
+     manages budgets adds and removes them here; removing can be undone from the toast. -->
 <script setup lang="ts">
-interface Holder { id: string, accountId: string, name: string, roleName: string, expiresAt: number | null }
+interface Holder { accountId: string, name: string, addedAt: number }
 
 const props = defineProps<{ budgetId: string, holders: Holder[], canManage: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -43,7 +42,7 @@ async function save() {
 }
 async function remove(h: Holder) {
   try {
-    await $api(`/api/budgets/budgets/${props.budgetId}/holders/${h.id}` as string, { method: 'DELETE' })
+    await $api(`/api/budgets/budgets/${props.budgetId}/holders/${h.accountId}` as string, { method: 'DELETE' })
     offer(t('budgets.screens.holders.removed', { name: h.name }), () => give(h.accountId))
     emit('changed')
   }
@@ -52,7 +51,7 @@ async function remove(h: Holder) {
     toast.add({ title: r.reason, description: r.remedy, color: 'error' })
   }
 }
-const describe = (h: Holder) => [h.roleName, h.expiresAt ? t('budgets.screens.holders.until', { day: day(h.expiresAt - 1) }) : null].filter(Boolean).join(' · ')
+const describe = (h: Holder) => t('budgets.screens.holders.since', { day: day(h.addedAt) })
 </script>
 
 <template>
@@ -84,7 +83,7 @@ const describe = (h: Holder) => [h.roleName, h.expiresAt ? t('budgets.screens.ho
     >
       <RecordListItem
         v-for="h in holders"
-        :key="h.id"
+        :key="h.accountId"
         icon="i-lucide-user"
         :name="h.name"
         :description="describe(h)"

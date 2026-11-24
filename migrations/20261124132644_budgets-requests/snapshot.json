@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ae112bfa-2fb3-4851-b25f-14a4192cc5c0",
+  "id": "ce3f4bd5-fbb6-41db-8b21-2381cc008bcb",
   "prevIds": [
-    "4d74b8f1-0f26-4c0a-a8a4-4b89cebeea5a"
+    "28015892-8691-4971-b5c1-5a63aba2324d"
   ],
   "ddl": [
     {
@@ -236,6 +236,10 @@
     },
     {
       "name": "budgets_categories",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_holders",
       "entityType": "tables"
     },
     {
@@ -7349,6 +7353,46 @@
     {
       "table": "budgets_categories",
       "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_holders",
+      "name": "budget_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_holders",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_holders",
+      "name": "added_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_holders",
+      "name": "added_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -23585,6 +23629,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "budgets_holders",
+      "name": "budgets_holders_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "budgets_line_amounts",
       "name": "budgets_line_amounts_line",
       "columns": [
@@ -28767,6 +28825,21 @@
       "entityType": "fks"
     },
     {
+      "table": "budgets_holders",
+      "name": "fk_budgets_holders_budget_id_budgets_budgets_id_fk",
+      "columns": [
+        "budget_id"
+      ],
+      "tableTo": "budgets_budgets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "budgets_line_amounts",
       "name": "fk_budgets_line_amounts_line_id_budgets_lines_id_fk",
       "columns": [
@@ -30818,6 +30891,16 @@
       "columns": [
         "stock_item_id",
         "location_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_holders",
+      "name": "budgets_holders_pk",
+      "columns": [
+        "budget_id",
+        "account_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"

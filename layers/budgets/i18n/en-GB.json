@@ -137,12 +137,11 @@
   "budgets.screens.holders.add": "Add a holder",
   "budgets.screens.holders.added": "Holder added",
   "budgets.screens.holders.removed": "{name} no longer holds this budget",
-  "budgets.screens.holders.until": "until {day}",
   "budgets.screens.holders.none": "Nobody holds this budget yet.",
   "budgets.screens.holders.remove": "Remove",
   "budgets.screens.holders.actions": "Actions for {name}",
   "budgets.screens.holders.person": "Person",
-  "budgets.screens.holders.person-help": "They are given the Budget holder role on this budget only, until the role's usual end.",
+  "budgets.screens.holders.person-help": "They approve requests and claims on this budget's lines, within budget, until they are removed.",
   "budgets.screens.holders.you": "You hold this budget",
   "budgets.settings.requests.lapse-after.label": "Approved requests lapse after",
   "budgets.settings.requests.lapse-after.help": "An approved request that nothing has been spent against stops counting as committed after this long.",
@@ -191,5 +190,6 @@
   "budgets.screens.approvals.needs-treasurer": "{amount} over budget: needs the treasurer",
   "budgets.screens.approvals.note": "Why",
   "budgets.screens.approvals.note-help": "The person who asked reads this.",
-  "budgets.screens.approvals.actions": "Actions for this request"
+  "budgets.screens.approvals.actions": "Actions for this request",
+  "budgets.screens.holders.since": "since {day}"
 }

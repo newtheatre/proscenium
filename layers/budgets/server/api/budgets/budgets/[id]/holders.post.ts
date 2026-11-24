@@ -1,11 +1,10 @@
-// Makes somebody a holder of this budget (BC-14): the Budget holder role, given on this budget only,
-// ending at the role's own end like any grant. Core's rules hold: not oneself, and only what one holds.
+// Names somebody as a holder of this budget (BC-14). Holding is a fact read at each request, so
+// nothing has to end when they stop: removing them is enough.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
-import { defineRoute } from '#kit'
-import { giveRoleOn } from '#modules/core'
+import { defineRoute, refuse } from '#kit'
 import { requireBudget } from '../../../../budgets'
-import { HOLDER_ROLE } from '../../../../holders'
+import { addHolder } from '../../../../holders'
 
 export default defineRoute({
   ability: 'budgets.budget.manage',
@@ -13,6 +12,7 @@ export default defineRoute({
   input: z.object({ accountId: z.string().max(40) }).strict(), // not-policy: ids are short
 }, async (event, { input, unit, actor }) => {
   const budget = await requireBudget(getRouterParam(event, 'id'))
-  const given = await giveRoleOn(unit, actor, { accountId: input.accountId, roleKey: HOLDER_ROLE, record: ['budgets.budget', budget.id] })
-  return { grantId: given.id, expiresAt: given.expiresAt }
+  if (budget.state === 'closed') refuse('budgets.budget.state', 'This budget is closed.', { status: 409 })
+  await addHolder(unit, actor, budget.id, input.accountId)
+  return { accountId: input.accountId }
 })

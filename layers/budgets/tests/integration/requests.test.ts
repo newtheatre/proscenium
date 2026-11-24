@@ -103,7 +103,7 @@ beforeAll(async () => {
     await seed({ payload: { moduleId: 'budgets' } } as any, unit.view())
     await unit.commit()
     await ensureVocabularies('core')
-    await ensureModuleDefaults('budgets')
+    await ensureModuleDefaults('budgets', 'acc_testenabler')
   })
   manager = await account('Mo Manager', MANAGE)
   treasurer = await account('Tara Treasurer', [...MANAGE, 'budgets.claim.approve-any'])

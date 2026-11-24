@@ -125,6 +125,19 @@ export const lineSources = defineTable('budgets_line_sources', {
   extra: t => [primaryKey({ columns: [t.lineId, t.accountKey] })],
 })
 
+/** A budget's holders (BC-14): who approves spending on its lines, read as the fact budgets.holder-of. */
+export const holders = defineTable('budgets_holders', {
+  budgetId: col.ref('budgets_budgets'),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'alias' }),
+  addedBy: col.account('added_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  addedAt: col.timestamp('added_at').notNull(),
+}, {
+  realm: 'operational',
+  subject: 'account_id',
+  extra: t => [primaryKey({ columns: [t.budgetId, t.accountId] }), index('budgets_holders_account').on(t.accountId)],
+})
+
+
 export const REQUEST_STATES = ['requested', 'approved', 'declined', 'withdrawn', 'fulfilled', 'lapsed'] as const
 
 /** Asking to spend on a line before spending (BC-15): once approved, it counts as committed until it is fulfilled or lapses. */
@@ -169,4 +182,4 @@ export const requests = defineTable('budgets_spending_requests', {
   ],
 })
 
-export const tables = { categories, budgets, lines, lineAmounts, lineSources, requests }
+export const tables = { categories, budgets, lines, lineAmounts, lineSources, holders, requests }

@@ -21,7 +21,7 @@ interface View {
   totals: Totals
   history: History[]
   subject: { label: string, to: string | null } | null
-  holders: { id: string, accountId: string, name: string, roleName: string, expiresAt: number | null }[]
+  holders: { accountId: string, name: string, addedAt: number }[]
   closeDue: boolean
   canManage: boolean
   canApprove: boolean

@@ -2,7 +2,7 @@
 // budgets for a production, a department and year, a season or a general purpose, approved by someone
 // other than who proposed them, with spent read from Finance. Requests and claims follow; this file
 // declares only what is built.
-import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, setting, task } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, setting, task } from '#kit'
 import { z } from 'zod'
 import { tables } from './server/db/schema'
 
@@ -25,7 +25,7 @@ export default defineModule({
     'budget.view': ability({ on: 'budgets.budget' }),
     'budget.manage': ability({ implies: ['budget.view'] }),
     'budget.approve': ability({ risk: 'privileged', implies: ['budget.view'] }),
-    // Given per budget through the Budget holder role (BC-14); it approves spending on its lines.
+    // Approves spending on a budget's lines; held through the fact holder-of (BC-14).
     'budget.hold': ability({ on: 'budgets.budget', implies: ['budget.view'] }),
     'category.manage': ability({}),
     'settings.manage': ability({ risk: 'privileged' }),
@@ -33,6 +33,11 @@ export default defineModule({
     'request.make': ability({}),
     // The treasurer: decides over budget (C3). Claims add what it implies.
     'claim.approve-any': ability({ risk: 'privileged' }),
+  }),
+
+  // Read from budgets_holders at each request (decision 0009): authority from a fact, not a standing grant.
+  facts: defineFacts('budgets', {
+    'holder-of': factDecl({ on: 'budgets.budget', defaults: ['budgets.budget.hold'] }),
   }),
 
   settings: defineSettings('budgets', {
@@ -65,7 +70,6 @@ export default defineModule({
       { id: 'claims-payable', name: 'Expense claims to pay', kind: 'liability' },
       { id: 'expenses', name: 'General expenses', kind: 'expense' },
     ],
-    'core.role-preset': [{ id: 'budgets.holder', key: 'budget-holder', name: 'Budget holder', description: 'Given on one budget: approves spending on its lines, within budget.', abilities: ['budgets.budget.hold'] }],
     // The Budget tab and fact on a production's page (BC-11).
     'core.record-tab': [{ id: 'budgets.production', record: 'core.production', ability: 'budgets.budget.view', component: 'BudgetsProductionTab', order: 40 }],
     'core.record-fact': [{ id: 'budgets.production', record: 'core.production', ability: 'budgets.budget.view', component: 'BudgetsProductionFact', order: 40 }],
