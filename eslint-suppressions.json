@@ -1,4 +1,27 @@
 {
+  "layers/availability/app/composables/useMyAvailability.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "layers/availability/server/entries.ts": {
+    "max-params": {
+      "count": 2
+    }
+  },
+  "layers/availability/server/levels.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/availability/server/paint.ts": {
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
   "layers/awards/app/pages/console/awards/[id].vue": {
     "max-lines": {
       "count": 1
@@ -655,6 +678,9 @@
     }
   },
   "layers/core/app/components/SignInProviders.vue": {
+    "max-lines": {
+      "count": 1
+    },
     "vue/max-lines-per-block": {
       "count": 1
     }
@@ -802,6 +828,14 @@
       "count": 2
     }
   },
+  "layers/core/kit/measures.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
   "layers/core/kit/modules-store.ts": {
     "complexity": {
       "count": 1
@@ -812,7 +846,7 @@
   },
   "layers/core/kit/registry.ts": {
     "complexity": {
-      "count": 3
+      "count": 4
     },
     "max-depth": {
       "count": 4
@@ -824,7 +858,7 @@
       "count": 1
     },
     "sonarjs/cognitive-complexity": {
-      "count": 2
+      "count": 3
     }
   },
   "layers/core/kit/requirements.ts": {
@@ -892,6 +926,11 @@
   },
   "layers/core/module/identity.ts": {
     "max-lines": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/accounts/[id].get.ts": {
+    "complexity": {
       "count": 1
     }
   },
@@ -974,6 +1013,14 @@
       "count": 1
     }
   },
+  "layers/core/server/api/core/sign-in-providers/[provider].put.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
   "layers/core/server/api/core/sign-in/passkey.post.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
@@ -1033,6 +1080,11 @@
     },
     "sonarjs/cognitive-complexity": {
       "count": 3
+    }
+  },
+  "layers/core/server/identity/age.ts": {
+    "max-params": {
+      "count": 1
     }
   },
   "layers/core/server/identity/data-requests.ts": {
@@ -1109,6 +1161,9 @@
   "layers/core/server/identity/oidc.ts": {
     "complexity": {
       "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
     }
   },
   "layers/core/server/identity/roles.ts": {
@@ -1135,6 +1190,14 @@
   "layers/core/server/interface/access.ts": {
     "complexity": {
       "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/measures/service.ts": {
+    "complexity": {
+      "count": 2
     },
     "sonarjs/cognitive-complexity": {
       "count": 1
@@ -1562,7 +1625,7 @@
   },
   "layers/forms/shared/engine/conditions.ts": {
     "complexity": {
-      "count": 1
+      "count": 2
     },
     "sonarjs/cognitive-complexity": {
       "count": 2
@@ -1608,6 +1671,14 @@
     }
   },
   "layers/front-of-house/app/pages/admin/modules/front-of-house/checklists.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/app/pages/console/front-of-house/crew-calls/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
     "vue/max-lines-per-block": {
       "count": 1
     }
@@ -1676,6 +1747,11 @@
       "count": 1
     }
   },
+  "layers/front-of-house/server/grid.ts": {
+    "complexity": {
+      "count": 2
+    }
+  },
   "layers/front-of-house/server/incidents.ts": {
     "complexity": {
       "count": 1
@@ -1684,8 +1760,40 @@
       "count": 1
     }
   },
+  "layers/front-of-house/server/perks.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
   "layers/front-of-house/server/rota.ts": {
     "complexity": {
+      "count": 1
+    }
+  },
+  "layers/invoicing/app/pages/admin/modules/invoicing/exports/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/invoicing/server/build.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/invoicing/server/profiles.ts": {
+    "sonarjs/cognitive-complexity": {
       "count": 1
     }
   },
@@ -1919,6 +2027,14 @@
       "count": 1
     }
   },
+  "layers/person-busy/server/services.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
   "layers/promotions/app/pages/console/promotions/[id].vue": {
     "complexity": {
       "count": 1
@@ -1996,6 +2112,11 @@
       "count": 1
     }
   },
+  "layers/spaces/app/pages/console/spaces/requests.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
   "layers/spaces/app/pages/members/spaces/book.vue": {
     "max-lines": {
       "count": 1
@@ -2018,6 +2139,21 @@
     },
     "max-params": {
       "count": 2
+    }
+  },
+  "layers/spaces/server/bumping.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/spaces/server/contributions/core.change-impact/room-bookings.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/spaces/server/displace.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
     }
   },
   "layers/spaces/server/reading.ts": {
