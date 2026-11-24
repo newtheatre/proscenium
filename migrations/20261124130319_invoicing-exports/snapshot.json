@@ -1,11 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "17d6acfe-99e2-49fa-aa0c-98ed548aeebe",
+  "id": "9e8c7b00-a0da-436f-ba8a-ce8be764be5e",
   "prevIds": [
-    "253a73f7-3dc8-4fca-8c87-bdcbf1975c1d",
-    "27eee593-bbbf-4646-8a7c-179f088b6b30",
-    "6a5dbaff-cdd8-40bb-9e8e-dde482daafb1"
+    "7cf5fe44-b9dc-49fd-8826-1d97028a6e3d"
   ],
   "ddl": [
     {
@@ -2523,6 +2521,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -6883,6 +6891,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "'all'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },

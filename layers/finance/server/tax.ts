@@ -1,8 +1,8 @@
 // What other modules read of the ledger beyond balances (F-A2): sealed entry rows for an export, and
 // totals by tax code for a VAT report. Neither lets a module read finance_entries itself. A route
 // that serves either to a person requires finance.ledger.view, since both cover the whole ledger.
-import { all } from '#kit'
-import type { PostingKind, PostingPurpose } from './ledger'
+import { all, useSetting } from '#kit'
+import type { EntryInput, PostingKind, PostingPurpose } from './ledger'
 
 export interface LedgerRange {
   /** Facts that happened from this instant, inclusive. */
@@ -37,6 +37,7 @@ export interface EntryRow {
 
 /** The most rows one page holds. */
 export const ENTRY_PAGE_MAX = 1000 // not-policy: a page one Worker reads comfortably
+const BASIS = 10_000 // not-policy: basis points in a whole
 
 const SEALED = 'EXISTS (SELECT 1 FROM finance_seals s WHERE s.posting_id = p.id)'
 
@@ -146,4 +147,49 @@ export async function listTaxCodes(options: { activeOnly?: boolean } = {}): Prom
     FROM finance_tax_codes t ${options.activeOnly ? 'WHERE t.active = 1' : ''}
     ORDER BY t.code <> 'none', t.rate_basis_points DESC, t.code`)
   return rows.map(r => ({ code: r.code, label: r.label, rateBasisPoints: r.rate_basis_points, active: r.active === 1, inScope: r.in_scope === 1, used: r.used === 1 }))
+}
+
+/** An entry whose amount includes VAT at `taxCode`, as a till price does (FIN-07). */
+export type InclusiveEntry = Omit<EntryInput, 'taxMinor'>
+
+/**
+ * Splits VAT-inclusive amounts at posting (BO-78, BAR-60): each entry becomes its net amount with
+ * the VAT as its tax_minor, and the VAT goes on finance.vat-output (sales) or finance.vat-input
+ * (purchases), one entry per code. A theatre not registered for VAT records no codes at all.
+ */
+export async function splitVat(entries: InclusiveEntry[], side: 'output' | 'input'): Promise<EntryInput[]> {
+  const coded = entries.filter(e => (e.taxCode ?? 'none') !== 'none')
+  if (!coded.length) return entries
+  if (await useSetting('finance.tax.registered') !== true) return entries.map(e => ({ ...e, taxCode: 'none' }))
+  const rates = new Map((await all<{ code: string, rate_basis_points: number }>('SELECT code, rate_basis_points FROM finance_tax_codes WHERE code IN (SELECT value FROM json_each(?))', JSON.stringify([...new Set(coded.map(e => e.taxCode))])))
+    .map(r => [r.code, r.rate_basis_points]))
+  const vat = new Map<string, number>()
+  const out: EntryInput[] = entries.map((e) => {
+    const code = e.taxCode ?? 'none'
+    const rate = rates.get(code) ?? 0
+    if (code === 'none' || !rate) return { ...e, taxMinor: 0 }
+    const tax = vatIn(e.amountMinor, rate)
+    if (tax) vat.set(code, (vat.get(code) ?? 0) + tax)
+    return { ...e, amountMinor: e.amountMinor - tax, taxMinor: tax }
+  })
+  for (const [code, amountMinor] of vat) {
+    if (amountMinor) out.push({ account: { key: `finance.vat-${side}` }, amountMinor, forModule: 'finance', taxCode: code, taxMinor: 0 })
+  }
+  return out
+}
+
+/** The tax code a price sells at when its product or ticket type names none (FIN-07). */
+export async function defaultTaxCode(): Promise<string> {
+  return await useSetting('finance.tax.default-code') as string
+}
+
+/** The rate of each code, or none at all while the theatre is not registered, when nothing carries VAT. */
+export async function vatRates(): Promise<Map<string, number>> {
+  if (await useSetting('finance.tax.registered') !== true) return new Map()
+  return new Map((await all<{ code: string, rate_basis_points: number }>('SELECT code, rate_basis_points FROM finance_tax_codes')).map(r => [r.code, r.rate_basis_points]))
+}
+
+/** The VAT inside a VAT-inclusive amount at a rate, signed like it, as splitVat takes it out. */
+export function vatIn(amountMinor: number, rateBasisPoints: number): number {
+  return rateBasisPoints ? Math.sign(amountMinor) * Math.round(Math.abs(amountMinor) * rateBasisPoints / (BASIS + rateBasisPoints)) : 0
 }

@@ -1,7 +1,6 @@
 {
   "finance.module.name": "Finance",
   "finance.module.description": "The ledger: every sale, refund, fee and payout as a balanced, sealed posting, with periods a treasurer closes.",
-
   "finance.settings-sections.periods": "Accounting periods",
   "finance.settings-sections.year": "Financial year",
   "finance.settings-sections.tax": "Tax",
@@ -20,12 +19,13 @@
   "finance.settings.tax.scheme.options.standard": "Standard accounting: VAT is due when you invoice",
   "finance.settings.tax.scheme.options.cash": "Cash accounting: VAT is due when you are paid",
   "finance.settings.rules.tax-number-needed": "Add the theatre's VAT registration number before you turn on VAT.",
-
   "finance.abilities.ledger.view.label": "See the ledger",
   "finance.abilities.ledger.export.label": "Export the ledger as a spreadsheet",
   "finance.abilities.posting.correct.label": "Reverse a posting to correct a mistake",
   "finance.abilities.account.manage.label": "Rename, recode and add ledger accounts",
   "finance.abilities.period.close.label": "Close an accounting period",
   "finance.abilities.period.reopen.label": "Reopen a closed accounting period",
-  "finance.abilities.settings.manage.label": "Change finance settings"
+  "finance.abilities.settings.manage.label": "Change finance settings",
+  "finance.settings.tax.default-code.label": "Usual tax code for sales",
+  "finance.settings.tax.default-code.help": "Bar products and ticket types sell at this code unless they name their own. Prices include the VAT, which is split out when each sale is recorded."
 }
