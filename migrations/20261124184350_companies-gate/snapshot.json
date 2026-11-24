@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "6dbbfa71-7878-4d7b-a7b4-ee8808135ac2",
+  "id": "de9215a8-6895-4472-83e2-9416521ad4a8",
   "prevIds": [
-    "2a1ff70d-800e-4e89-bba5-d471a3ba1d81"
+    "c9f3d26f-dbce-45ed-9eff-4db04123576c"
   ],
   "ddl": [
     {
@@ -14081,6 +14081,16 @@
       "notNull": false,
       "autoincrement": false,
       "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "shape",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'timed'",
       "generated": null,
       "entityType": "columns"
     },
