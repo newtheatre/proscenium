@@ -4,8 +4,11 @@
 // (a changed type, a lowered data class) and classes the rest as safe, caution or breaking.
 import { all, can, first, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { actionList } from './actions'
+import { getVersion } from './versions'
 import { sources } from './sources'
 import { DATA_CLASSES, FORMAT, checkDefinition, hasStages, parseDefinition, publishable, questionsOf, withoutAnswerKey, type DataClass, type Definition, type Fault, type Limits, type Problem, type Question } from '../shared/engine'
+
+export { VERSION, getVersion, listVersions, type VersionRow } from './versions'
 
 export interface FormRow {
   id: string
@@ -34,7 +37,6 @@ export async function authorDefinition(def: Definition, actor: Actor, formId: st
 
 export interface DraftRow { definition: string, editRevision: number, editedBy: string, updatedAt: number }
 export interface FieldRow { questionId: string, key: string, type: string, dataClass: DataClass, label: string, firstVersion: number, retiredInVersion: number | null }
-export interface VersionRow { id: string, number: number, definition: string, definitionHash: string, changeSummary: string, publishedBy: string, publishedAt: number }
 
 const FORM = `id, slug, title, mode, status, live_version_id AS liveVersionId, anonymous, allow_edits AS allowEdits, retention_days AS retentionDays,
   retention_declined_days AS retentionDeclinedDays, created_by AS createdBy, created_at AS createdAt, archived_at AS archivedAt`
@@ -76,10 +78,6 @@ export async function getDraft(formId: string): Promise<DraftRow> {
 }
 
 export const getFields = (formId: string) => all<FieldRow>('SELECT question_id AS questionId, key, type, data_class AS dataClass, label, first_version AS firstVersion, retired_in_version AS retiredInVersion FROM forms_fields WHERE form_id = ?', formId)
-
-export const VERSION = 'id, number, definition, definition_hash AS definitionHash, change_summary AS changeSummary, published_by AS publishedBy, created_at AS publishedAt'
-export const getVersion = (id: string | null) => id ? first<VersionRow>(`SELECT ${VERSION} FROM forms_versions WHERE id = ?`, id) : Promise.resolve(null)
-export const listVersions = (formId: string) => all<Omit<VersionRow, 'definition'>>('SELECT id, number, definition_hash AS definitionHash, change_summary AS changeSummary, published_by AS publishedBy, created_at AS publishedAt FROM forms_versions WHERE form_id = ? ORDER BY number DESC', formId)
 
 export async function accountName(id: string): Promise<string | null> {
   const row = await first<{ name: string | null }>('SELECT name AS name FROM core_accounts WHERE id = ?', id)
