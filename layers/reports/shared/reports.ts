@@ -80,6 +80,8 @@ export interface ReportView {
   period: { rule: PeriodRule, from: string, to: string }
   scope: { kind: ScopeKind, id: string | null, title: string | null }
   saved: { editable: boolean, basedOn: string | null, shareRole: string | null, archived: boolean } | null
+  /** Whether the reader may save reports of their own, so the page offers Save a copy. */
+  mayCreate: boolean
 }
 
 export type FigureAnswer

@@ -4,6 +4,8 @@
 <script setup lang="ts">
 import { useIntervalFn } from '@vueuse/core'
 import type { RunOpened } from '../../../../composables/useRunState'
+import type { ReportColumn } from '../../../../../shared/reports'
+import { cellKey } from '../../../../../shared/table'
 
 definePageMeta({ layout: 'console' })
 
@@ -22,13 +24,22 @@ const working = computed(() => data.value?.state === 'queued' || data.value?.sta
 const { pause } = useIntervalFn(() => { if (working.value) void refresh() }, WAIT)
 watch(working, (now) => { if (!now) pause() })
 
+const { words, keyName } = useReportWords()
 const run = computed(() => data.value)
-const question = computed(() => run.value ? questionText(run.value.question.scope.title, run.value.question.period.from, run.value.question.period.to, run.value.question.by) : '')
+const question = computed(() => {
+  const q = run.value?.question
+  return q ? questionText(q.scope.title, q.period.from, q.period.to, q.rowsBy ? keyName(q.rowsBy, q.keyLabels) : undefined, q.acrossBy ? keyName(q.acrossBy, q.keyLabels) : undefined) : ''
+})
+const filterChip = computed(() => {
+  const q = run.value?.question
+  return q?.filter ? `${keyName(q.filter.key, q.keyLabels)}: ${q.filter.values.map(v => q.filter!.labels[v] ?? v).join(', ')}` : null
+})
 const table = computed(() => run.value?.table ?? null)
-const facts = computed(() => (table.value?.visible ?? []).map(f => ({ label: t(f.label), value: text(f.unit, table.value!.totals[f.id]).text })))
+const label = (c: ReportColumn) => c.kind === 'formula' ? c.label : t(c.label)
+const facts = computed(() => (table.value?.columns ?? []).flatMap((c, i) => c.shown ? [{ label: label(c), value: text(c.unit, table.value!.totals[cellKey(i, null)]).text }] : []))
 const figureLabel = (measure: string) => {
-  const figure = run.value?.question.figures.find(f => f.id === measure)
-  return figure ? t(figure.label) : measure
+  const figure = run.value?.question.columns.find(c => c.kind === 'figure' && c.id === measure)
+  return figure && !(figure.kind === 'figure' && figure.gone) ? label(figure) : measure
 }
 const actions = computed(() => run.value?.state === 'done' && table.value
   ? [{ label: t('reports.copy.download'), icon: 'i-lucide-download', to: `/api/reports/runs/${id.value}/csv` }]
@@ -37,7 +48,7 @@ const actions = computed(() => run.value?.state === 'done' && table.value
 
 <template>
   <PageFrame
-    :title="run ? t(run.label) : t('reports.runs.title')"
+    :title="run ? words(run.name) : t('reports.runs.title')"
     :description="question"
     :trail="[{ label: t('reports.title'), to: '/console/reports' }, { label: t('reports.runs.title'), to: '/console/reports/runs' }]"
   >
@@ -94,16 +105,21 @@ const actions = computed(() => run.value?.state === 'done' && table.value
             icon="i-lucide-archive"
           />
           <template v-else>
+            <UBadge
+              v-if="filterChip"
+              :label="filterChip"
+              icon="i-lucide-filter"
+              color="neutral"
+              variant="outline"
+            />
             <FactStrip
               :facts="facts"
               framed
             />
             <ReportTable
-              v-if="loaded.question.by && table.rows.length"
-              :figures="table.visible"
-              :rows="table.rows"
-              :totals="table.totals"
-              :by="loaded.question.by"
+              v-if="loaded.question.rowsBy && table.rows.length"
+              :table="table"
+              :by-label="keyName(loaded.question.rowsBy, loaded.question.keyLabels)"
               :caption="question"
             />
             <ul

@@ -1,48 +1,49 @@
-// Reads a report's figures live, in parallel, for the page (rule R1): each readable figure once by
-// the chosen breakdown and once for its total, because a distinct or level figure's total is never
-// the sum of its rows (M6). Nothing is kept.
-import type { FigureAnswer, FigureColumn, PageBreakdown, ReportView } from '../../shared/reports'
+// Reads a report's figures live, in parallel, for the page (rule R1): each readable figure by the
+// rows (and the pivot), each row's and group's total and the grand total, because a distinct or
+// level figure's total is never the sum of its parts (M6). Nothing is kept. The table is laid out
+// by the same function a copy uses (B7).
+import type { FigureAnswer, ReportView } from '../../shared/reports'
+import { gather, readsFor } from '../../shared/plan'
 import { layOut, type OkAnswer } from '../../shared/table'
 
-export function useReportFigures(view: Ref<ReportView | undefined | null>, by: Ref<PageBreakdown | undefined>) {
+export function useReportFigures(view: Ref<ReportView | undefined | null>, by: Ref<string | undefined>) {
+  const { t } = useT()
   const { $api } = useNuxtApp()
   const { dayNamed, dateTime, monthYear } = useDates()
 
-  const ready = computed(() => !!view.value && (view.value.report.scope === 'none' || !!view.value.scope.id))
-  const shown = computed<FigureColumn[]>(() => (view.value?.figures ?? []).filter(f => f.readable))
-  const question = computed(() => view.value && ready.value
-    ? { from: view.value.period.from, to: view.value.period.to, ...(view.value.scope.id ? { scope: `${view.value.scope.kind}:${view.value.scope.id}` } : {}) }
-    : null)
+  const ready = computed(() => !!view.value && (view.value.scopeKind === 'none' || !!view.value.scope.id))
+  const question = computed(() => {
+    const v = view.value
+    if (!v || !ready.value) return null
+    return {
+      from: v.period.from,
+      to: v.period.to,
+      ...(v.scope.id ? { scope: `${v.scope.kind}:${v.scope.id}` } : {}),
+      ...(v.filter ? { filter: `${v.filter.key}:${v.filter.values.join(',')}` } : {}),
+    }
+  })
+  const reads = computed(() => view.value ? readsFor(view.value.columns, by.value, view.value.acrossBy ?? undefined) : [])
 
-  const read = (id: string, withBy: boolean) => $api<FigureAnswer>('/api/reports/figures', { query: { id, ...question.value, ...(withBy && by.value ? { by: by.value } : {}) } })
   const { data, status, error, refresh } = useAsyncData(
-    () => `reports:figures:${view.value?.report.id}:${JSON.stringify(question.value)}:${by.value ?? ''}`,
+    () => `reports:figures:${view.value?.id}:${JSON.stringify(question.value)}:${by.value ?? ''}:${JSON.stringify(view.value?.columns.map(c => c.kind === 'figure' ? c.id : c.formula))}`,
     async () => {
       if (!question.value) return null
-      const ids = shown.value.map(f => f.id)
-      const [rows, totals] = await Promise.all([
-        by.value ? Promise.all(ids.map(id => read(id, true))) : Promise.resolve(ids.map(() => null)),
-        Promise.all(ids.map(id => read(id, false))),
-      ])
-      return Object.fromEntries(ids.map((id, i) => [id, { rows: rows[i] ?? null, total: totals[i]! }]))
+      return await Promise.all(reads.value.map(r => $api<FigureAnswer>('/api/reports/figures', { query: { id: r.figure, ...question.value, ...(r.by.length ? { by: r.by.join(',') } : {}) } })))
     },
-    { watch: [question, by] },
+    { watch: [question, reads] },
   )
 
-  function name(key: string, answer: OkAnswer) {
-    if (by.value === 'day') return { label: dayNamed(key), sortBy: key }
-    if (by.value === 'month') return { label: monthYear(`${key}-01`), sortBy: key }
-    const title = answer.labels[key] ?? key
-    const starts = answer.starts?.[key]
+  function name(key: string, value: string, answer: OkAnswer) {
+    if (key === 'day') return { label: dayNamed(value), sortBy: value }
+    if (key === 'month') return { label: monthYear(`${value}-01`), sortBy: value }
+    const title = answer.labels[value] ?? value
+    const starts = key === 'performance' ? answer.starts?.[value] : undefined
     return starts ? { label: `${title}, ${dateTime(starts)}`, sortBy: starts } : { label: title, sortBy: title.toLowerCase() }
   }
 
-  const table = computed(() => layOut(shown.value, data.value ?? {}, by.value, name))
-  // A figure not yet answered counts as visible until its answer says otherwise.
-  const visible = computed(() => data.value ? table.value.visible : shown.value)
-  const hidden = computed(() => (view.value?.figures.length ?? 0) - visible.value.length)
-  const totals = computed(() => table.value.totals)
-  const rows = computed(() => table.value.rows)
+  const table = computed(() => view.value && data.value
+    ? layOut(view.value.columns, gather(reads.value, data.value), { rowsBy: by.value, acrossBy: view.value.acrossBy ?? undefined, name, totalLabel: t('reports.total') })
+    : null)
 
-  return { ready, visible, hidden, totals, rows, status, error, refresh }
+  return { ready, table, status, error, refresh }
 }

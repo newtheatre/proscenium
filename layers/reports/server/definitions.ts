@@ -204,17 +204,18 @@ export async function setArchived(unit: UnitView, actor: Actor, id: string, arch
   unit.audit({ action: 'state', record: ['reports.definition', id], detail: { to } })
 }
 
-export interface SavedListing { id: string, name: string, description: string | null, basedOn: string | null, mine: boolean, shared: boolean, archived: boolean }
+export interface SavedListing { id: string, name: string, description: string | null, basedOn: string | null, mine: boolean, shared: boolean, archived: boolean, editable: boolean }
 
 /** The saved reports this person may open: their own, those shared with a role they hold, all for a manager. */
 export async function savedFor(actor: Actor): Promise<SavedListing[]> {
   if (!(await can(actor, 'reports.report.view' as never)).allowed) return []
   const manager = (await can(actor, 'reports.report.manage' as never)).allowed
+  const creator = (await can(actor, 'reports.report.create' as never)).allowed
   const mine = actor.accountId ? inAccountScope('made_by', actor.accountId) : sql`0`
   const roles = rolesOf(actor)
   const shared = roles.length ? sql`share_role IN (SELECT value FROM json_each(${JSON.stringify(roles)}))` : sql`0`
   const rows = await useDb().all<DefinitionRow & { is_mine: number }>(sql`SELECT *, (${mine}) AS is_mine FROM reports_definitions ${manager ? sql`` : sql`WHERE (${mine}) OR (${shared})`} ORDER BY lower(name)`)
-  return rows.map(r => ({ id: r.id, name: r.name, description: r.description, basedOn: r.based_on, mine: !!r.is_mine, shared: !!r.share_role, archived: r.state === 'archived' }))
+  return rows.map(r => ({ id: r.id, name: r.name, description: r.description, basedOn: r.based_on, mine: !!r.is_mine, shared: !!r.share_role, archived: r.state === 'archived', editable: manager || (!!r.is_mine && creator) }))
 }
 
 /** A saved report as the page draws it, or as the builder edits it. */

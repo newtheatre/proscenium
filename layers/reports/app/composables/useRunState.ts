@@ -1,5 +1,5 @@
 // A copy as the screens show it: its state as a badge, and the shape the server sends.
-import type { FigureColumn, PageBreakdown, PeriodRule, ScopeKind } from '../../shared/reports'
+import type { PeriodRule, ReportColumn, ReportView, ScopeKind, Words } from '../../shared/reports'
 import type { ReportTable } from '../../shared/table'
 
 export type RunState = 'queued' | 'running' | 'done' | 'failed' | 'expired' | 'stale'
@@ -7,8 +7,16 @@ export type RunState = 'queued' | 'running' | 'done' | 'failed' | 'expired' | 's
 export interface RunListed {
   id: string
   report: string
-  label: string
-  question: { figures: FigureColumn[], by?: PageBreakdown, scope: { kind: ScopeKind, id: string | null, title: string | null }, period: { rule: PeriodRule, from: string, to: string } }
+  name: Words
+  question: {
+    columns: ReportColumn[]
+    rowsBy?: string
+    acrossBy?: string
+    filter: ReportView['filter']
+    keyLabels: Record<string, string>
+    scope: { kind: ScopeKind, id: string | null, title: string | null }
+    period: { rule: PeriodRule, from: string, to: string }
+  }
   state: RunState
   failure: string | null
   rows: number | null

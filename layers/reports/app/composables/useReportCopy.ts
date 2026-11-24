@@ -1,8 +1,8 @@
 // Keep a copy and Download CSV (R1, REP-09, REP-10): each queues a run of the report as it is shown
 // now. A copy is worked out in the background, so the copy's own page is where its file appears.
-import type { PageBreakdown, ReportView } from '../../shared/reports'
+import type { ReportView } from '../../shared/reports'
 
-export function useReportCopy(view: Ref<ReportView | undefined | null>, by: Ref<PageBreakdown | undefined>) {
+export function useReportCopy(view: Ref<ReportView | undefined | null>, by: Ref<string | undefined>) {
   const { t } = useT()
   const { $api } = useNuxtApp()
   const toast = useRecordToast('reports:copy')
@@ -13,7 +13,7 @@ export function useReportCopy(view: Ref<ReportView | undefined | null>, by: Ref<
     if (!v) return null
     try {
       const body = {
-        report: v.report.id,
+        report: v.id,
         period: v.period.rule,
         ...(v.period.rule === 'chosen' ? { from: v.period.from, to: v.period.to } : {}),
         ...(v.scope.id ? { scope: `${v.scope.kind}:${v.scope.id}` } : {}),

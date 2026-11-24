@@ -67,7 +67,8 @@ export async function viewBase(columns: ReportColumn[], actor: Actor, query: Vie
   // Until the record is chosen, "all of it" has no dates of its own: the page asks for the record first.
   const waiting = rule === 'scope' && kind !== 'none' && !scope.id
   const period = waiting ? { from: await operatingDayOf(nowMs()), to: await operatingDayOf(nowMs()) } : await periodOf(rule, query)
-  return { columns, breakdowns, keyLabels: await keyLabels(breakdowns), scopeKind: usual.scopeKind, periodRule: usual.periodRule, period: { rule, ...period }, scope }
+  const mayCreate = (await can(actor, 'reports.report.create' as never)).allowed
+  return { columns, breakdowns, mayCreate, keyLabels: await keyLabels(breakdowns), scopeKind: usual.scopeKind, periodRule: usual.periodRule, period: { rule, ...period }, scope }
 }
 
 const column = (m: MeasureListing, readable: boolean): FigureColumn => ({ kind: 'figure', id: m.id, label: m.label, unit: m.unit, combine: m.combine, by: m.by, filters: m.filters, readable })
