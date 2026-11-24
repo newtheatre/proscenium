@@ -105,7 +105,12 @@ const placed = computed(() => columns.value.reduce((n, c) => n + c.blocks.filter
     </div>
 
     <!-- Wider: spaces across, time down. -->
-    <div class="hidden overflow-x-auto rounded-md border border-default sm:block">
+    <div
+      class="hidden overflow-x-auto rounded-md border border-default sm:block"
+      role="region"
+      tabindex="0"
+      :aria-label="t('programme-planning.board.grid-label')"
+    >
       <div
         class="grid min-w-max"
         :style="{ gridTemplateColumns: `3.5rem repeat(${Math.max(columns.length, 1)}, minmax(10rem, 1fr))` }"
