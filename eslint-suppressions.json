@@ -2217,6 +2217,27 @@
       "count": 1
     }
   },
+  "layers/training/server/courses.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/training/server/db/schema.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "layers/training/server/progress.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 2
+    }
+  },
   "scripts/checks/interface.ts": {
     "complexity": {
       "count": 2
