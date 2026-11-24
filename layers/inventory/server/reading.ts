@@ -5,7 +5,7 @@ import { operatingDayOf } from '#modules/core'
 import type { ItemDetail, ItemRow } from '../shared/items'
 
 // The departments this person may see the items of, or edit, by a grant anywhere above them.
-export async function departmentsFor(actor: Actor, ability: 'inventory.item.view' | 'inventory.item.edit'): Promise<{ id: string, name: string }[]> {
+export async function departmentsFor(actor: Actor, ability: 'inventory.item.view' | 'inventory.item.edit' | 'inventory.loan.view' | 'inventory.loan.approve'): Promise<{ id: string, name: string }[]> {
   const departments = await all<{ id: string, name: string }>('SELECT id, name FROM inventory_departments WHERE state = \'active\' ORDER BY sort, lower(name)')
   const allowed: { id: string, name: string }[] = []
   for (const d of departments) if ((await can(actor, ability, ['inventory.department', d.id])).allowed) allowed.push(d)

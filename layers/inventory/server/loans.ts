@@ -57,7 +57,7 @@ const lendsSql = (kind: LoanKind): SQL => kind === 'production'
   : kind === 'member' ? sql`d.lends_to IN ('members', 'anyone')` : sql`d.lends_to = 'anyone'`
 
 /** Makes a draft pull list or a request. The department must be active and lend to this kind of borrower (L3). */
-export async function insertLoan(unit: UnitView, input: NewLoan): Promise<string> {
+export async function insertLoan(unit: UnitView, input: NewLoan, { quiet = false } = {}): Promise<string> {
   const id = newId('kln')
   const at = nowMs()
   const w = await windowFor(input.startsAt, input.dueBackOn)
@@ -67,7 +67,7 @@ export async function insertLoan(unit: UnitView, input: NewLoan): Promise<string
       ${input.startsAt}, ${input.dueBackOn}, ${w.to}, 'by-person', ${input.requestedBy}, ${at}, ${at}
     FROM inventory_departments d WHERE d.id = ${input.departmentId} AND d.state = 'active' AND ${lendsSql(input.kind)}`)
     .expect(1, { code: 'inventory.loan.not-lent', reason: 'This department does not lend to this borrower.', remedy: 'Ask the department.' })
-  if (input.state === 'requested') unit.announce('inventory.loan.requested', { loanId: id, departmentId: input.departmentId }, { record: ['inventory.loan', id] })
+  if (input.state === 'requested' && !quiet) unit.announce('inventory.loan.requested', { loanId: id, departmentId: input.departmentId }, { record: ['inventory.loan', id] })
   return id
 }
 
