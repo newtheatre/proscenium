@@ -79,75 +79,75 @@ const setupNeeded = computed(() => setup.value?.needed === true && !viewer.value
       :title="t('core.public.setup-needed.title')"
       :actions="[{ label: t('core.public.setup-needed.action'), to: '/setup', color: 'neutral', variant: 'outline', trailingIcon: 'i-lucide-arrow-right' }]"
     />
-    <div class="dark">
-      <UHeader
-        :title="name"
-        :toggle="!onSetup"
-        :ui="{ root: 'bg-default border-b border-default' }"
+    <!-- .dark goes on the header itself: a wrapper would be its sticky containing block and stop it sticking. -->
+    <UHeader
+      :title="name"
+      :toggle="!onSetup"
+      class="dark"
+      :ui="{ root: 'bg-default border-b border-default' }"
+    >
+      <template
+        v-if="logo"
+        #title
       >
-        <template
-          v-if="logo"
-          #title
+        <img
+          :src="logo.url"
+          :alt="logo.alt || name"
+          :width="logo.width ?? undefined"
+          :height="logo.height ?? undefined"
+          class="block h-7 w-auto sm:h-9"
         >
-          <img
-            :src="logo.url"
-            :alt="logo.alt || name"
-            :width="logo.width ?? undefined"
-            :height="logo.height ?? undefined"
-            class="block h-7 w-auto sm:h-9"
-          >
-        </template>
-        <UNavigationMenu
-          v-if="!onSetup"
-          :items="links"
-          :aria-label="t('core.public.navigation')"
-        />
-        <template #right>
-          <template v-if="!onSetup">
-            <div class="peer contents">
-              <component
-                :is="item.component"
-                v-for="item in headerItems"
-                :key="item.name"
-              />
-            </div>
-            <InboxBell side="audience" />
-            <!-- On a phone a module's item (tickets held) takes the place of the Sign in icon, which the menu repeats. -->
-            <div :class="viewer.signedIn ? 'contents' : 'peer-has-[a]:max-lg:hidden'">
-              <AccountMenu />
-            </div>
-            <UButton
-              :to="BOOKING_TO"
-              label="Book tickets"
-              size="sm"
-              class="nnt-button-poster ms-2 hidden sm:inline-flex"
+      </template>
+      <UNavigationMenu
+        v-if="!onSetup"
+        :items="links"
+        :aria-label="t('core.public.navigation')"
+      />
+      <template #right>
+        <template v-if="!onSetup">
+          <div class="peer contents">
+            <component
+              :is="item.component"
+              v-for="item in headerItems"
+              :key="item.name"
             />
-          </template>
-        </template>
-        <template
-          v-if="!onSetup"
-          #body
-        >
-          <UNavigationMenu
-            :items="[{ label: t('core.public.whats-on'), to: '/whats-on' }, ...links]"
-            orientation="vertical"
-            :aria-label="t('core.public.navigation')"
-          />
-          <USeparator class="my-4" />
-          <UNavigationMenu
-            :items="accountLinks"
-            orientation="vertical"
-            :aria-label="t('core.menu.account')"
-          />
+          </div>
+          <InboxBell side="audience" />
+          <!-- On a phone a module's item (tickets held) takes the place of the Sign in icon, which the menu repeats. -->
+          <div :class="viewer.signedIn ? 'contents' : 'peer-has-[a]:max-lg:hidden'">
+            <AccountMenu />
+          </div>
           <UButton
             :to="BOOKING_TO"
             label="Book tickets"
-            block
-            class="nnt-button-poster mt-6"
+            size="sm"
+            class="nnt-button-poster ms-2 hidden sm:inline-flex"
           />
         </template>
-      </UHeader>
-    </div>
+      </template>
+      <template
+        v-if="!onSetup"
+        #body
+      >
+        <UNavigationMenu
+          :items="[{ label: t('core.public.whats-on'), to: '/whats-on' }, ...links]"
+          orientation="vertical"
+          :aria-label="t('core.public.navigation')"
+        />
+        <USeparator class="my-4" />
+        <UNavigationMenu
+          :items="accountLinks"
+          orientation="vertical"
+          :aria-label="t('core.menu.account')"
+        />
+        <UButton
+          :to="BOOKING_TO"
+          label="Book tickets"
+          block
+          class="nnt-button-poster mt-6"
+        />
+      </template>
+    </UHeader>
 
     <UMain
       id="main"
