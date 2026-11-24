@@ -3,11 +3,15 @@
 // asked, lays the table out as the page does and keeps it as a CSV and as JSON for the copy's page.
 // Opening a copy checks today's abilities, not the requester's then.
 import { sql } from 'drizzle-orm'
-import { can, createUnit, first, inAccountScope, isRefusal, log, newId, nowMs, refuse, siteWords, theatreTimeZone, useDb, useSetting, type Actor, type UnitView } from '#kit'
+import { can, createUnit, inAccountScope, isRefusal, log, newId, nowMs, refuse, siteWords, theatreTimeZone, useDb, useSetting, type Actor, type UnitView } from '#kit'
 import { listMeasures, storedFileBytes, storeFile } from '#modules/core'
 import { readFigure } from './figures'
+import { keyName } from './keys'
+import { runById } from './run-rows'
 import { reportView, type ViewQuery } from './ready-made'
 import { savedView } from './definitions'
+import { expirePeople, mayOpenPeople, peopleCopy } from './people'
+import type { PeopleTable } from '../shared/people'
 import { gather, readsFor } from '../shared/plan'
 import { cellKey, layOut, type OkAnswer, type ReportTable } from '../shared/table'
 import type { FigureAnswer, FigureColumn, PeriodRule, ReportColumn, ReportView, ScopeKind, Words } from '../shared/reports'
@@ -19,6 +23,8 @@ const HEADLINE_MAX = 6 // not-policy: the spec's headline width, which an email 
 
 /** Exactly what a run answers (R4), stored when it is queued. */
 export interface RunQuestion {
+  /** A people report's copy keeps its rows in reports_person_rows (P5); left out for figures. */
+  kind?: 'people'
   source: ReportView['source']
   report: string
   name: Words
@@ -59,6 +65,7 @@ const wordsOf = (words: Words) => 'key' in words ? siteWords()(words.key) : word
 /** Queues a copy of a report as the reader sees it now (R1, R4). */
 export async function queueRun(unit: UnitView, actor: Actor, reportId: string, query: ViewQuery & { by?: string[] }): Promise<{ id: string }> {
   const view = await viewOf(reportId, actor, query)
+  if (view.kind === 'people') refuse('reports.run.people', 'A report about people is kept as a copy from its own page.', { status: 422 })
   if (view.scopeKind !== 'none' && !view.scope.id) refuse('reports.run.no-scope', 'Choose what the report is about first.', { status: 422, fields: { scope: 'Choose one.' } })
   const rowsBy = query.by?.[0]
   if (rowsBy && !view.breakdowns.includes(rowsBy)) refuse('reports.run.breakdown', 'This report cannot be broken down that way.', { status: 422, fields: { by: 'Choose another breakdown.' } })
@@ -77,8 +84,6 @@ export async function queueRun(unit: UnitView, actor: Actor, reportId: string, q
   unit.audit({ action: 'create', record: [OWNER, id], detail: { report: view.id, columns: view.columns.length } })
   return { id }
 }
-
-export const runById = (id: string) => first<RunRow>('SELECT * FROM reports_runs WHERE id = ?', id)
 
 /** The job (R2, R3): claims the run, works it out as its requester and keeps the files. */
 export async function runReport(runId: string): Promise<void> {
@@ -181,9 +186,6 @@ function cell(value: string | number | null | undefined): string {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
-/** A key's name in words: Reports names the shared keys, a module its own. */
-export const keyName = (key: string, labels: Record<string, string>) => siteWords()(labels[key] ?? `reports.by.${key}`)
-
 /** The question in words, as the page says it, with the pivot and the filter. */
 async function questionWords(question: RunQuestion): Promise<string[]> {
   const say = siteWords()
@@ -258,8 +260,9 @@ export async function csvOf(question: RunQuestion, table: ReportTable): Promise<
  * longer cannot be checked, so the copy is not opened.
  */
 export async function mayOpen(actor: Actor, run: Pick<RunRow, 'id' | 'question'>, checked = new Map<string, boolean>()): Promise<boolean> {
-  if (!(await can(actor, 'reports.run.view' as never, [OWNER, run.id])).allowed) return false
   const question = JSON.parse(run.question) as RunQuestion
+  if (question.kind === 'people') return await mayOpenPeople(actor, run)
+  if (!(await can(actor, 'reports.run.view' as never, [OWNER, run.id])).allowed) return false
   const abilities = new Map((await listMeasures(null)).map(m => [m.id, m.ability]))
   const record = question.scope.kind === 'production' && question.scope.id ? ['core.production', question.scope.id] as const : undefined
   for (const f of question.columns.filter((c): c is FigureColumn => c.kind === 'figure' && c.readable)) {
@@ -311,9 +314,13 @@ export function summaryOf(row: RunRow, mine: boolean): RunSummary {
 }
 
 /** One copy for its page, with the table as it was kept; refused as not found when it may not be opened. */
-export async function openRun(actor: Actor, id: string): Promise<RunSummary & { table: ReportTable | null }> {
+export async function openRun(actor: Actor, id: string): Promise<RunSummary & { table: ReportTable | null, people?: PeopleTable | null }> {
   const row = await runById(id)
   if (!row || !(await mayOpen(actor, row))) return refuse('reports.run.unknown', 'There is no such copy, or you cannot open it.', { status: 404 })
+  if ((JSON.parse(row.question) as RunQuestion).kind === 'people') {
+    const own = !!(await useDb().get(sql`SELECT 1 AS one FROM reports_runs WHERE id = ${id} AND ${inAccountScope('requested_by', actor.accountId!)}`))
+    return { ...summaryOf(row, own), table: null, people: await peopleCopy(row) }
+  }
   const bytes = row.state === 'done' && row.data_file_id ? await storedFileBytes(row.data_file_id, { type: OWNER, id }) : null
   const mine = !!(await useDb().get(sql`SELECT 1 AS one FROM reports_runs WHERE id = ${id} AND ${inAccountScope('requested_by', actor.accountId!)}`))
   return { ...summaryOf(row, mine), table: bytes ? JSON.parse(new TextDecoder().decode(bytes)) as ReportTable : null }
@@ -336,8 +343,9 @@ export async function expireRuns(): Promise<void> {
   const keepFor = await useSetting('reports.runs.keep-for') as number
   const before = nowMs() - keepFor * 1000 // not-policy: seconds to milliseconds
   const unit = createUnit()
-  unit.add({ sql: "UPDATE reports_runs SET state = 'expired', file_id = NULL, data_file_id = NULL WHERE state IN ('done', 'failed') AND finished_at < ?", params: [before] })
+  unit.add({ sql: "UPDATE reports_runs SET state = 'expired', file_id = NULL, data_file_id = NULL WHERE state IN ('done', 'failed') AND coalesce(json_extract(question, '$.kind'), 'figures') <> 'people' AND finished_at < ?", params: [before] })
   await unit.commit()
+  await expirePeople()
 }
 
 /** When a copy's files go: the keep-for in force when it was made; core's files sweep removes them. */

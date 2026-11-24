@@ -20,6 +20,7 @@ export default defineModule({
   settings: defineSettings('reports', {
     'runs.keep-for': setting.duration({ default: '730d', min: '30d', max: '2555d', units: DAYS, change, audience: 'staff', onChange: 'confirm' }),
     'runs.row-limit': setting.integer({ default: 20_000, min: 1000, max: 100_000, unit: 'reports.units.rows', change, audience: 'staff' }),
+    'people.keep-for': setting.duration({ default: '90d', min: '1d', max: '365d', units: DAYS, change, audience: 'public', quotable: true, onChange: 'confirm' }),
     'builder.max-columns': setting.integer({ default: 60, min: 1, max: 200, unit: 'reports.units.columns', change, audience: 'staff' }),
   }),
 
@@ -38,6 +39,8 @@ export default defineModule({
     'run.export': ability({ implies: ['run.view'] }),
     // Figures per named person (rules P1, P2): granted on purpose, and every read is audited.
     'people.view': ability({ risk: 'privileged', fresh: false, audit: 'read', implies: ['report.view'] }),
+    // Downloading one (rule P4): made on the fly from the stored rows and never kept.
+    'people.export': ability({ risk: 'privileged', implies: ['people.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -84,5 +87,7 @@ export default defineModule({
       { id: 'reports.run-data', owner: 'reports.run', ability: 'reports.run.view', accepts: ['json' as const], limit: 'core.files.document-limit', access: 'record' as const, textClass: 'internal' as const, clean: false, source: 'server' as const },
     ],
     'core.file-access': [{ id: 'reports.run', file: 'run' }],
+    // A merge moves a copy's rows to the survivor and marks the copy stale (rule P7).
+    'core.merge-handler': [{ id: 'reports.person-rows', file: 'person-rows' }],
   },
 })

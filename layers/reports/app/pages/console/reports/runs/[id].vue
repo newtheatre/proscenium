@@ -35,15 +35,18 @@ const filterChip = computed(() => {
   return q?.filter ? `${keyName(q.filter.key, q.keyLabels)}: ${q.filter.values.map(v => q.filter!.labels[v] ?? v).join(', ')}` : null
 })
 const table = computed(() => run.value?.table ?? null)
+const people = computed(() => run.value?.people ?? null)
 const label = (c: ReportColumn) => c.kind === 'formula' ? c.label : t(c.label)
 const facts = computed(() => (table.value?.columns ?? []).flatMap((c, i) => c.shown ? [{ label: label(c), value: text(c.unit, table.value!.totals[cellKey(i, null)]).text }] : []))
 const figureLabel = (measure: string) => {
   const figure = run.value?.question.columns.find(c => c.kind === 'figure' && c.id === measure)
   return figure && !(figure.kind === 'figure' && figure.gone) ? label(figure) : measure
 }
-const actions = computed(() => run.value?.state === 'done' && table.value
-  ? [{ label: t('reports.copy.download'), icon: 'i-lucide-download', to: `/api/reports/runs/${id.value}/csv` }]
-  : [])
+const actions = computed(() => run.value?.state !== 'done'
+  ? []
+  : table.value
+    ? [{ label: t('reports.copy.download'), icon: 'i-lucide-download', to: `/api/reports/runs/${id.value}/csv` }]
+    : people.value ? [{ label: t('reports.copy.download'), icon: 'i-lucide-download', to: `/api/reports/people/runs/${id.value}/csv` }] : [])
 </script>
 
 <template>
@@ -98,6 +101,19 @@ const actions = computed(() => run.value?.state === 'done' && table.value
             :description="t(`reports.runs.failures.${loaded.failure === 'reports.run.too-large' ? 'too-large' : 'other'}`)"
             icon="i-lucide-circle-alert"
           />
+          <template v-else-if="people">
+            <UAlert
+              v-if="loaded.state === 'stale'"
+              icon="i-lucide-merge"
+              color="warning"
+              variant="subtle"
+              :title="t('reports.people.stale')"
+            />
+            <ReportPeopleTable
+              :table="people"
+              :caption="question"
+            />
+          </template>
           <EmptyState
             v-else-if="!table"
             :title="t('reports.runs.expired')"

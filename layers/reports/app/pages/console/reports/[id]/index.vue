@@ -39,7 +39,8 @@ const chosenBy = computed<string>({
 })
 const by = computed(() => chosenBy.value === 'none' ? undefined : chosenBy.value)
 
-const { ready, table, status: reading, error: readError, refresh: reread } = useReportFigures(view, by)
+const people = computed(() => view.value?.kind === 'people')
+const { ready, table, status: reading, error: readError, refresh: reread } = useReportFigures(computed(() => people.value ? null : view.value), by)
 const { text } = useFigureText()
 const { keep, download } = useReportCopy(view, by)
 const { archive } = useReportArchive()
@@ -47,10 +48,10 @@ const actions = computed(() => {
   const v = view.value
   if (!v) return []
   return [
-    ...(ready.value
+    ...(ready.value || (people.value && (v.scopeKind === 'none' || v.scope.id))
       ? [
           { label: t('reports.copy.keep'), icon: 'i-lucide-copy-plus', onSelect: keep },
-          { label: t('reports.copy.download'), icon: 'i-lucide-download', lesser: true, onSelect: download },
+          ...(!people.value || v.mayExport ? [{ label: t('reports.copy.download'), icon: 'i-lucide-download', lesser: true, onSelect: download }] : []),
         ]
       : []),
     ...(v.saved?.editable ? [{ label: t('reports.edit'), icon: 'i-lucide-pencil', lesser: true, to: `/console/reports/${v.id}/edit` }] : []),
@@ -135,8 +136,28 @@ const chartSummary = computed(() => {
             v-model:by="chosenBy"
             :view="loaded"
           />
+          <template v-if="loaded.kind === 'people'">
+            <UAlert
+              icon="i-lucide-eye"
+              color="warning"
+              variant="subtle"
+              :title="t('reports.people.banner')"
+            />
+            <EmptyState
+              v-if="loaded.scopeKind !== 'none' && !loaded.scope.id"
+              :title="t(`reports.choose.${loaded.scopeKind}`)"
+              :description="t('reports.choose-description')"
+              icon="i-lucide-mouse-pointer-click"
+            />
+            <ReportPeople
+              v-else
+              :view="loaded"
+              :by="by"
+              :question="question"
+            />
+          </template>
           <EmptyState
-            v-if="!ready"
+            v-else-if="!ready"
             :title="t(`reports.choose.${loaded.scopeKind}`)"
             :description="t('reports.choose-description')"
             icon="i-lucide-mouse-pointer-click"

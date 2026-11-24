@@ -41,7 +41,7 @@ export async function reportView(id: string, actor: Actor, query: ViewQuery): Pr
   const columns = await figureColumns(report.figures, actor)
   const base = await viewBase(columns, actor, query, { scopeKind: report.scope, periodRule: report.period })
   return {
-    ...base, source: 'ready-made', id: report.id, name: { key: report.label }, description: { key: report.description }, module,
+    ...base, source: 'ready-made', kind: 'figures', id: report.id, name: { key: report.label }, description: { key: report.description }, module,
     usualBy: report.breakdown ?? null, chart: report.chart ?? null, acrossBy: null, filter: null, saved: null,
   }
 }
@@ -64,11 +64,21 @@ export async function viewBase(columns: ReportColumn[], actor: Actor, query: Vie
   const kind = query.scope?.kind ?? usual.scopeKind
   const scope = { kind, id: query.scope?.id ?? null, title: query.scope ? await scopeTitle(query.scope.kind, query.scope.id) : null }
   const rule = query.period ?? usual.periodRule
-  // Until the record is chosen, "all of it" has no dates of its own: the page asks for the record first.
-  const waiting = rule === 'scope' && kind !== 'none' && !scope.id
-  const period = waiting ? { from: await operatingDayOf(nowMs()), to: await operatingDayOf(nowMs()) } : await periodOf(rule, query)
+  const period = await viewPeriod(rule, query, scope)
   const mayCreate = (await can(actor, 'reports.report.create' as never)).allowed
   return { columns, breakdowns, mayCreate, keyLabels: await keyLabels(breakdowns), scopeKind: usual.scopeKind, periodRule: usual.periodRule, period: { rule, ...period }, scope }
+}
+
+/** The dates a view shows: the rule's own, or today until the page has what the rule needs. */
+async function viewPeriod(rule: PeriodRule, query: ViewQuery, scope: { kind: ScopeKind, id: string | null }): Promise<{ from: string, to: string }> {
+  // Until the record is chosen, "all of it" has no dates of its own: the page asks for the record first.
+  if (rule === 'scope' && scope.kind !== 'none' && !scope.id) {
+    const today = await operatingDayOf(nowMs())
+    return { from: today, to: today }
+  }
+  // Chosen dates not yet chosen start as last month's, for the page to change.
+  const unchosen = rule === 'chosen' && !query.from && !query.to
+  return await periodOf(unchosen ? 'last-month' : rule, query)
 }
 
 const column = (m: MeasureListing, readable: boolean): FigureColumn => ({ kind: 'figure', id: m.id, label: m.label, unit: m.unit, combine: m.combine, by: m.by, filters: m.filters, readable })

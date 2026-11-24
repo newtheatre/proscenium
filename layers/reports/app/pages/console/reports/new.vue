@@ -8,7 +8,7 @@ definePageMeta({ layout: 'console' })
 const { t } = useT()
 const route = useRoute()
 const from = computed(() => typeof route.query.from === 'string' ? route.query.from : null)
-const blank: BuilderForm = { name: '', description: null, basedOn: null, columns: [], rowsBy: null, acrossBy: null, filter: null, scopeKind: 'none', scopeId: null, periodRule: 'last-month', chart: null, shareRole: null }
+const blank: BuilderForm = { kind: 'figures', name: '', description: null, basedOn: null, columns: [], rowsBy: null, acrossBy: null, filter: null, scopeKind: 'none', scopeId: null, periodRule: 'last-month', chart: null, shareRole: null }
 const { data, status, error, refresh } = await useAPI<BuilderForm>(() => from.value ? `/api/reports/definitions/${from.value}/form` : '/api/reports/definitions/none/form', {
   key: `reports:draft:${from.value ?? ''}`,
   immediate: !!from.value,

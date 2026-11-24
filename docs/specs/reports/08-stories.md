@@ -171,3 +171,26 @@ with `reports.key.lists-people`, because figures per person go only through `cor
 record key (venue, production) takes one record; archiving says nothing of schedules or pins, which
 do not exist yet; the builder has no live preview, as the saved report opens straight after saving.
 See `layers/reports/tests/integration/builder.test.ts` and `layers/reports/tests/unit/formula.test.ts`.
+
+REP-35, REP-44 and REP-45 are built in Reports. The builder offers "Named people" as the report's kind
+to holders of `reports.people.view`: figures come from core's new `listPersonMeasures` (only those the
+reader may read), at most six, with an optional shared breakdown; formulas, a pivot, a filter, a chart
+and a role are refused (P3, P8; a role with `reports.people.not-shareable`). Such a report is listed
+and opened only for holders of `reports.people.view`. Its page shows the banner "This report shows
+figures about named people. Opening it is recorded." and reads `GET /api/reports/people`, which calls
+`readPersonMeasure` for each figure (core audits every read) and names each person today with core's
+new `accountLabels`; rows are searchable by name and sorted by the first figure. The totals row is
+the module's own `core.measure` total of the same id, where it offers one, and otherwise says there is
+no total; Reports never adds people up. "Keep a copy" (`POST /api/reports/people/runs`) writes a done
+run and one `reports_person_rows` row per person and figure: account ids and numbers, never names
+(no file). The copy's page shows today's names. "Download CSV" (`GET
+/api/reports/people/runs/:id/csv`, `reports.people.export`) is made on the fly, headed "Contains
+personal data: do not forward", never stored and audited as `export`. The daily task deletes a copy's
+rows after `reports.people.keep-for` (90 days) and marks it expired. A merge handler marks every copy
+holding the merged-away person stale before core moves the rows, and a stale copy refuses its CSV with
+"Re-run to combine merged people". Erasure deletes a person's rows (`onErasure: 'delete-row'`), and the
+data download lists them, both from the table's declaration. Deviations: keeping a copy is gated by
+`reports.report.view` with `reports.people.view` checked in the service, because a privileged ability
+that skips a fresh sign-in may not gate a route that writes; a saved report whose period rule is
+"chosen" opens on last month's dates until the reader chooses. See
+`layers/reports/tests/integration/people.test.ts`.

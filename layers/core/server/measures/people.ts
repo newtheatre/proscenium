@@ -39,6 +39,18 @@ function declaringModule(id: string): string | null {
   return null
 }
 
+export interface PersonMeasureListing { id: string, module: string, label: string, unit: PersonMeasure['unit'], combine: PersonMeasure['combine'], by: PersonMeasure['by'], ability: string }
+
+/** The figures per person this reader may read (both abilities), or every one for null; nothing is read. */
+export async function listPersonMeasures(actor: Actor | null): Promise<PersonMeasureListing[]> {
+  const all = (await usePoint<PersonMeasure>('core.person-measure')).map(({ id, module, value: m }) => ({ id, module, label: m.label, unit: m.unit, combine: m.combine, by: [...m.by], ability: m.ability }))
+  if (!actor) return all
+  if (actor.kind !== 'person' || !(await can(actor, PEOPLE_VIEW as never)).allowed) return []
+  const out: PersonMeasureListing[] = []
+  for (const m of all) if ((await can(actor, m.ability as never)).allowed) out.push(m)
+  return out
+}
+
 /** What is wrong with an answer, as a code, or null when each row is an account, the asked key and a number. */
 export function badPersonAnswer(query: Pick<PersonMeasureQuery, 'by'>, answer: unknown): string | null {
   const rows = (answer as { rows?: unknown })?.rows

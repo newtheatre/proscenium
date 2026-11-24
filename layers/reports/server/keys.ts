@@ -1,6 +1,6 @@
 // A module's own breakdown keys, such as Box office's ticket types (B6, REP-43): the module labels
 // the key and lists its values through reports.key, so a page can name a row and offer a filter.
-import { refuse, usePoint } from '#kit'
+import { refuse, siteWords, usePoint } from '#kit'
 import { MODULE_KEY, isPageBreakdown } from '../shared/reports'
 
 export interface ReportKey {
@@ -46,3 +46,6 @@ export async function keyValues(key: string): Promise<{ value: string, label: st
   const found = (await keysOf()).get(key)
   return found ? checkedValues(key, await found.values()) : []
 }
+
+/** A key's name in words: Reports names the shared keys, a module its own. */
+export const keyName = (key: string, labels: Record<string, string>) => siteWords()(labels[key] ?? `reports.by.${key}`)
