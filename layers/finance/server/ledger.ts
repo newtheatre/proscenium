@@ -33,6 +33,10 @@ export interface EntryInput {
   performanceId?: string | null
   /** The budget line this entry is spent against (Budgets). */
   budgetLineId?: string | null
+  /** An active code from finance_tax_codes; `none` when left out. */
+  taxCode?: string
+  /** The VAT on this entry's net amount, signed like the entry, posted on its own entry to a VAT account. 0 for `none`. */
+  taxMinor?: number
 }
 
 export interface PostingInput {
@@ -126,6 +130,11 @@ function checkShape(posting: PostingInput) {
   if (amounts.length < 2) throw new Error(`Posting ${posting.key} has fewer than two entries`)
   if (amounts.some(a => !Number.isSafeInteger(a) || a === 0)) throw new Error(`Posting ${posting.key} has an entry that is not a whole, non-zero number of minor units`)
   if (amounts.reduce((s, a) => s + a, 0) !== 0) throw new Error(`Posting ${posting.key} does not balance`)
+  for (const e of posting.entries) {
+    if (e.taxMinor !== undefined && !Number.isSafeInteger(e.taxMinor)) throw new Error(`Posting ${posting.key} has tax that is not a whole number of minor units`)
+    if ((e.taxCode ?? 'none') === 'none' && (e.taxMinor ?? 0) !== 0) throw new Error(`Posting ${posting.key} has tax on an entry with the code none`)
+    if ((e.taxMinor ?? 0) !== 0 && Math.sign(e.taxMinor!) !== Math.sign(e.amountMinor)) throw new Error(`Posting ${posting.key} has tax signed unlike its entry`)
+  }
   if (posting.purpose == null) return
   if (!(PURPOSES as readonly string[]).includes(posting.purpose)) throw new Error(`Posting ${posting.key} has the purpose ${posting.purpose}, which is not one of ${PURPOSES.join(', ')}`)
   if (posting.kind !== 'transfer' && !(posting.kind === 'correction' && posting.reversesId)) throw new Error(`Posting ${posting.key} has a purpose, which only a transfer (or its reversal) carries`)
@@ -186,6 +195,17 @@ export async function postEntries(unit: UnitView, posting: PostingInput): Promis
       throw new Refusal('finance.entry.wrong-module', `${owner} cannot post to an account that belongs to ${resolved[i]!.module}.`, { status: 500 })
   })
 
+  // Every code named is known, and active unless the posting reverses one written while it was.
+  const codes = [...new Set(posting.entries.map(e => e.taxCode ?? 'none').filter(c => c !== 'none'))]
+  if (codes.length) {
+    const found = await all<{ code: string, active: number }>('SELECT code, active FROM finance_tax_codes WHERE code IN (SELECT value FROM json_each(?))', JSON.stringify(codes))
+    for (const code of codes) {
+      const row = found.find(r => r.code === code)
+      if (!row) throw new Refusal('finance.tax-code.missing', `There is no tax code ${code}.`, { status: 409 })
+      if (!row.active && !posting.reversesId) throw new Refusal('finance.tax-code.inactive', `The tax code ${code} is no longer in use.`, { status: 409, remedy: 'Choose a code that is in use on the Tax codes screen.' })
+    }
+  }
+
   addAccounts(unit, toMake)
   for (const made of toMake) madeIn(unit).set(`${made.systemKey}\u0000${made.scope ?? ''}`, made)
   addPeriods(unit, await missingPeriods(date))
@@ -206,6 +226,8 @@ export async function postEntries(unit: UnitView, posting: PostingInput): Promis
     productionId: entry.productionId ?? null,
     performanceId: entry.performanceId ?? null,
     budgetLineId: entry.budgetLineId ?? null,
+    taxCode: entry.taxCode ?? 'none',
+    taxMinor: entry.taxMinor ?? 0,
   })))
   unit.expect(posting.entries.length)
   unit.add({ sql: 'INSERT INTO finance_seals (posting_id, entry_count, created_at) VALUES (?, ?, ?)', params: [postingId, posting.entries.length, nowMs()] })
@@ -222,8 +244,8 @@ export async function reversePosting(unit: UnitView, postingId: string, options:
   if (!original) throw new Refusal('core.not-found', 'There is no such posting.', { status: 404 })
   const reversed = await first('SELECT id FROM finance_postings WHERE reverses_id = ?', postingId)
   if (reversed) throw new Refusal('finance.posting.already-reversed', 'This posting has already been reversed.', { status: 409 })
-  const lines = await all<{ account_id: string, amount_minor: number, currency: string, for_module: string | null, production_id: string | null, performance_id: string | null, budget_line_id: string | null }>(
-    'SELECT account_id, amount_minor, currency, for_module, production_id, performance_id, budget_line_id FROM finance_entries WHERE posting_id = ? ORDER BY id', postingId)
+  const lines = await all<{ account_id: string, amount_minor: number, currency: string, for_module: string | null, production_id: string | null, performance_id: string | null, budget_line_id: string | null, tax_code: string, tax_minor: number }>(
+    'SELECT account_id, amount_minor, currency, for_module, production_id, performance_id, budget_line_id, tax_code, tax_minor FROM finance_entries WHERE posting_id = ? ORDER BY id', postingId)
   return postEntries(unit, {
     key: `${original.idempotency_key}:reversed`,
     source: { module: original.source_module, type: original.source_type, id: original.source_id },
@@ -233,7 +255,7 @@ export async function reversePosting(unit: UnitView, postingId: string, options:
     occurredAt: options.occurredAt,
     postedBy: options.postedBy,
     currency: lines[0]?.currency,
-    entries: lines.map(l => ({ account: l.account_id, amountMinor: -l.amount_minor, forModule: l.for_module ?? undefined, productionId: l.production_id, performanceId: l.performance_id, budgetLineId: l.budget_line_id })),
+    entries: lines.map(l => ({ account: l.account_id, amountMinor: -l.amount_minor, forModule: l.for_module ?? undefined, productionId: l.production_id, performanceId: l.performance_id, budgetLineId: l.budget_line_id, taxCode: l.tax_code, taxMinor: -l.tax_minor })),
   })
 }
 
