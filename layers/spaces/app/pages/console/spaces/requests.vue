@@ -34,6 +34,20 @@ const toast = useToast()
 
 const { data, status, error, refresh } = await useAPI<{ requests: Row[] }>('/api/spaces/requests', { key: 'spaces:requests' })
 
+// A7: a series is one request, shown once with how many of its dates wait.
+const rows = computed(() => {
+  const counts = new Map<string, number>()
+  for (const r of data.value?.requests ?? []) if (r.seriesId) counts.set(r.seriesId, (counts.get(r.seriesId) ?? 0) + 1)
+  const seen = new Set<string>()
+  return (data.value?.requests ?? []).filter((r) => {
+    if (!r.seriesId) return true
+    if (seen.has(r.seriesId)) return false
+    seen.add(r.seriesId)
+    return true
+  }).map(r => ({ ...r, dates: r.seriesId ? counts.get(r.seriesId) ?? 1 : 1 }))
+})
+type Shown = Row & { dates: number }
+
 const describe = (r: Row) => [
   dates.range(r.startsAt, r.endsAt, 'dateTime'),
   r.bookableName,
@@ -44,13 +58,14 @@ const recordLine = (r: Row) => r.record.noShows || r.record.lateCancels
   ? t('spaces.requests.record', { noShows: r.record.noShows, lateCancels: r.record.lateCancels })
   : t('spaces.requests.record-clean')
 
-const deciding = ref<{ row: Row, verb: 'confirm' | 'decline' } | null>(null)
+const deciding = ref<{ row: Shown, verb: 'confirm' | 'decline' } | null>(null)
 const open = computed({ get: () => !!deciding.value, set: (v: boolean) => { if (!v) deciding.value = null } })
-const answer = reactive({ note: '', reference: '' })
+const answer = reactive({ note: '', reference: '', whole: true })
+const wholeSeries = computed(() => !!deciding.value?.row.seriesId && !deciding.value.row.external && answer.whole)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const formEl = useFormRef('formEl')
-function start(row: Row, verb: 'confirm' | 'decline') {
-  Object.assign(answer, { note: '', reference: '' })
+function start(row: Shown, verb: 'confirm' | 'decline') {
+  Object.assign(answer, { note: '', reference: '', whole: true })
   refusal.value = null
   deciding.value = { row, verb }
 }
@@ -66,7 +81,8 @@ async function send() {
   refusal.value = null
   try {
     const body = d.verb === 'confirm' ? { note: answer.note.trim() || null, reference: answer.reference.trim() || null } : { note: answer.note.trim() }
-    await $api(`/api/spaces/bookings/${d.row.id}/${d.verb}`, { method: 'POST', body })
+    if (wholeSeries.value) await $api(`/api/spaces/series/${d.row.seriesId}/${d.verb}`, { method: 'POST', body: { note: body.note } })
+    else await $api(`/api/spaces/bookings/${d.row.id}/${d.verb}`, { method: 'POST', body })
     toast.add({ title: t(d.verb === 'confirm' ? 'spaces.requests.confirmed' : 'spaces.requests.declined', { name: d.row.bookedForName }), color: 'success' })
     deciding.value = null
     await refresh()
@@ -110,7 +126,7 @@ async function markAsked(row: Row) {
           :label="t('spaces.navigation.requests.label')"
         >
           <RecordListItem
-            v-for="r in d.requests"
+            v-for="r in rows"
             :key="r.id"
             :name="r.title"
             :description="describe(r)"
@@ -142,7 +158,7 @@ async function markAsked(row: Row) {
                     v-if="r.seriesId"
                     color="neutral"
                     variant="subtle"
-                    :label="t('spaces.requests.series')"
+                    :label="t('spaces.requests.series-dates', { count: r.dates })"
                   />
                 </div>
                 <p class="text-muted">
@@ -222,6 +238,12 @@ async function markAsked(row: Row) {
               :maxlength="120"
             />
           </UFormField>
+          <UCheckbox
+            v-if="deciding?.row.seriesId && !deciding.row.external"
+            v-model="answer.whole"
+            :label="t('spaces.requests.whole-series', { count: deciding.row.dates })"
+            :description="t('spaces.requests.whole-series-help')"
+          />
           <UFormField
             name="note"
             :label="t('spaces.requests.note')"

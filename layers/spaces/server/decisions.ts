@@ -1,7 +1,7 @@
 // Deciding requests (spec part 3, rules A2 to A7 and E2): the queue a person may decide, confirming
 // and declining with the booker told, and recording an outside owner's answer for an external room.
 import { sql } from 'drizzle-orm'
-import { all, can, inAccountScope, nowMs, refuse, useDb, useSetting, wordsFrom, type Actor, type UnitView } from '#kit'
+import { all, can, first, inAccountScope, nowMs, refuse, useDb, useSetting, wordsFrom, type Actor, type UnitView } from '#kit'
 import { accountLabel, holdersOf, notify } from '#modules/core'
 import { confirmRequest, history, moveBooking, requireBookable, requireBooking, type Booking } from './bookings'
 import { listBookables } from './setup'
@@ -174,6 +174,8 @@ async function tellBooker(unit: UnitView, booking: Booking, outcome: 'confirmed'
 /** A5: the people who may decide a new request are told of it, never the booker themselves. */
 export async function tellApprovers(unit: UnitView, bookingId: string): Promise<void> {
   const booking = await requireBooking(bookingId)
+  // A series is one request (A7): only its first date tells anyone.
+  if (booking.seriesId && await first('SELECT 1 FROM spaces_bookings WHERE series_id = ? AND starts_at < ? LIMIT 1', booking.seriesId, booking.startsAt)) return
   const to = (await holdersOf('spaces.booking.decide', ['spaces.booking', bookingId])).filter(a => a !== booking.bookedFor)
   if (!to.length) return
   await notify(unit, 'spaces.request-new', { to, variables: await bookingWords(bookingId), dedupeKey: `request:${bookingId}`, subject: ['spaces.booking', bookingId] })

@@ -23,3 +23,16 @@ export async function bookingWords(id: string): Promise<BookingWords> {
     title: row.title,
   }
 }
+
+/** The same for a whole series: its room, its first and last dates, its times and its title. */
+export async function seriesWords(id: string): Promise<BookingWords> {
+  const ends = await first<{ first: string, last: string }>(
+    `SELECT (SELECT id FROM spaces_bookings WHERE series_id = ?1 ORDER BY starts_at LIMIT 1) AS first,
+            (SELECT id FROM spaces_bookings WHERE series_id = ?1 ORDER BY starts_at DESC LIMIT 1) AS last`, id)
+  const opening = await bookingWords(ends!.first)
+  const closing = await bookingWords(ends!.last)
+  return { ...opening, date: opening.date === closing.date ? opening.date : say('spaces.words.dates', { from: opening.date, to: closing.date }) }
+}
+
+/** What a decision message says when the room manager wrote no note. */
+export const noNote = () => say('spaces.words.no-note')

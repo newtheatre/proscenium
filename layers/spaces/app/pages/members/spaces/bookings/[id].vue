@@ -22,6 +22,7 @@ interface Booking {
   closedReason: string | null
   lateCancel: boolean
   overrideReason: string | null
+  seriesId: string | null
   history: { kind: string, at: number, note: string | null, byBooker: boolean }[]
 }
 
@@ -97,12 +98,34 @@ async function withdraw() {
   catch (e) { refusal.value = toRefusal(e) }
 }
 
+// R6: the dates of a series from this one on, or all those not yet started.
+async function cancelSeries(fromHere: boolean) {
+  refusal.value = null
+  const ok = await confirm({
+    verb: t(fromHere ? 'spaces.booking-page.cancel-later' : 'spaces.booking-page.cancel-all'),
+    thing: b.value!.title,
+    consequence: t('spaces.booking-page.cancel-series-consequence'),
+    button: t('spaces.booking-page.cancel-series-button'),
+  })
+  if (!ok) return
+  try {
+    const { cancelled } = await $api<{ cancelled: number }>(`/api/spaces/series/${b.value!.seriesId}/cancel`, { method: 'POST', body: { from: fromHere ? id.value : null } })
+    toast.add({ title: t('spaces.booking-page.cancelled-dates', { count: cancelled }), color: 'success' })
+    await refresh()
+  }
+  catch (e) { refusal.value = toRefusal(e) }
+}
+
 const primary = computed(() => live.value && !elsewhere.value ? { label: t('spaces.booking-page.edit'), icon: 'i-lucide-pencil' } : undefined)
 const actions = computed<DropdownMenuItem[][]>(() => {
   if (!live.value || elsewhere.value || !b.value) return []
-  return [[b.value.state === 'requested'
-    ? { label: t('spaces.booking-page.withdraw'), icon: 'i-lucide-undo-2', color: 'error', onSelect: withdraw }
-    : { label: t('spaces.booking-page.cancel'), icon: 'i-lucide-x', color: 'error', onSelect: cancel }]]
+  const one: DropdownMenuItem = b.value.state === 'requested'
+    ? { label: t(b.value.seriesId ? 'spaces.booking-page.withdraw-this' : 'spaces.booking-page.withdraw'), icon: 'i-lucide-undo-2', color: 'error', onSelect: withdraw }
+    : { label: t(b.value.seriesId ? 'spaces.booking-page.cancel-this' : 'spaces.booking-page.cancel'), icon: 'i-lucide-x', color: 'error', onSelect: cancel }
+  if (!b.value.seriesId) return [[one]]
+  return [[one,
+    { label: t('spaces.booking-page.cancel-later'), icon: 'i-lucide-calendar-x', color: 'error', onSelect: () => cancelSeries(true) },
+    { label: t('spaces.booking-page.cancel-all'), icon: 'i-lucide-calendar-x-2', color: 'error', onSelect: () => cancelSeries(false) }]]
 })
 const summary = computed(() => {
   const x = b.value
@@ -113,6 +136,7 @@ const summary = computed(() => {
     { label: t('spaces.booking-page.purpose'), value: x.productionTitle ? `${x.purpose}: ${x.productionTitle}` : x.purpose },
     { label: t('spaces.booking-page.booked-for'), value: x.bookedForName },
     ...(x.attendees ? [{ label: t('spaces.booking-page.attendees'), value: String(x.attendees) }] : []),
+    ...(x.seriesId ? [{ label: t('spaces.booking-page.series'), value: t('spaces.booking-page.series-yes') }] : []),
   ]
 })
 const tabs = computed(() => [{ id: 'details', label: t('spaces.booking-page.tabs.details') }, { id: 'history', label: t('spaces.booking-page.tabs.history') }])

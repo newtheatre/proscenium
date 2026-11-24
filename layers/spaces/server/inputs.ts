@@ -1,6 +1,6 @@
 // Route input shared by more than one route. Bounds are shapes, as the tables' CHECKs.
 import { z } from 'zod'
-import { CONTROLS, OPEN_TO } from '../shared/states'
+import { CONTROLS, FREQUENCIES, OPEN_TO } from '../shared/states'
 import { COLOURS } from '../shared/setup'
 
 const note = (max: number) => z.string().trim().max(max).nullish().transform(v => v || null)
@@ -75,3 +75,19 @@ export const requestInput = askInput.extend(detailsInput.shape).strict()
 
 // The form sends what it has so far; only the time, place and purpose are checked.
 export const checkInput = askInput.extend({ title: z.string().max(120).optional(), notes: z.string().max(1000).nullish(), attendees: z.number().int().nullish() }).strict() // not-policy: shape bound
+
+const localDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/) // not-policy: a date's shape
+
+// A series (part 3, rules R1 to R8): the request's details with when it repeats instead of one time.
+export const seriesInput = askInput.omit({ startsAt: true, endsAt: true }).extend({
+  frequency: z.enum(FREQUENCIES),
+  weekdays: z.array(z.number().int().min(1).max(7)).max(7).nullish(), // not-policy: days of a week
+  startsLocal: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), // not-policy: a clock time's shape
+  lengthMinutes: z.number().int().min(1).max(1440), // not-policy: shape bound, a day
+  firstDate: localDay,
+  lastDate: localDay,
+  leaveOut: z.array(localDay).max(104).default([]), // not-policy: as the setting's ceiling
+}).extend(detailsInput.shape).strict()
+export type SeriesInput = z.infer<typeof seriesInput>
+
+export const seriesCheckInput = seriesInput.extend({ title: z.string().max(120).optional(), notes: z.string().max(1000).nullish(), attendees: z.number().int().nullish() }).strict() // not-policy: shape bound

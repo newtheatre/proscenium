@@ -4,9 +4,10 @@
 <script setup lang="ts">
 import { parseDateTime, parseDate, parseTime, toZoned, today } from '@internationalized/date'
 import { watchDebounced } from '@vueuse/core'
+import { seriesDates, weekdayOf, type Frequency } from '../../../../shared/series'
 
 interface Bookable { id: string, name: string, kind: 'space' | 'resource', venueName: string | null, external: boolean, approvalNote: string | null, guidance: string | null, capacity: number | null, manage: boolean, override: boolean, purposes: string[] }
-interface Purpose { id: string, name: string, description: string | null, tier: number, openTo: string, needsProduction: boolean }
+interface Purpose { id: string, name: string, description: string | null, tier: number, openTo: string, needsProduction: boolean, mayRepeat: boolean }
 interface Options { bookables: Bookable[], purposes: Purpose[], productions: { id: string, title: string }[], slotMinutes: number }
 interface Check {
   outcome: 'confirm' | 'request' | 'refused'
@@ -19,6 +20,8 @@ interface Check {
   waiting: number
   overridden: string[]
 }
+interface Occurrence { date: string, startsAt: number | null, endsAt: number | null, outcome: 'confirm' | 'request' | 'refused', rule: string | null, code: string | null, reason: string | null }
+interface SeriesCheck { occurrences: Occurrence[], needsDecision: boolean }
 
 const { t } = useT()
 const route = useRoute()
@@ -42,6 +45,12 @@ const form = reactive({
   title: '',
   attendees: null as number | null,
   notes: '',
+  repeat: false,
+  frequency: 'weekly' as Frequency,
+  weekdays: [] as string[],
+  endBy: 'date' as 'date' | 'count',
+  lastDate: '',
+  count: 10 as number | null,
 })
 
 const purpose = computed(() => data.value?.purposes.find(p => p.id === form.purposeId))
@@ -61,6 +70,7 @@ const bookableItems = computed(() => {
 watch(() => form.purposeId, () => {
   if (form.bookableId && bookable.value && !bookable.value.purposes.includes(form.purposeId)) form.bookableId = ''
   if (!purpose.value?.needsProduction) form.productionId = NONE
+  if (!purpose.value?.mayRepeat) form.repeat = false
 })
 
 function timeOf(value: string) {
@@ -82,7 +92,7 @@ const span = computed(() => {
 })
 
 const ask = computed(() => {
-  if (!form.purposeId || !form.bookableId || !span.value) return null
+  if (form.repeat || !form.purposeId || !form.bookableId || !span.value) return null
   return {
     bookableId: form.bookableId,
     purposeId: form.purposeId,
@@ -106,8 +116,90 @@ watchDebounced(ask, async (body) => {
   finally { checking.value = false }
 }, { debounce: 400, deep: true }) // not-policy: a pause in typing
 
+// A series (part 3, R1 to R5): every date is checked, and a refused one is booked only when left out.
+const MINUTE = 60_000 // not-policy: unit of time
+const COUNT_HORIZON = 800 // not-policy: days enough for 104 monthly dates
+const weekdayItems = computed(() => [1, 2, 3, 4, 5, 6, 7].map(d => ({ value: String(d), label: t(`spaces.book.weekday.${d}`) })))
+const frequencyItems = computed(() => (['daily', 'weekly', 'fortnightly', 'monthly-by-weekday'] as const).map(f => ({ value: f, label: t(`spaces.book.frequency.${f}`) })))
+const endItems = computed(() => [{ value: 'date', label: t('spaces.book.end-by-date') }, { value: 'count', label: t('spaces.book.end-by-count') }])
+const byWeekday = computed(() => form.frequency === 'weekly' || form.frequency === 'fortnightly')
+watch(() => [form.repeat, form.day], () => {
+  if (form.repeat && !form.weekdays.length && form.day) form.weekdays = [String(weekdayOf(form.day))]
+})
+const weekdays = computed(() => byWeekday.value ? form.weekdays.map(Number) : null)
+const lastDate = computed(() => {
+  if (form.endBy === 'date') return form.lastDate
+  if (!form.day || !form.count) return ''
+  const far = parseDate(form.day).add({ days: COUNT_HORIZON }).toString()
+  return seriesDates({ frequency: form.frequency, first: form.day, last: far, weekdays: weekdays.value }, form.count).at(-1) ?? ''
+})
+const seriesAsk = computed(() => {
+  if (!form.repeat || !form.purposeId || !form.bookableId || !span.value || !lastDate.value) return null
+  return {
+    bookableId: form.bookableId,
+    purposeId: form.purposeId,
+    productionId: form.productionId === NONE ? null : form.productionId,
+    bookedFor: form.bookedFor ?? null,
+    overrideReason: form.overrideReason.trim() || null,
+    frequency: form.frequency,
+    weekdays: weekdays.value,
+    startsLocal: form.start,
+    lengthMinutes: Math.round((span.value.endsAt - span.value.startsAt) / MINUTE),
+    firstDate: form.day,
+    lastDate: lastDate.value,
+  }
+})
+const series = ref<SeriesCheck | null>(null)
+const seriesRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const leftOut = ref<string[]>([])
+async function checkSeriesNow(body = seriesAsk.value) {
+  seriesRefusal.value = null
+  if (!body) {
+    series.value = null
+    return
+  }
+  checking.value = true
+  try {
+    series.value = await $api<SeriesCheck>('/api/spaces/series/check', { method: 'POST', body })
+    const dates = new Set(series.value.occurrences.map(o => o.date))
+    leftOut.value = leftOut.value.filter(d => dates.has(d))
+  }
+  catch (e) {
+    series.value = null
+    seriesRefusal.value = toRefusal(e)
+  }
+  finally { checking.value = false }
+}
+watchDebounced(seriesAsk, body => checkSeriesNow(body), { debounce: 400, deep: true }) // not-policy: a pause in typing
+const seriesCounts = computed(() => {
+  const all = series.value?.occurrences ?? []
+  const kept = all.filter(o => !leftOut.value.includes(o.date))
+  return { all: all.length, kept: kept.length, blocked: kept.filter(o => o.outcome === 'refused').length }
+})
+const seriesVerdict = computed(() => {
+  const s = series.value
+  if (!s) return null
+  const { blocked, kept } = seriesCounts.value
+  if (blocked) return { color: 'error' as const, icon: 'i-lucide-circle-x', title: t('spaces.book.series-blocked', { count: blocked }), description: t('spaces.book.series-blocked-help') }
+  if (!kept) return { color: 'error' as const, icon: 'i-lucide-circle-x', title: t('spaces.book.series-none'), description: undefined }
+  if (s.needsDecision) return { color: 'warning' as const, icon: 'i-lucide-hourglass', title: t('spaces.book.series-request'), description: bookable.value?.approvalNote ?? undefined }
+  return { color: 'success' as const, icon: 'i-lucide-circle-check', title: t('spaces.book.series-confirm'), description: undefined }
+})
+const outcomeBadge = (o: Occurrence) => leftOut.value.includes(o.date)
+  ? { color: 'neutral' as const, label: t('spaces.book.left-out') }
+  : o.outcome === 'refused'
+    ? { color: 'error' as const, label: t('spaces.book.outcome.refused') }
+    : o.outcome === 'request'
+      ? { color: 'warning' as const, label: t('spaces.book.outcome.request') }
+      : { color: 'success' as const, label: t('spaces.book.outcome.confirm') }
+function toggleLeftOut(date: string, out: boolean | 'indeterminate') {
+  leftOut.value = out === true ? [...leftOut.value, date] : leftOut.value.filter(d => d !== date)
+}
+
 const OVERRIDABLE = ['P5', 'P6', 'P7', 'P8', 'P9']
-const mayOverride = computed(() => !!bookable.value?.override && (!!check.value?.overridden.length || (check.value?.outcome === 'refused' && OVERRIDABLE.includes(check.value.rule ?? ''))))
+const mayOverride = computed(() => !!bookable.value?.override && (form.overrideReason.length > 0
+  || !!check.value?.overridden.length || (check.value?.outcome === 'refused' && OVERRIDABLE.includes(check.value.rule ?? ''))
+  || !!series.value?.occurrences.some(o => o.outcome === 'refused' && OVERRIDABLE.includes(o.rule ?? ''))))
 
 const verdict = computed(() => {
   const c = check.value
@@ -132,11 +224,40 @@ function takeNearest() {
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const formEl = useFormRef('formEl')
-const validate = () => needs({ purposeId: form.purposeId, bookableId: form.bookableId, day: form.day, start: form.start, end: form.end, title: form.title, ...(purpose.value?.needsProduction ? { productionId: form.productionId === NONE ? '' : form.productionId } : {}) })
-const ready = computed(() => !!ask.value && form.title.trim().length >= 3 && check.value?.outcome !== 'refused') // not-policy: as the title's minimum
+const validate = () => needs({
+  purposeId: form.purposeId, bookableId: form.bookableId, day: form.day, start: form.start, end: form.end, title: form.title,
+  ...(purpose.value?.needsProduction ? { productionId: form.productionId === NONE ? '' : form.productionId } : {}),
+  ...(form.repeat && form.endBy === 'date' ? { lastDate: form.lastDate } : {}),
+  ...(form.repeat && form.endBy === 'count' ? { count: form.count ? String(form.count) : '' } : {}),
+})
+const titled = computed(() => form.title.trim().length >= 3) // not-policy: as the title's minimum
+const ready = computed(() => form.repeat
+  ? !!seriesAsk.value && !!series.value && titled.value && !seriesCounts.value.blocked && seriesCounts.value.kept > 0
+  : !!ask.value && titled.value && check.value?.outcome !== 'refused')
+const submitLabel = computed(() => {
+  if (form.repeat && series.value) return t(series.value.needsDecision ? 'spaces.book.request-some' : 'spaces.book.book-some', { n: seriesCounts.value.kept, m: seriesCounts.value.all })
+  return check.value?.outcome === 'request' ? t('spaces.book.send-request') : t('spaces.book.book')
+})
+async function saveSeries() {
+  if (!seriesAsk.value) return
+  try {
+    const made = await $api<{ seriesId: string, state: string, occurrences: number }>('/api/spaces/series', {
+      method: 'POST',
+      body: { ...seriesAsk.value, leaveOut: leftOut.value, title: form.title.trim(), notes: form.notes.trim() || null, attendees: form.attendees },
+    })
+    toast.add({ title: t(made.state === 'confirmed' ? 'spaces.book.booked-series' : 'spaces.book.requested-series', { count: made.occurrences }), color: 'success' })
+    await navigateTo('/members/spaces/bookings')
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+    // R4: a date taken since the check refuses the whole series, so the list is checked again.
+    await checkSeriesNow()
+  }
+}
 async function save() {
-  if (!ask.value) return
   refusal.value = null
+  if (form.repeat) return await saveSeries()
+  if (!ask.value) return
   try {
     const made = await $api<{ bookingId: string, state: string }>('/api/spaces/bookings', {
       method: 'POST',
@@ -255,8 +376,110 @@ async function save() {
               />
             </UFormField>
           </div>
+          <template v-if="purpose?.mayRepeat">
+            <UCheckbox
+              v-model="form.repeat"
+              :label="t('spaces.book.repeat')"
+              :description="t('spaces.book.repeat-help')"
+            />
+            <div
+              v-if="form.repeat"
+              class="space-y-4 border-s border-default ps-4"
+            >
+              <UFormField
+                :label="t('spaces.book.frequency')"
+                name="frequency"
+              >
+                <USelect
+                  v-model="form.frequency"
+                  :items="frequencyItems"
+                  class="min-w-64"
+                />
+              </UFormField>
+              <UFormField
+                v-if="byWeekday"
+                :label="t('spaces.book.weekdays')"
+                name="weekdays"
+              >
+                <UCheckboxGroup
+                  v-model="form.weekdays"
+                  :items="weekdayItems"
+                  orientation="horizontal"
+                />
+              </UFormField>
+              <UFormField
+                :label="t('spaces.book.ends')"
+                name="endBy"
+              >
+                <URadioGroup
+                  v-model="form.endBy"
+                  :items="endItems"
+                  orientation="horizontal"
+                />
+              </UFormField>
+              <UFormField
+                v-if="form.endBy === 'date'"
+                :label="t('spaces.book.last-date')"
+                name="lastDate"
+                required
+              >
+                <FieldDate v-model="form.lastDate" />
+              </UFormField>
+              <UFormField
+                v-else
+                :label="t('spaces.book.count')"
+                name="count"
+                required
+              >
+                <FieldNumber
+                  v-model="form.count"
+                  :min="2"
+                  :max="104"
+                />
+              </UFormField>
+            </div>
+          </template>
           <div
-            v-if="verdict"
+            v-if="form.repeat && (seriesVerdict || seriesRefusal)"
+            aria-live="polite"
+            class="space-y-2"
+          >
+            <RefusalNotice :refusal="seriesRefusal" />
+            <UAlert
+              v-if="seriesVerdict"
+              :color="seriesVerdict.color"
+              variant="subtle"
+              :icon="checking ? 'i-lucide-loader-circle' : seriesVerdict.icon"
+              :title="seriesVerdict.title"
+              :description="seriesVerdict.description"
+            />
+            <RecordList
+              v-if="series"
+              :label="t('spaces.book.dates')"
+            >
+              <RecordListItem
+                v-for="o in series.occurrences"
+                :key="o.date"
+                :name="dates.dayNamed(o.date)"
+                :description="o.outcome === 'refused' ? o.reason ?? undefined : undefined"
+                :muted="leftOut.includes(o.date)"
+              >
+                <UBadge
+                  :color="outcomeBadge(o).color"
+                  variant="subtle"
+                  :label="outcomeBadge(o).label"
+                />
+                <UCheckbox
+                  v-if="o.outcome === 'refused'"
+                  :model-value="leftOut.includes(o.date)"
+                  :label="t('spaces.book.leave-out')"
+                  @update:model-value="toggleLeftOut(o.date, $event)"
+                />
+              </RecordListItem>
+            </RecordList>
+          </div>
+          <div
+            v-if="!form.repeat && verdict"
             aria-live="polite"
           >
             <UAlert
@@ -344,7 +567,7 @@ async function save() {
           <div class="flex gap-2">
             <UButton
               type="submit"
-              :label="check?.outcome === 'request' ? t('spaces.book.send-request') : t('spaces.book.book')"
+              :label="submitLabel"
               :loading="formEl?.loading"
               :disabled="!ready"
             />
