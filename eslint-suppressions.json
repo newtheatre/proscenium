@@ -4,6 +4,14 @@
       "count": 1
     }
   },
+  "layers/availability/app/pages/members/find-a-time/index.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
   "layers/availability/server/entries.ts": {
     "max-params": {
       "count": 2
@@ -19,6 +27,11 @@
       "count": 1
     },
     "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/availability/shared/find.ts": {
+    "max-params": {
       "count": 1
     }
   },
@@ -830,7 +843,7 @@
   },
   "layers/core/kit/measures.ts": {
     "complexity": {
-      "count": 1
+      "count": 2
     },
     "sonarjs/cognitive-complexity": {
       "count": 1
@@ -846,7 +859,7 @@
   },
   "layers/core/kit/registry.ts": {
     "complexity": {
-      "count": 4
+      "count": 5
     },
     "max-depth": {
       "count": 4
@@ -858,7 +871,7 @@
       "count": 1
     },
     "sonarjs/cognitive-complexity": {
-      "count": 3
+      "count": 4
     }
   },
   "layers/core/kit/requirements.ts": {
@@ -1190,6 +1203,14 @@
   "layers/core/server/interface/access.ts": {
     "complexity": {
       "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/measures/people.ts": {
+    "complexity": {
+      "count": 2
     },
     "sonarjs/cognitive-complexity": {
       "count": 1
