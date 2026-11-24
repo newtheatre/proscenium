@@ -94,5 +94,6 @@
   "core.recovery-codes.continue": "Continue",
   "core.recovery-codes.file.heading": "{site}: recovery codes",
   "core.recovery-codes.file.saved": "Saved {date}. Each code works once, if you lose your passkey.",
-  "core.recovery-codes.file.name": "recovery-codes"
+  "core.recovery-codes.file.name": "recovery-codes",
+  "core.welcome.under-18-help": "We keep only the day you turn 18, never your date of birth, and forget it once it comes."
 }

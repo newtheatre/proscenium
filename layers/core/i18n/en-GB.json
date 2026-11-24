@@ -710,5 +710,9 @@
   "core.home-figures.performances.detail.one": "Across {count} production",
   "core.home-figures.performances.detail.other": "Across {count} productions",
   "core.home-figures.no-value": "None",
-  "core.home-figures.meter": "{value} of {max}"
+  "core.home-figures.meter": "{value} of {max}",
+  "core.settings.under-18.latest-finish.label": "Latest finish for under-18s",
+  "core.settings.under-18.latest-finish.help": "Rehearsals and productions warn when a call or shift for someone under 18 ends after this time. Leave it empty to warn nobody.",
+  "core.abilities.age.record.label": "Record that someone is under 18, after seeing ID",
+  "core.settings-sections.under-18": "Under 18s"
 }

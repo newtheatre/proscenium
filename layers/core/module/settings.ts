@@ -56,6 +56,7 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   'access-scheme': on('people'),
   'emergency-contacts': on('people'),
   'merge': on('people'),
+  'under-18': on('people'),
 }
 
 const change = 'core.settings.manage'
