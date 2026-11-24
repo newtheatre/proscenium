@@ -8,7 +8,7 @@ import { setting, defineSettings, validateSettingValue, formatSetting, optionsOf
 import { catalogueLabel, searchable } from '../../layers/core/shared/choices'
 import { ability, defineAbilities, record, defineRecords } from '#kit/abilities'
 import { code, defineModule, event, job, task } from '#kit/manifest'
-import { col, columnMeta, defineTable } from '#kit/db'
+import { col, columnMeta, defineTable, withoutRowidSql } from '#kit/db'
 import { latestSlot } from '#kit/jobs'
 import { instantOfLocal } from '#kit/clock'
 import { DeclarationError } from '#kit/refusal'
@@ -246,6 +246,33 @@ describe('tables', () => {
   it('take the realms audience, members, operational and system', () => {
     expect(() => defineTable('lost_property_bins', { id: col.id() }, { id: 'lpb', realm: 'system' })).not.toThrow()
     expect(() => defineTable('lost_property_bins', { id: col.id() }, { id: 'lpb', realm: 'member' as 'members' })).toThrow(/realm/)
+  })
+  it('keep no times in a table declared timestamps: false (R3-23)', () => {
+    const ballot = () => ({ id: col.id(), choice: col.internal(text('choice')) })
+    expect(() => defineTable('lost_property_votes', ballot(), { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false })).not.toThrow()
+    expect(() => defineTable('lost_property_votes', { ...ballot(), at: col.createdAt() }, { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false })).toThrow(/lost_property_votes\.at.*keeps no times/)
+    expect(() => defineTable('lost_property_votes', { ...ballot(), changed: col.updatedAt() }, { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false })).toThrow(/keeps no times/)
+    expect(() => defineTable('lost_property_votes', { ...ballot(), cast: col.timestamp('cast_at') }, { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false })).toThrow(/keeps no times/)
+    expect(() => defineTable('lost_property_votes', { ...ballot(), day: col.localDate('day') }, { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false })).toThrow(/keeps no times/)
+  })
+  it('want random ids and no retention in a table that keeps no times, since either would date its rows', () => {
+    const ballot = () => ({ id: col.id(), choice: col.internal(text('choice')) })
+    expect(() => defineTable('lost_property_votes', ballot(), { id: 'lpv', realm: 'members', subject: 'none', timestamps: false })).toThrow(/random: true/)
+    expect(() => defineTable('lost_property_votes', ballot(), { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: false, retention: { fixed: '30d' } })).toThrow(/retention/)
+    expect(() => defineTable('lost_property_votes', ballot(), { id: 'lpv', realm: 'members', subject: 'none', random: true, timestamps: true as false })).toThrow(/timestamps/)
+  })
+  it('make a table WITHOUT ROWID only when it has a primary key and is not searched (R3-23)', () => {
+    expect(() => defineTable('lost_property_votes', { id: col.id() }, { id: 'lpv', realm: 'members', subject: 'none', random: true, withoutRowid: true })).not.toThrow()
+    expect(() => defineTable('lost_property_tallies', { choice: col.internal(text('choice')) }, { realm: 'members', subject: 'none', withoutRowid: true })).toThrow(/primary key/)
+    expect(() => defineTable('lost_property_votes', { id: col.id() }, { id: 'lpv', realm: 'members', subject: 'none', withoutRowid: 'yes' as unknown as true })).toThrow(/withoutRowid/)
+  })
+  it('add WITHOUT ROWID to the statements that make such a table, and to a rebuild of it', () => {
+    const sql = 'CREATE TABLE `lost_property_votes` (\n\t`id` text PRIMARY KEY\n);\n--> statement-breakpoint\nCREATE TABLE `lost_property_bins` (\n\t`id` text PRIMARY KEY\n);\n--> statement-breakpoint\nCREATE TABLE `__new_lost_property_votes` (\n\t`id` text PRIMARY KEY,\n\t`x` text\n);\n'
+    const out = withoutRowidSql(sql, ['lost_property_votes'])
+    expect(out).toContain('CREATE TABLE `lost_property_votes` (\n\t`id` text PRIMARY KEY\n) WITHOUT ROWID;')
+    expect(out).toContain('CREATE TABLE `__new_lost_property_votes` (\n\t`id` text PRIMARY KEY,\n\t`x` text\n) WITHOUT ROWID;')
+    expect(out).toContain('CREATE TABLE `lost_property_bins` (\n\t`id` text PRIMARY KEY\n);')
+    expect(withoutRowidSql(out, ['lost_property_votes'])).toBe(out)
   })
   it('mark a column to be sealed with the core key', () => {
     expect(columnMeta(col.internal(text('secret'), { encrypted: true }))?.encrypted).toBe(true)

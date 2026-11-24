@@ -650,7 +650,7 @@ Finance ships no accounts of its own. Each module declares the accounts it posts
 | Box office | `box-office.ticket-income`, `box-office.deferred-ticket-income`, `box-office.booking-fee-income`, `box-office.donation-income`, `box-office.pass-liability` |
 | Payments | `payments.cash` (cash in tills), `payments.card-clearing` (one per provider account, by `scope`), `payments.other` (money taken some other way at the desk), `payments.bank`, `payments.provider-fees`, `payments.cash-variance`, `payments.unfulfilled` |
 
-A trigger refuses an entry whose posting's `source_module` is not the account's `module`, except that Payments may write the entries an owner returned for its own part (part 4). To let the trigger judge that, finance\_entries has one more column than the table of columns shows: for\_module (text, null, Internal, keep), which Payments sets to the part's owner. The trigger requires the account's module to equal for\_module when it is set and the posting's source\_module otherwise, and for\_module may differ from source\_module only when source\_module is payments. A declared account's code starts as its system key, such as box-office.ticket-income, until the treasurer recodes it.
+A trigger refuses an entry whose posting's `source_module` is not the account's `module`, except that Payments may write the entries an owner returned for its own part (part 4). To let the trigger judge that, finance\_entries has one more column than the table of columns shows: for\_module (text, null, Internal, keep), which Payments sets to the part's owner. The trigger requires the account's module to equal for\_module when it is set and the posting's source\_module otherwise, and for\_module may differ from source\_module only when source\_module is payments or invoicing (Invoices and exports, part 4, F-A1). A declared account's code starts as its system key, such as box-office.ticket-income, until the treasurer recodes it.
 
 ### `finance_postings` (append-only)
 
@@ -664,6 +664,7 @@ A trigger refuses an entry whose posting's `source_module` is not the account's 
 | `occurred_at` | integer | when the fact happened | Internal | keep |
 | `posted_at` | integer | when it was written | Internal | keep |
 | `posted_by` | text | account; null for the system | Personal | keep reference |
+| `purpose` | text | null, or why a `transfer` was posted: `expense`, `disbursement`, `bill`, `invoice`, `credit_note`, `write_off`. Checked in `postEntries`, carried by a reversal. Added by the Budgets and claims amendment (its part 4) so no kind is added and the table is never rebuilt | Internal | keep |
 
 No memo column: a free-text field in an append-only table could never be erased.
 
@@ -678,6 +679,7 @@ No memo column: a free-text field in an append-only table could never be erased.
 | `production_id`, `performance_id` | text | null when not attributable | Internal | keep |
 | `tax_code` | text | `finance_tax_codes`; default `none` | Internal | keep |
 | `tax_minor` | integer | the tax part of the amount; 0 for `none` | Internal | keep |
+| `budget_line_id` | text | null, or the Budgets line this entry is spent against; opaque to Finance, like `production_id`. `balances` filters by it | Internal | keep |
 
 ### `finance_seals` (append-only)
 
