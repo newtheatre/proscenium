@@ -18,8 +18,6 @@ import { questionsOf } from '../shared/engine'
 export const FILE_SLOT = 'forms.answer-file'
 export const OWNER = 'forms.response'
 
-/** What core's check can take in: the kinds it judges from the bytes. Anything else is refused there. */
-export const ACCEPTS = ['png', 'jpeg', 'webp', 'pdf'] as const
 const MEDIA: Record<string, string> = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'application/pdf': '.pdf' }
 
 const MEGABYTE = 1024 * 1024 // not-policy: unit of size

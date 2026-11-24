@@ -174,10 +174,6 @@ export const col = {
 /** Every table declared so far, by SQL name. `col.ref` resolves through it. */
 const tables = new Map<string, unknown>()
 
-export function declaredTables(): Map<string, unknown> {
-  return tables
-}
-
 const snakeTable = sqliteTableCreator(name => name, 'snake_case')
 
 function toSnake(key: string): string {
