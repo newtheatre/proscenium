@@ -1,0 +1,21 @@
+{
+  "availability.module.name": "Availability",
+  "availability.module.description": "Members say when they are free, maybe or busy, with a weekly pattern and dated exceptions. People who plan for a team see it in one place, and can ask the team to check theirs.",
+  "availability.navigation.groups.availability.label": "Availability",
+  "availability.settings-sections.grid": "Grid",
+  "availability.settings-sections.entry": "Entering availability",
+  "availability.settings.grid.step.label": "Time step",
+  "availability.settings.grid.step.help": "The smallest piece of time people mark on their availability. Times start and end on this step.",
+  "availability.settings.grid.step.options.15": "15 minutes",
+  "availability.settings.grid.step.options.30": "30 minutes",
+  "availability.settings.grid.step.options.60": "1 hour",
+  "availability.settings.entry.unmarked-default.label": "Time nobody has marked",
+  "availability.settings.entry.unmarked-default.help": "What a person's unmarked time means, unless they choose for themselves. \"Not known\" asks planners to check; \"Free\" assumes they can come.",
+  "availability.settings.entry.unmarked-default.options.unknown": "Not known",
+  "availability.settings.entry.unmarked-default.options.free": "Free",
+  "availability.settings.entry.horizon.label": "How far ahead",
+  "availability.settings.entry.horizon.help": "The furthest ahead anyone can enter a dated change to their availability.",
+  "availability.abilities.find.anyone.label": "See anyone's availability",
+  "availability.abilities.request.send.label": "Ask people to check their availability",
+  "availability.abilities.settings.manage.label": "Change availability settings"
+}
