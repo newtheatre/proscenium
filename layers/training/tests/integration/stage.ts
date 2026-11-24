@@ -53,6 +53,15 @@ import sendQuiz from '../../server/api/training/courses/[id]/steps/[step]/quiz.p
 import allowance from '../../server/api/training/courses/[id]/steps/[step]/allowances.post'
 import readActivity from '../../server/api/training/courses/[id]/activity.post'
 import stepSources from '../../server/api/training/step-sources.get'
+import evidenceFile from '../../server/api/training/courses/[id]/steps/[step]/evidence-file.post'
+import submitEvidence from '../../server/api/training/courses/[id]/evidence/index.post'
+import seen from '../../server/api/training/courses/[id]/evidence/seen.post'
+import evidenceQueue from '../../server/api/training/evidence/index.get'
+import getEvidence from '../../server/api/training/evidence/[id]/index.get'
+import verifyEvidence from '../../server/api/training/evidence/[id]/verify.post'
+import rejectEvidence from '../../server/api/training/evidence/[id]/reject.post'
+import withdrawEvidence from '../../server/api/training/evidence/[id]/withdraw.post'
+import myEvidence from '../../server/api/training/me/evidence.get'
 
 export const training = server({
   'GET /api/training/courses': listCourses,
@@ -104,6 +113,15 @@ export const training = server({
   'POST /api/training/courses/:id/steps/:step/allowances': allowance,
   'POST /api/training/courses/:id/activity': readActivity,
   'GET /api/training/step-sources': stepSources,
+  'POST /api/training/courses/:id/steps/:step/evidence-file': evidenceFile,
+  'POST /api/training/courses/:id/evidence': submitEvidence,
+  'POST /api/training/courses/:id/evidence/seen': seen,
+  'GET /api/training/evidence': evidenceQueue,
+  'GET /api/training/evidence/:id': getEvidence,
+  'POST /api/training/evidence/:id/verify': verifyEvidence,
+  'POST /api/training/evidence/:id/reject': rejectEvidence,
+  'POST /api/training/evidence/:id/withdraw': withdrawEvidence,
+  'GET /api/training/me/evidence': myEvidence,
 })
 
 /** 24 November 2026, 10:00 in London. */

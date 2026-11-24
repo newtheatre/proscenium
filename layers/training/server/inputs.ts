@@ -45,7 +45,20 @@ export const stepInput = z.discriminatedUnion('kind', [
     sourceParams: z.record(z.string(), z.unknown()).default({}),
     timesRequired: z.number().int().min(1).max(20).default(1), // not-policy: the schema's limit (part 2)
   }),
-  z.object({ kind: z.literal('certificate'), ...common, evidenceExpiry: z.enum(EVIDENCE_EXPIRY), evidenceFile: z.enum(EVIDENCE_FILE) }),
+  z.object({
+    kind: z.literal('certificate'),
+    ...common,
+    evidenceExpiry: z.enum(EVIDENCE_EXPIRY),
+    evidenceFile: z.enum(EVIDENCE_FILE),
+    // The outside qualifications the step recognises, offered first (E7; TR-48).
+    qualifications: z.array(z.object({
+      title: z.string().trim().min(1).max(120), // not-policy: the schema's limit (part 2)
+      issuers: z.array(z.string().trim().min(1).max(120)).max(20).default([]), // not-policy: the schema's limit (part 2)
+    })).max(20).default([]), // not-policy: the schema's limit (part 2)
+    otherQualification: z.boolean().default(true),
+  }),
+  // Experience gained elsewhere, stated with optional evidence and the questions of a form (E5).
+  z.object({ kind: z.literal('declaration'), ...common, evidenceFile: z.enum(EVIDENCE_FILE), formId: z.string().min(1).nullable().optional() }),
   // A lesson's teaching is its sections, saved on their own (O5), so it carries no guidance.
   z.object({ kind: z.literal('lesson'), ...common, guidance: z.null().optional() }),
   z.object({
@@ -144,3 +157,39 @@ export const sectionsInput = z.object({
 
 export const quizInput = z.object({ answers: z.record(z.string(), z.unknown()) })
 export const allowanceInput = z.object({ accountId: z.string().min(1), note: optionalText(300) }) // not-policy: the schema's limit (part 2)
+
+const day_ = day.nullable().optional().transform(v => v || null)
+/** Evidence a person sends for a certificate or declaration step (E1, E5 to E7). Which fields count depends on the step. */
+export const evidenceInput = z.object({
+  stepId: z.string().min(1),
+  // Staff sending it for someone else; left out, it is the signed-in person's own.
+  accountId: z.string().min(1).optional(),
+  // The id the file was uploaded under, when there is a file.
+  evidenceId: z.string().min(1).optional(),
+  fileId: z.string().min(1).nullable().optional(),
+  issuer: optionalText(120), // not-policy: the schema's limit (part 2)
+  reference: optionalText(80), // not-policy: the schema's limit (part 2)
+  issuedOn: day_,
+  expiresOn: day_,
+  qualification: optionalText(120), // not-policy: the schema's limit (part 2)
+  statement: optionalText(2000), // not-policy: the schema's limit (part 2)
+  organisation: optionalText(120), // not-policy: the schema's limit (part 2)
+  doneFrom: day_,
+  doneTo: day_,
+  linkUrl: z.string().trim().url().max(500).nullable().optional().transform(v => v || null), // not-policy: the schema's limit (part 2)
+  referee: optionalText(200), // not-policy: the schema's limit (part 2)
+  answers: z.record(z.string(), z.unknown()).optional(),
+}).strict()
+export type EvidenceInput = z.infer<typeof evidenceInput>
+
+/** A verifier records that they saw the original, keeping nothing of it (E2). */
+export const seenInput = z.object({
+  stepId: z.string().min(1),
+  accountId: z.string().min(1),
+  issuer: z.string().trim().min(1).max(120), // not-policy: the schema's limit (part 2)
+  issuedOn: day,
+  expiresOn: day_,
+}).strict()
+export type SeenInput = z.infer<typeof seenInput>
+
+export const rejectInput = z.object({ reason: z.string().trim().min(1).max(300) }).strict() // not-policy: the schema's limit (part 2)
