@@ -33,6 +33,7 @@ interface One {
   answers: ShownAnswer[]
   restricted: boolean
   calculated?: Record<string, Figure> | null
+  marking: { score: number, outOf: number, passed: boolean | null, perQuestion: { questionId: string, correct: boolean, points: number, outOf: number }[] } | null
   revision: number
   revisions: number
   changed: string[]
@@ -711,11 +712,23 @@ const panel = computed({ get: () => !!openId.value, set: (v: boolean) => { if (!
               class="min-w-48"
             />
           </UFormField>
+          <div
+            v-if="one.marking"
+            class="flex flex-wrap items-center gap-2"
+          >
+            <span class="font-medium">{{ t('forms.screens.marking.score', { score: one.marking.score, outOf: one.marking.outOf }) }}</span>
+            <StatusBadge
+              v-if="one.marking.passed !== null"
+              :tone="one.marking.passed ? 'success' : 'neutral'"
+              :label="t(one.marking.passed ? 'forms.screens.marking.passed' : 'forms.screens.marking.not-passed-staff')"
+            />
+          </div>
           <FormsAnswers
             :definition="one.definition"
             :answers="one.answers"
             :changed="one.changed"
             :calculated="one.calculated"
+            :marks="one.marking ? Object.fromEntries(one.marking.perQuestion.map(m => [m.questionId, m])) : null"
           />
           <section
             v-if="one.history.length"

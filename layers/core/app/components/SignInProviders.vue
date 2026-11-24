@@ -1,7 +1,8 @@
 <!-- The outside sign-in providers on Admin > Sign-in, set up the way Payments' providers are: one card
      each with its state, and a slide-over that walks through the set-up in order: the redirect URI
-     to register with the provider, the client ID, secret and accepted organisations saved together,
-     a check with the provider, and putting it in use (or out of use) last, with Undo. -->
+     to register with the provider, the client ID, secret and what it accepts saved together (with
+     Microsoft's tenants, or another provider's name and discovery address), a check with the
+     provider, and putting it in use (or out of use) last, with Undo (ID-04, ID-47). -->
 <script setup lang="ts">
 interface Provider {
   id: string
@@ -9,9 +10,14 @@ interface Provider {
   on: boolean
   clientId: string | null
   domains: string[]
+  managedDomains: string[]
+  tenants?: string[]
+  personal?: boolean
+  discovery?: string | null
+  found?: { ok: true, issuer: string, authoriseUrl: string, tokenUrl: string } | { ok: false, problem: string } | null
   secret: { saved: boolean, hint: string | null, start: string | null }
   callbackUrl: string
-  missing: ('client-id' | 'secret')[]
+  missing: ('client-id' | 'secret' | 'label' | 'discovery')[]
 }
 
 const props = defineProps<{
@@ -34,30 +40,55 @@ watch([() => props.highlight, data], ([key]) => {
   if (id && data.value?.providers.some(p => p.id === id)) managing.value = id
 }, { immediate: true })
 
-const summaryOf = (p: Provider) => p.domains.length
-  ? t('core.sign-in-providers.only-domains', { domains: p.domains.join(', ') })
-  : t('core.sign-in-providers.any-account', { provider: p.label })
+const summaryOf = (p: Provider) => {
+  if (p.tenants) {
+    if (!p.tenants.length) return t(p.personal ? 'core.sign-in-providers.any-microsoft-and-personal' : 'core.sign-in-providers.any-microsoft')
+    return t(p.personal ? 'core.sign-in-providers.tenants-and-personal' : 'core.sign-in-providers.tenants', { count: p.tenants.length })
+  }
+  if (p.id !== 'google') return p.found?.ok ? p.found.issuer : t('core.sign-in-providers.any-account', { provider: p.label })
+  return p.domains.length
+    ? t('core.sign-in-providers.only-domains', { domains: p.domains.join(', ') })
+    : t('core.sign-in-providers.any-account', { provider: p.label })
+}
 const badgeOf = (p: Provider): { tone: 'success' | 'danger' | 'neutral', label: string } => {
   if (p.on && p.missing.length) return { tone: 'danger', label: t('core.sign-in-providers.not-ready') }
   if (p.on) return { tone: 'success', label: t('core.sign-in-providers.in-use') }
   if (p.missing.length) return { tone: 'neutral', label: t('core.sign-in-providers.not-set-up') }
   return { tone: 'neutral', label: t('core.sign-in-providers.not-in-use') }
 }
-const missingLine = (p: Provider) => p.missing.length === 2 ? t('core.sign-in-providers.missing.both') : t(`core.sign-in-providers.missing.${p.missing[0]}`)
+// What a general provider's discovery address gave when last fetched: its issuer and endpoints, or the problem.
+function foundOf(p: Provider): { title: string, description?: string, color: 'neutral' | 'warning', icon: string } | null {
+  if (!p.found) return null
+  if (!p.found.ok) return { title: t(`core.sign-in-providers.discovery-problem.${p.found.problem}`), color: 'warning', icon: 'i-lucide-triangle-alert' }
+  return {
+    title: t('core.sign-in-providers.found.title', { issuer: p.found.issuer }),
+    description: t('core.sign-in-providers.found.endpoints', { authorise: p.found.authoriseUrl, token: p.found.tokenUrl }),
+    color: 'neutral',
+    icon: 'i-lucide-search-check',
+  }
+}
+const missingLine = (p: Provider) => {
+  if (p.missing.length === 1) return t(`core.sign-in-providers.missing.${p.missing[0]}`)
+  return p.missing.length === 2 && p.missing.includes('client-id') && p.missing.includes('secret') ? t('core.sign-in-providers.missing.both') : t('core.sign-in-providers.missing.several')
+}
 
 // The set-up form, filled from the provider each time its slide-over opens.
-const form = reactive({ clientId: '', secret: '', domains: [] as string[] })
+const form = reactive({ clientId: '', secret: '', domains: [] as string[], managedDomains: [] as string[], tenants: [] as string[], personal: false, label: '', discovery: '' })
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const saving = ref(false)
 watch(managed, (p, before) => {
   if (!p || p.id === before?.id) return
-  Object.assign(form, { clientId: p.clientId ?? '', secret: '', domains: [...p.domains] })
+  Object.assign(form, {
+    clientId: p.clientId ?? '', secret: '', domains: [...p.domains], managedDomains: [...p.managedDomains],
+    tenants: [...(p.tenants ?? [])], personal: !!p.personal, label: p.id === 'oidc' && p.missing.includes('label') ? '' : p.label, discovery: p.discovery ?? '',
+  })
   refusal.value = null
   checked.value = null
 }, { immediate: true })
 
 async function save(p: Provider) {
   const domainsChanged = JSON.stringify(form.domains) !== JSON.stringify(p.domains)
+    || (!!p.tenants && (JSON.stringify(form.tenants) !== JSON.stringify(p.tenants) || form.personal !== p.personal))
   // Narrowing the organisations of a provider in use can shut people out, so it asks first.
   if (domainsChanged && p.on && !(await confirm({
     verb: t('core.sign-in-providers.domains-verb'),
@@ -70,7 +101,16 @@ async function save(p: Provider) {
   try {
     await $api(`/api/core/sign-in-providers/${p.id}` as string, {
       method: 'PUT',
-      body: { clientId: form.clientId.trim() || null, domains: form.domains, secret: form.secret.trim() || undefined, confirm: true },
+      body: {
+        clientId: form.clientId.trim() || null,
+        domains: form.domains,
+        secret: form.secret.trim() || undefined,
+        // Google's managed domains are on the sign-in settings, beside whether they count as strong.
+        ...(p.id === 'google' ? {} : { managedDomains: form.managedDomains }),
+        ...(p.tenants ? { tenants: form.tenants, personal: form.personal } : {}),
+        ...(p.id === 'oidc' ? { label: form.label.trim() || null, discovery: form.discovery.trim() || null } : {}),
+        confirm: true,
+      },
     })
     form.secret = ''
     checked.value = null
@@ -231,7 +271,7 @@ async function copy(text: string) {
                the Save button does not jump away from the pointer as it is pressed. -->
           <UForm
             :state="form"
-            :validate="() => needs({ clientId: form.clientId, secret: p.secret.saved ? true : form.secret })"
+            :validate="() => needs({ ...(p.id === 'oidc' ? { label: form.label, discovery: form.discovery } : {}), clientId: form.clientId, secret: p.secret.saved ? true : form.secret })"
             novalidate
             class="space-y-4"
             @submit="save(p)"
@@ -240,6 +280,43 @@ async function copy(text: string) {
               {{ t('core.sign-in-providers.client.title') }}
             </h3>
             <RefusalNotice :refusal="refusal" />
+            <div
+              v-if="p.id === 'oidc'"
+              class="space-y-4"
+            >
+              <UFormField
+                name="label"
+                eager-validation
+                :label="t('core.sign-in-providers.label')"
+                :help="t('core.sign-in-providers.label-help')"
+                required
+              >
+                <UInput
+                  v-model="form.label"
+                  maxlength="40"
+                />
+              </UFormField>
+              <UFormField
+                name="discovery"
+                eager-validation
+                :label="t('core.sign-in-providers.discovery')"
+                :help="t('core.sign-in-providers.discovery-help')"
+                required
+              >
+                <UInput
+                  v-model="form.discovery"
+                  type="url"
+                  maxlength="300"
+                  spellcheck="false"
+                  autocomplete="off"
+                />
+              </UFormField>
+              <UAlert
+                v-if="foundOf(p)"
+                variant="subtle"
+                v-bind="foundOf(p)!"
+              />
+            </div>
             <UFormField
               name="clientId"
               eager-validation
@@ -271,13 +348,50 @@ async function copy(text: string) {
                 :placeholder="p.secret.saved ? t('core.sign-in-providers.secret-keep') : undefined"
               />
             </UFormField>
+            <div
+              v-if="p.tenants"
+              class="space-y-4"
+            >
+              <UFormField
+                name="tenants"
+                :label="t('core.sign-in-providers.tenants-field')"
+                :help="t('core.sign-in-providers.tenants-help')"
+              >
+                <UInputTags
+                  v-model="form.tenants"
+                  :max-length="36"
+                  :placeholder="t('core.settings-page.add-value')"
+                  add-on-blur
+                  add-on-paste
+                />
+              </UFormField>
+              <UCheckbox
+                v-model="form.personal"
+                :label="t('core.sign-in-providers.personal')"
+                :description="t('core.sign-in-providers.personal-help')"
+              />
+            </div>
             <UFormField
               name="domains"
-              :label="t('core.sign-in-providers.domains')"
+              :label="t(p.id === 'google' ? 'core.sign-in-providers.domains' : 'core.sign-in-providers.vouched-domains')"
               :help="t(`core.sign-in-providers.domains-help.${p.id}`)"
             >
               <UInputTags
                 v-model="form.domains"
+                :max-length="253"
+                :placeholder="t('core.settings-page.add-value')"
+                add-on-blur
+                add-on-paste
+              />
+            </UFormField>
+            <UFormField
+              v-if="p.id !== 'google'"
+              name="managedDomains"
+              :label="t('core.sign-in-providers.managed-domains', { provider: p.label })"
+              :help="t('core.sign-in-providers.managed-domains-help', { provider: p.label })"
+            >
+              <UInputTags
+                v-model="form.managedDomains"
                 :max-length="253"
                 :placeholder="t('core.settings-page.add-value')"
                 add-on-blur

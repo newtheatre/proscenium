@@ -2,10 +2,13 @@
 // has one draft, saved as its author works, and any number of published versions, each immutable.
 // Publishing compares the draft with the field catalogue, refuses what the specification forbids
 // (a changed type, a lowered data class) and classes the rest as safe, caution or breaking.
-import { all, first, refuse, useSetting, type UnitView } from '#kit'
+import { all, can, first, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { actionList } from './actions'
+import { getVersion } from './versions'
 import { sources } from './sources'
-import { DATA_CLASSES, FORMAT, checkDefinition, hasStages, parseDefinition, publishable, questionsOf, type DataClass, type Definition, type Fault, type Limits, type Problem, type Question } from '../shared/engine'
+import { DATA_CLASSES, FORMAT, checkDefinition, hasStages, parseDefinition, publishable, questionsOf, withoutAnswerKey, type DataClass, type Definition, type Fault, type Limits, type Problem, type Question } from '../shared/engine'
+
+export { VERSION, getVersion, listVersions, type VersionRow } from './versions'
 
 export interface FormRow {
   id: string
@@ -23,9 +26,17 @@ export interface FormRow {
   createdAt: number
   archivedAt: number | null
 }
+/** Whether somebody may set this form's correct answers and pass mark (FB-513); with no form, whether they may on any. */
+export const mayMark = async (actor: Actor, formId: string | null): Promise<boolean> =>
+  (await can(actor, 'forms.form.mark', formId ? ['forms.form', formId] : undefined)).allowed
+
+/** A definition as its author is sent it: the correct answers only to somebody who may mark the form. */
+export async function authorDefinition(def: Definition, actor: Actor, formId: string | null): Promise<Definition> {
+  return await mayMark(actor, formId) ? def : withoutAnswerKey(def)
+}
+
 export interface DraftRow { definition: string, editRevision: number, editedBy: string, updatedAt: number }
 export interface FieldRow { questionId: string, key: string, type: string, dataClass: DataClass, label: string, firstVersion: number, retiredInVersion: number | null }
-export interface VersionRow { id: string, number: number, definition: string, definitionHash: string, changeSummary: string, publishedBy: string, publishedAt: number }
 
 const FORM = `id, slug, title, mode, status, live_version_id AS liveVersionId, anonymous, allow_edits AS allowEdits, retention_days AS retentionDays,
   retention_declined_days AS retentionDeclinedDays, created_by AS createdBy, created_at AS createdAt, archived_at AS archivedAt`
@@ -67,10 +78,6 @@ export async function getDraft(formId: string): Promise<DraftRow> {
 }
 
 export const getFields = (formId: string) => all<FieldRow>('SELECT question_id AS questionId, key, type, data_class AS dataClass, label, first_version AS firstVersion, retired_in_version AS retiredInVersion FROM forms_fields WHERE form_id = ?', formId)
-
-const VERSION = 'id, number, definition, definition_hash AS definitionHash, change_summary AS changeSummary, published_by AS publishedBy, created_at AS publishedAt'
-export const getVersion = (id: string | null) => id ? first<VersionRow>(`SELECT ${VERSION} FROM forms_versions WHERE id = ?`, id) : Promise.resolve(null)
-export const listVersions = (formId: string) => all<Omit<VersionRow, 'definition'>>('SELECT id, number, definition_hash AS definitionHash, change_summary AS changeSummary, published_by AS publishedBy, created_at AS publishedAt FROM forms_versions WHERE form_id = ? ORDER BY number DESC', formId)
 
 export async function accountName(id: string): Promise<string | null> {
   const row = await first<{ name: string | null }>('SELECT name AS name FROM core_accounts WHERE id = ?', id)
@@ -251,15 +258,14 @@ export function writePublish(unit: UnitView, form: FormRow, draft: DraftRow, pla
     sql: 'UPDATE forms_forms SET live_version_id = ?, status = CASE status WHEN \'draft\' THEN \'live\' ELSE status END WHERE id = ? AND live_version_id IS ?',
     params: [versionId, form.id, form.liveVersionId],
   }).expect(1, stale)
-  const present = questionsOf(plan.definition).map(q => q.question)
-  for (const q of present) {
-    unit.add({
-      sql: `INSERT INTO forms_fields (form_id, question_id, key, type, data_class, label, first_version, retired_in_version) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
-            ON CONFLICT (form_id, question_id) DO UPDATE SET key = excluded.key, data_class = excluded.data_class, label = excluded.label, retired_in_version = NULL`,
-      params: [form.id, q.id, q.key, q.type, q.dataClass, q.label, plan.number],
-    })
-  }
-  for (const c of plan.summary.changes) {
-    if (c.kind === 'retired') unit.add({ sql: 'UPDATE forms_fields SET retired_in_version = ? WHERE form_id = ? AND question_id = ?', params: [plan.number, form.id, c.questionId] })
-  }
+  // One statement each, however many questions, so a long form stays inside the unit's statement limit.
+  const present = questionsOf(plan.definition).map(({ question: q }) => ({ id: q.id, key: q.key, type: q.type, dataClass: q.dataClass, label: q.label }))
+  unit.add({
+    sql: `INSERT INTO forms_fields (form_id, question_id, key, type, data_class, label, first_version, retired_in_version)
+          SELECT ?, json_extract(j.value, '$.id'), json_extract(j.value, '$.key'), json_extract(j.value, '$.type'), json_extract(j.value, '$.dataClass'), json_extract(j.value, '$.label'), ?, NULL FROM json_each(?) j WHERE true
+          ON CONFLICT (form_id, question_id) DO UPDATE SET key = excluded.key, data_class = excluded.data_class, label = excluded.label, retired_in_version = NULL`,
+    params: [form.id, plan.number, JSON.stringify(present)],
+  })
+  const retired = plan.summary.changes.filter(c => c.kind === 'retired').map(c => c.questionId)
+  if (retired.length) unit.add({ sql: 'UPDATE forms_fields SET retired_in_version = ? WHERE form_id = ? AND question_id IN (SELECT value FROM json_each(?))', params: [plan.number, form.id, JSON.stringify(retired)] })
 }

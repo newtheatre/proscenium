@@ -29,6 +29,8 @@ jobs:
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run check:conformance
+      # No file, dependency or import that nothing uses (knip.json teaches it the registry's conventions).
+      - run: bun run check:unused
 
   test:
     name: Unit and integration tests

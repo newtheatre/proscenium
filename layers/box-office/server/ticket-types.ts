@@ -7,6 +7,7 @@
 // complimentary type by hand.
 import { sql } from 'drizzle-orm'
 import { all, createUnit, first, idSchema, newId, nowMs, refuse, requirements, usePoint, type UnitView } from '#kit'
+import { listTaxCodes } from '#modules/finance'
 
 /** The type a pass entry's line carries (pass-entries.ts): kept out of every list of types. */
 export const HIDDEN_TYPE = 'box-office.pass-entry'
@@ -47,6 +48,7 @@ interface Row {
   channel: Channel
   managed_by: string | null
   sort: number
+  tax_code: string | null
 }
 
 export interface TicketType {
@@ -60,6 +62,8 @@ export interface TicketType {
   needsPaidTicket: boolean
   active: boolean
   channel: Channel
+  /** The Finance tax code its prices include, or null for the theatre's usual one (BO-78). */
+  taxCode: string | null
   sort: number
   /** The module that keeps this type, or null for one a person made. */
   managedBy: string | null
@@ -162,6 +166,7 @@ function toType(r: Row, declared: Map<string, unknown>, used: Set<string>): Tick
     needsPaidTicket: !!r.needs_paid_ticket,
     active: !!r.active,
     channel: r.channel,
+    taxCode: r.tax_code,
     sort: r.sort,
     managedBy: r.managed_by,
     available: !r.managed_by || declared.has(r.managed_by),
@@ -201,6 +206,12 @@ async function checkRefs(refs: readonly string[]): Promise<void> {
   if (unknown.length) refuse('box-office.ticket-type.unknown-requirement', 'One of those requirements is not provided by anything switched on.', { status: 422, fields: { requirementRefs: 'unknown' }, remedy: 'Choose requirements from the list.' })
 }
 
+/** A code a ticket type may be given: one Finance offers now. */
+async function knownTaxCode(code: string): Promise<void> {
+  if (!(await listTaxCodes({ activeOnly: true })).some(c => c.code === code && c.code !== 'none'))
+    refuse('box-office.ticket-type.tax-code', 'That tax code is not offered.', { status: 422, remedy: 'Choose a code from the list.', fields: { taxCode: 'box-office.ticket-type.tax-code' } })
+}
+
 export interface TicketTypeInput {
   name: string
   kind?: 'standard' | 'concession'
@@ -209,15 +220,17 @@ export interface TicketTypeInput {
   maxPerHolder?: number
   recheckAtEntry?: boolean
   channel?: Channel
+  taxCode?: string | null
   sort?: number
 }
 
 export async function createTicketType(unit: UnitView, input: TicketTypeInput): Promise<string> {
   await checkRefs(input.requirementRefs ?? [])
+  if (input.taxCode) await knownTaxCode(input.taxCode)
   const id = newId('tty')
   const at = nowMs()
-  unit.add(sql`INSERT INTO box_office_ticket_types (id, name, kind, requirement_refs, recheck_at_entry, max_per_holder, proof_note, needs_paid_ticket, active, channel, sort, created_at, updated_at)
-    SELECT ${id}, ${input.name}, ${input.kind ?? 'standard'}, ${refsText(input.requirementRefs)}, ${(input.recheckAtEntry ?? true) ? 1 : 0}, ${input.maxPerHolder ?? 1}, ${input.proofNote ?? null}, 0, 1, ${input.channel ?? 'all'}, ${input.sort ?? sql`(SELECT coalesce(max(sort) + 1, 0) FROM box_office_ticket_types)`}, ${at}, ${at}
+  unit.add(sql`INSERT INTO box_office_ticket_types (id, name, kind, requirement_refs, recheck_at_entry, max_per_holder, proof_note, needs_paid_ticket, active, channel, tax_code, sort, created_at, updated_at)
+    SELECT ${id}, ${input.name}, ${input.kind ?? 'standard'}, ${refsText(input.requirementRefs)}, ${(input.recheckAtEntry ?? true) ? 1 : 0}, ${input.maxPerHolder ?? 1}, ${input.proofNote ?? null}, 0, 1, ${input.channel ?? 'all'}, ${input.taxCode ?? null}, ${input.sort ?? sql`(SELECT coalesce(max(sort) + 1, 0) FROM box_office_ticket_types)`}, ${at}, ${at}
     WHERE NOT EXISTS (SELECT 1 FROM box_office_ticket_types WHERE name = ${input.name} COLLATE NOCASE)`)
     .expect(1, { code: 'box-office.ticket-type.name-taken', reason: 'There is already a ticket type with that name.' })
   unit.audit({ action: 'create', record: ['box-office.ticket-type', id] })
@@ -234,6 +247,7 @@ export interface TicketTypeChange {
   maxPerHolder?: number
   recheckAtEntry?: boolean
   channel?: Channel
+  taxCode?: string | null
 }
 
 const RULES: (keyof TicketTypeChange)[] = ['kind', 'requirementRefs', 'maxPerHolder', 'recheckAtEntry']
@@ -252,6 +266,7 @@ export async function updateTicketType(unit: UnitView, id: string, change: Ticke
   if (MANAGED_KINDS.includes(row.kind) && change.kind)
     refuse('box-office.ticket-type.managed', 'Companion and complimentary tickets are kept by a module.', { status: 409 })
   if (change.requirementRefs) await checkRefs(change.requirementRefs)
+  if (change.taxCode && change.taxCode !== row.tax_code) await knownTaxCode(change.taxCode)
   const at = nowMs()
   const sets = [sql`updated_at = ${at}`]
   if (change.name !== undefined) sets.push(sql`name = ${change.name}`)
@@ -263,6 +278,7 @@ export async function updateTicketType(unit: UnitView, id: string, change: Ticke
   if (change.maxPerHolder !== undefined) sets.push(sql`max_per_holder = ${change.maxPerHolder}`)
   if (change.recheckAtEntry !== undefined) sets.push(sql`recheck_at_entry = ${change.recheckAtEntry ? 1 : 0}`)
   if (change.channel !== undefined) sets.push(sql`channel = ${change.channel}`)
+  if (change.taxCode !== undefined) sets.push(sql`tax_code = ${change.taxCode}`)
   const name = change.name ?? row.name
   unit.add(sql`UPDATE box_office_ticket_types SET ${sql.join(sets, sql`, `)} WHERE id = ${id}
     AND NOT EXISTS (SELECT 1 FROM box_office_ticket_types WHERE name = ${name} COLLATE NOCASE AND id <> ${id})`)

@@ -238,6 +238,7 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
     }
     for (const [key, { decl }] of [...r.facts].filter(([, a]) => a.module === m.id)) {
       if (decl.on && !r.records.has(decl.on)) fail(entry, `facts.${key}.on`, `"${decl.on}" is not a record type`)
+      if (decl.pin && !decl.on) fail(entry, `facts.${key}.pin`, 'only a fact on a record type can be pinned to one record')
       for (const name of decl.defaults ?? []) {
         const ability = r.abilities.get(name)
         if (!ability || (ability.module !== m.id && ability.module !== 'core')) fail(entry, `facts.${key}.defaults`, `"${name}" is not an ability of ${m.id} or core`)
@@ -288,11 +289,6 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
 /** The part of a job, task or call name after the module: `box-office.sweep-holds` → `sweep-holds`. */
 export function short(name: string): string {
   return name.slice(name.indexOf('.') + 1)
-}
-
-/** The module that owns a table name, by its prefix. */
-export function moduleOfTable(name: string): string {
-  return name.split('_')[0]!
 }
 
 let installed: Registry | undefined
