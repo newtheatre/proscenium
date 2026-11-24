@@ -9,3 +9,4 @@ playwright-report/
 .env
 .dev.vars
 *.log
+.claude/settings.local.json

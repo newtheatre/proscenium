@@ -6,7 +6,7 @@ import { getQuery, type H3Event } from 'h3'
 import { all, first, newId, refuse, requireAbility, siteUrl, usePoint, type Actor, type UnitView } from '#kit'
 import type { FormRow } from './forms'
 import { LINK_SLOT } from './db/schema'
-import { PLACE, getLink, shut, type LinkRow, type StoredPlace } from './responses'
+import { PLACE, getLink, shut, type LinkRow, type StoredPlace } from './response-rows'
 import { sourceOf } from './sources'
 
 export interface FormsSlot {
