@@ -1,6 +1,6 @@
 <!-- Your engagement (part 5, CO-19 and the start of CO-20): what a company's contact sees of one
-     engagement on their phone: its dates, and the agreement to read and answer, once. Calls, people
-     and guests join it with their slices. -->
+     engagement on their phone: its dates, the agreement to read and answer once, the calls, and who
+     from the company is coming. Guests join it with their slice. -->
 <script setup lang="ts">
 import type { AgreementVersion } from '../../../../shared/views'
 
@@ -101,6 +101,11 @@ async function answer(v: AgreementVersion, choice: 'accepted' | 'declined') {
             </div>
           </div>
         </PageSection>
+        <CompaniesSchedule
+          v-if="engagement"
+          :engagement-id="engagement.id"
+          :closed="['cancelled', 'settled'].includes(engagement.state)"
+        />
       </div>
     </DataBoundary>
   </PageFrame>

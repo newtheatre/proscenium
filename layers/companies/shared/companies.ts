@@ -25,6 +25,7 @@ export const PAYMENT_METHODS = ['bank-transfer', 'cheque', 'payments'] as const
 export type EngagementKind = typeof ENGAGEMENT_KINDS[number]
 export type EngagementState = typeof ENGAGEMENT_STATES[number]
 export type Receives = typeof RECEIVES[number]
+export type CallKind = typeof CALL_KINDS[number]
 
 /** Part 3's moves a person makes; the listeners and the daily task make the rest. */
 export const MOVES = {
@@ -34,7 +35,7 @@ export const MOVES = {
 export type Move = keyof typeof MOVES
 
 // The columns' bounds (part 2), checked by the routes before the tables' own checks.
-export const LIMITS = { name: 160, legalName: 200, registration: 60, taxNumber: 30, address: 400, postcode: 12, website: 300, description: 600, notes: 4000, role: 80, phone: 30, title: 160, reason: 500, personName: 120, email: 254, places: 50 } // not-policy: the columns' bounds
+export const LIMITS = { name: 160, legalName: 200, registration: 60, taxNumber: 30, address: 400, postcode: 12, website: 300, description: 600, notes: 4000, role: 80, phone: 30, title: 160, reason: 500, personName: 120, email: 254, places: 50, callLabel: 80, callNotes: 1000 } // not-policy: the columns' bounds
 
 /** Rule G1's near match: letters and digits only, accents and a leading or trailing "The" dropped. */
 export function nameKey(name: string): string {

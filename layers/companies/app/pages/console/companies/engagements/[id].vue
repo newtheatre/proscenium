@@ -2,7 +2,7 @@
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { EngagementDetail } from '../../../../../shared/views'
 
-// One engagement for staff (part 5): its outline and its history. Confirming is the primary step once
+// One engagement for staff (part 5): its outline, agreement, calls and people, and its history. Confirming is the primary step once
 // it is agreed; cancelling, with a reason, is last in the menu (E5). Linking a production names it (G3).
 const { t } = useT()
 const route = useRoute()
@@ -49,7 +49,7 @@ const summary = computed(() => {
     { label: t('companies.field.dates'), value: when(e) },
   ]
 })
-const tabs = computed(() => [{ id: 'overview', label: t('companies.tabs.overview') }, { id: 'agreement', label: t('companies.tabs.agreement') }, { id: 'history', label: t('companies.tabs.history') }])
+const tabs = computed(() => [{ id: 'overview', label: t('companies.tabs.overview') }, { id: 'agreement', label: t('companies.tabs.agreement') }, { id: 'schedule', label: t('companies.tabs.schedule') }, { id: 'history', label: t('companies.tabs.history') }])
 const historyItems = computed(() => (engagement.value?.history ?? []).map(h => ({
   value: h.id,
   date: dates.dateTime(h.at),
@@ -110,6 +110,12 @@ function cancelled() {
           :currency="engagement.currency"
           :closed="['cancelled', 'settled'].includes(engagement.state)"
           @changed="refresh()"
+        />
+      </template>
+      <template #tab-schedule>
+        <CompaniesSchedule
+          :engagement-id="engagement.id"
+          :closed="['cancelled', 'settled'].includes(engagement.state)"
         />
       </template>
       <template #tab-history>

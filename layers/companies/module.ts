@@ -57,13 +57,14 @@ export default defineModule({
     'settings.manage': ability({ risk: 'privileged' }),
     'engagement.view-own': ability({ on: 'companies.engagement', audit: false }),
     'guest.name': ability({ on: 'companies.engagement', implies: ['engagement.view-own'] }),
+    'people.manage-own': ability({ on: 'companies.engagement', implies: ['engagement.view-own'] }),
   }),
 
   // Part 4, "Fact": read live from the contacts table, so ending a contact ends their access at once (CO-05).
   facts: defineFacts('companies', {
     'contact-of': factDecl({
       on: 'companies.engagement',
-      defaults: ['companies.engagement.view-own', 'companies.guest.name', 'companies.agreement.answer'],
+      defaults: ['companies.engagement.view-own', 'companies.guest.name', 'companies.people.manage-own', 'companies.agreement.answer'],
     }),
   }),
 
@@ -77,6 +78,7 @@ export default defineModule({
   events: {
     announces: {
       'companies.contact.changed': event({ version: 1, payload: z.object({ companyId: z.string(), contactId: z.string() }), internal: true }),
+      'companies.call.changed': event({ version: 1, payload: z.object({ engagementId: z.string(), callId: z.string() }), internal: false }),
       'companies.engagement.changed': event({ version: 1, payload: engagementMoved, internal: false }),
       'companies.settlement.approved': event({ version: 1, payload: z.object({ settlementId: z.string(), engagementId: z.string() }), internal: false }),
     },
@@ -141,6 +143,20 @@ export default defineModule({
         'en-GB': {
           subject: 'An agreement for {{ title }} is waiting for your answer',
           body: '{{ theatre }} has sent **{{ company }}** the terms for **{{ title }}** (version {{ version }}).\n\nRead them and accept or decline them under Your companies. Nothing is settled until you answer.\n\n[Open Your companies]({{ link }})',
+        },
+      },
+    }, {
+      // D4: calls changed after confirmation, once for the changes of five minutes.
+      id: 'companies.schedule-changed',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      variables: { title: 'text' as const },
+      link: '/account/companies',
+      wording: {
+        'en-GB': {
+          subject: 'The schedule for {{ title }} has changed',
+          body: '{{ theatre }} has changed the get-in, technical or get-out times for **{{ title }}**.\n\nCheck the new times under Your companies before you plan your day.\n\n[Open Your companies]({{ link }})',
         },
       },
     }],

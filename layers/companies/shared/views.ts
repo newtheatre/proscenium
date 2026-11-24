@@ -1,5 +1,5 @@
 // What the console's Companies list and a company's record page are sent (part 5), shared by the server and the screens.
-import type { EngagementKind, EngagementState, Receives } from './companies'
+import type { CallKind, EngagementKind, EngagementState, Receives } from './companies'
 
 export interface CompanyRow {
   id: string
@@ -117,4 +117,29 @@ export interface AgreementVersion {
   answeredAt: number | null
   onPaper: boolean
   responder: string | null
+}
+
+/** One call on an engagement's schedule (D1); `space` is the space's name. */
+export interface CallRow {
+  id: string
+  kind: CallKind
+  spaceId: string | null
+  space: string | null
+  startsAt: number
+  endsAt: number
+  label: string | null
+  notes: string | null
+}
+
+/** Someone from the company who will be in the building (D3). */
+export interface PersonRow { id: string, name: string, role: string | null, under18: boolean }
+
+/** An engagement's calls and people, with what the viewer may change. */
+export interface Schedule {
+  calls: CallRow[]
+  people: PersonRow[]
+  spaces: { value: string, label: string }[]
+  canManageCalls: boolean
+  canManagePeople: boolean
+  started: boolean
 }
