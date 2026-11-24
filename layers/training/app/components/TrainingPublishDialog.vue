@@ -15,7 +15,8 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const busy = ref(false)
 const form = reactive({ changeKind: undefined as ChangeKind | undefined, changeNote: '' })
 const first = computed(() => props.number === 1)
-const kinds = computed(() => CHANGE_KINDS.map(value => ({ value, label: t(`training.change-kinds.${value}`), description: t(`training.publish.${value}-help`, { count: props.holders }) })))
+const kinds = computed(() => CHANGE_KINDS.map(value => ({ value, label: t(`training.change-kinds.${value}`), description: helpOf(value) })))
+const helpOf = (value: ChangeKind) => value === 'retraining-required' && !props.holders ? t('training.publish.retraining-required-help-none') : t(`training.publish.${value}-help`, { count: props.holders })
 watch(open, (now) => {
   if (!now) return
   Object.assign(form, { changeKind: undefined, changeNote: '' })

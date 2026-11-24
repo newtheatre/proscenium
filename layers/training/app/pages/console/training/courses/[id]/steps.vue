@@ -38,8 +38,11 @@ function done(step: StepDraft) {
   put(step)
   editing.value = null
 }
+// The course page shares this page's data, so it is read again before going back to it.
 async function saveAll() {
-  if (await save()) await navigateTo(coursePath.value)
+  if (!await save()) return
+  await refresh()
+  await navigateTo(coursePath.value)
 }
 const rowActions = (d: StepDraft, i: number) => [
   [

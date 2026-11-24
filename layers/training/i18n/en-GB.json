@@ -394,6 +394,7 @@
   "training.publish.records-stand-help": "Nobody's training changes; use this for a typing fix or a small change.",
   "training.publish.retraining-required-help": "All {count} holders are told what changed and must retrain on it before their training is cut short.",
   "training.publish.retraining-required-help.one": "The 1 holder is told what changed and must retrain on it before their training is cut short.",
+  "training.publish.retraining-required-help-none": "Nobody holds this course yet, so nobody needs to retrain.",
   "training.publish.note": "What changed",
   "training.publish.note-help": "Holders see this when they are told.",
   "training.publish.submit": "Publish version {number}",
