@@ -396,7 +396,10 @@ const pollLine = (p: PollRow) => t('availability.poll.sent-line', { answered: p.
                 :key="i"
               >
                 {{ p.name || t('availability.sent.former') }}<em
-                  v-if="p.reason"
+                  v-if="p.commitment"
+                  class="text-muted"
+                >, {{ t(p.commitment) }}</em><em
+                  v-else-if="p.reason"
                   class="text-muted"
                 >, {{ p.reason }}</em>
               </li>
