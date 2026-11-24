@@ -295,7 +295,7 @@ test.describe('a poll', () => {
       await expect(page.getByRole('heading', { name: 'Are you going?' })).toBeVisible()
       await noViolations(page)
       await page.getByRole('button', { name: 'Going', exact: true }).click()
-      await expect(page.getByText('Answer saved')).toBeVisible()
+      await expect(page.getByText('Answer saved', { exact: true })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Going', exact: true })).toHaveAttribute('aria-pressed', 'true')
     })
   })
