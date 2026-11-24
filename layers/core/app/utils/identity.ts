@@ -9,7 +9,7 @@ export const PASSKEY_LATER_COOKIE = 'proscenium-passkey-later'
 export interface Refusal { code: string, reason: string, remedy?: string, fields?: Record<string, string> }
 export type Answer<T> = { ok: true, data: T } | { ok: false, refusal: Refusal }
 
-export async function callIdentity<T>(path: string, body?: unknown, headers: Record<string, string> = {}, method?: 'POST' | 'PATCH'): Promise<Answer<T>> {
+export async function callIdentity<T>(path: string, body?: unknown, headers: Record<string, string> = {}, method?: 'POST' | 'PATCH' | 'PUT'): Promise<Answer<T>> {
   // Sent through `$api`, so a refusal of "confirm it is you" is confirmed in place and retried.
   // The path is only known at run time, so the typed fetch is used as a plain one.
   const send = useNuxtApp().$api as unknown as (path: string, options: object) => Promise<T>

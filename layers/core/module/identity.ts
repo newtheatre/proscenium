@@ -62,6 +62,9 @@ export const identitySettings = defineSettings('core', {
   'privacy.data-location': setting.text({ unset: true, maxLength: 80, change, audience: 'public', quotable: true }),
   // The youngest a person may be to hold an account, as the terms of use and privacy notice state it.
   'accounts.minimum-age': setting.integer({ default: 16, min: 13, max: 21, change, audience: 'public', quotable: true, onChange: 'confirm' }),
+  // The latest a call or shift should end for someone under 18 (C-74, R3-25), read by Rehearsals and
+  // Productions to warn, never to refuse. Unset, nobody is warned.
+  'under-18.latest-finish': setting.time({ unset: true, change }),
 
   'access-scheme.enabled': setting.boolean({ default: true, change, audience: 'public' }),
   'access-scheme.name': setting.text({ default: 'Access scheme', maxLength: 40, change, audience: 'public', quotable: true }),
@@ -131,6 +134,9 @@ export const identityAbilities = defineAbilities('core', {
   // Read one member's emergency contacts, with a reason. Strong but never asked again, so an
   // emergency is not slowed; an Owner does not hold it by being an Owner (OWNER_DOES_NOT_READ).
   'emergency-contact.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', grantAt: ['site'] }),
+  // Record or clear the day someone under 18 turns 18, after seeing ID (C-74). Seeing whether someone
+  // is under 18 is each module's own ability, through ageStatus.
+  'age.record': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
 })
 
 /**
