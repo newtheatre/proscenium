@@ -7,7 +7,7 @@ import { currentContext } from '../context-store'
 import { Refusal } from '../refusal'
 import type { PracticeAnswer } from './sample'
 
-export { PRACTICE_HEADER } from '../../shared/practice'
+export { PRACTICE_HEADER, PRACTICE_TICKED_HEADER } from '../../shared/practice'
 
 /** The practice session a request, job or listener runs in. */
 export interface PracticeSession {
@@ -26,8 +26,8 @@ export interface PracticeGate {
   enter: (event: H3Event, actor: Actor) => Promise<PracticeEntry>
   /** An unmarked request: refuses a change sent from a practice page (M2). */
   unmarked: (event: H3Event) => void | Promise<void>
-  /** After a marked change commits, inside the store: ticks the scenario's tasks (T1). */
-  changed?: (answer: PracticeAnswer) => Promise<void>
+  /** After a marked change commits, inside the store: ticks the scenario's tasks (T1) and answers those ticked now. */
+  changed?: (answer: PracticeAnswer) => Promise<readonly string[]>
 }
 
 const closed: PracticeGate = {

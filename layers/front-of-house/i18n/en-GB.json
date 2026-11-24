@@ -873,5 +873,22 @@
   "front-of-house.grid.kept-title": "{count} shifts kept, as people are on them",
   "front-of-house.grid.kept-title.one": "1 shift kept, as people are on it",
   "front-of-house.grid.no-batches.title": "No batches",
-  "front-of-house.grid.no-batches.description": "Applying a template from the grid makes a batch you can remove again."
+  "front-of-house.grid.no-batches.description": "Applying a template from the grid makes a batch you can remove again.",
+  "front-of-house.practice.night": "Run front of house for the night",
+  "front-of-house.practice.night-summary": "Tonight's show is about 60% sold and you are leading front of house. Check your team in, work through the opening checklist, then write the night report and sign it off.",
+  "front-of-house.practice.check-in": "Check in the team: yourself and everyone on tonight's rota",
+  "front-of-house.practice.opening-checklist": "Complete the opening checklist",
+  "front-of-house.practice.night-report": "Write a note in the night report, then sign it off",
+  "front-of-house.practice.incident": "Report an incident",
+  "front-of-house.practice.incident-summary": "You are on shift tonight. Find the emergency card for the venue, then report an incident where first aid was given, with the people involved.",
+  "front-of-house.practice.emergency-card": "Find the emergency card for the venue",
+  "front-of-house.practice.first-aid": "Report an incident where first aid was given, with the people involved",
+  "front-of-house.practice.duty-manager": "Duty manager",
+  "front-of-house.practice.steward": "Steward",
+  "front-of-house.practice.checklist": "Opening checklist",
+  "front-of-house.practice.item.exits": "Fire exits clear and unlocked",
+  "front-of-house.practice.item.first-aid-kit": "First aid kit checked and stocked",
+  "front-of-house.practice.item.toilets": "Toilets checked",
+  "front-of-house.practice.item.auditorium": "Auditorium walked for hazards",
+  "front-of-house.practice.card": "**This card was made for practice.** Your venue's own card is in the console.\n\n**Fire:** sound the nearest alarm, open the house doors and guide everyone out by the nearest exit. Do not stop to collect belongings.\n\n**Assembly point:** the pavement opposite the main entrance.\n\n**Someone hurt or unwell:** send for the first aider and the duty manager. If it is serious, ask someone to call the emergency services and meet them at the front door.\n\n**After:** report what happened as an incident before you leave."
 }

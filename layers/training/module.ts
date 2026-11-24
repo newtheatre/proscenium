@@ -258,6 +258,7 @@ export default defineModule({
     'core.navigation': [
       { id: 'training.home', menu: 'members', to: '/members/training', icon: 'i-lucide-graduation-cap', ability: 'training.course.view', order: 50 },
       { id: 'training.teach', menu: 'members', to: '/members/training/teaching', icon: 'i-lucide-presentation', ability: 'training.teaching.view', order: 51 },
+      { id: 'training.courses', menu: 'console', group: 'training', section: 'everyday', to: '/console/training/courses', match: '/console/training/courses', icon: 'i-lucide-graduation-cap', ability: 'training.course.manage', order: 10 },
     ],
     'core.record-resolver': [
       { id: 'training.course', file: 'course' },
