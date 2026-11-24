@@ -152,5 +152,7 @@
   "box-office.measures.net": "Net takings",
   "box-office.measures.net.help": "What was kept: sales less refunds.",
   "box-office.measures.net-of-vat": "Net takings less VAT",
-  "box-office.measures.net-of-vat.help": "What was kept, less the VAT within it."
+  "box-office.measures.net-of-vat.help": "What was kept, less the VAT within it.",
+  "box-office.ready-made.sales-and-attendance": "Sales and attendance",
+  "box-office.ready-made.sales-and-attendance.description": "Tickets sold and complimentary, who came, capacity filled and takings, by performance."
 }

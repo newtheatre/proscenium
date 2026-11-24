@@ -17,7 +17,7 @@ export default defineModule({
   stability: 'experimental',
   requires: ['payments', 'finance'],
   // Form builder joins this list with the checkout questions (R-17), once its module id exists.
-  uses: ['front-of-house', 'communications', 'promotions', 'maintenance'],
+  uses: ['front-of-house', 'communications', 'promotions', 'maintenance', 'reports'],
 
   settings: defineSettings('box-office', {
     'baskets.hold-for': setting.duration({ default: '10m', min: '2m', max: '60m', change, audience: 'public', quotable: true }),
@@ -191,6 +191,20 @@ export default defineModule({
 
   contributes: {
     // Figures for Reports (REP-02): tickets from Box office's tables, money from its own ledger accounts.
+    // Its ready-made report for Reports (REP-04), when Reports is on.
+    'reports.report': [{
+      id: 'box-office.sales-and-attendance',
+      label: 'box-office.ready-made.sales-and-attendance',
+      description: 'box-office.ready-made.sales-and-attendance.description',
+      area: 'box-office',
+      scope: 'production',
+      period: 'scope',
+      breakdown: 'performance',
+      figures: ['box-office.tickets-sold', 'box-office.tickets-comp', 'box-office.admitted', 'box-office.capacity', 'box-office.capacity-filled', 'box-office.gross', 'box-office.net'],
+      chart: 'bar',
+      ability: 'box-office.report.view',
+      order: 10,
+    }],
     'core.measure': ['tickets-sold', 'tickets-comp', 'tickets-issued', 'admitted', 'orders', 'bookers', 'capacity', 'capacity-filled', 'gross', 'refunds', 'net', 'net-of-vat'].map(file => ({ id: `box-office.${file}`, file })),
     // Links already sent by email keep working while maintenance mode closes the site: a booking's
     // tickets (and cancelling from them) and confirming a reservation.

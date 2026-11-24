@@ -9,6 +9,7 @@ export { operatingDayOf, dayBounds, operatingDayAt, operatingDayBounds, recentDa
 export type { FigureAnswer, FigureChart, FigureText, HomeFigure } from './points/home-figure'
 export { attachFile, detachFile, fileUrl, storeFile } from './files/service'
 export type { FileAccess } from './points/file-access'
+export type { RecordResolver } from './points/record-resolver'
 export type { UpcomingItem, UpcomingSource } from './points/upcoming'
 export type { ChangeGuard, GuardAnswer, GuardQuestion } from './points/change-guard'
 export type { BookingAction, BookingAnswer, BookingState, BookingSubject, PriceSummary } from './points/booking-action'
