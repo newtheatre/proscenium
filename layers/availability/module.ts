@@ -10,6 +10,8 @@ const change = 'availability.settings.manage'
 export default defineModule({
   id: 'availability',
   manifest: 1,
+  // Find a time shows when the chosen rooms are taken (F5) and where people are committed elsewhere (F4).
+  requires: ['occupancy', 'person-busy'],
   since: '0.1.0',
   stability: 'experimental',
 
@@ -23,19 +25,27 @@ export default defineModule({
     'requests.default-due': setting.duration({ default: '7d', min: '1d', max: '60d', units: ['day'], change, audience: 'staff' }),
     'requests.first-reminder': setting.duration({ default: '3d', min: '0d', max: '14d', units: ['day'], change, audience: 'staff' }),
     'requests.second-reminder': setting.duration({ default: '1d', min: '0d', max: '7d', units: ['day'], change, audience: 'staff' }),
+    'safeguarding.one-to-one': setting.boolean({ default: true, change, audience: 'staff' }),
+    'polls.abandon-after': setting.duration({ default: '14d', min: '1d', max: '60d', units: ['day'], change, audience: 'staff' }),
     'retention.past': setting.duration({ default: '90d', min: '0d', max: '730d', units: ['day'], change, audience: 'staff', onChange: 'confirm' }),
     'retention.history': setting.duration({ default: '12mo', min: '3mo', max: '36mo', units: ['month'], change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   records: defineRecords('availability', {
     request: { table: 'availability_requests' },
+    find: { table: 'availability_finds' },
+    meeting: { table: 'availability_meetings' },
   }),
 
   abilities: defineAbilities('availability', {
     // Entering one's own needs only a sign-in (A1). Reaches every member's time, so it is audited
     // on read; it never shows a reason (A7).
     'find.anyone': ability({ risk: 'privileged', audit: 'read' }),
+    // Find a time for groups one plans for; the group check does the real work (F1).
+    'find.use': ability({}),
     'request.send': ability({}),
+    // M1: arrange, move and cancel meetings for people one plans for.
+    'meeting.arrange': ability({}),
     // A8: busy or maybe for a member of a group one plans for; the group check limits it.
     'entry.on-behalf': ability({}),
     'settings.manage': ability({ risk: 'privileged' }),
@@ -49,7 +59,7 @@ export default defineModule({
   },
 
   tasks: {
-    // Joiners and leavers (R2, R6), past exceptions and old requests (retention), lapsing at the end of the due date (R5) and closing at the end of the period (R7).
+    // Joiners and leavers (R2, R6), lapsing (R5) and closing (R7), giving up stale polls (F8), and retention.
     'availability.sweep-requests': task({ dailyAt: '04:30' }),
     // Reminders before the due date (R3).
     'availability.send-reminders': task({ every: '1h' }),
@@ -58,9 +68,12 @@ export default defineModule({
   contributes: {
     'core.navigation': [
       { id: 'availability.mine', menu: 'members', to: '/members/availability', icon: 'i-lucide-calendar-check', order: 45 },
-      { id: 'availability.requests', menu: 'members', to: '/members/find-a-time/requests', icon: 'i-lucide-send', ability: 'availability.request.send', order: 46 },
+      { id: 'availability.find', menu: 'members', to: '/members/find-a-time', icon: 'i-lucide-calendar-search', ability: 'availability.find.use', order: 46 },
+      { id: 'availability.requests', menu: 'members', to: '/members/find-a-time/requests', icon: 'i-lucide-send', ability: 'availability.request.send', order: 47 },
     ],
-    'core.record-resolver': [{ id: 'availability.request', file: 'request' }],
+    // Stated busy time, so other modules warn about it (part 4).
+    'core.person-busy': [{ id: 'availability' }],
+    'core.record-resolver': [{ id: 'availability.request', file: 'request' }, { id: 'availability.find', file: 'find' }, { id: 'availability.meeting', file: 'meeting' }],
     'core.notification-type': [{
       id: 'availability.request-opened',
       category: 'transactional' as const,
@@ -103,6 +116,118 @@ export default defineModule({
           action: 'Check my availability',
         },
       },
+    }, {
+      id: 'availability.poll-asked',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/polls/{{ poll }}',
+      variables: { title: 'text' as const, organiser: 'text' as const, due: 'text' as const, poll: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'When can you make {{ title }}?',
+          body: '{{ organiser }} is choosing a time for **{{ title }}**. Please say which of the times you can make by {{ due }}. Only they see your answers.',
+          action: 'Answer the poll',
+        },
+      },
+    }, {
+      id: 'availability.poll-decided',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/polls/{{ poll }}',
+      variables: { title: 'text' as const, when: 'text' as const, poll: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: '{{ title }}: {{ when }}',
+          body: 'The time for **{{ title }}** has been chosen: **{{ when }}**.',
+          action: 'See the poll',
+        },
+      },
+    }, {
+      id: 'availability.poll-abandoned',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/polls/{{ poll }}',
+      variables: { title: 'text' as const, poll: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'No time chosen for {{ title }}',
+          body: 'The poll for **{{ title }}** has closed without a time being chosen. You do not need to do anything.',
+          action: 'See the poll',
+        },
+      },
+    }, {
+      id: 'availability.poll-expired',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/find-a-time/{{ poll }}',
+      variables: { title: 'text' as const, poll: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your poll for {{ title }} has closed',
+          body: 'Nobody chose a time for **{{ title }}**, so the poll has been given up and everyone asked has been told. You can start a new one from Find a time.',
+          action: 'See the answers',
+        },
+      },
+    }, {
+      id: 'availability.meeting-invited',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/meetings/{{ meeting }}',
+      variables: { title: 'text' as const, when: 'text' as const, organiser: 'text' as const, meeting: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: '{{ title }}: {{ when }}',
+          body: '{{ organiser }} has arranged **{{ title }}** for {{ when }}. Please say whether you are going.',
+          action: 'Answer',
+        },
+      },
+    }, {
+      id: 'availability.meeting-moved',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/meetings/{{ meeting }}',
+      variables: { title: 'text' as const, when: 'text' as const, meeting: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'New time for {{ title }}: {{ when }}',
+          body: '**{{ title }}** has moved to {{ when }}. Please say again whether you are going.',
+          action: 'Answer',
+        },
+      },
+    }, {
+      id: 'availability.meeting-changed',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/meetings/{{ meeting }}',
+      variables: { title: 'text' as const, when: 'text' as const, meeting: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: '{{ title }} has changed',
+          body: 'The details of **{{ title }}**, {{ when }}, have changed.',
+          action: 'See the meeting',
+        },
+      },
+    }, {
+      id: 'availability.meeting-cancelled',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/availability/meetings/{{ meeting }}',
+      variables: { title: 'text' as const, when: 'text' as const, meeting: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Cancelled: {{ title }}',
+          body: '**{{ title }}**, {{ when }}, has been cancelled.',
+          action: 'See the meeting',
+        },
+      },
     }],
   },
 
@@ -112,6 +237,10 @@ export default defineModule({
       'availability.entry.updated': event({ version: 1, payload: z.object({ accountId: z.string(), from: code(), to: code() }), internal: true }),
       'availability.request.opened': event({ version: 1, payload: z.object({ requestId: z.string() }), internal: true }),
       'availability.request.closed': event({ version: 1, payload: z.object({ requestId: z.string() }), internal: true }),
+      'availability.meeting.arranged': event({ version: 1, payload: z.object({ meetingId: z.string(), from: z.number(), to: z.number() }), internal: true }),
+      'availability.meeting.moved': event({ version: 1, payload: z.object({ meetingId: z.string(), from: z.number(), to: z.number() }), internal: true }),
+      'availability.meeting.cancelled': event({ version: 1, payload: z.object({ meetingId: z.string(), from: z.number(), to: z.number() }), internal: true }),
+      'availability.poll.decided': event({ version: 1, payload: z.object({ findId: z.string(), from: z.number(), to: z.number() }), internal: true }),
     },
   },
 })

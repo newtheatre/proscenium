@@ -118,7 +118,7 @@ export async function approve(unit: UnitView, actor: Actor, claim: Claim, input:
   await notOwn(actor, claim)
   const items = await itemsOf(claim.id)
   const { any, held } = await requireApprover(actor, claim, items)
-  if (claim.firstApprovedBy) return approveSecond(unit, actor, claim, items, { version: input.version, any })
+  if (claim.firstApprovedBy) return approveSecond(unit, actor, claim, { items, version: input.version, any })
   await checkDecisions(claim, items, input.items, held)
   const over = await overByLine(claim, input.items.map(d => ({ lineId: d.lineId, amountMinor: d.approvedMinor })))
   const overMinor = [...over.values()].reduce((a, b) => a + b, 0)
@@ -155,21 +155,23 @@ export async function approve(unit: UnitView, actor: Actor, claim: Claim, input:
     await askSecond(unit, claim, actor, total)
     return { state: 'submitted' }
   }
-  await settleApproval(unit, actor, claim, decided as (Item & { approvedMinor: number, lineId: string })[], { version: input.version, total, at })
+  await settleApproval(unit, actor, claim, { decided: decided as Decided[], version: input.version, total, at })
   return { state: 'approved' }
 }
 
 /** C4's second approval: the treasurer, not the first approver, approves the amounts already decided. */
-async function approveSecond(unit: UnitView, actor: Actor, claim: Claim, items: Item[], input: { version: number, any: boolean }): Promise<{ state: 'approved' }> {
+async function approveSecond(unit: UnitView, actor: Actor, claim: Claim, input: { items: Item[], version: number, any: boolean }): Promise<{ state: 'approved' }> {
+  const { items } = input
   if (!(await maySecond(actor, claim, input.any))) refuse('budgets.claim.second', 'This claim needs a second approval from the treasurer, someone other than who approved it first.', { status: 403 })
   const total = items.reduce((sum, i) => sum + (i.approvedMinor ?? 0), 0)
-  await settleApproval(unit, actor, claim, items as (Item & { approvedMinor: number, lineId: string })[], { version: input.version, total, at: nowMs() })
+  await settleApproval(unit, actor, claim, { decided: items as Decided[], version: input.version, total, at: nowMs() })
   return { state: 'approved' }
 }
 
 /** The approval that moves the claim: the expense posted, the request fulfilled, the claimant told (C5). */
-async function settleApproval(unit: UnitView, actor: Actor, claim: Claim, decided: (Item & { approvedMinor: number, lineId: string })[], input: { version: number, total: number, at: number }): Promise<void> {
-  const { total, at } = input
+type Decided = Item & { approvedMinor: number, lineId: string }
+async function settleApproval(unit: UnitView, actor: Actor, claim: Claim, input: { decided: Decided[], version: number, total: number, at: number }): Promise<void> {
+  const { decided, total, at } = input
   const postingId = await postExpense(unit, claim, decided, at)
   unit.add({
     sql: "UPDATE budgets_claims SET state = 'approved', approved_minor = ?1, decided_at = ?2, expense_posting_id = ?3, version = version + 1, updated_at = ?2 WHERE id = ?4 AND state = 'submitted' AND version = ?5", // not-policy: numbered parameters
@@ -179,7 +181,7 @@ async function settleApproval(unit: UnitView, actor: Actor, claim: Claim, decide
   logEvent(unit, claim.id, { action: 'approved', by: actor.accountId ?? null, at, amountMinor: total, postingId })
   unit.audit({ action: 'state', record: ['budgets.claim', claim.id], detail: { from: 'submitted', to: 'approved', approvedMinor: total } })
   unit.announce('budgets.claim.decided', { claimId: claim.id, decision: 'approved', amountMinor: total }, { record: ['budgets.claim', claim.id] })
-  await tellClaimant(unit, claim, 'approved', total, decided.some(i => i.partReason) ? 'Part of it was approved; the reasons are on the claim.' : 'It will be paid by the route you chose.')
+  await tellClaimant(unit, claim, { decision: 'approved', amountMinor: total, note: decided.some(i => i.partReason) ? 'Part of it was approved; the reasons are on the claim.' : 'It will be paid by the route you chose.' })
 }
 
 /** Tells the treasurers, other than the first approver and the claimant, that a claim waits on their second approval. */
@@ -233,7 +235,8 @@ function fulfil(unit: UnitView, claim: Claim, amountMinor: number, at: number): 
   })
 }
 
-export async function tellClaimant(unit: UnitView, claim: Claim, decision: string, amountMinor: number, note: string): Promise<void> {
+export async function tellClaimant(unit: UnitView, claim: Claim, told: { decision: string, amountMinor: number, note: string }): Promise<void> {
+  const { decision, amountMinor, note } = told
   if (!claim.claimantId) return
   await notify(unit, 'budgets.claim-decided', {
     to: claim.claimantId,
@@ -243,7 +246,12 @@ export async function tellClaimant(unit: UnitView, claim: Claim, decision: strin
 }
 
 /** Sends a claim back to its claimant to change (BC-23), or declines it; either way with a note they see. */
-export async function reject(unit: UnitView, actor: Actor, claim: Claim, input: { version: number, note: string, decline: boolean }): Promise<void> {
+/** Sends a claim back to its claimant to change. */
+export const sendBack = (unit: UnitView, actor: Actor, claim: Claim, input: { version: number, note: string }) => reject(unit, actor, claim, { ...input, decline: false })
+/** Declines a claim; nothing is posted. */
+export const decline = (unit: UnitView, actor: Actor, claim: Claim, input: { version: number, note: string }) => reject(unit, actor, claim, { ...input, decline: true })
+
+async function reject(unit: UnitView, actor: Actor, claim: Claim, input: { version: number, note: string, decline: boolean }): Promise<void> {
   submitted(claim)
   await notOwn(actor, claim)
   await requireApprover(actor, claim, await itemsOf(claim.id))
@@ -258,7 +266,7 @@ export async function reject(unit: UnitView, actor: Actor, claim: Claim, input: 
   logEvent(unit, claim.id, { action: state, by: actor.accountId ?? null, at, note: input.note })
   unit.audit({ action: 'state', record: ['budgets.claim', claim.id], detail: { from: 'submitted', to: state } })
   unit.announce('budgets.claim.decided', { claimId: claim.id, decision: state, amountMinor: 0 }, { record: ['budgets.claim', claim.id] })
-  await tellClaimant(unit, claim, input.decline ? 'declined' : 'sent back to you', claim.totalMinor, input.note)
+  await tellClaimant(unit, claim, { decision: input.decline ? 'declined' : 'sent back to you', amountMinor: claim.totalMinor, note: input.note })
 }
 
 /** Voids an approved claim nothing has been paid on (BC-25): the treasurer, never on their own; the expense is reversed. */
@@ -282,7 +290,7 @@ export async function voidClaim(unit: UnitView, actor: Actor, claim: Claim, inpu
   logEvent(unit, claim.id, { action: 'voided', by: actor.accountId ?? null, at, note: input.note, postingId })
   unit.audit({ action: 'state', record: ['budgets.claim', claim.id], detail: { from: 'approved', to: 'voided' } })
   unit.announce('budgets.claim.decided', { claimId: claim.id, decision: 'voided', amountMinor: claim.approvedMinor ?? 0 }, { record: ['budgets.claim', claim.id] })
-  await tellClaimant(unit, claim, 'voided', claim.approvedMinor ?? 0, input.note)
+  await tellClaimant(unit, claim, { decision: 'voided', amountMinor: claim.approvedMinor ?? 0, note: input.note })
 }
 
 export interface WaitingClaim { id: string, number: string | null, title: string, claimantId: string | null, currency: string, totalMinor: number, submittedAt: number | null, overMinor: number, late: boolean, notAskedFirst: boolean }

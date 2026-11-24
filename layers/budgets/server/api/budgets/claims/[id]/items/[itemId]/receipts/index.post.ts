@@ -13,5 +13,5 @@ export default defineRoute({ ability: 'budgets.claim.make', rateLimit: 'write', 
   const item = await requireItem(claim, getRouterParam(event, 'itemId'))
   if (Number(getHeader(event, 'content-length') ?? 0) > await receiptLimit()) refuse('core.files.too-large', 'This file is larger than a receipt may be.', { status: 413, fields: { file: 'too-large' } })
   const body = await readRawBody(event, false)
-  return uploadReceipt(unit, actor, claim, item, { name: input.name, bytes: body ? new Uint8Array(body) : new Uint8Array() })
+  return uploadReceipt(unit, actor, { claim, item }, { name: input.name, bytes: body ? new Uint8Array(body) : new Uint8Array() })
 })

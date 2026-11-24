@@ -4,8 +4,11 @@ import { minutesOf, type Level, type ShownLevel } from './levels'
 
 export const DAY_MINUTES = 1440 // not-policy: minutes in a day
 
-export interface Piece { start: number, end: number, level: ShownLevel, reason?: string }
+/** `commitment` is the translation key of what holds the person elsewhere (F4), never a name. */
+export interface Piece { start: number, end: number, level: ShownLevel, reason?: string, commitment?: string }
 export interface Day { date: string, pieces: Piece[] }
+/** A5: a stretch another module holds a person to; `labelKey` is a translation key. */
+export interface Commitment { start: number, end: number, labelKey: string, firm: boolean }
 
 /** "HH:MM" for minutes past midnight, "24:00" at the end of the day. */
 export function clockOf(minutes: number): string {
