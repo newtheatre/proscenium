@@ -24,3 +24,15 @@ What the build settled that the parts above leave open, and where it differs fro
 - **Own record.** Handing yourself a perk is refused `core.access.own-record` in the service; the Owner stands above it, as everywhere. `handout.record` sits on the crew call rather than on the person, so the kit's owner rule could not do it.
 - **Retention.** Handouts are append-only. The daily sweep clears the size once the call's last day is older than `front-of-house.retention.assignments`; the rows stay.
 - **Not done.** The `leading-shift` fact does not bring `handout.record`, because the fact sits on a performance and the ability on a crew call; the Front of house manager preset has it. There is no `welfare-lead` preset yet to give `view-needs` to.
+
+## C-69, C-71 to C-73, C-75: what other modules add to the public site
+
+- **Where it lives.** Contracts in `layers/public-site/server/points/` and `layers/core/server/points/public-lines.ts`; reading them in `layers/public-site/server/shape.ts` and `layers/core/server/programme/public-lines.ts`. `docs/kit/interface.md` ("What other modules add to the public site") is the guide for a contributor.
+- **Name.** The spec's `core.production.public-lines` became `core.public-lines`, because a point is `<module>.<noun>`.
+- **Failing contributors.** A contributor that throws counts as not applying (and a menu that throws adds nothing), so the theatre's own site always shows.
+- **Shape.** `/api/public-site/shape` answers `{ frontPage, menu, footer, productionBase }`. The public-site plugin reads it once, before the first page with the default layout, into core's `usePublicShape()`; the layout puts the menu and footer entries before the theatre's own, and the catch-all page draws the front page's component at `/`.
+- **Address (C-73).** While a contributor applies, the show page answers `base`; `PublicSiteProduction` redirects `/whats-on` and `/shows` there (302), and the canonical link, event data and the sitemap use it. The contributor owns the page at its base. Emails and in-app links still name `/whats-on` and `/shows` and rely on the redirect, since core cannot read a public-site point.
+- **Health.** More than one applying contributor for the front page or the address gives a warning on the health page; the first in manifest order is used.
+- **Lines (C-75).** Trimmed, cut to 200 characters, empty ones dropped, ordered; drawn as plain text under the title, at the end of the credits (which then shows even with no credits) or at the foot of the page.
+- **Not done.** Dropping a menu entry that points at a switched-off module's page is left to the contributor, which only applies while its own module is on.
+- **Tests.** `layers/public-site/tests/integration/site-shape.test.ts`, through the `festive` fixture module.
