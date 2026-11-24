@@ -32,7 +32,7 @@ export default defineModule({
 
   records: defineRecords('availability', {
     request: { table: 'availability_requests' },
-    poll: { table: 'availability_finds' },
+    find: { table: 'availability_finds' },
   }),
 
   abilities: defineAbilities('availability', {
@@ -69,7 +69,7 @@ export default defineModule({
     ],
     // Stated busy time, so other modules warn about it (part 4).
     'core.person-busy': [{ id: 'availability' }],
-    'core.record-resolver': [{ id: 'availability.request', file: 'request' }, { id: 'availability.poll', file: 'poll' }],
+    'core.record-resolver': [{ id: 'availability.request', file: 'request' }, { id: 'availability.find', file: 'find' }],
     'core.notification-type': [{
       id: 'availability.request-opened',
       category: 'transactional' as const,

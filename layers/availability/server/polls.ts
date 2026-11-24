@@ -164,7 +164,7 @@ export async function decide(unit: UnitView, id: string, slotId: string, actor: 
   unit.add(sql`UPDATE availability_finds SET state = 'decided', decided_slot_id = ${slotId}, decided_at = ${at}, updated_at = ${at} WHERE id = ${id} AND state = 'polling'`)
     .expect(1, { code: 'availability.poll.finished', reason: 'This poll is already decided or given up.' })
   const starts = instantOfLocal(slot.date, clockOf(slot.start), await theatreTimeZone())
-  unit.announce('availability.poll.decided', { findId: id, from: starts, to: starts + f.length_minutes * MINUTE_MS }, { record: ['availability.poll', id] })
+  unit.announce('availability.poll.decided', { findId: id, from: starts, to: starts + f.length_minutes * MINUTE_MS }, { record: ['availability.find', id] })
   const variables = words(f, { when: await whenOf(slot) })
   await notify(unit, 'availability.poll-decided', { to: (await peopleIds(id)).filter(a => a !== f.created_by).map(accountId => ({ accountId, variables, dedupeKey: `poll-decided:${id}` })) })
 }
