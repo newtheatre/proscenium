@@ -42,6 +42,8 @@ export default defineConfig({
           setupFiles: ['./tests/integration/setup.ts'],
           // Coverage instruments every module, which slows the longest flows past the 5 s default.
           testTimeout: 20_000, // not-policy: a test runner limit
+          // Off because the pool inlines every cached module into one message, past workerd's 32 MiB limit.
+          fsModuleCache: false,
         },
       },
     ],
