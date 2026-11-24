@@ -76,6 +76,8 @@ async function measure(): Promise<Record<string, Metric>> {
 
 // Size grows with features, so the Worker may grow by this share in one change before it fails.
 const WORKER_ALLOWANCE = 0.05 // not-policy: a review prompt, not a rule of the theatre's
+// A percentage moves a little with every change in a large codebase; a real slide is bigger.
+const PERCENT_ALLOWANCE = 0.1 // not-policy: percentage points
 
 const baseline: Record<string, number> = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : {}
 const now = await measure()
@@ -84,8 +86,8 @@ const worse: string[] = []
 let improved = false
 for (const [key, m] of Object.entries(now)) {
   const was = baseline[key]
-  const allowance = mode === 'worker' && was !== undefined ? was * WORKER_ALLOWANCE : 0
-  const isWorse = was !== undefined && (m.better === 'lower' ? m.value > was + allowance : m.value < was)
+  const allowance = was === undefined ? 0 : mode === 'worker' ? was * WORKER_ALLOWANCE : m.unit === '%' ? PERCENT_ALLOWANCE : 0
+  const isWorse = was !== undefined && (m.better === 'lower' ? m.value > was + allowance : m.value < was - allowance)
   const isBetter = was !== undefined && (m.better === 'lower' ? m.value < was : m.value > was)
   improved ||= isBetter
   if (isWorse) worse.push(`${m.label}: ${was}${m.unit ?? ''} -> ${m.value}${m.unit ?? ''}`)

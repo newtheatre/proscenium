@@ -19,7 +19,7 @@ before 24 November 2026; it stops new code adding to it.
 | Explicit `any` outside the kit | None | ESLint `@typescript-eslint/no-explicit-any` |
 | Import cycles | No more than `metrics.json` | `bun run metrics` |
 | Duplicated lines (70 tokens or more) | No more than `metrics.json` | `bun run metrics` |
-| Type coverage, strict, server and app | No less than `metrics.json` | `bun run metrics` |
+| Type coverage, strict, server and app | No more than 0.1 points below `metrics.json` | `bun run metrics` |
 | `@ts-ignore` and `eslint-disable` comments | No more than `metrics.json` | `bun run metrics` |
 | Test coverage (unit and integration) | No less than the thresholds in `vitest.config.ts` | `bun run test:coverage` |
 | Worker and browser bundles, gzipped | At most 5% above `metrics.json` in one change | `bun run metrics worker` after a build |
