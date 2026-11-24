@@ -5,7 +5,8 @@
 import { first, refuse, siteOrigin, useContext } from '#kit'
 import type { UnitView } from '#kit'
 import { createProduction as createProductionAs, updateProduction, type ProductionInput } from './service'
-import { createPerformance as createPerformanceAs, movePerformance as movePerformanceAs, type MadeProduction, type PerformanceInput } from './performances'
+import { createPerformance as createPerformanceAs, type MadeProduction, type PerformanceInput } from './performances'
+import { movePerformance as movePerformanceAs } from './performances-update'
 import { insertCredit, removeCredit as removeCreditOf, updateCredit as updateCreditOf, type CreditInput } from './credits'
 
 export { schedulePerformances } from './performances'
