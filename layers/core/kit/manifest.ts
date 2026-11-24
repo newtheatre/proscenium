@@ -30,7 +30,12 @@ export interface TaskDecl {
   dailyAt?: string
   weeklyOn?: { day: Weekday, at: string }
 }
-export type PointDecl = { kind: 'data', schema: z.ZodType } | { kind: 'code', contract: string }
+export type PointDecl = { kind: 'data', schema: z.ZodType } | {
+  kind: 'code'
+  contract: string
+  /** Every contribution lists in `from` the columns its words come from, and none may hold anything about a person (CF4). */
+  publicSafe?: true
+}
 export interface SecretDecl { needed: 'always' | 'when-used' | 'optional' }
 export interface CredentialDecl {
   needed: 'always' | 'when-used' | 'optional'

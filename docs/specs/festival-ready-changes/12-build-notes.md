@@ -2,6 +2,17 @@
 
 What the build settled that the parts above leave open, and where it differs from them. Each entry names its story.
 
+## C-70: the calendar feed
+
+- **Where it lives.** `layers/calendar-feed`, a support module (`support: true`) that Front of house requires, so it is on while Front of house is. Its table is `calendar_feed_tokens`; the feed is `server/routes/calendar/[file].get.ts`, served at `/calendar/<token>.ics` through `defineRoute` with the new `module` option. The address is made and reset by `POST /api/calendar-feed/me` and `/api/calendar-feed/me/reset`, shown on My account > Your calendar (`/account/calendar`) and on Front of house's My shifts, both through `CalendarFeedPanel`.
+- **Coming on.** A contributor lists `calendar-feed` in `requires`, which is what brings the module on; contributing alone does not, since core owns the point.
+- **CF3.** The marker is the core setting `core.calendar.site-marker` (managed, on the Advanced page's calendar group), set to the site's host in the same unit as the first address is made, or on the first serve if a carried-over address comes first. `siteMarker()` is in `#modules/core` for Availability's I4.
+- **CF4 as a kit check.** `core.calendar-feed` is declared `publicSafe: true`. Each contribution lists in `from` the `<table>.<column>` its titles and locations come from, and `buildRegistry` refuses one naming a personal, free-text, special or per-row column, or one naming no columns. It checks the declaration, not the code, so a reviewer still checks the query matches it.
+- **CF5.** The migration copies Front of house's rows across with their hash and generation and drops the old table. The token seed stays `front-of-house.feed`, so a carried-over address and a new one are worked out the same way, and `/api/front-of-house/calendar/<token>` still answers, now with the whole feed.
+- **CF6.** Each contributor is asked in turn; one that throws is logged (`calendar-feed.contributor-failed`) and the rest are served. Erasure deletes the row through the plan (`onErasure: 'delete-row'`).
+- **Front of house's events.** Places on published, completed or cancelled shifts in the window: requested is tentative; a cancelled shift or a place declined, withdrawn, released or removed is cancelled. Titles are the duty with the show or occasion; the briefing and the curtain time stay out of the feed and stay in the single-shift "Add to calendar" file, which now uses the feed's UID so adding both gives one event.
+- **Window.** 30 days back to a year ahead; the contract leaves cancelled events to each contributor within that window.
+
 ## FH-49: crew calls and sign-up questions
 
 - **Where it lives.** `layers/front-of-house/server/crew-calls.ts`; the console list is `/console/front-of-house/crew-calls` and each call's page has Details, Questions, Crew and Shifts tabs. A volunteer's page for a call is `/members/front-of-house/crew-calls/<id>`.
