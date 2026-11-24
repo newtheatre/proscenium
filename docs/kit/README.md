@@ -195,6 +195,17 @@ Any module may import core's services without listing core: `import { notifyAddr
   once that passes, and it is not served after. A slot with `access: 'record'` is served only to
   someone your `core.file-access` contribution allows: key it by the owning record type and export
   `{ canRead(actor, record, file) }` (type `FileAccess` from `#modules/core`).
+- Write services for productions, performances and credits (C-68), each adding to your unit and
+  checking no ability (your route checks its own): `createProduction(unit, { title, kind, seasonId?,
+  summary?, categoryTermId?, companyName?, runningMinutes?, credits? })` and `createPerformance(unit,
+  { productionId, spaceId, startsAt, endsAt?, ..., made? })` make drafts (pass `made` with the
+  production's running time when it was made earlier in the same unit; the statement checks it
+  exists); `movePerformance(unit, id, { spaceId, startsAt, endsAt })`; `schedulePerformances(unit,
+  ids)` answers `{ scheduled, refused: { id, reason }[] }`, reason `space-taken`, `closed`,
+  `not-draft` or `started`, and catches drafts that clash with each other;
+  `setProductionCompanyName(unit, productionId, name)`; `listCredits(productionId)`,
+  `addCredit(unit, { productionId, creditedName, role, sectionTermId, accountId?, visibility? })`,
+  `updateCredit(unit, creditId, patch)` (never visibility) and `removeCredit(unit, creditId)`.
 - `isSpaceFree(spaceId, from, to, { except? })`: no scheduled performance or blocking closure, and
   nothing another module reports to `core.space-busy`, overlaps the window; `except` leaves out one
   module's own times. A read for showing and for a module's check just before its own write; a core
@@ -723,6 +734,10 @@ declares only what the kit needs.
   `{ tonight: 'perf_...' }`. A scenario's task checks are one `core.practice-check` file keyed by the
   scenario id, `definePracticeChecks({ taskId: async context => boolean })`, run after each marked
   change. Core's own sets are `core.people` and `core.tonight`.
+- **In the app.** Live pages are served again under `/practice/live/...` inside the practice frame,
+  and `$api` marks every request from a `/practice` page; `docs/kit/interface.md` ("Live mode")
+  says how. A scenario's `runnable` tasks run in the store from the panel's "Run now"
+  (`POST /api/core/practice/run`); nothing runs a store's tasks on a timer.
 - **Ending.** `endPractice(accountId, reason)` (core's `server/practice/session.ts`) deletes a store,
   its files and its cache keys; erasure and merges call it. A store's alarm ends it when idle or at
   the end of the show night.
