@@ -40,6 +40,11 @@ export interface FactDecl {
    * mapping is the theatre's, and a fact it has emptied is left empty.
    */
   defaults?: readonly string[]
+  /**
+   * The theatre may map the fact to abilities for one named record of its `on` type, such as one
+   * competency; the fact is then judged against that record whatever record the ability is used on.
+   */
+  pin?: boolean
 }
 
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*'

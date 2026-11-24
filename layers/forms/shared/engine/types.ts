@@ -32,6 +32,11 @@ export type Operand
     | { today: true }
     | { option: string }
     | { value: Literal }
+    | { marking: MarkingOperand }
+
+/** What a marked response came to, for a system move's condition (FB-514): its score, its share of the total, and whether it passed. */
+export const MARKING_OPERANDS = ['score', 'percent', 'passed'] as const
+export type MarkingOperand = typeof MARKING_OPERANDS[number]
 
 export const OPERATORS = [
   'is', 'is-not', 'any-of', 'contains', 'not-contains', 'starts-with',
@@ -160,8 +165,8 @@ export interface Ending { id: string, title: string, message?: string, submits: 
 
 export const STAGE_KINDS = ['pending', 'in_review', 'returned', 'approved', 'declined', 'closed'] as const
 export type StageKind = typeof STAGE_KINDS[number]
-/** Who may make a move: staff who may move this form's responses, or the person who sent the response. */
-export const MOVERS = ['staff', 'submitter'] as const
+/** Who may make a move: staff who may move this form's responses, the person who sent the response, or the system when its condition holds (FB-514). */
+export const MOVERS = ['staff', 'submitter', 'system'] as const
 export type Mover = typeof MOVERS[number]
 export interface Stage {
   key: string
@@ -188,6 +193,8 @@ export interface Transition {
   needsReason?: boolean
   /** What other modules do once a response has taken this move. Each runs once. */
   actions?: ActionUse[]
+  /** A system move's condition (AT1): required on one, refused on any other. */
+  when?: Condition
 }
 
 // ---- review (part 3, "Review rules"; change 1: a vote is a second kind of review) ----
@@ -269,6 +276,8 @@ export interface Context {
   facts?: Record<string, Literal | null>
   /** Attributes of the record the form is attached to. */
   attributes?: Record<string, Literal | null>
+  /** What the response scored, on the server only, for a system move's condition. */
+  marking?: { score: number, outOf: number, passed: boolean | null } | null
 }
 
 /** Why an answer is refused. `message` is the theatre's own wording where the rule carries one. */

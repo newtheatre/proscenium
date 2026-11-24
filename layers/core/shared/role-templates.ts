@@ -52,6 +52,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'membership-fees.charge.view', 'membership-fees.charge.waive',
       'bar.sale.view',
       'budgets.budget.view', 'budgets.budget.manage', 'budgets.budget.approve', 'budgets.budget.hold', 'budgets.category.manage', 'budgets.settings.manage', 'budgets.claim.approve-any',
+      'invoicing.export.manage', 'invoicing.settings.manage',
     ],
   },
 ]

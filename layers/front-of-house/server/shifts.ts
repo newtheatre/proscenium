@@ -3,6 +3,7 @@
 // read when a shift is made or its times change, so changing a setting moves no shift that exists.
 import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { getPerformance } from '#modules/core'
+import { joinSeasonCall } from './crew-calls'
 
 const MINUTE = 60_000 // not-policy: unit conversion
 
@@ -104,12 +105,13 @@ export async function addShift(unit: UnitView, performanceId: string, input: Shi
   const id = newId('shf')
   const at = nowMs()
   unit.add({
-    sql: `INSERT INTO front_of_house_shifts (id, performance_id, venue_id, duty_id, places, call_at, ends_at, window_opens_at, window_closes_at, sign_up_closes_at, briefing, state, created_at, updated_at)
-      SELECT ?, ?, ?, d.id, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ? FROM front_of_house_duties d
+    sql: `INSERT INTO front_of_house_shifts (id, performance_id, venue_id, space_id, duty_id, places, call_at, ends_at, window_opens_at, window_closes_at, sign_up_closes_at, briefing, state, created_at, updated_at)
+      SELECT ?, ?, ?, ?, d.id, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ? FROM front_of_house_duties d
        WHERE d.id = ? AND d.archived_at IS NULL
          AND NOT EXISTS (SELECT 1 FROM front_of_house_shifts s WHERE s.performance_id = ? AND s.duty_id = ?)`,
-    params: [id, performanceId, performance.venueId, input.places, times.callAt, times.endsAt, times.windowOpensAt, times.windowClosesAt, times.signUpClosesAt, input.briefing ?? null, at, at, duty.id, performanceId, duty.id],
+    params: [id, performanceId, performance.venueId, performance.spaceId, input.places, times.callAt, times.endsAt, times.windowOpensAt, times.windowClosesAt, times.signUpClosesAt, input.briefing ?? null, at, at, duty.id, performanceId, duty.id],
   }).expect(1, { code: 'front-of-house.shift-exists', reason: `This performance already has a ${duty.name} shift.`, remedy: 'Change the places on that shift instead.' })
+  joinSeasonCall(unit, [id])
   unit.audit({ action: 'create', record: ['front-of-house.shift', id] })
   return id
 }
@@ -131,16 +133,18 @@ export interface Shift {
   signUpClosesAt: number | null
   briefing: string | null
   state: 'draft' | 'published' | 'completed' | 'cancelled'
+  spaceId: string | null
+  crewCallId: string | null
 }
 
-interface ShiftRow { id: string, performance_id: string | null, venue_id: string | null, title: string | null, duty_id: string, duty_name: string, is_lead: number, places: number, places_taken: number, call_at: number, ends_at: number, window_opens_at: number, window_closes_at: number, sign_up_closes_at: number | null, briefing: string | null, state: Shift['state'] }
+interface ShiftRow { id: string, performance_id: string | null, venue_id: string | null, title: string | null, duty_id: string, duty_name: string, is_lead: number, places: number, places_taken: number, call_at: number, ends_at: number, window_opens_at: number, window_closes_at: number, sign_up_closes_at: number | null, briefing: string | null, state: Shift['state'], space_id: string | null, crew_call_id: string | null }
 
 const SHIFT = 'SELECT s.*, d.name AS duty_name, d.is_lead FROM front_of_house_shifts s JOIN front_of_house_duties d ON d.id = s.duty_id'
 
 const toShift = (r: ShiftRow): Shift => ({
   id: r.id, performanceId: r.performance_id, venueId: r.venue_id, title: r.title, dutyId: r.duty_id, dutyName: r.duty_name, isLead: !!r.is_lead,
   places: r.places, placesTaken: r.places_taken, callAt: r.call_at, endsAt: r.ends_at, windowOpensAt: r.window_opens_at, windowClosesAt: r.window_closes_at,
-  signUpClosesAt: r.sign_up_closes_at, briefing: r.briefing, state: r.state,
+  signUpClosesAt: r.sign_up_closes_at, briefing: r.briefing, state: r.state, spaceId: r.space_id, crewCallId: r.crew_call_id,
 })
 
 export async function getShift(id: string): Promise<Shift | null> {
