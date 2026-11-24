@@ -44,3 +44,8 @@ export const kindInput = z.object({
 export type KindInput = z.infer<typeof kindInput>
 
 export const stateInput = z.object({ to: z.enum(['active', 'archived']) }).strict()
+
+export const moveInput = z.object({
+  itemIds: z.array(id).min(1).max(200), // not-policy: shape bound
+  locationId: id,
+}).strict()

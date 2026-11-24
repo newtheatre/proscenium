@@ -14,7 +14,7 @@ export const SHELL_PREFIXES: Record<ShellName, string> = {
 
 /** The console's groups in the fixed order that does not vary by viewer. */
 export const CONSOLE_GROUP_ORDER = [
-  'tonight', 'programme', 'box-office', 'front-of-house', 'bar', 'venues', 'spaces', 'training', 'membership',
+  'tonight', 'programme', 'box-office', 'front-of-house', 'bar', 'venues', 'spaces', 'inventory', 'training', 'membership',
   'people', 'money', 'communications', 'forms', 'reports', 'system',
 ] as const
 

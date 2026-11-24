@@ -2,12 +2,13 @@
 // full path ("Costume store › Rail 3") for pickers.
 import type { Location } from '../../shared/setup'
 
-export interface TreeRow { location: Location, depth: number, path: string }
+type Place = Pick<Location, 'id' | 'name' | 'parentId'>
+export interface TreeRow<L extends Place = Location> { location: L, depth: number, path: string }
 
-export function locationTree(locations: Location[]): TreeRow[] {
-  const children = new Map<string | null, Location[]>()
+export function locationTree<L extends Place>(locations: L[]): TreeRow<L>[] {
+  const children = new Map<string | null, L[]>()
   for (const l of locations) children.set(l.parentId, [...(children.get(l.parentId) ?? []), l])
-  const out: TreeRow[] = []
+  const out: TreeRow<L>[] = []
   const walk = (parentId: string | null, depth: number, above: string) => {
     for (const l of children.get(parentId) ?? []) {
       const path = above ? `${above} › ${l.name}` : l.name
@@ -20,7 +21,7 @@ export function locationTree(locations: Location[]): TreeRow[] {
 }
 
 // A location and everything inside it, which it may not be moved into.
-export function insideOf(locations: Location[], id: string): Set<string> {
+export function insideOf(locations: Place[], id: string): Set<string> {
   const found = new Set([id])
   let grew = true
   while (grew) {
