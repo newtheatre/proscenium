@@ -192,6 +192,7 @@ export default defineModule({
   contributes: {
     // Figures for Reports (REP-02): tickets from Box office's tables, money from its own ledger accounts.
     // Its ready-made report for Reports (REP-04), when Reports is on.
+    'reports.key': [{ id: 'box-office.ticket-type', file: 'ticket-type' }, { id: 'box-office.channel', file: 'channel' }],
     'reports.report': [{
       id: 'box-office.sales-and-attendance',
       label: 'box-office.ready-made.sales-and-attendance',

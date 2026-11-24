@@ -20,15 +20,19 @@ export default defineModule({
   settings: defineSettings('reports', {
     'runs.keep-for': setting.duration({ default: '730d', min: '30d', max: '2555d', units: DAYS, change, audience: 'staff', onChange: 'confirm' }),
     'runs.row-limit': setting.integer({ default: 20_000, min: 1000, max: 100_000, unit: 'reports.units.rows', change, audience: 'staff' }),
+    'builder.max-columns': setting.integer({ default: 60, min: 1, max: 200, unit: 'reports.units.columns', change, audience: 'staff' }),
   }),
 
   records: defineRecords('reports', {
     run: { table: 'reports_runs', owner: 'requested_by' },
+    definition: { table: 'reports_definitions', owner: 'made_by' },
   }),
 
   abilities: defineAbilities('reports', {
     // Each figure still needs its own module's ability, so Reports never shows more than the module would.
     'report.view': ability({ on: 'core.production' }),
+    'report.create': ability({ implies: ['report.view'] }),
+    'report.manage': ability({ on: 'reports.definition', implies: ['report.create', 'run.view'] }),
     // A copy; the person who asked for it holds this as its owner, if they still hold its figures' abilities.
     'run.view': ability({ on: 'reports.run', owner: 'grants' }),
     'run.export': ability({ implies: ['run.view'] }),
@@ -49,6 +53,8 @@ export default defineModule({
   },
 
   points: {
+    // A module's own breakdown key (B6): its name and its values, so a page can label rows and offer a filter.
+    'reports.key': point({ kind: 'code', contract: 'report-key' }),
     // A ready-made report (rules K1 to K3): figures, a scope and period rule and a breakdown.
     'reports.report': point({
       kind: 'data',
