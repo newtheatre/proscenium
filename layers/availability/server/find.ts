@@ -5,12 +5,13 @@ import { refuse, theatreTimeZone, useDb, useSetting, type Actor } from '#kit'
 import { instantOfLocal, localDateOf, localParts, nowMs } from '#kit/clock'
 import { occupancy } from '#modules/occupancy'
 import { addDays } from '../shared/grid'
-import { bestTimes, overlay, type Slot, type Span, type Week } from '../shared/find'
+import { bestTimes, overlay, type Slot, type Span, type Under18, type Week } from '../shared/find'
 import { minutesOf, type Unmarked } from '../shared/levels'
 import { resolveDay } from './levels'
 import { PEOPLE_MAX, plannable } from './planning'
 import { rowsOf } from './reading'
 import { commitmentsOf, localSpans } from './commitments'
+import { under18 } from './safeguarding'
 
 export const DAYS_MAX = 62 // not-policy: rule F2's widest window
 export const MUST_MAX = 30 // not-policy: rule F1's ceiling on must-have people
@@ -26,6 +27,7 @@ export interface FindResult {
   weeks: Record<string, Week>
   taken: Record<string, (Span & { label: string | null })[]>
   best: Slot[]
+  under18: Under18
 }
 
 function datesOf(from: string, to: string): string[] {
@@ -118,5 +120,6 @@ export async function findTime(viewer: Actor, input: FindInput): Promise<FindRes
     weeks,
     taken,
     best: bestTimes({ dates, people: ids, must, weeks, step, hours, length: input.length, taken, roomOptional: input.roomOptional, after }),
+    under18: await under18(ids, dates),
   }
 }
