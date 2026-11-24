@@ -47,9 +47,31 @@ export default defineModule({
   // Each ability is declared with the first route that needs it (part 6 lists all sixteen).
   abilities: defineAbilities('inventory', {
     'settings.manage': ability({ risk: 'privileged' }),
+    'setup.manage': ability({ risk: 'privileged' }),
   }),
 
   tables,
+
+  contributes: {
+    // Set-up screens are Admin tabs of the module (S10); tags are its Lists tab.
+    'core.navigation': [
+      { id: 'inventory.departments', menu: 'admin', group: 'modules', to: '/admin/modules/inventory/departments', icon: 'i-lucide-boxes', ability: 'inventory.setup.manage', order: 80 },
+      { id: 'inventory.locations', menu: 'admin', group: 'modules', to: '/admin/modules/inventory/locations', icon: 'i-lucide-warehouse', ability: 'inventory.setup.manage', order: 81 },
+      { id: 'inventory.inspection-kinds', menu: 'admin', group: 'modules', to: '/admin/modules/inventory/inspection-kinds', icon: 'i-lucide-clipboard-check', ability: 'inventory.setup.manage', order: 82 },
+    ],
+    // Nothing can be added until there is a department to own it and a store to keep it in.
+    'core.setup-step': [
+      { id: 'inventory.departments', required: true, to: '/admin/modules/inventory/departments', order: 80 },
+      { id: 'inventory.locations', required: true, to: '/admin/modules/inventory/locations', order: 81 },
+    ],
+    'core.vocabulary': [{ id: 'inventory.tag', label: 'Kit tags', description: 'Free tags for finding kit, such as a period, a colour or a size.', ordering: 'alphabetical' as const, terms: [] }],
+    'core.record-resolver': [
+      { id: 'inventory.department', file: 'department' },
+      { id: 'inventory.category', file: 'category' },
+      { id: 'inventory.location', file: 'location' },
+      { id: 'inventory.inspection-kind', file: 'inspection-kind' },
+    ],
+  },
 
   events: {
     announces: {
