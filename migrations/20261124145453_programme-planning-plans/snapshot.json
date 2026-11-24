@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "0d3a0a16-eec2-48bd-9d93-f783c21da039",
+  "id": "076e91b4-3d55-4861-ac16-5fd211e7ef87",
   "prevIds": [
-    "bfe96915-c75c-4c0b-bf0d-6cf7db64fc8f",
+    "91aae97a-4c87-4070-8eef-9a204bc5fe0c",
     "fac31bd0-474f-4c1c-93d3-8515d3a03d00"
   ],
   "ddl": [
@@ -1333,6 +1333,16 @@
     },
     {
       "table": "availability_requests",
+      "name": "account_refs",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
       "name": "source_ref",
       "type": "text",
       "notNull": false,
@@ -1358,6 +1368,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "'open'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "reminded_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
