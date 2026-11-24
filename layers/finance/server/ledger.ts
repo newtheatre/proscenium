@@ -341,13 +341,17 @@ export async function accountsOf(module: string, kind?: AccountSummary['kind']):
   return rows.map(r => ({ id: r.id, code: r.code, name: r.name, kind: r.kind, module: r.module, systemKey: r.system_key, scope: r.scope }))
 }
 
-/** What sealed entries spent against each budget line come to, debits positive: a budget's Spent (Budgets, BC-10). */
-export async function budgetLineTotals(lineIds: readonly string[]): Promise<Map<string, number>> {
+/**
+ * What sealed entries spent against each budget line come to, debits positive: a budget's Spent
+ * (Budgets, BC-10), or within `range` (from inclusive, to exclusive) for Budgets' figures (BC-35).
+ */
+export async function budgetLineTotals(lineIds: readonly string[], range?: { from: number, to: number }): Promise<Map<string, number>> {
   if (!lineIds.length) return new Map()
+  const within = range ? 'AND EXISTS (SELECT 1 FROM finance_postings p WHERE p.id = e.posting_id AND p.occurred_at >= ? AND p.occurred_at < ?)' : ''
   const rows = await all<{ line: string, amount: number }>(
     `SELECT e.budget_line_id AS line, sum(e.amount_minor) AS amount FROM finance_entries e
-      WHERE e.budget_line_id IN (SELECT value FROM json_each(?)) AND EXISTS (SELECT 1 FROM finance_seals s WHERE s.posting_id = e.posting_id)
-      GROUP BY e.budget_line_id`, JSON.stringify(lineIds))
+      WHERE e.budget_line_id IN (SELECT value FROM json_each(?)) AND EXISTS (SELECT 1 FROM finance_seals s WHERE s.posting_id = e.posting_id) ${within}
+      GROUP BY e.budget_line_id`, JSON.stringify(lineIds), ...(range ? [range.from, range.to] : []))
   return new Map(rows.map(r => [r.line, r.amount]))
 }
 

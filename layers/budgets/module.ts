@@ -192,6 +192,14 @@ export default defineModule({
       },
     ],
     'core.count': [{ id: 'budgets.approvals', file: 'approvals' }],
+    // Figures for Reports (BC-35): aggregates only, keyed by production, season, line and department.
+    'core.measure': [
+      { id: 'budgets.budgeted', file: 'budgeted' },
+      { id: 'budgets.committed', file: 'committed' },
+      { id: 'budgets.spent', file: 'spent' },
+      { id: 'budgets.claims-pending', file: 'claims-pending' },
+      { id: 'budgets.claims-pending-value', file: 'claims-pending-value' },
+    ],
     // Warns, never blocks, of claims still undecided with items spent in the period (BC-36).
     'finance.period-close-check': [{ id: 'budgets.claims-to-come', file: 'claims-to-come' }],
     // Approved claims paid through Payments: the part clears claims payable and raises paid (BC-30, BC-31).
