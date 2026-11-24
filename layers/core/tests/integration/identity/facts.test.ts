@@ -2,7 +2,8 @@
 // what they do not hold, and a privileged ability counts only once the theatre confirms it.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { grantDirectly, leaveIdentity, reset, staff, useIdentity } from './helpers'
-import { inContext, rows, setModule } from '../../../../../tests/integration/helpers'
+import { inContext, performance, rows, setModule } from '../../../../../tests/integration/helpers'
+import { can, type Actor } from '#kit'
 import { factAbilityMap } from '../../../server/identity/grants'
 
 beforeAll(useIdentity)
@@ -149,5 +150,84 @@ describe('defaults for modules already on, after a deploy (FH-4)', () => {
     expect(await presetRoles()).toEqual([])
     expect(await leadingShift()).toBe(0)
     expect(await rows('SELECT key FROM core_module_defaults WHERE module_id = \'front-of-house\'')).toEqual([])
+  })
+})
+
+describe('a mapping pinned to one record (Foundations, "A fact mapping may be pinned")', () => {
+  const performerOf = (performanceId: string, accountId: string) => import('../../../../../tests/fixtures/modules/seats/server/facts/performer').then(({ performers }) => {
+    performers.set(performanceId, new Set([...performers.get(performanceId) ?? [], accountId]))
+  })
+  const asPerson = (accountId: string): Actor => ({ kind: 'person', accountId, assurance: 'strong', reassertedAt: Date.now() })
+
+  beforeEach(async () => {
+    await setModule('seats', true)
+    const { performers } = await import('../../../../../tests/fixtures/modules/seats/server/facts/performer')
+    performers.clear()
+  })
+
+  it('holds the ability on any record while the fact holds on the pinned one, and only then', async () => {
+    const admin = await staff()
+    await grantDirectly(admin.accountId, ['core.role.manage', 'seats.orders.sell'])
+    const pinned = await performance()
+    const other = await performance()
+    const saved = await admin.browser.put('/api/core/facts/seats.performer', { abilities: ['seats.orders.sell'], record: pinned })
+    expect(saved.status).toBe(200)
+    expect(await rows('SELECT DISTINCT pinned_record FROM core_fact_abilities WHERE fact = \'seats.performer\'')).toEqual([{ pinned_record: pinned }])
+
+    const inIt = 'acc_pinnedperformerpinnedperfo'
+    const elsewhere = 'acc_otherperformerotherperform'
+    await performerOf(pinned, inIt)
+    await performerOf(other, elsewhere)
+    expect((await inContext(() => can(asPerson(inIt), 'seats.orders.sell', ['seats.performance', other]))).allowed).toBe(true)
+    // Performing in another performance is not performing in the pinned one.
+    expect((await inContext(() => can(asPerson(elsewhere), 'seats.orders.sell', ['seats.performance', other]))).allowed).toBe(false)
+  })
+
+  it('lists pinned mappings with the record\'s title, offers the records to pin to, and removes one when emptied', async () => {
+    const admin = await staff()
+    await grantDirectly(admin.accountId, ['core.role.manage', 'seats.orders.sell'])
+    const pinned = await performance()
+    await admin.browser.put('/api/core/facts/seats.performer', { abilities: ['seats.orders.sell'], record: pinned })
+    const read = await admin.browser.get('/api/core/facts')
+    const performer = read.body.facts.find((f: { name: string }) => f.name === 'seats.performer')
+    expect(performer).toMatchObject({ pin: true, abilities: [], pinned: [{ record: pinned, title: 'Hamlet', abilities: expect.arrayContaining([{ ability: 'seats.orders.sell', confirmed: false }]) }] })
+    const choices = await admin.browser.get('/api/core/facts/seats.performer/choices')
+    expect(choices.body.records).toEqual(expect.arrayContaining([{ id: pinned, title: 'Hamlet' }]))
+    expect((await admin.browser.put('/api/core/facts/seats.performer', { abilities: [], record: pinned })).status).toBe(200)
+    expect(await rows('SELECT 1 FROM core_fact_abilities WHERE fact = \'seats.performer\'')).toEqual([])
+  })
+
+  it('refuses to pin a fact not declared pinnable, or to a record that does not exist', async () => {
+    const admin = await staff()
+    await grantDirectly(admin.accountId, ['core.role.manage', 'seats.orders.sell'])
+    expect((await admin.browser.put('/api/core/facts/seats.regular', { abilities: ['seats.orders.sell'], record: await performance() })).body.code).toBe('core.fact.not-pinnable')
+    expect((await admin.browser.put('/api/core/facts/seats.performer', { abilities: ['seats.orders.sell'], record: 'sp_nothing' })).body.code).toBe('core.fact.record-missing')
+  })
+
+  it('a mapping whose record has gone grants nothing and shows as broken', async () => {
+    const admin = await staff()
+    await grantDirectly(admin.accountId, ['core.role.manage', 'seats.orders.sell'])
+    const pinned = await performance()
+    await admin.browser.put('/api/core/facts/seats.performer', { abilities: ['seats.orders.sell'], record: pinned })
+    const inIt = 'acc_pinnedperformerpinnedperfo'
+    await performerOf(pinned, inIt)
+    const { env } = await import('./helpers')
+    await env.DB.prepare('DELETE FROM seats_performances WHERE id = ?').bind(pinned).run()
+    expect((await inContext(() => can(asPerson(inIt), 'seats.orders.sell'))).allowed).toBe(false)
+    const read = await admin.browser.get('/api/core/facts')
+    expect(read.body.facts.find((f: { name: string }) => f.name === 'seats.performer').pinned).toEqual([expect.objectContaining({ record: pinned, title: null })])
+    // A broken mapping can still be removed.
+    expect((await admin.browser.put('/api/core/facts/seats.performer', { abilities: [], record: pinned })).status).toBe(200)
+  })
+
+  it('counts pinned holders among holdersOf', async () => {
+    const admin = await staff()
+    await grantDirectly(admin.accountId, ['core.role.manage', 'seats.orders.sell'])
+    const pinned = await performance()
+    await admin.browser.put('/api/core/facts/seats.performer', { abilities: ['seats.orders.sell'], record: pinned })
+    await performerOf(pinned, admin.accountId)
+    const { holdersOf } = await import('../../../server/identity/holders')
+    const other = await performance()
+    expect(await inContext(() => holdersOf('seats.orders.sell', ['seats.performance', other]))).toContain(admin.accountId)
   })
 })

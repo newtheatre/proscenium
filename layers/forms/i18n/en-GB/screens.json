@@ -1006,5 +1006,15 @@
   "forms.screens.details.advanced": "Advanced",
   "forms.screens.publish.share-later": "Nobody yet: share it later",
   "forms.screens.builder.view": "Edit or preview",
-  "forms.screens.preview.width": "Preview width"
+  "forms.screens.preview.width": "Preview width",
+  "forms.screens.stages.who.system": "The system",
+  "forms.screens.stages.when": "When",
+  "forms.screens.stages.when-help": "Checked as soon as a response arrives in the stage this move is from. The first automatic move whose condition holds is made, with nobody's name on it.",
+  "forms.screens.logic.marking.score": "Score",
+  "forms.screens.logic.marking.percent": "Score as a percentage",
+  "forms.screens.logic.marking.passed": "Passed",
+  "forms.problems.system-no-condition": "An automatic move needs a condition, so it is made only when that holds.",
+  "forms.problems.condition-not-system": "Only an automatic move has a condition. Remove it, or let the system make this move.",
+  "forms.problems.system-loop": "Automatic moves could take a response round and back to this stage for ever. Change a condition or a stage so they cannot.",
+  "forms.problems.marking-unmarked": "This reads a score, but no question has a correct answer."
 }

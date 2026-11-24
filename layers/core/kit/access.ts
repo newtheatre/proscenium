@@ -22,11 +22,15 @@ export interface AccessProvider {
   grants?: (actor: Actor) => Promise<Grant[]>
   /** The theatre's mapping of facts to abilities. A privileged ability appears only once confirmed. */
   factAbilities?: () => Promise<Record<string, string[]>>
+  /** Mappings pinned to one record of the fact's type: the fact is judged against that record alone. */
+  pinnedFactAbilities?: () => Promise<PinnedMapping[]>
   /** Whether the actor's account has any way to sign in strongly (a passkey, or an authenticator app where accepted). */
   strongSetUp?: (actor: Actor) => Promise<boolean>
   /** Whether the actor stands above the own-record refusal: the theatre's Owners, who have nobody above them to ask. */
   ownRecordExempt?: (actor: Actor) => Promise<boolean>
 }
+
+export interface PinnedMapping { fact: string, record: string, abilities: string[] }
 
 /** Refusals that mean "you hold this, but your sign-in is not strong enough": the second when nothing is set up to make it so. */
 export const STRONGER_SIGN_IN = ['core.access.needs-strong-sign-in', 'core.access.two-step-not-set-up'] as const
@@ -37,6 +41,7 @@ const defaultProvider: AccessProvider = {
   actor: async () => ({ kind: 'anonymous' }),
   grants: async actor => actor.grants ?? [],
   factAbilities: async () => ({}),
+  pinnedFactAbilities: async () => [],
   ownRecordExempt: async () => false,
 }
 let provider: AccessProvider = defaultProvider
@@ -168,6 +173,19 @@ export async function can(actor: Actor, ability: AbilityName | 'signed-in', reco
       const anyRecord = !record && fact.decl.on && abilities.some(a => implying.has(a))
       if ((await holdsFact(factName, actor, record)) || (anyRecord && actor.accountId && (await factHolders(factName))?.includes(actor.accountId))) {
         by = `fact:${factName}`
+        break
+      }
+    }
+  }
+  if (!by) {
+    // A pinned mapping asks about its own record, never the one in hand; a record that no longer
+    // exists holds the fact for nobody, so the mapping grants nothing.
+    for (const pinned of await provider.pinnedFactAbilities!()) {
+      if (!pinned.abilities.some(a => granting.has(a))) continue
+      const fact = registry.facts.get(pinned.fact)
+      if (!fact?.decl.pin || !fact.decl.on || !(await isEnabled(fact.module))) continue
+      if (await holdsFact(pinned.fact, actor, { type: fact.decl.on, id: pinned.record })) {
+        by = `fact:${pinned.fact}:${pinned.record}`
         break
       }
     }

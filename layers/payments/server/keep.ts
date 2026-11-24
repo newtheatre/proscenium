@@ -9,6 +9,7 @@ import { postEntries, type EntryInput } from '#modules/finance'
 import { asPart, getIntent, partsOf, settlements } from './intents'
 import { isTestMoney } from './test-money'
 import type { AttemptRow } from './answers'
+import { ownerEntries } from './owner-entries'
 
 /**
  * SQL on `payments_intents i`: money taken for a payment that could not complete, neither kept nor
@@ -66,7 +67,7 @@ export async function keepPayment(unit: UnitView, intentId: string, by: string):
     const own = await handler.kept(unit, asPart(part, intent.currency))
     const total = own.reduce((sum, e) => sum + e.amountMinor, 0)
     if (total !== -part.amount_minor) throw new Refusal('payments.settlement.part-mismatch', `${part.owner_module}'s entries for this part total ${-total}, not ${part.amount_minor}.`, { status: 500 })
-    entries.push(...own.map(e => ({ account: e.account, amountMinor: e.amountMinor, forModule: part.owner_module, productionId: e.productionId ?? null, performanceId: e.performanceId ?? null })))
+    entries.push(...await ownerEntries(own, part.owner_module))
   }
   if (!await isTestMoney(intent.id)) {
     await postEntries(unit, {

@@ -93,17 +93,16 @@ export const termGroups = defineTable('core_term_groups', {
   id: col.id(),
   vocabularyKey: col.internal(text('vocabulary_key').notNull().references(() => vocabularies.key, { onDelete: 'restrict' })),
   label: col.public(text('label').notNull()),
+  // A declared heading's stable code, from its label when it was made (R3-07: a term's kind is its
+  // heading's slug, so a picker narrows by it whatever the theatre renames the heading to).
+  slug: col.internal(text('slug')),
   sort: col.internal(integer('sort').notNull().default(0)),
-  // A declared heading's fixed key, for code that reads a kind of term (core.department's production
-  // and organisation, R3-07); the label stays the theatre's to change.
-  key: col.internal(text('key')),
 }, {
   id: 'tgr',
   realm: 'operational',
   subject: 'none',
   extra: t => [
     uniqueIndex('core_term_groups_label').on(t.vocabularyKey, sql`lower(${t.label})`),
-    uniqueIndex('core_term_groups_key').on(t.vocabularyKey, t.key).where(sql`${t.key} IS NOT NULL`),
     index('core_term_groups_order').on(t.vocabularyKey, t.sort),
     check('core_term_groups_label_length', sql`length(${t.label}) BETWEEN 1 AND 80`),
   ],
