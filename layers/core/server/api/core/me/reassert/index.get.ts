@@ -5,6 +5,6 @@ import { defineRoute } from '#kit'
 import { sessionOf } from '../../../../identity/guards'
 import { waysToConfirm } from '../../../../identity/reassert'
 
-export default defineRoute({ ability: 'signed-in', rateLimit: 'default', input: z.object({}) }, async (event) => {
+export default defineRoute({ practice: 'refuse', ability: 'signed-in', rateLimit: 'default', input: z.object({}) }, async (event) => {
   return waysToConfirm(await sessionOf(event))
 })

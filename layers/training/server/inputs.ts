@@ -1,7 +1,7 @@
 // What Training's routes accept. Limits are the schema's (part 2); a step kind is accepted here once
 // the slice that delivers it is built.
 import { z } from 'zod'
-import { EVIDENCE_EXPIRY, EVIDENCE_FILE, NEEDED_FOR, REVOKE_CODES } from '../shared/states'
+import { EVIDENCE_EXPIRY, EVIDENCE_FILE, NEEDED_FOR, REVOKE_CODES, ROUTE_STATES, SECTION_KINDS, SHOW_ANSWERS, SIGN_UP } from '../shared/states'
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/ // not-policy: the shape of a date
 export const day = z.string().regex(DAY, 'Give the date as a day, month and year.')
@@ -37,7 +37,39 @@ export const stepInput = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('session'), ...common, ...material }),
   z.object({ kind: z.literal('practical'), ...common, ...material, timesRequired: z.number().int().min(1).max(20).default(1) }), // not-policy: the schema's limit (part 2)
   z.object({ kind: z.literal('reading'), ...common, ...material }),
-  z.object({ kind: z.literal('certificate'), ...common, evidenceExpiry: z.enum(EVIDENCE_EXPIRY), evidenceFile: z.enum(EVIDENCE_FILE) }),
+  // Signed off by another module's confirmed activity, such as a shadowed shift (H1).
+  z.object({
+    kind: z.literal('activity'),
+    ...common,
+    sourceId: z.string().min(1).max(100), // not-policy: an id's length
+    sourceParams: z.record(z.string(), z.unknown()).default({}),
+    timesRequired: z.number().int().min(1).max(20).default(1), // not-policy: the schema's limit (part 2)
+  }),
+  z.object({
+    kind: z.literal('certificate'),
+    ...common,
+    evidenceExpiry: z.enum(EVIDENCE_EXPIRY),
+    evidenceFile: z.enum(EVIDENCE_FILE),
+    // The outside qualifications the step recognises, offered first (E7; TR-48).
+    qualifications: z.array(z.object({
+      title: z.string().trim().min(1).max(120), // not-policy: the schema's limit (part 2)
+      issuers: z.array(z.string().trim().min(1).max(120)).max(20).default([]), // not-policy: the schema's limit (part 2)
+    })).max(20).default([]), // not-policy: the schema's limit (part 2)
+    otherQualification: z.boolean().default(true),
+  }),
+  // Experience gained elsewhere, stated with optional evidence and the questions of a form (E5).
+  z.object({ kind: z.literal('declaration'), ...common, evidenceFile: z.enum(EVIDENCE_FILE), formId: z.string().min(1).nullable().optional() }),
+  // A lesson's teaching is its sections, saved on their own (O5), so it carries no guidance.
+  z.object({ kind: z.literal('lesson'), ...common, guidance: z.null().optional() }),
+  z.object({
+    kind: z.literal('quiz'),
+    ...common,
+    formId: z.string().min(1),
+    // Null is no limit (Q3); left out, the step takes training.quizzes.default-max-attempts.
+    maxAttempts: z.number().int().min(1).max(20).nullable().optional(), // not-policy: the schema's limit (part 2)
+    retryAfter: z.number().int().positive().optional(),
+    showAnswers: z.enum(SHOW_ANSWERS).default('after-pass'),
+  }),
 ])
 export type StepInput = z.infer<typeof stepInput>
 export const stepsInput = z.object({ steps: z.array(stepInput).min(1).max(20) }) // not-policy: the schema's limit (part 2)
@@ -67,3 +99,100 @@ export const revokeInput = z.object({
   code: z.enum(REVOKE_CODES),
   note: z.string().trim().min(1).max(500), // not-policy: the schema's limit (part 2)
 })
+
+export const competencyInput = z.object({
+  title: z.string().trim().min(1).max(80), // not-policy: the schema's limit (part 2)
+  description: optionalText(500), // not-policy: the schema's limit (part 2)
+})
+export const competencyChange = competencyInput.partial()
+
+const routeItem = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('course'), courseId: z.string().min(1) }),
+  z.object({ kind: z.literal('recognised'), requirementRef: z.string().trim().min(3).max(200) }), // not-policy: the schema's limit (part 2)
+])
+export const routesInput = z.object({
+  routes: z.array(z.object({
+    id: z.string().optional(),
+    label: z.string().trim().min(1).max(80), // not-policy: the schema's limit (part 2)
+    status: z.enum(ROUTE_STATES).default('active'),
+    items: z.array(routeItem).max(10), // not-policy: a route of more than ten items is a different competency
+  })).max(10), // not-policy: R5 offers three; ten keeps the screen readable
+})
+
+const instant = z.number().int().positive()
+export const sessionInput = z.object({
+  title: optionalText(120), // not-policy: the schema's limit (part 2)
+  startsAt: instant,
+  endsAt: instant,
+  spaceId: z.string().nullable().optional(),
+  placeNote: optionalText(200), // not-policy: the schema's limit (part 2)
+  capacity: z.number().int().min(1).max(500).optional(), // not-policy: the setting's own bounds
+  signUp: z.enum(SIGN_UP).optional(),
+  trainerIds: z.array(z.string().min(1)).max(20).optional(), // not-policy: a screen's worth of trainers
+})
+export const sessionChange = sessionInput.partial()
+export const cancelSessionInput = z.object({ reason: z.string().trim().min(1).max(300) }) // not-policy: the schema's limit (part 2)
+export const placeInput = z.object({ accountId: z.string().min(1).optional() })
+export const attendanceInput = z.object({
+  marks: z.array(z.object({ placeId: z.string().min(1), state: z.enum(['attended', 'absent']) })).min(1).max(500), // not-policy: the largest capacity
+})
+export const walkInInput = z.union([
+  z.object({ accountId: z.string().min(1) }),
+  z.object({ name: z.string().trim().min(1).max(120), address: z.string().trim().email().max(254).nullable().optional() }), // not-policy: the account's limits
+])
+
+export const sectionsInput = z.object({
+  sections: z.array(z.object({
+    id: z.string().optional(),
+    kind: z.enum(SECTION_KINDS),
+    title: z.string().trim().min(1).max(120), // not-policy: the schema's limit (part 2)
+    body: optionalText(20000), // not-policy: the schema's limit (part 2)
+    videoUrl: z.string().trim().url().startsWith('https://').max(500).nullable().optional(), // not-policy: an address's length
+    videoCaptionNote: optionalText(200), // not-policy: the schema's limit (part 2)
+    scenarioId: z.string().trim().min(1).max(120).nullable().optional(), // not-policy: an id's length
+    // The author says the section has changed, so people part-way through must reach it again (O5).
+    changed: z.boolean().optional(),
+  })).min(1).max(30), // not-policy: the schema's limit (part 2)
+})
+
+export const quizInput = z.object({ answers: z.record(z.string(), z.unknown()) })
+export const allowanceInput = z.object({ accountId: z.string().min(1), note: optionalText(300) }) // not-policy: the schema's limit (part 2)
+
+const day_ = day.nullable().optional().transform(v => v || null)
+/** Evidence a person sends for a certificate or declaration step (E1, E5 to E7). Which fields count depends on the step. */
+export const evidenceInput = z.object({
+  stepId: z.string().min(1),
+  // Staff sending it for someone else; left out, it is the signed-in person's own.
+  accountId: z.string().min(1).optional(),
+  // The id the file was uploaded under, when there is a file.
+  evidenceId: z.string().min(1).optional(),
+  fileId: z.string().min(1).nullable().optional(),
+  issuer: optionalText(120), // not-policy: the schema's limit (part 2)
+  reference: optionalText(80), // not-policy: the schema's limit (part 2)
+  issuedOn: day_,
+  expiresOn: day_,
+  qualification: optionalText(120), // not-policy: the schema's limit (part 2)
+  statement: optionalText(2000), // not-policy: the schema's limit (part 2)
+  organisation: optionalText(120), // not-policy: the schema's limit (part 2)
+  doneFrom: day_,
+  doneTo: day_,
+  linkUrl: z.string().trim().url().max(500).nullable().optional().transform(v => v || null), // not-policy: the schema's limit (part 2)
+  referee: optionalText(200), // not-policy: the schema's limit (part 2)
+  answers: z.record(z.string(), z.unknown()).optional(),
+}).strict()
+export type EvidenceInput = z.infer<typeof evidenceInput>
+
+/** A verifier records that they saw the original, keeping nothing of it (E2). */
+export const seenInput = z.object({
+  stepId: z.string().min(1),
+  accountId: z.string().min(1),
+  issuer: z.string().trim().min(1).max(120), // not-policy: the schema's limit (part 2)
+  issuedOn: day,
+  expiresOn: day_,
+}).strict()
+export type SeenInput = z.infer<typeof seenInput>
+
+export const rejectInput = z.object({ reason: z.string().trim().min(1).max(300) }).strict() // not-policy: the schema's limit (part 2)
+
+/** A route that takes no body. */
+export const noInput = z.object({}).strict()

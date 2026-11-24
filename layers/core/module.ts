@@ -10,6 +10,7 @@ import * as identity from './module/identity'
 import { tables } from './server/db/schema'
 import * as domain from './module/domain'
 import { tables as domainTables } from './server/db/domain'
+import { practiceAbilities, practicePoints, practiceRecords, practiceSettings } from './module/practice'
 
 export default defineModule({
   id: 'core',
@@ -18,15 +19,15 @@ export default defineModule({
   stability: 'experimental',
   switchable: false,
 
-  settings: { ...settings, ...identity.identitySettings, ...domain.settings },
+  settings: { ...settings, ...identity.identitySettings, ...domain.settings, ...practiceSettings },
   settingRules: defineSettingRules('core', [...settingRules.rules, ...identity.identitySettingRules, ...domain.settingRules]),
   settingGroups,
   settingPages,
-  abilities: { ...abilities, ...identity.identityAbilities, ...domain.abilities },
-  records: { ...records, ...identity.identityRecords, ...domain.records },
+  abilities: { ...abilities, ...identity.identityAbilities, ...domain.abilities, ...practiceAbilities },
+  records: { ...records, ...identity.identityRecords, ...domain.records, ...practiceRecords },
   facts: { ...identity.identityFacts, ...domain.facts },
   tables: { ...tables, ...domainTables },
-  points: { ...points, ...identity.identityPoints, ...domain.points },
+  points: { ...points, ...identity.identityPoints, ...domain.points, ...practicePoints },
   contributes: {
     ...domain.contributes,
     ...identity.identityContributions,
@@ -50,6 +51,8 @@ export default defineModule({
     ],
     // The coming week's performances, on the console home's grid.
     'core.home-figure': [{ id: 'core.performances', file: 'performances' }],
+    // Practice mode's base sample sets (C-76): the people and tonight's show every scenario starts from.
+    'core.practice-sample': [{ id: 'core.people', file: 'people' }, { id: 'core.tonight', file: 'tonight' }],
     'core.account-notice': [...identity.identityContributions['core.account-notice']],
     'core.account-section': [...identity.identityContributions['core.account-section'], ...domain.contributes['core.account-section']],
     // My account's entries (identity spec part 6). The passkey offer after signing in is a getting-in

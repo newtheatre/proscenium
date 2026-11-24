@@ -19,6 +19,8 @@ import { connectRealtime } from './realtime-hub'
 export { RateLimitCounter } from './rate-counter'
 // The Durable Object behind realtime rooms (binding REALTIME).
 export { RealtimeHub } from './realtime-hub'
+// Each person's practice store (binding PRACTICE, Practice mode).
+export { PracticeStore } from '#kit/practice/store'
 
 installRegistry(registry)
 installMigrations(migrations, release)

@@ -14,11 +14,12 @@
      Offline (D2), the door keeps working from its copy of the door list on the device
      (useOfflineDoor): a ticket's signed code is checked here, admitted here and sent when the
      connection returns; the strip says how many admissions are waiting. The door list can be
-     printed as the paper fallback. -->
+     printed as the paper fallback. Count, beside Scan, is the door counter (BO-73); a performance
+     never put on sale, with no bookings, opens there instead (HC1). -->
 <script setup lang="ts">
 import { useDebounceFn, useOnline } from '@vueuse/core'
 
-interface Summary { performance: { id: string, title: string, label: string | null, startsAt: number, venue: string, latecomers: string }, tickets: number, admitted: number, unpaid: number, canRelease?: boolean }
+interface Summary { performance: { id: string, title: string, label: string | null, startsAt: number, venue: string, latecomers: string }, tickets: number, admitted: number, unpaid: number, onSale?: boolean, canRelease?: boolean }
 interface Scan {
   result: string
   admittedAt?: number
@@ -70,6 +71,7 @@ const { data: live } = await useNavigation('live')
 const tillTo = (reference: string) => live.value?.items.some(i => i.to === '/live/till') ? `/live/till?panel=box-office&collect=${encodeURIComponent(reference)}` : undefined
 
 const { data, status, error, refresh } = await useAPI<Summary>(() => `${base.value}/door/summary`, { key: `box-office:door:summary:${id.value}` })
+if (data.value && data.value.onSale === false && !data.value.tickets && !data.value.unpaid) await navigateTo(`/live/door/${encodeURIComponent(id.value)}/count`, { replace: true })
 
 // The door's copy on the device, and the admissions made offline waiting to be sent.
 const toast = useToast()
@@ -373,6 +375,10 @@ async function admit(row: Row, count: number): Promise<number> {
         <template #default="{ data: d }">
           <div class="flex flex-1 flex-col gap-3 lg:flex-row">
             <div class="flex flex-1 flex-col gap-3">
+              <BoxOfficeDoorModes
+                :performance-id="id"
+                mode="scan"
+              />
               <p class="flex flex-wrap items-baseline gap-x-2">
                 <span class="whitespace-nowrap text-3xl font-bold">{{ t('box-office.live-door.count', { admitted: (counts ?? d).admitted, tickets: (counts ?? d).tickets + (counts ?? d).unpaid }) }}</span>
                 <span class="text-muted">{{ t('box-office.live-door.to-come', { count: (counts ?? d).tickets + (counts ?? d).unpaid - (counts ?? d).admitted }) }}<template v-if="(counts ?? d).unpaid"> · {{ t('box-office.live-door.unpaid', { count: (counts ?? d).unpaid }) }}</template></span>
