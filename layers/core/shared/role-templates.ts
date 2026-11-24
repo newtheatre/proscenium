@@ -52,11 +52,8 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'payments.attempt.reconcile', 'payments.refund.approve', 'payments.session.view',
       'membership-fees.charge.view', 'membership-fees.charge.waive',
       'bar.sale.view',
-<<<<<<< HEAD
       'reports.report.view', 'reports.run.export',
-=======
       'budgets.budget.view', 'budgets.budget.manage', 'budgets.budget.approve', 'budgets.category.manage',
->>>>>>> origin/next
       'invoicing.export.manage', 'invoicing.settings.manage',
     ],
   },
