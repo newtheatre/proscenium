@@ -34,4 +34,4 @@ export const MOVES = {
 export type Move = keyof typeof MOVES
 
 // The columns' bounds (part 2), checked by the routes before the tables' own checks.
-export const LIMITS = { name: 160, legalName: 200, registration: 60, taxNumber: 30, address: 400, postcode: 12, website: 300, description: 600, notes: 4000, role: 80, phone: 30, title: 160, reason: 500 } // not-policy: the columns' bounds
+export const LIMITS = { name: 160, legalName: 200, registration: 60, taxNumber: 30, address: 400, postcode: 12, website: 300, description: 600, notes: 4000, role: 80, phone: 30, title: 160, reason: 500, personName: 120, email: 254, places: 50 } // not-policy: the columns' bounds

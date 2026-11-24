@@ -2,7 +2,7 @@
 // first enquiry to a settled account. The gate declares the module whole (CO-01); the routes, the fact
 // and the moves so far are companies, contacts and engagements. Later slices add to this file.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, setting } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettings, event, factDecl, point, setting } from '#kit'
 import { tables } from './server/db/schema'
 import { ENGAGEMENT_STATES } from './shared/companies'
 
@@ -48,21 +48,28 @@ export default defineModule({
     'contact.manage': ability({ on: 'companies.company', implies: ['company.view'] }),
     'engagement.view': ability({ on: 'companies.engagement', implies: ['company.view'] }),
     'engagement.manage': ability({ on: 'companies.engagement', implies: ['engagement.view'] }),
+    'allocation.manage': ability({ on: 'companies.engagement', implies: ['engagement.view'] }),
     'settlement.view': ability({ on: 'companies.engagement', implies: ['engagement.view'] }),
     'settlement.approve': ability({ on: 'companies.settlement', risk: 'privileged', owner: 'refuses', implies: ['settlement.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
     'engagement.view-own': ability({ on: 'companies.engagement', audit: false }),
+    'guest.name': ability({ on: 'companies.engagement', implies: ['engagement.view-own'] }),
   }),
 
   // Part 4, "Fact": read live from the contacts table, so ending a contact ends their access at once (CO-05).
   facts: defineFacts('companies', {
     'contact-of': factDecl({
       on: 'companies.engagement',
-      defaults: ['companies.engagement.view-own'],
+      defaults: ['companies.engagement.view-own', 'companies.guest.name'],
     }),
   }),
 
   tables,
+
+  points: {
+    // BO-75: the selling module that issues a company's guests their tickets (part 4).
+    'companies.guest-issuer': point({ kind: 'code', contract: 'guest-issuer' }),
+  },
 
   events: {
     announces: {

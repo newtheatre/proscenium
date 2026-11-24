@@ -48,7 +48,7 @@ For modules that list `companies` in `requires`. None of this round's specs does
 | Point | Kind | Contract | Contributors agreed |
 | --- | --- | --- | --- |
 | `companies.engagement-panel` | code | `{ id, label, order, appliesTo(engagement), component }`; shown on the contact's engagement page and the staff engagement page | Festival ("Festival information"), Productions (tasks, show reports) |
-| `companies.guest-issuer` | code | `{ hold(unit, performanceId, places, label) -> holdRef, issue(unit, holdRef, accountId, places) -> orderRef, withdraw(unit, orderRef), release(unit, holdRef, places) }` | Box office (new contribution, BO-75) |
+| `companies.guest-issuer` | code | `{ hold(unit, performanceId, places, label) -> holdRef, issue(unit, holdRef, accountId, places) -> orderRef, withdraw(unit, orderRef), release(unit, holdRef, places) }` | Box office (new contribution, BO-75; `issue` built with CO-04, the rest with CO-26 and CO-27) |
 | `companies.hire-source` | code | `{ bookingsFor(engagementId) -> [{ bookingId, spaceId, startsAt, endsAt, state }] }`; also says whether a booking may be linked | Spaces (amendment; part 9, Q4) |
 | `companies.settlement-note` | code | `{ id, lines(engagement) -> [{ label, amountMinor, currency, link }] }`; read only, never posted | Budgets (awards) |
 | `companies.settlement-charge` | code | `{ key, lines(engagement) -> [{ key, label, amountMinor, currency, sourceRef }], entries(unit, line) }`; the contributor posts the income side on its own accounts | Inventory (kit hire, later) |
