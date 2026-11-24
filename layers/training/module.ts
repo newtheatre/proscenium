@@ -80,6 +80,7 @@ export default defineModule({
     session: { table: 'training_sessions', parent: 'training.course' },
     record: { table: 'training_records', parent: 'training.course', owner: 'account_id' },
     competency: { table: 'training_competencies' },
+    evidence: { table: 'training_evidence', parent: 'training.course', owner: 'account_id' },
   }),
 
   // Each ability is declared with the first route that needs it (part 6).
@@ -98,6 +99,8 @@ export default defineModule({
     'session.run': ability({ on: 'training.course', implies: ['course.view', 'core.account.find'] }),
     'place.book': ability({ grantAt: ['site'], implies: ['course.view'] }),
     'place.manage': ability({ on: 'training.course', implies: ['course.view', 'core.account.find'] }),
+    // Open evidence and verify or reject it; never one's own (S4). Does not imply record.view.
+    'evidence.verify': ability({ on: 'training.course', risk: 'privileged' }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -127,7 +130,14 @@ export default defineModule({
     ],
     'core.space-busy': [{ id: 'training' }],
     // A marked form on a course, for its quiz steps (Q1).
-    'forms.slot': [{ id: 'training.quiz', subject: 'training.course', attach: 'training.course.manage', label: 'training.forms.quiz.label' }],
+    'forms.slot': [
+      { id: 'training.quiz', subject: 'training.course', attach: 'training.course.manage', label: 'training.forms.quiz.label' },
+      // Questions asked beside a declaration's statement (E5).
+      { id: 'training.declaration', subject: 'training.course', attach: 'training.course.manage', label: 'training.forms.declaration.label' },
+    ],
+    // One file per piece of evidence, uploaded through Training's own route (E2, E4).
+    'core.file-slot': [{ id: 'training.evidence-file', owner: 'training.evidence', ability: 'training.settings.manage', accepts: ['png' as const, 'jpeg' as const, 'webp' as const, 'pdf' as const], limit: 'core.files.document-limit', access: 'record' as const, textClass: 'personal' as const, clean: true }],
+    'core.file-access': [{ id: 'training.evidence', file: 'evidence' }],
     // Two places on one session after an account merge: the stronger is kept.
     'core.merge-handler': [{ id: 'training.places', file: 'places' }],
     'core.notification-type': [{
@@ -160,6 +170,36 @@ export default defineModule({
           action: 'See my training',
         },
       },
+    }, {
+      id: 'training.evidence-submitted',
+      category: 'optional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      topic: 'training.records',
+      link: '/console/training/evidence',
+      variables: { course: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Evidence to check for {{ course }}',
+          body: 'Someone has sent in a certificate or declaration for **{{ course }}**. It counts once somebody has checked it.',
+          action: 'Check evidence',
+        },
+      },
+    }, {
+      // The answer to something the person sent, so it cannot be switched off.
+      id: 'training.evidence-decided',
+      category: 'transactional' as const,
+      side: 'members' as const,
+      channels: ['email' as const, 'inbox' as const],
+      link: '/members/training',
+      variables: { course: 'text' as const, outcome: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your evidence for {{ course }} has been checked',
+          body: 'Your evidence for **{{ course }}** has been looked at. {{ outcome }}',
+          action: 'See my training',
+        },
+      },
     }, ...SESSION_NOTICES],
     'core.requirement': [{ id: 'training', file: 'training' }],
     'core.record-resolver': [
@@ -167,6 +207,7 @@ export default defineModule({
       { id: 'training.session', file: 'session' },
       { id: 'training.record', file: 'record' },
       { id: 'training.competency', file: 'competency' },
+      { id: 'training.evidence', file: 'evidence' },
     ],
   },
 
@@ -189,6 +230,8 @@ export default defineModule({
       'training.place.promoted': event({ version: 1, payload: z.object(place), internal: true }),
       'training.place.cancelled': event({ version: 1, payload: z.object(place), internal: true }),
       'training.quiz.attempted': event({ version: 1, payload: z.object({ attemptId: z.string(), accountId: z.string(), courseId: z.string(), stepId: z.string(), passed: z.boolean() }), internal: true }),
+      'training.evidence.submitted': event({ version: 1, payload: z.object({ evidenceId: z.string(), courseId: z.string() }), internal: true }),
+      'training.evidence.decided': event({ version: 1, payload: z.object({ evidenceId: z.string(), accountId: z.string(), state: z.enum(['verified', 'rejected']) }), internal: true }),
       'training.competency.routes-changed': event({ version: 1, payload: z.object({ competencyId: z.string() }), internal: false }),
     },
   },

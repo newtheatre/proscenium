@@ -56,6 +56,8 @@ export interface Step {
   showAnswers: 'never' | 'after-pass' | 'after-each' | null
   sourceId: string | null
   sourceParams: Record<string, unknown> | null
+  qualifications: { title: string, issuers: string[] }[] | null
+  otherQualification: boolean | null
   carriesStepId: string | null
 }
 
@@ -66,7 +68,7 @@ const VERSION = `SELECT id, course_id AS courseId, number, status, change_kind A
 const STEP = `SELECT id, version_id AS versionId, position, title, kind, needed_for AS neededFor, times_required AS timesRequired, guidance,
   material_url AS materialUrl, material_file_id AS materialFileId, evidence_expiry AS evidenceExpiry, evidence_file AS evidenceFile,
   form_id AS formId, form_version_id AS formVersionId, max_attempts AS maxAttempts, retry_after AS retryAfter, show_answers AS showAnswers,
-  source_id AS sourceId, source_params AS sourceParams, carries_step_id AS carriesStepId FROM training_course_steps`
+  source_id AS sourceId, source_params AS sourceParams, qualifications, other_qualification AS otherQualification, carries_step_id AS carriesStepId FROM training_course_steps`
 
 const SECTION_COLUMNS = ['id', 'step_id', 'position', 'kind', 'title', 'body', 'video_url', 'video_id', 'video_caption_note', 'scenario_id', 'carries_section_id', 'created_at', 'updated_at']
 
@@ -92,7 +94,13 @@ export async function versionsOf(courseId: string): Promise<Version[]> {
   return all<Version>(`${VERSION} WHERE course_id = ? ORDER BY number DESC`, courseId)
 }
 
-const stepRow = <S extends Step>(row: any): S => ({ ...row, sourceParams: typeof row.sourceParams === 'string' ? JSON.parse(row.sourceParams) : row.sourceParams ?? null })
+const json = (v: unknown) => typeof v === 'string' ? JSON.parse(v) : v ?? null
+const stepRow = <S extends Step>(row: any): S => ({
+  ...row,
+  sourceParams: json(row.sourceParams),
+  qualifications: json(row.qualifications),
+  otherQualification: row.otherQualification === null || row.otherQualification === undefined ? null : !!row.otherQualification,
+})
 
 export async function stepsOf(versionId: string): Promise<Step[]> {
   return (await all(`${STEP} WHERE version_id = ? ORDER BY position`, versionId)).map(r => stepRow(r))
@@ -187,10 +195,11 @@ export async function saveSteps(unit: UnitView, courseId: string, input: StepInp
   unit.add({ sql: 'DELETE FROM training_course_steps WHERE version_id = ?', params: [version.id] })
   unit.add({
     sql: `INSERT INTO training_course_steps (id, version_id, position, title, kind, needed_for, times_required, guidance, material_url, material_file_id, evidence_expiry, evidence_file,
-        form_id, max_attempts, retry_after, show_answers, source_id, source_params, carries_step_id)
+        form_id, max_attempts, retry_after, show_answers, source_id, source_params, qualifications, other_qualification, carries_step_id)
       SELECT j.value ->> 'id', ?, j.value ->> 'position', j.value ->> 'title', j.value ->> 'kind', j.value ->> 'neededFor', j.value ->> 'timesRequired', j.value ->> 'guidance',
         j.value ->> 'materialUrl', j.value ->> 'materialFileId', j.value ->> 'evidenceExpiry', j.value ->> 'evidenceFile',
-        j.value ->> 'formId', j.value ->> 'maxAttempts', j.value ->> 'retryAfter', j.value ->> 'showAnswers', j.value ->> 'sourceId', j.value ->> 'sourceParams', j.value ->> 'carriesStepId'
+        j.value ->> 'formId', j.value ->> 'maxAttempts', j.value ->> 'retryAfter', j.value ->> 'showAnswers', j.value ->> 'sourceId', j.value ->> 'sourceParams',
+        j.value ->> 'qualifications', j.value ->> 'otherQualification', j.value ->> 'carriesStepId'
       FROM json_each(?) j`,
     params: [version.id, JSON.stringify(rows)],
   }).expect(rows.length)
@@ -199,13 +208,14 @@ export async function saveSteps(unit: UnitView, courseId: string, input: StepInp
   return ids
 }
 
-const NO_KIND_FIELDS = { evidenceExpiry: null, evidenceFile: null, formId: null, maxAttempts: null, retryAfter: null, showAnswers: null, sourceId: null, sourceParams: null }
+const NO_KIND_FIELDS = { evidenceExpiry: null, evidenceFile: null, formId: null, maxAttempts: null, retryAfter: null, showAnswers: null, sourceId: null, sourceParams: null, qualifications: null, otherQualification: null }
 
 interface StepDefaults { before: Map<string, Step>, defaultAttempts: number | null, defaultRetry: number, sourceParams?: Record<string, unknown> }
 
 /** The columns only one kind of step fills; every other kind leaves them empty. */
 function kindFields(step: StepInput, d: StepDefaults) {
-  if (step.kind === 'certificate') return { ...NO_KIND_FIELDS, evidenceExpiry: step.evidenceExpiry, evidenceFile: step.evidenceFile }
+  if (step.kind === 'certificate') return { ...NO_KIND_FIELDS, evidenceExpiry: step.evidenceExpiry, evidenceFile: step.evidenceFile, qualifications: JSON.stringify(step.qualifications), otherQualification: step.otherQualification ? 1 : 0 }
+  if (step.kind === 'declaration') return { ...NO_KIND_FIELDS, evidenceFile: step.evidenceFile, formId: step.formId ?? null }
   if (step.kind === 'quiz') return { ...NO_KIND_FIELDS, formId: step.formId, maxAttempts: step.maxAttempts === undefined ? d.defaultAttempts : step.maxAttempts, retryAfter: step.retryAfter ?? d.defaultRetry, showAnswers: step.showAnswers }
   if (step.kind === 'activity') return { ...NO_KIND_FIELDS, sourceId: step.sourceId, sourceParams: JSON.stringify(d.sourceParams) }
   return NO_KIND_FIELDS
@@ -238,9 +248,9 @@ export async function startVersion(unit: UnitView, courseId: string): Promise<st
   const steps = (await stepsOf(course.liveVersionId)).map(s => ({ ...s, newId: newId('tstp') }))
   unit.add({
     sql: `INSERT INTO training_course_steps (id, version_id, position, title, kind, needed_for, times_required, guidance, material_url, material_file_id, evidence_expiry, evidence_file,
-        form_id, max_attempts, retry_after, show_answers, source_id, source_params, carries_step_id)
+        form_id, max_attempts, retry_after, show_answers, source_id, source_params, qualifications, other_qualification, carries_step_id)
       SELECT j.value ->> 'newId', ?, s.position, s.title, s.kind, s.needed_for, s.times_required, s.guidance, s.material_url, s.material_file_id, s.evidence_expiry, s.evidence_file,
-        s.form_id, s.max_attempts, s.retry_after, s.show_answers, s.source_id, s.source_params, s.id
+        s.form_id, s.max_attempts, s.retry_after, s.show_answers, s.source_id, s.source_params, s.qualifications, s.other_qualification, s.id
       FROM json_each(?) j JOIN training_course_steps s ON s.id = j.value ->> 'id'`,
     params: [versionId, JSON.stringify(steps.map(s => ({ id: s.id, newId: s.newId })))],
   })
@@ -320,6 +330,12 @@ async function pinQuizzes(courseId: string, steps: Step[]): Promise<{ stepId: st
     if (!quiz?.marked)
       refuse('training.quiz.not-marked', `The quiz for "${step.title}" needs a published form, attached to this course, with correct answers and a pass mark.`, { status: 422, remedy: 'Set the answers and pass mark in the form, publish it, and attach it to the course.' })
     out.push({ stepId: step.id, versionId: quiz.versionId })
+  }
+  // A declaration's questions are pinned the same way, with no marking (V9).
+  for (const step of steps.filter(s => s.kind === 'declaration' && s.formId)) {
+    const form = await slotQuiz('training.declaration', courseId, step.formId!)
+    if (!form) refuse('training.declaration.form-unavailable', `The questions for "${step.title}" need a published form attached to this course.`, { status: 422, remedy: 'Publish the form and attach it to the course.' })
+    out.push({ stepId: step.id, versionId: form.versionId })
   }
   return out
 }
