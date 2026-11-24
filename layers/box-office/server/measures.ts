@@ -40,12 +40,16 @@ export async function countTickets(query: MeasureQuery, options: { where?: SQL, 
   const performances = measuredPerformances(query, performanceKeys(query.by))
   if (!performances) return 'unsupported'
   const filter = query.filter ? sql` AND ${keySql(query.filter.key)} IN (SELECT value FROM json_each(${JSON.stringify(query.filter.values)}))` : sql``
-  const columns = [...query.by.map((k, i) => sql`${keySql(k)} AS ${groupAs(i)}`), sql`${options.count ?? sql`count(*)`} AS value`]
-  const rows = await useDb().all<Record<string, unknown>>(sql`
-    SELECT ${sql.join(columns, sql`, `)}
-    FROM (${performances}) mp
+  return grouped(query, options.count ?? sql`count(*)`, sql`FROM (${performances}) mp
     JOIN box_office_tickets t ON t.performance_id = mp.performance_id${joins(query, options.uses ?? [])}
-    WHERE t.state = 'valid'${options.where ? sql` AND ${options.where}` : sql``}${filter}
+    WHERE t.state = 'valid'${options.where ? sql` AND ${options.where}` : sql``}${filter}`)
+}
+
+/** One value per group of the asked keys: `value` over the rows `from` reads. */
+async function grouped(query: MeasureQuery, value: SQL, from: SQL): Promise<{ rows: MeasureRow[] }> {
+  const columns = [...query.by.map((k, i) => sql`${keySql(k)} AS ${groupAs(i)}`), sql`${value} AS value`]
+  const rows = await useDb().all<Record<string, unknown>>(sql`
+    SELECT ${sql.join(columns, sql`, `)} ${from}
     ${query.by.length ? sql`GROUP BY ${sql.join(query.by.map((_, i) => groupAs(i)), sql`, `)}` : sql``}`)
   return { rows: rows.map(r => ({ keys: keysOf(query.by, r), value: Number(r.value ?? 0) })) }
 }
@@ -54,12 +58,7 @@ export async function countTickets(query: MeasureQuery, options: { where?: SQL, 
 export async function countCapacity(query: MeasureQuery): Promise<{ rows: MeasureRow[] } | 'unsupported'> {
   const performances = measuredPerformances(query, performanceKeys(query.by))
   if (!performances) return 'unsupported'
-  const columns = [...query.by.map((k, i) => sql`${keySql(k)} AS ${groupAs(i)}`), sql`coalesce(sum(b.capacity), 0) AS value`]
-  const rows = await useDb().all<Record<string, unknown>>(sql`
-    SELECT ${sql.join(columns, sql`, `)}
-    FROM box_office_pools b JOIN (${performances}) mp ON mp.performance_id = b.performance_id
-    ${query.by.length ? sql`GROUP BY ${sql.join(query.by.map((_, i) => groupAs(i)), sql`, `)}` : sql``}`)
-  return { rows: rows.map(r => ({ keys: keysOf(query.by, r), value: Number(r.value ?? 0) })) }
+  return grouped(query, sql`coalesce(sum(b.capacity), 0)`, sql`FROM box_office_pools b JOIN (${performances}) mp ON mp.performance_id = b.performance_id`)
 }
 
 /**
