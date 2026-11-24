@@ -90,6 +90,23 @@ import rotaGet from '../../server/api/front-of-house/rota.get'
 import performanceRotaGet from '../../server/api/front-of-house/performances/[id]/rota.get'
 import peopleSearch from '../../server/api/front-of-house/incident-people/index.get'
 import personRedact from '../../server/api/front-of-house/incident-people/[id]/redact.post'
+import crewCallsGet from '../../server/api/front-of-house/crew-calls/index.get'
+import crewCallsPost from '../../server/api/front-of-house/crew-calls/index.post'
+import crewCallGet from '../../server/api/front-of-house/crew-calls/[id]/index.get'
+import crewCallPatch from '../../server/api/front-of-house/crew-calls/[id]/index.patch'
+import crewCallState from '../../server/api/front-of-house/crew-calls/[id]/state.post'
+import crewCallMine from '../../server/api/front-of-house/crew-calls/[id]/mine.get'
+import perksGet from '../../server/api/front-of-house/crew-calls/[id]/perks/index.get'
+import perksPeople from '../../server/api/front-of-house/crew-calls/[id]/perks/people.get'
+import handoutsGet from '../../server/api/front-of-house/crew-calls/[id]/handouts/index.get'
+import handoutsPost from '../../server/api/front-of-house/crew-calls/[id]/handouts/index.post'
+import handoutUndo from '../../server/api/front-of-house/crew-calls/[id]/handouts/[handoutId]/undo.post'
+import handoutCalls from '../../server/api/front-of-house/handout-calls.get'
+import gridGet from '../../server/api/front-of-house/grid.get'
+import batchesGet from '../../server/api/front-of-house/batches/index.get'
+import batchesPost from '../../server/api/front-of-house/batches/index.post'
+import batchRemove from '../../server/api/front-of-house/batches/[id]/remove.post'
+import shiftCopy from '../../server/api/front-of-house/shifts/[id]/copy.post'
 import { call, inContext, person, rows, saveKey, server, setModule } from '../../../../tests/integration/helpers'
 
 export const handle = server({
@@ -180,6 +197,23 @@ export const handle = server({
   'POST /api/front-of-house/incidents/:id/actions/:actionId/resolve': actionResolve,
   'POST /api/front-of-house/incidents/:id/close': incidentClose,
   'POST /api/front-of-house/incidents/:id/reopen': incidentReopen,
+  'GET /api/front-of-house/crew-calls': crewCallsGet,
+  'POST /api/front-of-house/crew-calls': crewCallsPost,
+  'GET /api/front-of-house/crew-calls/:id': crewCallGet,
+  'PATCH /api/front-of-house/crew-calls/:id': crewCallPatch,
+  'POST /api/front-of-house/crew-calls/:id/state': crewCallState,
+  'GET /api/front-of-house/crew-calls/:id/mine': crewCallMine,
+  'GET /api/front-of-house/crew-calls/:id/perks': perksGet,
+  'GET /api/front-of-house/crew-calls/:id/perks/people': perksPeople,
+  'GET /api/front-of-house/crew-calls/:id/handouts': handoutsGet,
+  'POST /api/front-of-house/crew-calls/:id/handouts': handoutsPost,
+  'POST /api/front-of-house/crew-calls/:id/handouts/:handoutId/undo': handoutUndo,
+  'GET /api/front-of-house/handout-calls': handoutCalls,
+  'GET /api/front-of-house/grid': gridGet,
+  'GET /api/front-of-house/batches': batchesGet,
+  'POST /api/front-of-house/batches': batchesPost,
+  'POST /api/front-of-house/batches/:id/remove': batchRemove,
+  'POST /api/front-of-house/shifts/:id/copy': shiftCopy,
 })
 
 export type Person = ReturnType<typeof person>

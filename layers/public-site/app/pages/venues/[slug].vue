@@ -36,7 +36,7 @@ const { t } = useT()
 const { span } = useDates()
 const route = useRoute()
 const slug = computed(() => String(route.params.slug))
-const { data } = await useAPI<{ venue: Venue, productions: Listing[] }>(() => `/api/public-site/venues/${encodeURIComponent(slug.value)}`, { key: `public-site:venue:${slug.value}` })
+const { data } = await useAPI<{ venue: Venue, productions: Listing[], sections?: { id: string, component: string }[] }>(() => `/api/public-site/venues/${encodeURIComponent(slug.value)}`, { key: `public-site:venue:${slug.value}` })
 if (!data.value) throw createError({ statusCode: 404, statusMessage: t('public-site.venue.not-found'), fatal: true })
 const venue = computed(() => data.value!.venue)
 const productions = computed(() => data.value?.productions ?? [])
@@ -213,6 +213,11 @@ useHead(() => ({
           {{ t('public-site.venue.nothing-on') }}
         </p>
       </section>
+
+      <PublicSiteAddedSections
+        :sections="data?.sections ?? []"
+        :subject="{ venueId: venue.id }"
+      />
     </UPage>
   </UContainer>
 </template>

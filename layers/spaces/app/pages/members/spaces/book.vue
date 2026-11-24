@@ -19,6 +19,7 @@ interface Check {
   nearest: { startsAt: number, endsAt: number } | null
   waiting: number
   overridden: string[]
+  bumps: boolean
 }
 interface Occurrence { date: string, startsAt: number | null, endsAt: number | null, outcome: 'confirm' | 'request' | 'refused', rule: string | null, code: string | null, reason: string | null }
 interface SeriesCheck { occurrences: Occurrence[], needsDecision: boolean }
@@ -196,7 +197,7 @@ function toggleLeftOut(date: string, out: boolean | 'indeterminate') {
   leftOut.value = out === true ? [...leftOut.value, date] : leftOut.value.filter(d => d !== date)
 }
 
-const OVERRIDABLE = ['P5', 'P6', 'P7', 'P8', 'P9']
+const OVERRIDABLE = ['P5', 'P6', 'P7', 'P8', 'P9', 'B3']
 const mayOverride = computed(() => !!bookable.value?.override && (form.overrideReason.length > 0
   || !!check.value?.overridden.length || (check.value?.outcome === 'refused' && OVERRIDABLE.includes(check.value.rule ?? ''))
   || !!series.value?.occurrences.some(o => o.outcome === 'refused' && OVERRIDABLE.includes(o.rule ?? ''))))
@@ -208,9 +209,10 @@ const verdict = computed(() => {
     return { color: 'error' as const, icon: 'i-lucide-circle-x', title: c.reason ?? t('spaces.book.refused'), description: c.remedy ?? undefined }
   }
   if (c.outcome === 'request') {
-    const title = c.external ? t('spaces.book.will-ask-elsewhere') : t('spaces.book.will-request')
+    const title = c.bumps ? t('spaces.book.will-bump', { count: c.blockers.length }) : c.external ? t('spaces.book.will-ask-elsewhere') : t('spaces.book.will-request')
     const waiting = c.waiting ? t('spaces.book.waiting', { count: c.waiting }) : undefined
-    return { color: 'warning' as const, icon: 'i-lucide-hourglass', title, description: [bookable.value?.approvalNote, waiting].filter(Boolean).join(' ') || undefined }
+    const overriding = c.overridden.length ? t('spaces.book.overriding') : undefined
+    return { color: 'warning' as const, icon: 'i-lucide-hourglass', title, description: [bookable.value?.approvalNote, waiting, overriding].filter(Boolean).join(' ') || undefined }
   }
   return { color: 'success' as const, icon: 'i-lucide-circle-check', title: t('spaces.book.will-confirm'), description: c.overridden.length ? t('spaces.book.overriding') : undefined }
 })

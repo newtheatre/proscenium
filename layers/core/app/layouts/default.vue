@@ -12,7 +12,11 @@ const { data: settings } = await usePublicSettings()
 const name = computed(() => brand.value?.name ?? t('core.public.default-name'))
 // The heading font is the public shell's alone (main.css); the staff shells stay calm.
 useHead({ bodyAttrs: { class: 'public-shell' } })
+// A module's entries come first while it reshapes the site (C-72), such as a festival's Events and Venues.
+const shape = usePublicShape()
+const added = (entries: PublicMenuEntry[] | undefined) => (entries ?? []).map(e => ({ label: t(e.labelKey), to: e.to }))
 const links = computed(() => [
+  ...added(shape.value?.menu),
   { label: t('core.public.whats-on'), to: '/whats-on' },
   // The archive of past shows, unless the theatre keeps it private (public-site.archive.public).
   ...(settings.value?.['public-site.archive.public']?.value === true ? [{ label: t('core.public.past-shows'), to: '/shows' }] : []),
@@ -42,6 +46,7 @@ const headerItems = computed(() => headerNames.value.flatMap((name) => {
 // own), so a new policy is linked without anyone editing the menu.
 const { data: policies } = await useAPI<{ policies: { id: string, title: string }[] }>('/api/core/policies', { key: 'core:policies', default: () => ({ policies: [] }) })
 const footer = computed(() => [
+  ...added(shape.value?.footer).map(l => ({ ...l, target: undefined })),
   ...(navigation.value?.footer ?? []).map(l => ({ label: l.label, to: l.to, target: /^https:/.test(l.to) ? '_blank' : undefined })),
   ...(policies.value?.policies ?? []).map(p => ({ label: p.title, to: `/policies/${p.id}`, target: undefined })),
 ])
