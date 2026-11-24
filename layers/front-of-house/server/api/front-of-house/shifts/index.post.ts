@@ -17,5 +17,6 @@ export default defineRoute({
     endsAt: z.number().int().positive(),
     briefing: z.string().trim().max(1000).nullish(), // not-policy: shape bound, as the table's CHECK
     signUp: z.boolean().optional(),
+    crewCallId: z.string().min(1).max(40).nullish(), // not-policy: shape bound
   }).strict(),
 }, async (_event, { input, unit }) => ({ shiftId: await addOccasionShift(unit.view(), input) }))
