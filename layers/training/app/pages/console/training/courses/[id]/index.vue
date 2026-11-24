@@ -1,6 +1,6 @@
 <!-- K2 A course (training-records part 5, "Console"): the state as a badge, the live version, how long
      training lasts, holders, those lapsing soon and the next session above the tabs Steps, Versions,
-     Trainers and the forms its quizzes and declarations use. Publish while a version is in preparation; otherwise "Edit steps" starts the next. -->
+     Sessions, Trainers and the forms its quizzes and declarations use. Publish while a version is in preparation; otherwise "Edit steps" starts the next. -->
 <script setup lang="ts">
 import type { CourseView } from '../../../../../composables/useCourseRecord'
 
@@ -16,6 +16,7 @@ const trail = computed(() => [{ label: t('training.navigation.courses.label'), t
 const tabs = computed(() => [
   { id: 'steps', label: t('training.course-record.tab.steps') },
   { id: 'versions', label: t('training.course-record.tab.versions') },
+  ...(data.value?.actions.manage ? [{ id: 'sessions', label: t('training.course-record.tab.sessions') }] : []),
   { id: 'trainers', label: t('training.course-record.tab.trainers') },
   ...(data.value?.actions.manage ? [{ id: 'forms', label: t('training.course-record.tab.forms') }] : []),
 ])
@@ -70,6 +71,13 @@ const shown = computed(() => data.value?.preparing
         </template>
         <template #tab-versions>
           <TrainingVersionList :versions="d.versions" />
+        </template>
+        <template #tab-sessions>
+          <TrainingCourseSessionsTab
+            :course-id="d.course.id"
+            :live="d.course.status === 'live'"
+            :manage="d.actions.manage"
+          />
         </template>
         <template #tab-trainers>
           <TrainingTrainers
