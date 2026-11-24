@@ -39,7 +39,7 @@ export function useSessionPlace(data: Ref<SessionView | undefined>, refresh: () 
     if (!d || d.session.status !== 'published') return null
     const { session, mine, times } = d
     if (mine && (mine.state === 'waiting' || (mine.state === 'booked' && now.value < times.cancelUntil)))
-      return { label: t(mine.state === 'waiting' ? 'training.session.leave-waiting' : 'training.session.cancel'), icon: 'i-lucide-calendar-x', run: () => run(`/api/training/places/${encodeURIComponent(mine.id)}/cancel`, t('training.session.cancelled')) }
+      return { label: t(mine.state === 'waiting' ? 'training.session.leave-waiting' : 'training.session.cancel'), icon: 'i-lucide-calendar-x', quiet: true, run: () => run(`/api/training/places/${encodeURIComponent(mine.id)}/cancel`, t('training.session.cancelled')) }
     if (mine || !d.actions.book || session.signUp !== 'open' || now.value >= times.signUpClosesAt) return null
     if (session.placesTaken < session.capacity)
       return { label: t('training.session.sign-up'), icon: 'i-lucide-calendar-plus', run: () => run(`/api/training/sessions/${encodeURIComponent(session.id)}/places`, t('training.session.signed-up')) }

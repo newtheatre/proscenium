@@ -68,6 +68,8 @@ const trail = computed(() => [
             v-if="action"
             :icon="action.icon"
             :label="action.label"
+            :color="'quiet' in action ? 'neutral' : undefined"
+            :variant="'quiet' in action ? 'outline' : undefined"
             loading-auto
             @click="action.run"
           />

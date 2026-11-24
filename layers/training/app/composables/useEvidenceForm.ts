@@ -27,7 +27,8 @@ export function useEvidenceForm(courseId: Ref<string>, step: Ref<EvidenceStep | 
     expiry: certificate.value && step.value?.action.expiry !== 'none',
     otherQualification: !listed.value.length || form.qualification === OTHER,
   }))
-  watch(step, () => Object.assign(form, blank()))
+  // With one qualification and nothing else on offer, it is already chosen.
+  watch(step, () => Object.assign(form, blank(), qualificationItems.value.length === 1 ? { qualification: qualificationItems.value[0]!.value } : {}), { immediate: true })
 
   const check = () => needs({
     ...(certificate.value
