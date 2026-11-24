@@ -5,7 +5,6 @@ import { refDebounced } from '@vueuse/core'
 import type { DonationLine } from '../../../../composables/useDonationText'
 
 const { t } = useT()
-const text = useDonationText()
 const query = ref('')
 const searching = ref(false)
 const fundId = ref<string | undefined>(undefined)
@@ -62,25 +61,11 @@ const stateItems = computed(() => ['pending', 'abandoned', 'refunded'].map(s => 
         :title="t('fundraising.donations.empty')"
         :description="t('fundraising.donations.empty-help')"
       />
-      <RecordList
+      <FundraisingDonationList
         v-else
+        :donations="data.donations"
         :label="t('fundraising.navigation.donations.label')"
-      >
-        <RecordListItem
-          v-for="d in data.donations"
-          :key="d.id"
-          :to="`/console/fundraising/donations/${d.id}`"
-          icon="i-lucide-hand-heart"
-          :name="text.name(d)"
-          :description="text.line(d)"
-        >
-          <StatusBadge
-            v-if="d.state !== 'received'"
-            :tone="text.state(d).tone"
-            :label="text.state(d).label"
-          />
-        </RecordListItem>
-      </RecordList>
+      />
     </DataBoundary>
   </PageFrame>
 </template>
