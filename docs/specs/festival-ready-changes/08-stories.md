@@ -98,3 +98,22 @@ credits from "Line-up and credits" in its menu on the production's Dates tab. Th
 announced acts under each date, that date's credits, and "Also appearing in" on an act's own page.
 Removing an act removes its credits; LU5 and LU6 needed no new code (the foreign keys cascade from a
 deleted draft, and `core.production-team` reads every credit).
+
+C-60 (24 November 2026): `core_collections`, `core_collection_productions` and
+`core_collection_slugs` (migration `collections`; old addresses of a collection that has been public
+redirect, as productions' do). Services in `layers/core/server/programme/collections.ts`:
+`listCollections`, `getCollection`, `collectionsFor` (one bound parameter whatever the number of
+ids), `publicCollection`, and the writes behind `/api/core/collections` (ability
+`core.collection.manage`, on `core.collection`). CL1 is a predicate on every insert, including
+`createProduction`'s `collectionIds`, and on a production's season change
+(`core.production.in-season-collection`, remedy "Remove it from StageFest first"). CL4 copies
+standing collections when a production is duplicated. Events `core.collection.published` and
+`core.collection.changed` (payload `addedIds`, `removedIds`, as the kit names lists of ids).
+Screens: Programme > Collections (list and record page with members dragged into order), a
+picker on a production's Details tab, chips on the public production page, and
+`/collections/<slug>`. `/collections`, `/seasons` and `/venues` are now reserved prefixes.
+Differences from the spec: the colour check is that white or near-black text reads on it at 4.5:1
+(chips and timetable blocks carry text), not a check against the brand's surfaces; the ability is
+in the Producer role template, as there is no communications-officer template. Owed: uploading the
+collection's image in the console (the slot `core.collection-image` is declared and the public page
+reads it).

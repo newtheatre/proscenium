@@ -17,7 +17,7 @@ Companies requires only Finance and Payments, and reaches every other module thr
 
 ## Fact
 
-**`companies.contact-of`**, record-scoped. True for an account that is a live contact (no `ended_at`) of: the company itself (scope `companies.company`); the company of a live engagement (scope `companies.engagement`); the company of the live engagement on a production (scope `core.production`, and so its performances). Recomputed in the batch that adds or ends a contact or links an engagement.
+**`companies.contact-of`**, record-scoped. True for an account that is a live contact (no `ended_at`) of: the company itself (scope `companies.company`); the company of a live engagement (scope `companies.engagement`); the company of the live engagement on a production (scope `core.production`, and so its performances). Read from the contacts table on every check, through the account scope, so it changes with the batch that adds or ends a contact or links an engagement; nothing is stored to fall out of date.
 
 Defaults offered to the theatre (Identity's fact mapping), replacing the `visiting-company` grant that Box office's part 6 names: on a production, `box-office.report.view` and `finance.ledger.view`; on an engagement, `companies.engagement.view-own`, `companies.guest.name`, `companies.people.manage-own`, `companies.agreement.answer`, `companies.settlement.answer`. Productions maps `productions.task.view` and its show-report view to the same fact (agreed with spec 4).
 
@@ -48,7 +48,7 @@ For modules that list `companies` in `requires`. None of this round's specs does
 | Point | Kind | Contract | Contributors agreed |
 | --- | --- | --- | --- |
 | `companies.engagement-panel` | code | `{ id, label, order, appliesTo(engagement), component }`; shown on the contact's engagement page and the staff engagement page | Festival ("Festival information"), Productions (tasks, show reports) |
-| `companies.guest-issuer` | code | `{ hold(unit, performanceId, places, label) -> holdRef, issue(unit, holdRef, accountId, places) -> orderRef, withdraw(unit, orderRef), release(unit, holdRef, places) }` | Box office (new contribution, BO-75) |
+| `companies.guest-issuer` | code | `{ hold(unit, performanceId, places, label) -> holdRef, issue(unit, holdRef, accountId, places) -> orderRef, withdraw(unit, orderRef), release(unit, holdRef, places) }` | Box office (new contribution, BO-75; `issue` built with CO-04, the rest with CO-26 and CO-27) |
 | `companies.hire-source` | code | `{ bookingsFor(engagementId) -> [{ bookingId, spaceId, startsAt, endsAt, state }] }`; also says whether a booking may be linked | Spaces (amendment; part 9, Q4) |
 | `companies.settlement-note` | code | `{ id, lines(engagement) -> [{ label, amountMinor, currency, link }] }`; read only, never posted | Budgets (awards) |
 | `companies.settlement-charge` | code | `{ key, lines(engagement) -> [{ key, label, amountMinor, currency, sourceRef }], entries(unit, line) }`; the contributor posts the income side on its own accounts | Inventory (kit hire, later) |
@@ -132,7 +132,10 @@ Slot notices on publishing a season are Programme planning's, not these.
 | `GET/POST /api/companies` | `company.view` / `company.manage` | G1 |
 | `POST /api/companies/<id>/merge` | `company.merge` | G5 |
 | `POST /api/companies/<id>/contacts` | `contact.manage` | G2, G4 |
-| `GET/POST /api/companies/engagements` | `engagement.view` / `engagement.manage` | E1 to E6 |
+| `POST /api/companies/<id>/contacts/<contact>/end` | `contact.manage` | G4; the fact ends with the batch |
+| `POST /api/companies/<id>/engagements` | `engagement.manage` on the company | E1, E6 |
+| `GET /api/companies/engagements/<id>` | `engagement.view`, or `engagement.view-own` through the fact | The outline |
+| `POST /api/companies/engagements/<id>/<move>` | `engagement.manage` | E3, E5; `confirm` or `cancel` |
 | `POST /api/companies/engagements/<id>/agreements` | `agreement.manage` | A1, A2, A6 |
 | `POST /api/companies/agreements/<id>/answer` | `agreement.answer` (fact) or `agreement.record` | A3 |
 | `POST /api/companies/allocations/<id>/guests` | `guest.name` (fact) or `allocation.manage` | L2, L3 |

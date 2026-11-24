@@ -22,8 +22,19 @@ export interface PracticeSample {
   seed: (unit: UnitView, context: PracticeSampleContext) => Promise<Record<string, string> | undefined> | Record<string, string> | undefined
 }
 
+/** The change a check runs after: its path and what the route answered, for a task that leaves no row behind. */
+export interface PracticeAnswer {
+  path: string
+  body: unknown
+}
+
+export interface PracticeCheckContext extends PracticeSampleContext {
+  /** The marked change just made, or none when the checks run for another reason. */
+  answer?: PracticeAnswer
+}
+
 /** A scenario's checks, by task id: each reads the module's own tables in the store and answers true once the task is done. */
-export type PracticeChecks = Record<string, (context: PracticeSampleContext) => Promise<boolean> | boolean>
+export type PracticeChecks = Record<string, (context: PracticeCheckContext) => Promise<boolean> | boolean>
 
 export const definePracticeSample = (sample: PracticeSample): PracticeSample => sample
 export const definePracticeChecks = (checks: PracticeChecks): PracticeChecks => checks
