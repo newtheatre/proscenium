@@ -166,5 +166,8 @@
   "finance.screens.export.period-placeholder": "Any dates",
   "finance.screens.export.from": "First day",
   "finance.screens.export.to": "Last day",
-  "finance.screens.export.button": "Download CSV"
+  "finance.screens.export.button": "Download CSV",
+  "finance.screens.tax-code-select.usual": "Usual: {code}",
+  "finance.screens.tax-code-select.label": "Tax code",
+  "finance.screens.tax-code-select.help": "Prices include the VAT at this code."
 }

@@ -89,7 +89,7 @@ describe('tax on entries', () => {
     expect(account).toEqual({ kind: 'asset', module: 'finance' })
   })
 
-  it('refuses an unknown code, a stopped one, tax with none, and tax signed unlike its entry', async () => {
+  it('refuses an unknown code, tax with none, and tax signed unlike its entry; a stopped code stays on what uses it', async () => {
     const bad = (key: string, taxCode: string, taxMinor: number) => ({ ...vatSale(key, 100, 20), entries: [
       { account: { key: 'tickets.deferred' }, amountMinor: 120, forModule: 'tickets' },
       { account: { key: 'tickets.income' }, amountMinor: -100, forModule: 'tickets', taxCode, taxMinor },
@@ -97,7 +97,8 @@ describe('tax on entries', () => {
     ] })
     await expect(commit(unit => postEntries(unit.view(), bad('vat:x1', 'luxury', -20)))).rejects.toMatchObject({ code: 'finance.tax-code.missing' })
     await env.DB.prepare("UPDATE finance_tax_codes SET active = 0 WHERE code = 'reduced'").run()
-    await expect(commit(unit => postEntries(unit.view(), bad('vat:x2', 'reduced', -20)))).rejects.toMatchObject({ code: 'finance.tax-code.inactive' })
+    // A price set while the code was offered still sells, and refunds, after it stops being offered.
+    await commit(unit => postEntries(unit.view(), { ...bad('vat:x2', 'reduced', -20), occurredAt: NOV_21 + 10 * DAY }))
     await env.DB.prepare("UPDATE finance_tax_codes SET active = 1 WHERE code = 'reduced'").run()
     await expect(commit(unit => postEntries(unit.view(), bad('vat:x3', 'none', -20)))).rejects.toThrow(/code none/)
     await expect(commit(unit => postEntries(unit.view(), bad('vat:x4', 'standard', 20)))).rejects.toThrow(/signed unlike/)
