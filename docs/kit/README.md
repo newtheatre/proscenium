@@ -204,7 +204,10 @@ Any module may import core's services without listing core: `import { notifyAddr
   yours, with its starting terms, as a contribution to `core.vocabulary` (`id` is
   `<module>.<name>`); it is made the first time the module is on and from then on its terms are the
   theatre's. A record stores the term's id in a `col.ref('core_terms')` column, never the label.
-  `listTerms(key, { includeRetired? })` gives a picker's options in order; `getTerm(id)` gives a
+  `listTerms(key, { includeRetired?, group? })` gives a picker's options in order; `group` narrows
+  to the terms under one declared heading by its slug (made from the declared label, and kept when
+  the theatre renames the heading), which is how `core.department`'s kinds, `production` and
+  `organisation`, are read (R3-07); `getTerm(id)` gives a
   label for any term, retired or merged ones too; `assertTerm(id, key)` is the predicate to put on
   your own insert or update, then `.expect(1)`, so a retired term or one from another vocabulary
   is refused. Staff edit a module's terms on the Lists tab of its page in Admin
@@ -275,7 +278,11 @@ modules that need it, and no switch.
 (`RESERVED_MODULE_IDS` in the registry); listening to it or contributing to its points then does
 nothing. A record type may have no table and a fixed list of ids (`record({ ids: ['site'] })`). A
 fact resolver may give the accounts that hold it, `defineFact(resolve, { holders })`, read with
-`factHolders(name, record?)`; without it the fact cannot be enumerated. A `core.navigation` entry
+`factHolders(name, record?)`; without it the fact cannot be enumerated. A fact on a record type may
+say `pin: true`: the theatre can then map it to abilities for one named record of that type (Admin >
+Roles > Automatic access, "For one post only"), and the fact is judged against that record whatever
+record the ability is used on. The type's `core.record-resolver` offers the records to pick from
+with `choices(limit)`. A pinned mapping whose record has gone grants nothing and shows as broken. A `core.navigation` entry
 names a `menu` (account, members, console or live) and may set `hideEmpty` beside `count`; only an
 account entry may use the ability `'signed-in'`. A theatre's page may not sit under a reserved
 address prefix (`RESERVED_PREFIXES` in `scripts/checks/routes.ts`) or start with an underscore.
@@ -310,6 +317,31 @@ and audits the read. A met answer may also carry `holderAccountId`, the account 
 presented value belongs to (R-34). It is for the host's server code only: the property is not
 enumerable, so an answer turned into JSON (a route returning it, a summary, an event or job
 payload) leaves it out, and it is dropped from any verdict that is not met.
+
+## Figures
+
+A module answers figures about its own records through `core.measure`, one file per figure in
+`server/contributions/core.measure/<name>.ts`, listed in the manifest as
+`{ id: '<module>.<name>', file: '<name>' }`:
+`export default defineMeasure({ label, unit, combine, by, filters?, ability, read })`. `unit` is
+count, money, minutes or percent; `combine` is sum, distinct or level; `by` lists the breakdowns it
+answers, the shared ones (`performance`, `production`, `season`, `collection`, `venue`, `space`,
+`day`, `week`, `month`, `committee-year`) or the module's own `<module>.<noun>`; `filters` the keys
+it narrows by. `read(query)` answers `{ rows: [{ keys, value, currency? }] }` or `'unsupported'`.
+A ratio has no read: `ratio: { of, over }` names two figures and core divides them group by group,
+leaving out a group with nothing under it. The registry refuses a figure not named under its module,
+an ability nobody declares, another module's own key, and a ratio of a figure that does not exist or
+does not break down as the ratio does.
+
+Read a figure only through `readMeasure(id, { from, to, scope?, by, filter? }, actor?)` from
+`#modules/core`. It refuses an unknown figure, an undeclared breakdown or filter, more than two
+breakdowns, a filter of no values or more than twenty, and a reader without the figure's ability
+site-wide or on the scope record, all before the module is asked. It answers `{ state: 'ok', rows }`,
+`{ state: 'unsupported' }` or `{ state: 'unavailable', reason }`: the module is off, the read threw,
+it outlasted `core.measures.read-budget`, or its answer held anything but asked keys and numbers (an
+account id, a stray field, money without a currency, a count with one). A bad answer is logged with
+the rule it broke, never the row. Unavailable is shown as unavailable, never as nought.
+`listMeasures(actor?)` lists the figures a reader may read somewhere.
 
 ## Email outcomes
 

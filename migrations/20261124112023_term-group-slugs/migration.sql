@@ -1,0 +1,1 @@
+ALTER TABLE `core_term_groups` ADD `slug` text;
