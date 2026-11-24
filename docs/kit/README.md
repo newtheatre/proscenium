@@ -609,6 +609,15 @@ markup only where Nuxt UI has nothing suitable. The core layer registers the mod
 Icons are bundled at build time, so nothing is fetched from Iconify while the Worker runs.
 Shells, page types and the navigation declaration are in [interface.md](interface.md).
 
+## Practice stores
+
+`PracticeStore` (`#kit/practice/store`) is a SQLite-backed Durable Object, one per person, made from
+the same migration bundle as D1. `storeDatabase(stub)` (`#kit/practice/database`) wraps its stub as
+a D1Database: `prepare`, `bind`, `run`, `all`, `first`, `raw` and `batch` behave as D1's, `batch`
+commits whole or not at all, and results carry D1's `meta`, `changes` included. Run the kit against
+a store by putting it in the context's env as `DB`. `destroy()` deletes everything the store holds.
+Proof P-PM-1 is in `tests/integration/practice-store.test.ts`.
+
 ## Testing
 
 Unit tests run in Node; integration tests run in workerd with a local D1, using the fixture
