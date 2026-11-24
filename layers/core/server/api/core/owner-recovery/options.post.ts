@@ -4,7 +4,7 @@ import { defineRoute } from '#kit'
 import { ownerByAddress, requireRecoverySecret } from '../../../identity/owner-recovery'
 import { registrationOptions } from '../../../identity/passkeys'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   public: true,
   rateLimit: 'sign-in',
   input: z.object({ secret: z.string().max(500), address: z.email().max(254) }), // not-policy: lengths that fit any secret and address

@@ -1,6 +1,6 @@
 // Sending job messages to the two lanes. The job row is the truth (J1): a message only says "look
 // at this job", so a lost message is recovered by the sweep and a duplicate is claimed once.
-import { useContext } from './context'
+import { runInContext, useContext } from './context'
 import { log } from './log'
 
 export type Lane = 'prompt' | 'bulk'
@@ -19,6 +19,7 @@ const MAX_BATCH = 100 // not-policy: the most messages Cloudflare Queues takes i
 
 export async function dispatch(messages: JobMessage[]): Promise<void> {
   if (!messages.length) return
+  if (useContext().practice) return runInStore(messages)
   if (override) return override(messages)
   const env = useContext().env
   for (const lane of ['prompt', 'bulk'] as const) {
@@ -40,4 +41,31 @@ export async function dispatch(messages: JobMessage[]): Promise<void> {
       }
     }
   }
+}
+
+let runJob: ((jobId: string) => Promise<unknown>) | undefined
+
+/** How a job is run in a store: jobs.ts says so when it loads, so this file never imports it. */
+export function setStoreJobRunner(runner: (jobId: string) => Promise<unknown>): void {
+  runJob = runner
+}
+
+/**
+ * In practice a job runs in the store after the response, under the same session (O4): nothing
+ * reaches the real queues. A delayed job waits for the trainee's "Run now" instead.
+ */
+async function runInStore(messages: JobMessage[]): Promise<void> {
+  const { env, practice, waitUntil } = useContext()
+  if (!runJob) throw new Error('No job runner: jobs.ts has not loaded')
+  const run = runJob
+  const due = messages.filter(m => !m.delaySeconds)
+  const running = (async () => {
+    for (const message of due) {
+      await runInContext({ env, practice, actor: { kind: 'job' }, cache: {} }, () => run(message.jobId))
+        .catch(error => log.error('core.practice.job-failed', { jobId: message.jobId, error: String((error as Error)?.message ?? error) }))
+    }
+  })()
+  // After the response where the platform allows it; a test, with no waitUntil, sees them done.
+  if (waitUntil) waitUntil(running)
+  else await running
 }
