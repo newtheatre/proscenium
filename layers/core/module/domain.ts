@@ -233,6 +233,7 @@ export const points = {
    * the account asked, with public-safe titles (CF4). Served by the calendar-feed module.
    */
   'core.calendar-feed': point({ kind: 'code', contract: 'calendar-feed', publicSafe: true }),
+  /**
    * Whether people are committed elsewhere in a window (C-66): each contributor answers only about
    * the accounts asked, with a translation key rather than words. Read through the person-busy module.
    */
