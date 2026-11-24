@@ -32,7 +32,7 @@ export default defineModule({
 
   records: defineRecords('availability', {
     request: { table: 'availability_requests' },
-    poll: { table: 'availability_finds' },
+    find: { table: 'availability_finds' },
   }),
 
   abilities: defineAbilities('availability', {
@@ -67,7 +67,7 @@ export default defineModule({
       { id: 'availability.find', menu: 'members', to: '/members/find-a-time', icon: 'i-lucide-calendar-search', ability: 'availability.find.use', order: 46 },
       { id: 'availability.requests', menu: 'members', to: '/members/find-a-time/requests', icon: 'i-lucide-send', ability: 'availability.request.send', order: 47 },
     ],
-    'core.record-resolver': [{ id: 'availability.request', file: 'request' }, { id: 'availability.poll', file: 'poll' }],
+    'core.record-resolver': [{ id: 'availability.request', file: 'request' }, { id: 'availability.find', file: 'find' }],
     'core.notification-type': [{
       id: 'availability.request-opened',
       category: 'transactional' as const,
