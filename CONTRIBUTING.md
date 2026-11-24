@@ -86,6 +86,7 @@ what to do instead, because that sentence is what the next person, or agent, act
 
 CI also ratchets quality metrics: complexity, file and function length, import cycles, type coverage
 and test coverage may not get worse than the committed baseline. Fixing one shrinks the baseline.
+[docs/quality.md](docs/quality.md) explains each limit and how to move a baseline.
 
 ## Testing
 
