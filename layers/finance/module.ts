@@ -23,6 +23,8 @@ export default defineModule({
     'tax.number': setting.custom({ schema: z.string().regex(/^GB(\d{9}|\d{12})$/), unset: true, change, audience: 'staff', onChange: 'confirm' }),
     // Standard accounting counts VAT when it is invoiced; cash accounting when it is paid (I-46).
     'tax.scheme': setting.choice({ default: 'standard', options: ['standard', 'cash'], change, audience: 'staff', onChange: 'confirm' }),
+    // The code a bar product or ticket type sells at when it names none (FIN-07). Read only while registered.
+    'tax.default-code': setting.custom({ schema: z.string().regex(/^[a-z][a-z0-9-]{0,31}$/), default: 'standard', change, audience: 'staff', onChange: 'confirm' }),
   }),
   // A theatre registers for VAT with its number (F-A2).
   settingRules: defineSettingRules('finance', [{ id: 'tax-number-needed', check: s => s['tax.registered'] !== true || typeof s['tax.number'] === 'string' }]),

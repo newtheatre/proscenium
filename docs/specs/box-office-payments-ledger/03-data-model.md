@@ -145,6 +145,7 @@ Who a ticket is for: "Full price", "Concession", "Companion". Site-wide, so repo
 | `proof_note` | text | shown to the buyer and the door, such as "Bring student ID" | Public | keep |
 | `needs_paid_ticket` | integer | boolean; a companion ticket needs a paid ticket in the same order | Internal | keep |
 | `active` | integer | boolean | Internal | keep |
+| `tax_code` | text | BO-78: null, or the Finance tax code its prices include; null follows `finance.tax.default-code`. Offered only while the theatre is registered for VAT | Internal | keep |
 | `managed_by` | text | null, or `<module>.<id>` for a type a module declares through `box-office.ticket-type` (part 5); unique when set. Its kind, requirements, `needs_paid_ticket`, `max_per_holder` and `recheck_at_entry` follow the declaration. Companion and complimentary types exist only this way | Internal | keep |
 | `sort` | integer | default 0; the order every list shows types in, the name breaking a tie. Set by dragging rows on the Ticket types screen, saved whole through `PUT /api/box-office/ticket-types/order`; a new type goes last | Internal | keep |
 
@@ -764,6 +765,8 @@ Closing is a row, not a flag. The newest row for a period says whether it is clo
 Rows shipped (amendment F-A2, Invoices and exports part 4): `none` (no tax), `standard` (2000 basis points), `reduced` (500), `zero`, `exempt` and `outside`. A trigger refuses changing a code's code, rate or scope once any entry uses it, and refuses deleting a used code; `none` never changes. A new rate is a new code, and the old one is made inactive. The Tax codes screen (Admin, Modules, Finance) adds and changes codes under `finance.settings.manage`.
 
 An entry's `tax_code` and `tax_minor` describe its net amount: `tax_minor` is the VAT on it, signed like the entry, and the VAT itself is a separate entry on Finance's own accounts `finance.vat-output` (liability) and `finance.vat-input` (asset), written with `for_module` = `finance`. Other modules read tax through `taxTotals(range)` and entry rows through `entryRows(range, { afterId, limit })`, never from these tables.
+
+VAT on sales (FIN-07, stories BO-78 and BAR-60). Till and ticket prices include VAT. An owner's settle, kept or refund entries name the tax code inside them (`OwnerEntry.taxCode`), and Payments splits them through Finance's `splitVat`: each entry becomes its net amount with the VAT as its `tax_minor`, and one entry per code goes on `finance.vat-output` (sales and refunds) or `finance.vat-input` (money paid out). A bar product or ticket type names its code, or follows `finance.tax.default-code`; a pass sold and a cheaper exchange's difference follow the usual code. While `finance.tax.registered` is off no code is recorded at all. Deferred ticket income therefore holds money without its VAT: Box office grosses it up at each code when deciding how much of a refund comes off deferred income, and its own transfers (a cancellation fee kept, an exchange carried to another performance, a ticket's money moved onto a pass) move net amounts, since the VAT was accounted for when the ticket was paid. A stopped code stays on what uses it, so postings accept any known code; only the screens stop offering it.
 
 ## Where the lessons came from
 
