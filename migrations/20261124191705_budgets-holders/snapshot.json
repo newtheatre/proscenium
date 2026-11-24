@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ac040dfc-a52e-4f98-9b99-f5362793e1e0",
+  "id": "e9545f8c-d11e-47dd-b89c-76e384ab9829",
   "prevIds": [
-    "ba15cf3a-6c90-4ca6-8ac2-f64a13a9304b"
+    "112b3bb5-4e73-4f6b-bf58-adb7fe0dff70"
   ],
   "ddl": [
     {
@@ -203,6 +203,10 @@
       "entityType": "tables"
     },
     {
+      "name": "box_office_headcount_taps",
+      "entityType": "tables"
+    },
+    {
       "name": "box_office_holds",
       "entityType": "tables"
     },
@@ -303,6 +307,62 @@
       "entityType": "tables"
     },
     {
+      "name": "calendar_feed_tokens",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_agreement_responses",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_agreements",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_allocations",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_calls",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_companies",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_contacts",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_engagement_events",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_engagements",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_guests",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_people",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_settlement_lines",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_settlement_payments",
+      "entityType": "tables"
+    },
+    {
+      "name": "companies_settlements",
+      "entityType": "tables"
+    },
+    {
       "name": "core_access_profiles",
       "entityType": "tables"
     },
@@ -344,6 +404,18 @@
     },
     {
       "name": "core_closures",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_collection_productions",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_collection_slugs",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_collections",
       "entityType": "tables"
     },
     {
@@ -460,6 +532,10 @@
     },
     {
       "name": "core_performance_effect_exceptions",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_performance_line_ups",
       "entityType": "tables"
     },
     {
@@ -660,10 +736,6 @@
     },
     {
       "name": "front_of_house_assignments",
-      "entityType": "tables"
-    },
-    {
-      "name": "front_of_house_calendar_feeds",
       "entityType": "tables"
     },
     {
@@ -5853,6 +5925,116 @@
       "entityType": "columns"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "reverses_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "reason_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "tapped_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "device_label",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "tapped_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "received_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "offline",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "box_office_holds",
       "name": "id",
       "type": "text",
@@ -8873,6 +9055,1736 @@
       "entityType": "columns"
     },
     {
+      "table": "calendar_feed_tokens",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "token_hash",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "generation",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreement_responses",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreement_responses",
+      "name": "agreement_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreement_responses",
+      "name": "answer",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreement_responses",
+      "name": "responder_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreement_responses",
+      "name": "on_behalf_of",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreement_responses",
+      "name": "recorded_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreement_responses",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreement_responses",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "engagement_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "version",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "supersedes_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "deal_type",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "company_share_bp",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "share_basis",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "guarantee_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "hire_fee_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "hire_fee_basis",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "deposit_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "guest_places",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "guest_names_due",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "settle_within",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "clauses",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "file_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "sent_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "engagement_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "places",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "named",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "hold_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "names_due_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'open'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_calls",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_calls",
+      "name": "engagement_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_calls",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_calls",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_calls",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_calls",
+      "name": "ends_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_calls",
+      "name": "label",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_calls",
+      "name": "notes",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_calls",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_calls",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "public_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "legal_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "registration",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "tax_number",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "address",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "postcode",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "country",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "invoice_email",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "website",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "individual",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "individual_account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "data_class",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'public'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "notes",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "archived_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "merged_into_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_companies",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "company_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "role",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "is_primary",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "receives",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "day_phone",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "ended_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "added_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "engagement_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "from_state",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "to_state",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "detail",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "actor_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "company_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "season_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'enquiry'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "venue_contact_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "tech_notes",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "arrival_notes",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "rider_file_ids",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "deposit_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "deposit_state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'none'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "deposit_intent_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "source_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "cancel_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_guests",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_guests",
+      "name": "allocation_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_guests",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_guests",
+      "name": "places",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_guests",
+      "name": "order_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_guests",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'named'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_guests",
+      "name": "named_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_guests",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_guests",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_people",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_people",
+      "name": "engagement_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_people",
+      "name": "account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_people",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_people",
+      "name": "role",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_people",
+      "name": "under_18",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_people",
+      "name": "added_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_people",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_people",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "settlement_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "label",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "source_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "posts",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "settlement_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "direction",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "method",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "reference",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "intent_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "posting_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "recorded_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "engagement_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "version",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "supersedes_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "agreement_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "statement_as_of",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "gross_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "fees_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "refunds_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "basis_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "balance_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "proposed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "query_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "queried_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "prepared_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "approved_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "agreed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "posting_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "invoice_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_access_profiles",
       "name": "account_id",
       "type": "text",
@@ -10014,6 +11926,176 @@
     },
     {
       "table": "core_closures",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_productions",
+      "name": "collection_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_productions",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_productions",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_slugs",
+      "name": "slug",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_slugs",
+      "name": "collection_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collection_slugs",
+      "name": "retired_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "summary",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "colour",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "season_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_collections",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -12323,6 +14405,116 @@
       "entityType": "columns"
     },
     {
+      "table": "core_performance_line_ups",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "announced",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_performance_runs",
       "name": "id",
       "type": "text",
@@ -12694,6 +14886,16 @@
     },
     {
       "table": "core_performances",
+      "name": "shape",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'timed'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -12959,6 +15161,26 @@
       "notNull": true,
       "autoincrement": false,
       "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "line_up_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -17265,46 +19487,6 @@
     {
       "table": "front_of_house_assignments",
       "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "account_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "token_hash",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "generation",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "1",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "created_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -27573,6 +29755,38 @@
       "entityType": "indexes"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_performance",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "tapped_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_reverses",
+      "columns": [
+        {
+          "value": "reverses_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "reverses_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "box_office_holds",
       "name": "box_office_holds_order",
       "columns": [
@@ -28463,6 +30677,336 @@
       "entityType": "indexes"
     },
     {
+      "table": "calendar_feed_tokens",
+      "name": "calendar_feed_tokens_token",
+      "columns": [
+        {
+          "value": "token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_agreement_responses",
+      "name": "companies_agreement_responses_once",
+      "columns": [
+        {
+          "value": "agreement_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "companies_agreements_version",
+      "columns": [
+        {
+          "value": "engagement_id",
+          "isExpression": false
+        },
+        {
+          "value": "version",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "companies_allocations_performance",
+      "columns": [
+        {
+          "value": "engagement_id",
+          "isExpression": false
+        },
+        {
+          "value": "performance_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_calls",
+      "name": "companies_calls_engagement",
+      "columns": [
+        {
+          "value": "engagement_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": "archived_at IS NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "companies_contacts_live",
+      "columns": [
+        {
+          "value": "company_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "ended_at IS NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "companies_contacts_primary",
+      "columns": [
+        {
+          "value": "company_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "ended_at IS NULL AND is_primary = 1",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "companies_contacts_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "companies_engagement_events_engagement",
+      "columns": [
+        {
+          "value": "engagement_id",
+          "isExpression": false
+        },
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "production_id IS NOT NULL AND state <> 'cancelled'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_source",
+      "columns": [
+        {
+          "value": "source_ref",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "source_ref IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_company",
+      "columns": [
+        {
+          "value": "company_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_season",
+      "columns": [
+        {
+          "value": "season_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_guests",
+      "name": "companies_guests_allocation",
+      "columns": [
+        {
+          "value": "allocation_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_guests",
+      "name": "companies_guests_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_people",
+      "name": "companies_people_engagement",
+      "columns": [
+        {
+          "value": "engagement_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "companies_settlement_lines_settlement",
+      "columns": [
+        {
+          "value": "settlement_id",
+          "isExpression": false
+        },
+        {
+          "value": "sort",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "companies_settlement_payments_settlement",
+      "columns": [
+        {
+          "value": "settlement_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "companies_settlements_version",
+      "columns": [
+        {
+          "value": "engagement_id",
+          "isExpression": false
+        },
+        {
+          "value": "version",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "companies_settlements_current",
+      "columns": [
+        {
+          "value": "engagement_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "state NOT IN ('superseded', 'void')",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_account_emails",
       "name": "core_account_emails_address",
       "columns": [
@@ -28697,6 +31241,48 @@
       ],
       "isUnique": true,
       "where": "\"core_closures\".\"feed_ref\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_collection_productions",
+      "name": "core_collection_productions_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_slug",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -29183,6 +31769,56 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_order",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "sort",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_once",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"core_performance_line_ups\".\"production_id\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_performance_runs",
       "name": "core_performance_runs_production",
       "columns": [
@@ -29391,6 +32027,20 @@
       ],
       "isUnique": false,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_performance",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "\"core_production_credits\".\"performance_id\" IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -30536,20 +33186,6 @@
         }
       ],
       "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "front_of_house_calendar_feeds_token",
-      "columns": [
-        {
-          "value": "token_hash",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -33979,6 +36615,36 @@
       "entityType": "fks"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "fk_box_office_headcount_taps_reverses_id_box_office_headcount_taps_id_fk",
+      "columns": [
+        "reverses_id"
+      ],
+      "tableTo": "box_office_headcount_taps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "fk_box_office_headcount_taps_reason_term_id_core_terms_id_fk",
+      "columns": [
+        "reason_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "box_office_holds",
       "name": "fk_box_office_holds_order_id_box_office_orders_id_fk",
       "columns": [
@@ -34504,6 +37170,201 @@
       "entityType": "fks"
     },
     {
+      "table": "companies_agreement_responses",
+      "name": "fk_companies_agreement_responses_agreement_id_companies_agreements_id_fk",
+      "columns": [
+        "agreement_id"
+      ],
+      "tableTo": "companies_agreements",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "fk_companies_agreements_engagement_id_companies_engagements_id_fk",
+      "columns": [
+        "engagement_id"
+      ],
+      "tableTo": "companies_engagements",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "fk_companies_allocations_engagement_id_companies_engagements_id_fk",
+      "columns": [
+        "engagement_id"
+      ],
+      "tableTo": "companies_engagements",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_calls",
+      "name": "fk_companies_calls_engagement_id_companies_engagements_id_fk",
+      "columns": [
+        "engagement_id"
+      ],
+      "tableTo": "companies_engagements",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "fk_companies_contacts_company_id_companies_companies_id_fk",
+      "columns": [
+        "company_id"
+      ],
+      "tableTo": "companies_companies",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "fk_companies_engagement_events_engagement_id_companies_engagements_id_fk",
+      "columns": [
+        "engagement_id"
+      ],
+      "tableTo": "companies_engagements",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "fk_companies_engagements_company_id_companies_companies_id_fk",
+      "columns": [
+        "company_id"
+      ],
+      "tableTo": "companies_companies",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_guests",
+      "name": "fk_companies_guests_allocation_id_companies_allocations_id_fk",
+      "columns": [
+        "allocation_id"
+      ],
+      "tableTo": "companies_allocations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_people",
+      "name": "fk_companies_people_engagement_id_companies_engagements_id_fk",
+      "columns": [
+        "engagement_id"
+      ],
+      "tableTo": "companies_engagements",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "fk_companies_settlement_lines_settlement_id_companies_settlements_id_fk",
+      "columns": [
+        "settlement_id"
+      ],
+      "tableTo": "companies_settlements",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "fk_companies_settlement_payments_settlement_id_companies_settlements_id_fk",
+      "columns": [
+        "settlement_id"
+      ],
+      "tableTo": "companies_settlements",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "fk_companies_settlements_engagement_id_companies_engagements_id_fk",
+      "columns": [
+        "engagement_id"
+      ],
+      "tableTo": "companies_engagements",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "fk_companies_settlements_agreement_id_companies_agreements_id_fk",
+      "columns": [
+        "agreement_id"
+      ],
+      "tableTo": "companies_agreements",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_account_merge_items",
       "name": "fk_core_account_merge_items_merge_id_core_account_merges_id_fk",
       "columns": [
@@ -34562,6 +37423,66 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_collection_productions",
+      "name": "fk_core_collection_productions_collection_id_core_collections_id_fk",
+      "columns": [
+        "collection_id"
+      ],
+      "tableTo": "core_collections",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_collection_productions",
+      "name": "fk_core_collection_productions_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_collection_slugs",
+      "name": "fk_core_collection_slugs_collection_id_core_collections_id_fk",
+      "columns": [
+        "collection_id"
+      ],
+      "tableTo": "core_collections",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_collections",
+      "name": "fk_core_collections_season_id_core_seasons_id_fk",
+      "columns": [
+        "season_id"
+      ],
+      "tableTo": "core_seasons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
       "nameExplicit": false,
       "entityType": "fks"
     },
@@ -34761,6 +37682,36 @@
       "entityType": "fks"
     },
     {
+      "table": "core_performance_line_ups",
+      "name": "fk_core_performance_line_ups_performance_id_core_performances_id_fk",
+      "columns": [
+        "performance_id"
+      ],
+      "tableTo": "core_performances",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "fk_core_performance_line_ups_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_performance_runs",
       "name": "fk_core_performance_runs_production_id_core_productions_id_fk",
       "columns": [
@@ -34956,6 +37907,36 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "fk_core_production_credits_performance_id_core_performances_id_fk",
+      "columns": [
+        "performance_id"
+      ],
+      "tableTo": "core_performances",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "fk_core_production_credits_line_up_id_core_performance_line_ups_id_fk",
+      "columns": [
+        "line_up_id"
+      ],
+      "tableTo": "core_performance_line_ups",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
       "nameExplicit": false,
       "entityType": "fks"
     },
@@ -37364,6 +40345,15 @@
       "entityType": "pks"
     },
     {
+      "table": "calendar_feed_tokens",
+      "name": "calendar_feed_tokens_pk",
+      "columns": [
+        "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_access_profiles",
       "name": "core_access_profiles_pk",
       "columns": [
@@ -37399,6 +40389,16 @@
       "name": "core_age_markers_pk",
       "columns": [
         "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_collection_productions",
+      "name": "core_collection_productions_pk",
+      "columns": [
+        "collection_id",
+        "production_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -37581,15 +40581,6 @@
       "name": "forms_response_drafts_pk",
       "columns": [
         "response_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "front_of_house_calendar_feeds_pk",
-      "columns": [
-        "account_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -38090,6 +41081,15 @@
       "entityType": "pks"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "box_office_holds",
       "name": "box_office_holds_pk",
       "columns": [
@@ -38297,6 +41297,123 @@
       "entityType": "pks"
     },
     {
+      "table": "companies_agreement_responses",
+      "name": "companies_agreement_responses_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "companies_agreements_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "companies_allocations_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_calls",
+      "name": "companies_calls_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "companies_contacts_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "companies_engagement_events_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_guests",
+      "name": "companies_guests_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_people",
+      "name": "companies_people_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "companies_settlement_lines_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "companies_settlement_payments_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "companies_settlements_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_account_emails",
       "name": "core_account_emails_pk",
       "columns": [
@@ -38353,6 +41470,24 @@
     {
       "table": "core_closures",
       "name": "core_closures_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_collection_slugs",
+      "name": "core_collection_slugs_pk",
+      "columns": [
+        "slug"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_pk",
       "columns": [
         "id"
       ],
@@ -38515,6 +41650,15 @@
     {
       "table": "core_passkeys",
       "name": "core_passkeys_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_pk",
       "columns": [
         "id"
       ],
@@ -40100,6 +43244,30 @@
       "entityType": "checks"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_kind",
+      "value": "\"kind\" IN ('in', 'out', 'undo')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_quantity",
+      "value": "\"quantity\" BETWEEN 1 AND 50",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_reverses",
+      "value": "(\"kind\" = 'undo') = (\"reverses_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_device",
+      "value": "\"device_label\" IS NULL OR length(\"device_label\") <= 40",
+      "entityType": "checks"
+    },
+    {
       "table": "box_office_holds",
       "name": "box_office_holds_kind",
       "value": "\"kind\" IN ('basket', 'payment', 'reservation', 'staff', 'waitlist_offer')",
@@ -40484,6 +43652,318 @@
       "entityType": "checks"
     },
     {
+      "table": "companies_agreement_responses",
+      "name": "companies_agreement_responses_answer",
+      "value": "\"answer\" IN ('accepted', 'declined')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "companies_agreements_deal_type",
+      "value": "\"deal_type\" IN ('split', 'guarantee', 'guarantee-or-split', 'hire', 'none')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "companies_agreements_state",
+      "value": "\"state\" IN ('draft', 'sent', 'accepted', 'declined', 'superseded', 'withdrawn')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "companies_agreements_version_from_one",
+      "value": "\"version\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "companies_agreements_share",
+      "value": "\"company_share_bp\" IS NULL OR \"company_share_bp\" BETWEEN 0 AND 10000",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "companies_agreements_money",
+      "value": "coalesce(\"guarantee_minor\", 0) >= 0 AND coalesce(\"hire_fee_minor\", 0) >= 0 AND \"deposit_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "companies_agreements_places",
+      "value": "\"guest_places\" BETWEEN 0 AND 50",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_agreements",
+      "name": "companies_agreements_clauses",
+      "value": "\"clauses\" IS NULL OR length(\"clauses\") <= 20000",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "companies_allocations_state",
+      "value": "\"state\" IN ('open', 'closed', 'released')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_allocations",
+      "name": "companies_allocations_places",
+      "value": "\"places\" BETWEEN 0 AND 50 AND \"named\" BETWEEN 0 AND \"places\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_calls",
+      "name": "companies_calls_kind",
+      "value": "\"kind\" IN ('get-in', 'technical', 'dress', 'get-out', 'other')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_calls",
+      "name": "companies_calls_times",
+      "value": "\"ends_at\" > \"starts_at\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_calls",
+      "name": "companies_calls_label",
+      "value": "(\"kind\" <> 'other' OR \"label\" IS NOT NULL) AND (\"label\" IS NULL OR length(\"label\") <= 80)",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_calls",
+      "name": "companies_calls_notes",
+      "value": "\"notes\" IS NULL OR length(\"notes\") <= 1000",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 160",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_public_name",
+      "value": "\"public_name\" IS NULL OR length(\"public_name\") <= 160",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_legal_name",
+      "value": "\"legal_name\" IS NULL OR length(\"legal_name\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_registration",
+      "value": "\"registration\" IS NULL OR length(\"registration\") <= 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_tax_number",
+      "value": "\"tax_number\" IS NULL OR length(\"tax_number\") <= 30",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_address",
+      "value": "\"address\" IS NULL OR length(\"address\") <= 400",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_postcode",
+      "value": "\"postcode\" IS NULL OR length(\"postcode\") <= 12",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_description",
+      "value": "\"description\" IS NULL OR length(\"description\") <= 600",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_notes",
+      "value": "\"notes\" IS NULL OR length(\"notes\") <= 4000",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_website",
+      "value": "\"website\" IS NULL OR (\"website\" LIKE 'https://%' AND length(\"website\") <= 300)",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_individual",
+      "value": "(\"individual\" = 0 AND \"data_class\" = 'public') OR (\"individual\" = 1 AND \"data_class\" = 'personal' AND \"individual_account_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_companies",
+      "name": "companies_companies_merged",
+      "value": "\"merged_into_id\" IS NULL OR \"archived_at\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "companies_contacts_role",
+      "value": "\"role\" IS NULL OR length(\"role\") <= 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_contacts",
+      "name": "companies_contacts_phone",
+      "value": "\"day_phone\" IS NULL OR length(\"day_phone\") <= 30",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_engagement_events",
+      "name": "companies_engagement_events_kind",
+      "value": "\"kind\" IN ('opened', 'moved', 'cancelled', 'linked', 'agreement-sent', 'agreement-answered', 'agreement-withdrawn', 'agreement-superseded', 'call-changed', 'people-changed', 'allocation-made', 'allocation-changed', 'allocation-closed', 'allocation-released', 'guest-named', 'guest-withdrawn', 'deposit-changed', 'settlement-drafted', 'settlement-proposed', 'settlement-answered', 'settlement-approved', 'settlement-paid')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_kind",
+      "value": "\"kind\" IN ('visiting', 'act', 'hire')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_state",
+      "value": "\"state\" IN ('enquiry', 'offered', 'agreed', 'confirmed', 'completed', 'settled', 'cancelled')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_deposit_state",
+      "value": "\"deposit_state\" IN ('none', 'due', 'held', 'returned', 'kept', 'part-kept')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_title",
+      "value": "length(\"title\") BETWEEN 1 AND 160",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_tech_notes",
+      "value": "\"tech_notes\" IS NULL OR length(\"tech_notes\") <= 8000",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_arrival_notes",
+      "value": "\"arrival_notes\" IS NULL OR length(\"arrival_notes\") <= 2000",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_deposit",
+      "value": "\"deposit_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_cancelled",
+      "value": "(\"state\" = 'cancelled') = (\"cancel_reason\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_engagements",
+      "name": "companies_engagements_cancel_reason",
+      "value": "\"cancel_reason\" IS NULL OR length(\"cancel_reason\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_guests",
+      "name": "companies_guests_state",
+      "value": "\"state\" IN ('named', 'issued', 'withdrawn')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_guests",
+      "name": "companies_guests_places",
+      "value": "\"places\" BETWEEN 1 AND 50",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_people",
+      "name": "companies_people_name",
+      "value": "length(\"name\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_people",
+      "name": "companies_people_role",
+      "value": "\"role\" IS NULL OR length(\"role\") <= 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "companies_settlement_lines_kind",
+      "value": "\"kind\" IN ('company-share', 'guarantee-top-up', 'hire-fee', 'charge', 'deposit-kept', 'adjustment', 'note')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "companies_settlement_lines_label",
+      "value": "length(\"label\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_settlement_lines",
+      "name": "companies_settlement_lines_note",
+      "value": "(\"kind\" = 'note') = (\"amount_minor\" = 0) AND (\"kind\" <> 'note' OR \"posts\" = 0)",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "companies_settlement_payments_direction",
+      "value": "\"direction\" IN ('out', 'in')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "companies_settlement_payments_method",
+      "value": "\"method\" IN ('bank-transfer', 'cheque', 'payments')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "companies_settlement_payments_amount",
+      "value": "\"amount_minor\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_settlement_payments",
+      "name": "companies_settlement_payments_reference",
+      "value": "\"reference\" IS NULL OR length(\"reference\") <= 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "companies_settlements_state",
+      "value": "\"state\" IN ('draft', 'proposed', 'agreed', 'queried', 'approved', 'paid', 'superseded', 'void')",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "companies_settlements_two_people",
+      "value": "\"approved_by\" IS NULL OR \"approved_by\" IS NOT \"prepared_by\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "companies_settlements",
+      "name": "companies_settlements_query",
+      "value": "\"query_note\" IS NULL OR length(\"query_note\") <= 2000",
+      "entityType": "checks"
+    },
+    {
       "table": "core_access_profiles",
       "name": "core_access_profiles_payload_when_accepted",
       "value": "(status = 'accepted') = (payload IS NOT NULL)",
@@ -40553,6 +44033,36 @@
       "table": "core_closures",
       "name": "core_closures_title",
       "value": "length(\"title\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_state",
+      "value": "\"state\" IN ('draft', 'published', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_summary_length",
+      "value": "\"summary\" IS NULL OR length(\"summary\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_description_length",
+      "value": "\"description\" IS NULL OR length(\"description\") <= 5000",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_collections",
+      "name": "core_collections_colour",
+      "value": "\"colour\" GLOB '#[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'",
       "entityType": "checks"
     },
     {
@@ -40649,6 +44159,24 @@
       "table": "core_performance_access",
       "name": "core_performance_access_detail",
       "value": "\"detail\" IS NULL OR length(\"detail\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_name",
+      "value": "length(\"name\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_minutes",
+      "value": "\"minutes\" IS NULL OR \"minutes\" BETWEEN 1 AND 600",
       "entityType": "checks"
     },
     {
