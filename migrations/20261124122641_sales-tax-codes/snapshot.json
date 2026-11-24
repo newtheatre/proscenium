@@ -1,9 +1,11 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "03ea0e76-1dc7-4830-a340-21b200866fab",
+  "id": "7cf5fe44-b9dc-49fd-8826-1d97028a6e3d",
   "prevIds": [
-    "253a73f7-3dc8-4fca-8c87-bdcbf1975c1d"
+    "253a73f7-3dc8-4fca-8c87-bdcbf1975c1d",
+    "27eee593-bbbf-4646-8a7c-179f088b6b30",
+    "6a5dbaff-cdd8-40bb-9e8e-dde482daafb1"
   ],
   "ddl": [
     {
@@ -752,6 +754,34 @@
     },
     {
       "name": "promotions_targets",
+      "entityType": "tables"
+    },
+    {
+      "name": "spaces_bookable_purposes",
+      "entityType": "tables"
+    },
+    {
+      "name": "spaces_bookables",
+      "entityType": "tables"
+    },
+    {
+      "name": "spaces_booking_events",
+      "entityType": "tables"
+    },
+    {
+      "name": "spaces_booking_series",
+      "entityType": "tables"
+    },
+    {
+      "name": "spaces_bookings",
+      "entityType": "tables"
+    },
+    {
+      "name": "spaces_opening_hours",
+      "entityType": "tables"
+    },
+    {
+      "name": "spaces_purposes",
       "entityType": "tables"
     },
     {
@@ -6851,6 +6881,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "'all'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -14576,6 +14616,36 @@
     },
     {
       "table": "forms_responses",
+      "name": "score",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "out_of",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "passed",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
       "name": "is_test",
       "type": "integer",
       "notNull": true,
@@ -20145,6 +20215,946 @@
       "entityType": "columns"
     },
     {
+      "table": "spaces_bookable_purposes",
+      "name": "bookable_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookable_purposes",
+      "name": "purpose_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookable_purposes",
+      "name": "allowed",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookable_purposes",
+      "name": "approval",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "home_venue_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "control",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "approval",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'by-purpose'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "approval_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "external_contact",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "always_open",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "max_length_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "guidance",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "colour",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "requirements",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "booking_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "actor",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "detail",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "bookable_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "purpose_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "booked_for",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "frequency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "weekdays",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "starts_local",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "length_minutes",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "first_date",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "last_date",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "bookable_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "purpose_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "tier",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "series_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "ends_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "booked_for",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "requested_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "origin_type",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "origin_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "notes",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "attendees",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "replaces_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "bumps",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "external_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "override_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "decided_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "decision_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "closed_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "bumped_by_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "late_cancel",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "no_show",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "reminded_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_opening_hours",
+      "name": "bookable_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_opening_hours",
+      "name": "weekday",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_opening_hours",
+      "name": "opens_at",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_opening_hours",
+      "name": "closes_at",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "tier",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "open_to",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "needs_production",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "approval",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'automatic'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "max_length_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "max_ahead_days",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "min_notice_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "may_repeat",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "can_be_bumped",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "requirements",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "awards_awards",
       "name": "awards_awards_type",
       "columns": [
@@ -25047,6 +26057,250 @@
       "entityType": "indexes"
     },
     {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_space",
+      "columns": [
+        {
+          "value": "space_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "space_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_resource_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": "kind = 'resource'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "sort",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "spaces_booking_events_booking",
+      "columns": [
+        {
+          "value": "booking_id",
+          "isExpression": false
+        },
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "spaces_booking_series_for",
+      "columns": [
+        {
+          "value": "booked_for",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_clash",
+      "columns": [
+        {
+          "value": "bookable_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_for",
+      "columns": [
+        {
+          "value": "booked_for",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_series",
+      "columns": [
+        {
+          "value": "series_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_origin",
+      "columns": [
+        {
+          "value": "origin_type",
+          "isExpression": false
+        },
+        {
+          "value": "origin_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "origin_type IS NOT NULL AND state IN ('requested', 'confirmed')",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_slug",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_order",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "tier",
+          "isExpression": false
+        },
+        {
+          "value": "sort",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "awards_awards",
       "name": "fk_awards_awards_type_id_awards_types_id_fk",
       "columns": [
@@ -28383,6 +29637,186 @@
       "entityType": "fks"
     },
     {
+      "table": "spaces_bookable_purposes",
+      "name": "fk_spaces_bookable_purposes_bookable_id_spaces_bookables_id_fk",
+      "columns": [
+        "bookable_id"
+      ],
+      "tableTo": "spaces_bookables",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "spaces_bookable_purposes",
+      "name": "fk_spaces_bookable_purposes_purpose_id_spaces_purposes_id_fk",
+      "columns": [
+        "purpose_id"
+      ],
+      "tableTo": "spaces_purposes",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "fk_spaces_bookables_space_id_core_spaces_id_fk",
+      "columns": [
+        "space_id"
+      ],
+      "tableTo": "core_spaces",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "fk_spaces_bookables_home_venue_id_core_venues_id_fk",
+      "columns": [
+        "home_venue_id"
+      ],
+      "tableTo": "core_venues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "fk_spaces_booking_events_booking_id_spaces_bookings_id_fk",
+      "columns": [
+        "booking_id"
+      ],
+      "tableTo": "spaces_bookings",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "fk_spaces_booking_series_bookable_id_spaces_bookables_id_fk",
+      "columns": [
+        "bookable_id"
+      ],
+      "tableTo": "spaces_bookables",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "fk_spaces_booking_series_purpose_id_spaces_purposes_id_fk",
+      "columns": [
+        "purpose_id"
+      ],
+      "tableTo": "spaces_purposes",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "fk_spaces_bookings_bookable_id_spaces_bookables_id_fk",
+      "columns": [
+        "bookable_id"
+      ],
+      "tableTo": "spaces_bookables",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "fk_spaces_bookings_purpose_id_spaces_purposes_id_fk",
+      "columns": [
+        "purpose_id"
+      ],
+      "tableTo": "spaces_purposes",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "fk_spaces_bookings_series_id_spaces_booking_series_id_fk",
+      "columns": [
+        "series_id"
+      ],
+      "tableTo": "spaces_booking_series",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "fk_spaces_bookings_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "spaces_opening_hours",
+      "name": "fk_spaces_opening_hours_bookable_id_spaces_bookables_id_fk",
+      "columns": [
+        "bookable_id"
+      ],
+      "tableTo": "spaces_bookables",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "bar_stock_levels",
       "name": "bar_stock_levels_pk",
       "columns": [
@@ -28620,6 +30054,27 @@
       "columns": [
         "template_id",
         "duty_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "spaces_bookable_purposes",
+      "name": "spaces_bookable_purposes_pk",
+      "columns": [
+        "bookable_id",
+        "purpose_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "spaces_opening_hours",
+      "name": "spaces_opening_hours_pk",
+      "columns": [
+        "bookable_id",
+        "weekday",
+        "opens_at"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -30058,6 +31513,51 @@
     {
       "table": "promotions_targets",
       "name": "promotions_targets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "spaces_booking_events_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "spaces_booking_series_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_pk",
       "columns": [
         "id"
       ],
@@ -32150,6 +33650,234 @@
       "table": "promotions_targets",
       "name": "promotions_targets_quantity",
       "value": "\"quantity\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookable_purposes",
+      "name": "spaces_bookable_purposes_approval",
+      "value": "\"approval\" IS NULL OR \"approval\" IN ('automatic', 'approval')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_kind",
+      "value": "\"kind\" IN ('space', 'resource')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_space_or_name",
+      "value": "(\"kind\" = 'space' AND \"space_id\" IS NOT NULL AND \"name\" IS NULL AND \"home_venue_id\" IS NULL) OR (\"kind\" = 'resource' AND \"space_id\" IS NULL AND \"name\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_control",
+      "value": "\"control\" IN ('own', 'external')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_approval",
+      "value": "\"approval\" IN ('by-purpose', 'always')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_state_values",
+      "value": "\"state\" IN ('active', 'paused', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_name_length",
+      "value": "\"name\" IS NULL OR length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_note_length",
+      "value": "\"approval_note\" IS NULL OR length(\"approval_note\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_contact",
+      "value": "\"external_contact\" IS NULL OR (length(\"external_contact\") <= 200 AND \"control\" = 'external')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_max_length",
+      "value": "\"max_length_minutes\" IS NULL OR \"max_length_minutes\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookables",
+      "name": "spaces_bookables_colour",
+      "value": "\"colour\" IS NULL OR \"colour\" IN ('calendar-1', 'calendar-2', 'calendar-3', 'calendar-4', 'calendar-5', 'calendar-6', 'calendar-7', 'calendar-8')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "spaces_booking_events_kind",
+      "value": "\"kind\" IN ('requested', 'confirmed', 'declined', 'withdrawn', 'expired', 'changed', 'cancelled', 'bumped', 'completed', 'no-show-set', 'no-show-cleared', 'external-placed', 'reminder-sent')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_booking_events",
+      "name": "spaces_booking_events_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "spaces_booking_series_frequency",
+      "value": "\"frequency\" IN ('daily', 'weekly', 'fortnightly', 'monthly-by-weekday')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "spaces_booking_series_state",
+      "value": "\"state\" IN ('active', 'ended')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "spaces_booking_series_length",
+      "value": "\"length_minutes\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_booking_series",
+      "name": "spaces_booking_series_dates",
+      "value": "\"last_date\" >= \"first_date\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_state_values",
+      "value": "\"state\" IN ('requested', 'confirmed', 'declined', 'withdrawn', 'expired', 'cancelled', 'bumped', 'completed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_times",
+      "value": "\"ends_at\" > \"starts_at\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_origin_pair",
+      "value": "(\"origin_type\" IS NULL) = (\"origin_id\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_title",
+      "value": "length(\"title\") BETWEEN 3 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_notes",
+      "value": "\"notes\" IS NULL OR length(\"notes\") <= 1000",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_attendees",
+      "value": "\"attendees\" IS NULL OR \"attendees\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_external_ref",
+      "value": "\"external_ref\" IS NULL OR length(\"external_ref\") <= 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_override",
+      "value": "\"override_reason\" IS NULL OR length(\"override_reason\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_decision_note",
+      "value": "\"decision_note\" IS NULL OR length(\"decision_note\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_closed_reason",
+      "value": "\"closed_reason\" IS NULL OR \"closed_reason\" IN ('by-booker', 'by-staff', 'performance', 'closure', 'higher-tier', 'bookable-removed', 'origin-removed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_bookings",
+      "name": "spaces_bookings_no_show",
+      "value": "\"no_show\" = 0 OR \"state\" = 'completed'",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_opening_hours",
+      "name": "spaces_opening_hours_weekday",
+      "value": "\"weekday\" BETWEEN 1 AND 7",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_opening_hours",
+      "name": "spaces_opening_hours_times",
+      "value": "\"opens_at\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"closes_at\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"closes_at\" > \"opens_at\" AND \"closes_at\" <= '24:00'",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_tier",
+      "value": "\"tier\" BETWEEN 1 AND 9",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_open_to",
+      "value": "\"open_to\" IN ('bookers', 'production-team', 'staff')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_team_needs_production",
+      "value": "\"open_to\" != 'production-team' OR \"needs_production\" = 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_approval",
+      "value": "\"approval\" IN ('automatic', 'approval')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_state_values",
+      "value": "\"state\" IN ('active', 'retired')",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_description",
+      "value": "\"description\" IS NULL OR length(\"description\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "spaces_purposes",
+      "name": "spaces_purposes_limits",
+      "value": "(\"max_length_minutes\" IS NULL OR \"max_length_minutes\" > 0) AND (\"max_ahead_days\" IS NULL OR \"max_ahead_days\" > 0) AND (\"min_notice_minutes\" IS NULL OR \"min_notice_minutes\" >= 0)",
       "entityType": "checks"
     }
   ],
