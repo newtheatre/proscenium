@@ -4,6 +4,7 @@ import { questionsOf } from '../../shared/engine'
 import type { Formula, Operation, Term } from '../../shared/builder/formula'
 import { figureName } from '../../shared/figures'
 import { find } from '../../shared/builder/edit'
+import { FORMS_END } from './forms-canvas'
 import { FORMS_QUESTION_ICONS } from '../components/FormsQuestionIcon.vue'
 
 export const formsQuestionIcon = (type: QuestionType): string => FORMS_QUESTION_ICONS[type]
@@ -67,6 +68,7 @@ export function formsStageTone(kind: string | null | undefined): 'success' | 'wa
 /** What a problem is about, in the author's words: the question, page, stage or move it points at. */
 export function formsProblemName(def: Definition, at: string, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (at.startsWith('stage:')) return def.workflow?.stages.find(s => s.key === at.slice(6))?.name.trim() || t('forms.screens.stages.a-stage') // not-policy: the length of "stage:"
+  if (at === FORMS_END) return t('forms.screens.ends.end')
   if (at.startsWith('move:')) return def.workflow?.transitions.find(m => m.key === at.slice(5))?.label.trim() || t('forms.screens.stages.a-move') // not-policy: the length of "move:"
   const found = find(def, at)
   if (!found) {

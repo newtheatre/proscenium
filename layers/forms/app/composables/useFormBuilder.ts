@@ -24,6 +24,8 @@ export interface BuilderData {
   actions?: BuilderAction[]
   /** Whether this person may save the form as a template for the theatre. */
   canSaveTemplate?: boolean
+  /** Whether this person may set correct answers, points and the pass mark (FB-513). */
+  canMark?: boolean
   versions: { id: string, number: number, publishedAt: number }[]
 }
 export type SaveState = 'saved' | 'waiting' | 'saving' | 'stale' | 'failed'
@@ -47,6 +49,8 @@ export interface FormBuilder {
   sources: ComputedRef<{ key: string, label: string, people: boolean }[]>
   /** What other modules can do when a response takes a move. */
   actions: ComputedRef<BuilderAction[]>
+  /** Whether correct answers and the pass mark are shown and may be changed. */
+  canMark: boolean
   canUndo: ComputedRef<boolean>
   canRedo: ComputedRef<boolean>
   /** Replaces the definition. Edits with the same `merge` name close together are one undo step. */
@@ -157,6 +161,7 @@ export function useFormBuilder(data: BuilderData, fields: () => PublishedField[]
     published: computed(() => new Map(fields().map(f => [f.questionId, f]))),
     sources: computed(() => data.sources ?? []),
     actions: computed(() => data.actions ?? []),
+    canMark: !!data.canMark,
     canUndo: computed(() => past.value.length > 0),
     canRedo: computed(() => future.value.length > 0),
     apply,

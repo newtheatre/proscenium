@@ -95,6 +95,8 @@ export interface Question {
   peopleInvolved?: boolean
   /** A `record` question anybody signed in may search while answering, whatever they may search elsewhere. The author's choice. */
   openSearch?: boolean
+  /** The correct answer, on a question that can be marked (FB-513). Never sent to anybody answering. */
+  answer?: AnswerKey
 }
 /** A repeating group: the questions are answered once per entry. */
 export interface Group {
@@ -215,12 +217,38 @@ export interface Review {
 /** A form's stages. A response starts in the first. A form with none has one stage, Received, which is closed. */
 export interface Workflow { stages: Stage[], transitions: Transition[] }
 
+// ---- marking (FB-513) ----
+
+/** The question types that can carry a correct answer. A choice is marked by its option ids; short text by the accepted texts. */
+export const MARKABLE_TYPES = ['choice.single', 'choice.multiple', 'choice.dropdown', 'yesno', 'number', 'text.short'] as const satisfies readonly QuestionType[]
+export const MARKING_SHOWS = ['score', 'score-and-feedback', 'score-feedback-and-answers'] as const
+export type MarkingShow = (typeof MARKING_SHOWS)[number]
+/**
+ * What is right: option ids (choice), true or false (yes or no), a range inclusive (number), or the
+ * accepted texts (short text), compared without regard to case or the spaces round them.
+ */
+export type Correct = string[] | boolean | { min?: number, max?: number }
+export interface AnswerKey {
+  correct: Correct
+  /** Whole points for getting it right, 0 to 100; 1 when left out. */
+  points?: number
+  feedback?: { right?: string, wrong?: string }
+}
+export interface Marking {
+  /** The least score that passes, in whole points. Without one, nobody passes or fails. */
+  passMark?: number
+  /** What the person is told once they have sent their answers. */
+  show: MarkingShow
+}
+
 export interface Definition {
   format: number
   pages: Page[]
   calculations?: Calculation[]
   endings?: Ending[]
   workflow?: Workflow
+  /** Answers are marked against their questions' correct answers. Present on a quiz. */
+  marking?: Marking
   presentation?: { introduction?: string, submitLabel?: string, confirmation?: string, progress?: boolean }
 }
 
