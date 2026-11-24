@@ -13,7 +13,7 @@ Written in the Foundations registry formats. Every operational number in parts 3
 - `payments.retention` is marked `advanced`, so it is drawn on the Advanced page in Admin under the heading Payments. How long webhook receipts are kept is an engineering limit.
 - None of these modules manages a setting on a screen of its own, so none declares `screen`. Provider accounts, readers, ledger accounts and periods are records, not settings.
 
-On saving, a fresh sign-in follows the setting and not the ability, so each setting whose silent change could cost money, mislead a buyer or delete data declares onChange confirm: the save shows what will change, asks again, and asks for a fresh sign-in. They are, in Box office: checkout.payment-timing; fees.booking-fee, fees.booking-fee-per and fees.booking-fee-at-desk; cancellations.by-buyer, cancellations.fee and cancellations.refund-fee-on-cancelled-show; exchanges.by-buyer and exchanges.fee; reservations.release-before; scanning.names-on-device; and all five retention settings. In Payments: refunds.self-approve-up-to, refunds.window, sessions.variance-needs-second-person and retention.webhooks. Every retention period is on the list by rule, in every module, because shortening one lets the next retention run delete rows for good. In Finance: periods.length, year.starts and tax.registered. None asks for a reason. Every other setting saves with no prompt. A payment provider, its mode and its readers are records on the Providers screen, not settings, and stay guarded by their privileged ability. One setting's history is visible to whoever may change it; the whole history needs core.audit.view. Every duration is entered with the kit's `DurationInput` and stored as whole seconds, as before; the limits in the tables are what that control offers. A duration is shown in the largest unit that divides it exactly, so no label or help line below names a unit.
+On saving, a fresh sign-in follows the setting and not the ability, so each setting whose silent change could cost money, mislead a buyer or delete data declares onChange confirm: the save shows what will change, asks again, and asks for a fresh sign-in. They are, in Box office: checkout.payment-timing; fees.booking-fee, fees.booking-fee-per and fees.booking-fee-at-desk; cancellations.by-buyer, cancellations.fee and cancellations.refund-fee-on-cancelled-show; exchanges.by-buyer and exchanges.fee; reservations.release-before; scanning.names-on-device; and all five retention settings. In Payments: refunds.self-approve-up-to, refunds.window, sessions.variance-needs-second-person, retention.webhooks and payees.keep-for. Every retention period is on the list by rule, in every module, because shortening one lets the next retention run delete rows for good. In Finance: periods.length, year.starts and tax.registered. None asks for a reason. Every other setting saves with no prompt. A payment provider, its mode and its readers are records on the Providers screen, not settings, and stay guarded by their privileged ability. One setting's history is visible to whoever may change it; the whole history needs core.audit.view. Every duration is entered with the kit's `DurationInput` and stored as whole seconds, as before; the limits in the tables are what that control offers. A duration is shown in the largest unit that divides it exactly, so no label or help line below names a unit.
 
 ## Settings: box office
 
@@ -77,6 +77,7 @@ When scanning opens is not a setting here: it is the core's `doors_at` for the p
 | `payments.sessions.variance-needs-second-person` | money | 500 | 0 to 100000 | PAY | staff | No | Cash variance above which a second person must close the session |
 | `payments.sessions.default-float` | money | 0 | 0 to 100000 | PAY | staff | No | Float suggested when opening a session |
 | `payments.retention.webhooks` | duration | 90d | 7d to 730d | PAY | staff | No | How long webhook receipts are kept |
+| `payments.payees.keep-for` | duration | 730d | 30d to 2190d | P-A1 | staff | No | Bank details nobody has been paid with for this long are cleared, counted from the last payment or, never paid, from when they were given |
 
 ## Settings: finance
 
@@ -163,6 +164,9 @@ A grant on a production covers its performances and so their orders: a visiting 
 | `payments.attempt.attest` |  | normal |  |  | Record a cash or standalone-card payment | `box-office-staff`, and any role that may sell |
 | `payments.provider.manage` |  | privileged |  |  | Add providers, pair readers, switch test mode | `administrator`, `finance-officer` |
 | `payments.settings.manage` |  | privileged |  |  | Change payments settings | `administrator` |
+| `payments.disbursement.record` |  | privileged |  |  | Record money the theatre has paid out against a module's record, or reverse one recorded by mistake (P-A1). Payments never sends money | `finance-officer` |
+| `payments.payee.read` |  | privileged |  |  | See bank details in full to make a payment; every read is audited | `finance-officer` |
+| `payments.payee.manage` |  | privileged |  |  | Save bank details for a person or company, such as from a supplier's invoice | `finance-officer` |
 
 ## Abilities: finance
 

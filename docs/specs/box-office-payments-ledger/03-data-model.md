@@ -89,8 +89,8 @@ Foundations amended the id format on 16 November: every id is `<prefix>_<26 char
 | `box_office_passes` | `pass` | `finance_periods` | `fpe` |
 | `box_office_pass_redemptions` | `psr` | `finance_period_closes` | `pcl` |
 | `box_office_comp_requests` | `comp` | `finance_tax_codes` | `tax` |
-| `box_office_pass_covers` | `pcv` |  |  |
-| `box_office_waitlist_entries` | `wle` |  |  |
+| `box_office_pass_covers` | `pcv` | `payments_payees` | `ppy` |
+| `box_office_waitlist_entries` | `wle` | `payments_disbursements` | `pdb` |
 
 `payments_intent_parts` has the prefix `pip`. With it, the list above is the final table list for the three modules.
 
@@ -626,6 +626,40 @@ The CHECK on `approved_by` is what makes the self-approve limit real. The reques
 | `received_at`, `handled_at` | integer |  | Internal | keep |
 
 The event body is not stored. The handler keeps the id and type, then asks the provider for the current state of the payment, so nothing personal from a provider's payload rests in the database. The table is not append-only: `attempt_id` and `handled_at` are filled in after the row is written, and the task `payments.prune-webhooks` deletes rows older than the retention setting.
+
+### `payments_payees` (plain, sealed, with a keep-for sweep)
+
+Bank details of the people and companies the theatre pays back (Invoices and exports, part 4, P-A1). One row per party.
+
+| Column | Type | Constraints | Class | On erasure |
+| --- | --- | --- | --- | --- |
+| `party_module`, `party_id` | text | not null; **unique together**. `core` and an account id for a person; `companies` and a company id | Internal | keep |
+| `account_id` | text | the person's account, null for a company; moves on a merge | Account | keep the row |
+| `account_name`, `sort_code`, `account_number` | text | sealed with the core key; null once cleared | Personal | clear |
+| `last_digits` | text | the account number's last two digits, for the masked view; null once cleared | Personal | clear |
+| `last_used_on` | text | London date of the last payment to it | Internal | keep |
+| `created_at`, `updated_at` | integer |  | Internal | keep |
+
+Nobody sees the details in full but a holder of `payments.payee.read`, and every such read writes an audit entry naming only the payee's id. Everyone else, the person included, sees the name's first letter and the last two digits. `last_digits` is not in the P-A1 amendment: the masked view needs it without opening the sealed number. A person clears their own details from My account; the task `payments.prune-payees` clears details unused for `payments.payees.keep-for`. Clearing keeps the row so payments already made still name it.
+
+### `payments_disbursements` (append-only)
+
+Money the theatre paid out against an owner module's record, such as a claim or a bill (P-A1). Payments records it after a person has paid it; it never initiates a payment.
+
+| Column | Type | Constraints | Class | On erasure |
+| --- | --- | --- | --- | --- |
+| `method` | text | `bank-transfer`, `cheque`, `theatre-card`, `petty-cash` or `parent-body` | Internal | keep |
+| `amount_minor`, `currency` | integer, text | amount above zero | Internal | keep |
+| `owner_module`, `owner_record` | text | the record paid, such as a claim | Internal | keep |
+| `payee_id` | text | the bank details used, if any | Internal | keep |
+| `paid_on` | text | London date; not after today | Internal | keep |
+| `reference` | text | bank reference or cheque number, at most 40 characters | Internal | keep |
+| `reverses_id` | text | **unique**: the row this reverses, once only | Internal | keep |
+| `posting_id` | text | not null | Internal | keep |
+| `by` | text | who recorded it; null for the system | Account | keep, alias on merge |
+| `created_at` | integer |  | Internal | keep |
+
+Recording one calls the owner's `payments.disbursement` handler, which marks its record paid and returns its debits (the payable cleared), and posts one transfer with the purpose `disbursement`: those debits, and a credit on the method's account. A bank transfer, cheque or the theatre's card pays from `payments.bank`, petty cash from `payments.cash`, and the parent body from `payments.parent-body` (what a students' union holds for the theatre). A mistake is undone by a reversing row, a reversal of the posting and the handler's `reversed`, which marks the record owed again.
 
 ## Finance: the ledger
 
