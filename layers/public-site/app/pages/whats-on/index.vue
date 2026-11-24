@@ -2,8 +2,8 @@
      soonest first, filtered by category, season, venue and month from one toolbar over the list
      (a sheet on a phone). Unfiltered, the soonest show is billed
      at the top with its next dates (PublicSiteSpotlight); the rest follow under the month they next
-     play. Each card links to the production's page. The filters are a GET form, so the page works with
-     scripts off. -->
+     play, each month as wide as its shows so that small months share a row. Each card links to the
+     production's page. The filters are a GET form, so the page works with scripts off. -->
 <script setup lang="ts">
 interface Listing {
   id: string
@@ -55,6 +55,9 @@ const months = computed(() => {
   }
   return [...groups.entries()].map(([month, shows]) => ({ month, label: monthYear(`${month}-01`), shows }))
 })
+// A month is as wide as its shows, up to the full row, so small months share a row when whole ones fit.
+const widths = [['sm:col-span-1', 'sm:col-span-2'], ['lg:col-span-1', 'lg:col-span-2', 'lg:col-span-3'], ['xl:col-span-1', 'xl:col-span-2', 'xl:col-span-3', 'xl:col-span-4']]
+const across = (shows: number) => widths.map(w => w[Math.min(shows, w.length) - 1])
 
 // A group shows only when it offers a real choice. Each choice keeps the other filters as they are.
 const link = (key: Key, value: string | undefined) => ({ path: '/whats-on', query: { ...chosen.value, [key]: value } })
@@ -232,14 +235,18 @@ useHead({ noscript: [{ key: 'whats-on-filters', innerHTML: '<style>.whats-on-noj
         </div>
       </template>
     </USlideover>
-    <template v-if="productions.length">
+    <div
+      v-if="productions.length"
+      class="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+    >
       <section
         v-for="m in months"
         :key="m.month"
         :aria-labelledby="`month-${m.month}`"
-        class="mb-10"
+        class="grid grid-cols-subgrid content-start"
+        :class="across(m.shows.length)"
       >
-        <div class="mb-4 flex items-baseline gap-3">
+        <div class="col-span-full mb-4 flex items-baseline gap-3 border-b border-default pb-2">
           <h3
             :id="`month-${m.month}`"
             class="text-2xl font-bold text-highlighted"
@@ -248,7 +255,7 @@ useHead({ noscript: [{ key: 'whats-on-filters', innerHTML: '<style>.whats-on-noj
           </h3>
           <span class="text-sm text-muted">{{ t('public-site.whats-on.month-count', { count: m.shows.length }) }}</span>
         </div>
-        <ul class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <ul class="col-span-full grid grid-cols-subgrid gap-y-6">
           <li
             v-for="p in m.shows"
             :key="p.id"
@@ -268,7 +275,7 @@ useHead({ noscript: [{ key: 'whats-on-filters', innerHTML: '<style>.whats-on-noj
           </li>
         </ul>
       </section>
-    </template>
+    </div>
     <EmptyState
       v-else
       icon="i-lucide-calendar"

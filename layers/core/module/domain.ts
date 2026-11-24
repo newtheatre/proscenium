@@ -222,6 +222,11 @@ export const points = {
    */
   'core.change-impact': point({ kind: 'code', contract: 'change-impact' }),
   /**
+   * The times another module takes a space, each yielding to a performance or not, with a label
+   * only for a reader who may see it. Read by isSpaceFree and the occupancy view (O1, O2).
+   */
+  'core.space-busy': point({ kind: 'code', contract: 'space-busy' }),
+  /**
    * Whether a module can live with a change: allow, or refuse with a reason and optionally a link to
    * its own screen where the matter is settled. Core runs every guard and stops on the first refusal.
    */

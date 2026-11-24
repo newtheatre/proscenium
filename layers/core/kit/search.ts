@@ -57,14 +57,6 @@ export function searchShadowTables(table: string): string[] {
   return ['data', 'idx', 'docsize', 'config'].map(s => `${name}_${s}`)
 }
 
-/** Whether a table name is a search index or one of its shadow tables. */
-export function isSearchTable(name: string, searchedTables: Iterable<string>): boolean {
-  for (const table of searchedTables) {
-    if (name === searchIndexName(table) || searchShadowTables(table).includes(name)) return true
-  }
-  return false
-}
-
 const q = (name: string) => `\`${name}\``
 
 /** The statements that remove a table's index and its triggers. The table's rows are untouched. */

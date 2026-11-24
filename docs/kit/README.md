@@ -42,7 +42,15 @@ erasure writing its placeholder. A realm is `audience`, `members`, `operational`
 platform's own tables). An account subject column that may be empty needs
 `subject: { account: 'account_id', unlinked: 'staff' }`: staff reach the rows it cannot link by
 search. `col.internal()` and `col.personal()` take `encrypted: true`, sealed with the one core key as
-`col.special()` always is. After changing a table run `bun run db:generate -- --name <what>`;
+`col.special()` always is.
+
+A table whose rows must not be dateable, such as a secret ballot, says `timestamps: false`: it may
+hold no `createdAt`, `updatedAt`, `timestamp` or `localDate` column, needs `random: true` (a
+time-sorted id dates its row) and has no retention. `withoutRowid: true` makes it `WITHOUT ROWID`,
+so SQLite stores rows in primary key order rather than the order they were written; the table
+needs a primary key and cannot be searched. Drizzle Kit cannot write the clause, so
+`db:generate` adds it, and the conformance check fails a migration that makes the table without
+it (R3-23). After changing a table run `bun run db:generate -- --name <what>`;
 the conformance check fails while the code and the migrations disagree.
 
 Until the first release the migrations were squashed into one baseline per journal on 19 November
@@ -184,6 +192,13 @@ Any module may import core's services without listing core: `import { notifyAddr
   once that passes, and it is not served after. A slot with `access: 'record'` is served only to
   someone your `core.file-access` contribution allows: key it by the owning record type and export
   `{ canRead(actor, record, file) }` (type `FileAccess` from `#modules/core`).
+- `isSpaceFree(spaceId, from, to, { except? })`: no scheduled performance or blocking closure, and
+  nothing another module reports to `core.space-busy`, overlaps the window; `except` leaves out one
+  module's own times. A read for showing and for a module's check just before its own write; a core
+  write uses the predicate `assertSpaceFree`. A module that takes a space (a room booking, a
+  training session, a pencil) contributes to `core.space-busy` a file whose `busy({ spaceIds, from,
+  to }, actor)` answers `{ spaceId, kind, from, to, yields, record, label }` items, the label null
+  where the reader may not see it (contract in `layers/core/server/points/space-busy.ts`).
 - `getBrand()`: the theatre's name, logos and colour tokens for light and dark.
 - Vocabularies, the shared lists of options such as production categories and advisories. Declare
   yours, with its starting terms, as a contribution to `core.vocabulary` (`id` is
@@ -248,6 +263,16 @@ switched-off module's jobs wait. Tasks are declared with `every`, `dailyAt` or `
 theatre's time zone (UTC until setup sets it); the cron trigger runs only the latest due slot, once.
 
 ## Modules, records, facts and pages
+
+A **support module** (`support: true`, C-65) is a shared part with no switch of its own, such as
+`occupancy`: it is on exactly while a module that is on requires it, directly or through another
+support module, and off otherwise (`resolveOn` in `#kit/modules-store`). Switching it is refused
+(`core.module.support`), a row stored for it is ignored, and it cannot also be `switchable: false`
+or `onAtSetup`. Its requirers list it under `requires` as usual, so they import its services
+without exception; switching a requirer on does not ask about it, and when the switch brings it on
+or off, `core.module.enabled` or `.disabled` is announced for it too. Its migrations run like any
+module's. Admin > Modules lists it under "Comes on with other modules", with its state and the
+modules that need it, and no switch.
 
 `uses` may name a module that is not written yet if the design has reserved its id
 (`RESERVED_MODULE_IDS` in the registry); listening to it or contributing to its points then does

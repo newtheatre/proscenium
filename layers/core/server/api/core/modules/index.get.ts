@@ -37,6 +37,8 @@ export default defineRoute({ ability: 'core.health.view', rateLimit: 'default' }
       since: m.since,
       stability: m.stability ?? 'stable',
       alwaysOn,
+      // A support module (C-65) has no switch: it is on while a module that is on requires it.
+      support: m.support === true,
       on: on.has(id),
       requires: [...(m.requires ?? [])],
       uses: [...(m.uses ?? [])],

@@ -20,8 +20,9 @@ const groups = computed(() => {
     .filter(m => !words || `${pageNameOf(m.id)} ${nameOf(m.id)} ${pageDescriptionOf(m.id) ?? ''}`.toLocaleLowerCase('en-GB').includes(words))
     .sort(byName)
   return [
-    { id: 'on', label: t('core.modules.group.on'), modules: all.filter(m => m.on && !m.alwaysOn) },
-    { id: 'off', label: t('core.modules.group.available'), modules: all.filter(m => !m.on && !m.alwaysOn) },
+    { id: 'on', label: t('core.modules.group.on'), modules: all.filter(m => m.on && !m.alwaysOn && !m.support) },
+    { id: 'off', label: t('core.modules.group.available'), modules: all.filter(m => !m.on && !m.alwaysOn && !m.support) },
+    { id: 'support', label: t('core.modules.group.support'), modules: all.filter(m => m.support) },
     { id: 'always', label: t('core.modules.group.always-on'), modules: all.filter(m => m.alwaysOn) },
   ].filter(g => g.modules.length)
 })
@@ -147,7 +148,7 @@ const footnote = (m: ModuleView) => m.settings ? t('core.modules.settings-count'
                   </div>
                 </div>
                 <USwitch
-                  v-if="data?.manage && !m.alwaysOn"
+                  v-if="data?.manage && !m.alwaysOn && !m.support"
                   :model-value="m.on"
                   :loading="busy === m.id"
                   :disabled="busy !== null && busy !== m.id"
@@ -182,6 +183,12 @@ const footnote = (m: ModuleView) => m.settings ? t('core.modules.settings-count'
                 class="text-sm text-muted"
               >
                 {{ t('core.modules.needed-by', { modules: listOf(lockedBy(m).map(nameOf)) }) }}
+              </p>
+              <p
+                v-else-if="m.support"
+                class="text-sm text-muted"
+              >
+                {{ m.requiredBy.length ? t('core.modules.support-off', { modules: listOf(m.requiredBy.map(nameOf)) }) : t('core.modules.support-unused') }}
               </p>
               <div class="flex items-center justify-between gap-2 text-sm">
                 <span class="text-muted">{{ footnote(m) }}</span>

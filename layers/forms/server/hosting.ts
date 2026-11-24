@@ -7,9 +7,9 @@
 // how often, the engine on every answer, data classes, the cap, the audit entry and the event.
 import { all, first, newId, nowMs, refuse, today, type Actor, type UnitView } from '#kit'
 import { ERASED } from '#kit/db'
-import type { Answers, DataClass, Definition, QuestionType, Value } from '../shared/engine'
-import { questionsOf, withoutWorkflow } from '../shared/engine'
-import { getForm, getVersion } from './forms'
+import type { Answers, DataClass, Definition, QuestionType, Value, Marked } from '../shared/engine'
+import { publicDefinition, questionsOf, withoutWorkflow } from '../shared/engine'
+import { VERSION, getForm, getVersion, type VersionRow } from './forms'
 import { PLACE, draftOf, readAnswers, sendResponse, shut, words, type LinkRow, type Shut, type StoredPlace } from './responses'
 import { EVERY, attachedTo, modeOf, slotOf, type FormsSlot } from './slots'
 
@@ -59,7 +59,7 @@ export async function slotForms(slotId: string, subjectId: string, actor: Actor)
       title: form.title,
       anonymous: form.anonymous,
       state: why ?? 'open',
-      definition: why ? null : withoutWorkflow(JSON.parse(version.definition) as Definition),
+      definition: why ? null : publicDefinition(withoutWorkflow(JSON.parse(version.definition) as Definition)),
       version: version.number,
       asksEmail: !form.anonymous && !actor.accountId,
       draft: draft ? { responseId: draft.response.id, answers: draft.answers } : null,
@@ -85,6 +85,82 @@ export async function slotDecides(slotId: string, subjectId: string): Promise<bo
   return false
 }
 
+/** Whether a record's slot has any published form to answer, so a host can ask for answers first. */
+export async function slotAsks(slotId: string, subjectId: string): Promise<boolean> {
+  const slot = await slotIn(slotId, 'submission')
+  for (const place of await attachedTo(slot.id, subjectId)) {
+    const form = await getForm(place.formId)
+    if (form && form.liveVersionId && form.status !== 'draft' && form.status !== 'archived') return true
+  }
+  return false
+}
+
+export interface Respondent { personId: string, responseId: string, submittedAt: number }
+
+/**
+ * Who has sent a response to the forms attached to one record in a submission slot, each person's
+ * latest. Withdrawn responses, working copies and tests are left out. Reads no answers.
+ */
+export async function slotRespondents(slotId: string, subjectId: string): Promise<Map<string, Respondent>> {
+  const slot = await slotIn(slotId, 'submission')
+  const rows = await all<{ person_id: string, id: string, submitted_at: number }>(
+    `SELECT r.person_id, r.id, r.submitted_at FROM forms_responses r JOIN forms_placements p ON p.id = r.placement_id
+      WHERE p.slot_key = ? AND p.subject_type = ? AND p.subject_id = ? AND r.person_id IS NOT NULL AND r.state IN ('submitted', 'awaiting_payment') AND (r.stage_kind IS NULL OR r.stage_kind <> 'declined') AND r.is_test = 0
+      ORDER BY r.submitted_at`, slot.id, slot.subject, subjectId)
+  const out = new Map<string, Respondent>()
+  for (const r of rows) out.set(r.person_id, { personId: r.person_id, responseId: r.id, submittedAt: Number(r.submitted_at) })
+  return out
+}
+
+export interface SlotQuestion { key: string, label: string, type: QuestionType, dataClass: DataClass, options: { id: string, label: string }[] }
+
+/** The questions of the published form attached to one record in a slot, for a host to name its roles. Answers are not read. */
+export async function slotQuestions(slotId: string, subjectId: string): Promise<SlotQuestion[]> {
+  const slot = await slotIn(slotId, 'submission')
+  for (const place of await attachedTo(slot.id, subjectId)) {
+    const form = await getForm(place.formId)
+    const version = form && form.status !== 'draft' && form.status !== 'archived' ? await getVersion(form.liveVersionId) : null
+    if (!version) continue
+    return questionsOf(JSON.parse(version.definition) as Definition).filter(q => !q.group).map(({ question: q }) => ({
+      key: q.key, label: q.label, type: q.type, dataClass: q.dataClass, options: (q.options ?? []).map(o => ({ id: o.id, label: o.label })),
+    }))
+  }
+  return []
+}
+
+export interface KeyedAnswer { value: Value, other: string | null }
+
+/**
+ * Each respondent's answers to some questions, by question key, from their latest sent response
+ * (as slotRespondents). `special` opens special-category answers; a host asks for them only for a
+ * count or under an ability that may see them, and audits a read by name itself.
+ */
+export async function slotAnswers(slotId: string, subjectId: string, keys: string[], options: { special: boolean }): Promise<Map<string, Record<string, KeyedAnswer>>> {
+  const out = new Map<string, Record<string, KeyedAnswer>>()
+  const respondents = [...(await slotRespondents(slotId, subjectId)).values()]
+  if (!respondents.length || !keys.length) return out
+  const versions = await all<{ id: string, version_id: string }>('SELECT id, version_id FROM forms_responses WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(respondents.map(r => r.responseId)))
+  const byVersion = new Map<string, string[]>()
+  for (const v of versions) byVersion.set(v.version_id, [...(byVersion.get(v.version_id) ?? []), v.id])
+  const personOf = new Map(respondents.map(r => [r.responseId, r.personId]))
+  for (const [versionId, responseIds] of byVersion) {
+    const version = await getVersion(versionId)
+    if (!version) continue
+    const questions = questionsOf(JSON.parse(version.definition) as Definition).filter(q => !q.group && keys.includes(q.question.key)).map(q => q.question)
+    const keyOf = new Map(questions.map(q => [q.id, q.key]))
+    const read = await readAnswers(responseIds, new Map(questions.map(q => [q.id, q.type])), options.special)
+    for (const [responseId, answers] of read) {
+      const keyed: Record<string, KeyedAnswer> = {}
+      for (const a of answers) {
+        const key = keyOf.get(a.questionId)
+        if (key && !a.restricted) keyed[key] = { value: a.value, other: a.other }
+      }
+      out.set(personOf.get(responseId)!, keyed)
+    }
+  }
+  return out
+}
+
 /**
  * Sends a response to a form attached to the host's record, in the host's unit of work, with every
  * check POST /api/forms/open/:slug/responses makes: the engine runs again on the answers, hidden
@@ -93,15 +169,29 @@ export async function slotDecides(slotId: string, subjectId: string): Promise<bo
  * go in the same unit. Give `responseId` (a `fres_` id made before the first try) so a retry stores
  * one response; one is made when left out. Never commits.
  */
-export async function addResponse(unit: UnitView, input: { slot: string, subject: string, formId: string, actor: Actor, answers: Answers, email?: string | null, responseId?: string }): Promise<{ responseId: string, reference: string }> {
+export async function addResponse(unit: UnitView, input: { slot: string, subject: string, formId: string, actor: Actor, answers: Answers, email?: string | null, responseId?: string, versionId?: string }): Promise<{ responseId: string, reference: string, marking?: Marked }> {
   const slot = await slotIn(input.slot, 'submission')
   const row = await first<StoredPlace>(`SELECT ${PLACE} FROM forms_placements WHERE slot_key = ? AND subject_type = ? AND subject_id = ? AND form_id = ? AND status <> 'ended'`, slot.id, slot.subject, input.subject, input.formId)
   const form = row ? await getForm(row.formId) : null
-  const version = form ? await getVersion(form.liveVersionId) : null
-  if (!row || !form || !version || form.status === 'draft' || form.status === 'archived') return refuse('forms.form.not-found', 'There is no form here.', { status: 404 }) // not-policy: HTTP status
+  if (!row || !form || form.status === 'draft' || form.status === 'archived') return refuse('forms.form.not-found', 'There is no form here.', { status: 404 }) // not-policy: HTTP status
+  // A host may pin the version its person was shown, such as a quiz begun before a new version was published.
+  const version = input.versionId === undefined ? await getVersion(form.liveVersionId) : await versionOf(form.id, input.versionId)
+  if (!version) return refuse(input.versionId === undefined ? 'forms.form.not-found' : 'forms.version-not-of-form', input.versionId === undefined ? 'There is no form here.' : 'That version is not one of this form\'s.', { status: 404 }) // not-policy: HTTP status
   if (input.responseId !== undefined && !/^fres_[0-9A-Za-z]{26}$/.test(input.responseId)) return refuse('forms.response.not-found', 'There is no response here.', { status: 404 }) // not-policy: HTTP status; an id is its prefix and 26 characters
   const link: LinkRow = { ...row, onePerPerson: !!row.onePerPerson }
-  return sendResponse(unit, { form, version, link, actor: input.actor, responseId: input.responseId ?? newId('fres'), answers: input.answers, email: input.email?.trim().toLowerCase() || null, at: nowMs() })
+  const sent = await sendResponse(unit, { form, version, link, actor: input.actor, responseId: input.responseId ?? newId('fres'), answers: input.answers, email: input.email?.trim().toLowerCase() || null, at: nowMs() })
+  return { responseId: sent.responseId, reference: sent.reference, ...(sent.marking ? { marking: sent.marking } : {}) }
+}
+
+/** A published version of a form, by id; null for a version of another form. */
+const versionOf = (formId: string, versionId: string) => first<VersionRow>(`SELECT ${VERSION} FROM forms_versions WHERE id = ? AND form_id = ?`, versionId, formId)
+
+/** One published version of the form on a placement, as its person may be sent it: without the correct answers or the stages. */
+export async function slotFormVersion(placementId: string, versionId: string): Promise<{ version: number, definition: Definition }> {
+  const place = await first<{ formId: string }>('SELECT form_id AS formId FROM forms_placements WHERE id = ?', placementId)
+  const version = place ? await versionOf(place.formId, versionId) : null
+  if (!version) return refuse('forms.version-not-of-form', 'That version is not one of this form\'s.', { status: 404 }) // not-policy: HTTP status
+  return { version: version.number, definition: publicDefinition(withoutWorkflow(JSON.parse(version.definition) as Definition)) }
 }
 
 // ---- custom fields, for the host's lists and exports ----
@@ -194,7 +284,7 @@ export async function eraseRecordFields(unit: UnitView, slotId: string, recordId
     sql: `UPDATE forms_placements SET response_count = response_count - (SELECT count(*) FROM forms_responses r WHERE r.placement_id = forms_placements.id AND r.id IN (${these}) AND r.state = 'submitted') WHERE id IN (SELECT placement_id FROM forms_responses WHERE id IN (${these}))`,
     params: [ids],
   })
-  unit.add({ sql: `UPDATE forms_responses SET state = 'withdrawn', unique_key = NULL, calculated = NULL, anonymised_at = ?2, updated_at = ?2 WHERE id IN (${these}) AND state = 'submitted'`, params: [ids, nowMs()] })
+  unit.add({ sql: `UPDATE forms_responses SET state = 'withdrawn', unique_key = NULL, calculated = NULL, score = NULL, passed = NULL, anonymised_at = ?2, updated_at = ?2 WHERE id IN (${these}) AND state = 'submitted'`, params: [ids, nowMs()] })
     .expect(gone.length, { code: 'forms.record.stale', reason: 'These fields changed while the record was being removed.', remedy: 'Try again.' })
   unit.audit(gone.map(r => ({ action: 'update' as const, record: ['forms.response', r.id] as [string, string], detail: { formId: r.formId, slot: slot.id, subject: recordId, withdrawn: 'record-gone' } })))
   return gone.length

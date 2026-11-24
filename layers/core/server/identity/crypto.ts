@@ -18,11 +18,6 @@ export function sessionKey(): string {
   return value
 }
 
-export function hasSessionKey(): boolean {
-  const value = useContext().env.CORE_SESSION_KEY
-  return typeof value === 'string' && value.length > 0
-}
-
 export function base64url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
