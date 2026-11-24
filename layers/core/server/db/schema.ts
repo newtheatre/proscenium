@@ -11,14 +11,14 @@ export const modules = defineTable('core_modules', {
   disabledAt: col.timestamp('disabled_at'),
   changedBy: col.account('changed_by', { role: 'actor', nullable: true }),
   manifestSeen: col.internal(text('manifest_seen')),
-}, { realm: 'system' })
+}, { practice: 'copy', realm: 'system' })
 
 export const settings = defineTable('core_settings', {
   key: col.internal(text('key').primaryKey()),
   value: col.internal(text('value').notNull()),
   updatedAt: col.timestamp('updated_at').notNull(),
   updatedBy: col.account('updated_by', { role: 'actor', nullable: true }),
-}, { realm: 'system' })
+}, { practice: 'copy', realm: 'system' })
 
 export const settingChanges = defineTable('core_setting_changes', {
   id: col.id(),

@@ -71,6 +71,16 @@ export default defineNuxtConfig({
         }
       }
       visit(pages)
+      // Practice mode (PM-S3): every live page again under /practice, where the frame draws round it
+      // and every request carries the practice mark. The pages themselves are the live ones, unchanged.
+      const practise = (page: (typeof pages)[number], top: boolean): (typeof pages)[number] => ({
+        ...page,
+        path: top ? `/practice${page.path}` : page.path,
+        name: page.name ? `practice-${page.name}` : undefined,
+        meta: { ...page.meta, layout: 'live', practice: true },
+        children: page.children?.map(child => practise(child, false)),
+      })
+      pages.push(...pages.filter(page => page.path === '/live' || page.path.startsWith('/live/')).map(page => practise(page, true)))
     },
     // The public pages do not ask the browser to fetch the signed-in shells' pages in advance.
     'build:manifest'(manifest) {

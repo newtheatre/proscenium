@@ -7,7 +7,7 @@ useHead({ bodyAttrs: { class: 'live-shell' } })
 </script>
 
 <template>
-  <div class="live-shell flex min-h-svh flex-col bg-default text-default">
+  <div class="live-shell flex min-h-[calc(100svh-var(--practice-banner,0px))] flex-col bg-default text-default">
     <SkipLink />
     <main
       id="main"

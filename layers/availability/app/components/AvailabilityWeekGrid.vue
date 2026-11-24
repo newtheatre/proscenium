@@ -1,8 +1,9 @@
 <!-- The week grid (spec part 5, "How the grid reads"): a column per day, a row per grid step, each
      cell coloured and named by its level. Drag down a day with a mouse, or tap where a stretch starts
-     and then where it ends (also Enter on the keyboard); a day's heading paints the whole day. -->
+     and then where it ends (also Enter on the keyboard); a day's heading paints the whole day.
+     Commitments (A5) lie on top, outlined and locked: painting changes what is stated beneath them. -->
 <script setup lang="ts">
-import { clockOf, DAY_MINUTES, pieceAt, rowStarts, type Day } from '../../shared/grid'
+import { clockOf, DAY_MINUTES, pieceAt, rowStarts, type Commitment, type Day } from '../../shared/grid'
 import type { ShownLevel } from '../../shared/levels'
 
 const props = defineProps<{
@@ -18,6 +19,8 @@ const props = defineProps<{
   readonly?: boolean
   /** Headings in place of dates, as for a pattern's typical week; every day can then be painted. */
   headings?: Record<string, string>
+  /** What holds the person elsewhere, by date (A5). */
+  commitments?: Record<string, Commitment[]>
 }>()
 const emit = defineEmits<{ paint: [stroke: { date: string, start: number, end: number }] }>()
 const { t } = useT()
@@ -41,7 +44,8 @@ const word = (level: ShownLevel) => t(`availability.levels.${level}`)
 const open = (date: string) => !props.readonly && (!!props.headings || (date >= props.today && date <= props.horizon))
 const named = (date: string) => props.headings?.[date] ?? dates.dayNamed(date)
 
-interface Cell { minute: number, level: ShownLevel, reason?: string, first: boolean, label: string }
+interface Cell { minute: number, level: ShownLevel, reason?: string, first: boolean, held?: string, heldFirst: boolean, label: string }
+const startsIn = (start: number, minute: number) => start >= minute && start < minute + props.step
 const columns = computed(() => props.days.map(d => ({
   date: d.date,
   open: open(d.date),
@@ -49,12 +53,16 @@ const columns = computed(() => props.days.map(d => ({
     const piece = pieceAt(d.pieces, minute)
     const level = piece?.level ?? 'unknown'
     const reason = piece?.reason
+    const held = props.commitments?.[d.date]?.find(c => c.start < minute + props.step && minute < c.end)
+    const heldLabel = held ? t(held.labelKey) : undefined
     return {
       minute,
       level,
       reason,
-      first: !!piece && (piece.start >= minute && piece.start < minute + props.step),
-      label: t('availability.grid.cell', { day: named(d.date), from: clockOf(minute), until: clockOf(Math.min(minute + props.step, DAY_MINUTES)), level: word(level) }) + (reason ? `, ${reason}` : ''),
+      first: !!piece && startsIn(piece.start, minute),
+      held: heldLabel,
+      heldFirst: !!held && (startsIn(held.start, minute) || (held.start < minute && minute === 0)),
+      label: t('availability.grid.cell', { day: named(d.date), from: clockOf(minute), until: clockOf(Math.min(minute + props.step, DAY_MINUTES)), level: word(level) }) + (reason ? `, ${reason}` : '') + (heldLabel ? `, ${t('availability.grid.held', { what: heldLabel })}` : ''),
     }
   }),
 })))
@@ -211,7 +219,21 @@ function move(event: KeyboardEvent) {
             @click="tap(d, r)"
           >
             <span
-              v-if="col.cells[r]!.first"
+              v-if="col.cells[r]!.held"
+              class="pointer-events-none absolute inset-y-0 inset-x-0.5 border-x-2 border-inverted/60 bg-default/60"
+              :class="col.cells[r]!.heldFirst ? 'border-t-2' : ''"
+              aria-hidden="true"
+            >
+              <span
+                v-if="col.cells[r]!.heldFirst"
+                class="flex items-center gap-0.5 px-0.5 font-medium text-highlighted"
+              ><UIcon
+                name="i-lucide-lock"
+                class="size-3 shrink-0"
+              /><span class="truncate">{{ col.cells[r]!.held }}</span></span>
+            </span>
+            <span
+              v-if="col.cells[r]!.first && !col.cells[r]!.held"
               class="font-medium"
             >{{ word(col.cells[r]!.level) }}<em
               v-if="col.cells[r]!.reason"

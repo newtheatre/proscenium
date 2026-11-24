@@ -8,6 +8,8 @@ import { addDays, clockOf, DAY_MINUTES } from '../shared/grid'
 import type { MeetingState, Response } from '../shared/levels'
 import { meetingInvitees } from './db/schema'
 import { peopleOf } from './find'
+import { under18 } from './safeguarding'
+import { lateFor } from '../shared/find'
 
 export interface MeetingTime { date: string, start: number, end: number }
 export interface ArrangeInput extends MeetingTime { title: string, place: string | null, notes: string | null, groupIds: string[], accountIds: string[], findId: string | null }
@@ -124,6 +126,8 @@ export interface MeetingView {
   mine: Response | null
   counts: Record<Response, number>
   invitees?: { accountId: string, name: string, response: Response }[]
+  /** F6 and M6, to the organiser only: who under 18 it keeps late, and one adult with one under-18. */
+  under18?: { late: string[], oneToOne: boolean }
 }
 
 /** S12: invitees see the meeting, their answer and the counts; the organiser sees everyone's answer. */
@@ -147,8 +151,16 @@ export async function meetingView(id: string, viewer: Actor): Promise<MeetingVie
     organiser,
     mine,
     counts,
-    ...(organiser ? { invitees: rows.map(r => ({ accountId: r.account_id, name: r.name ?? '', response: r.response })) } : {}),
+    ...(organiser ? { invitees: rows.map(r => ({ accountId: r.account_id, name: r.name ?? '', response: r.response })), under18: await warnings(rows, local) } : {}),
   }
+}
+
+/** F6 for a meeting: everyone not saying not going, on its day and end time. */
+async function warnings(rows: { account_id: string, response: Response, name: string | null }[], at: MeetingTime): Promise<MeetingView['under18']> {
+  const coming = rows.filter(r => r.response !== 'not-going')
+  const u = await under18(coming.map(r => r.account_id), [at.date])
+  const late = new Set(lateFor(u, at))
+  return { late: coming.filter(r => late.has(r.account_id)).map(r => r.name ?? ''), oneToOne: u.oneToOne }
 }
 
 export interface MeetingRowOut { id: string, title: string, from: number, to: number, state: MeetingState, response: Response | null, going: number, invited: number }
