@@ -1,10 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "7dad40b2-5b88-4e1f-bde5-eb19e1bbdba7",
+  "id": "77dd93cc-e5a3-4e27-bba6-0ea18f21ed76",
   "prevIds": [
-    "91aae97a-4c87-4070-8eef-9a204bc5fe0c",
-    "fac31bd0-474f-4c1c-93d3-8515d3a03d00"
+    "8b377ba6-2bf3-4377-adca-fccba078b30d"
   ],
   "ddl": [
     {
@@ -285,6 +284,10 @@
     },
     {
       "name": "core_accounts",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_age_markers",
       "entityType": "tables"
     },
     {
@@ -8578,6 +8581,56 @@
       "name": "anonymised_at",
       "type": "integer",
       "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "turns_18_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "recorded_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "recorded_at",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -24258,6 +24311,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_age_markers",
+      "name": "core_age_markers_turns",
+      "columns": [
+        {
+          "value": "turns_18_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_audit",
       "name": "core_audit_record",
       "columns": [
@@ -31445,6 +31512,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_age_markers",
+      "name": "core_age_markers_pk",
+      "columns": [
+        "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_credentials",
       "name": "core_credentials_pk",
       "columns": [
@@ -34148,6 +34224,12 @@
       "table": "core_accounts",
       "name": "core_accounts_pronouns_length",
       "value": "pronouns IS NULL OR length(pronouns) BETWEEN 1 AND 40",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_age_markers",
+      "name": "core_age_markers_date",
+      "value": "\"turns_18_on\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
       "entityType": "checks"
     },
     {
