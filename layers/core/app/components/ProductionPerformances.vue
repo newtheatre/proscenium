@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { noOverrides, overrideErrors, slotsInWords, type RunSlot, type ShowDefaultValues, type ShowOverrides } from '../utils/show-defaults'
+import { formOf, overridesOf, performanceBody, changeKinds } from '../utils/performance-form'
 import { parseTime } from '@internationalized/date'
 import type { HeldRefusal } from './ChangeHeld.vue'
 // A production's performances (C-03 to C-07, C-10): added one at a time or as a run (C-04), scheduled
@@ -177,71 +178,34 @@ function start(p: Performance | null) {
   editHeld.value = null
   editAnswer.value = undefined
   editing.value = p
-  form.value = { shape: p?.shape ?? 'timed', spaceId: p?.spaceId ?? usualSpace() ?? spaces.value[0]?.value ?? '', startsAt: p?.startsAt ?? null, endsAt: p?.shape === 'drop-in' ? p.endsAt : null }
-  overrides.value = noOverrides()
-  if (p) {
-    // A performance shows as changed only where it differs from the show's defaults.
-    const d = defaultsIn(p.spaceId)
-    const running = Math.round((p.endsAt - p.startsAt) / MINUTE)
-    const doors = p.doorsAt === null ? null : Math.round((p.startsAt - p.doorsAt) / MINUTE)
-    overrides.value = {
-      runningMinutes: running === d.runningMinutes ? null : running,
-      doorsBeforeMinutes: doors === null || doors === d.doorsBeforeMinutes ? null : doors,
-      intervalCount: p.intervalCount,
-      intervalMinutes: p.intervalMinutes,
-      capacity: p.capacity,
-      label: p.label ?? '',
-      bookedElsewhere: !!p.externalBookingUrl,
-      externalBookingUrl: p.externalBookingUrl ?? '',
-    }
-  }
+  form.value = formOf(p, usualSpace() ?? spaces.value[0]?.value ?? '')
+  overrides.value = overridesOf(p, p ? defaultsIn(p.spaceId) : null)
   open.value = true
 }
 async function save() {
   const space = spaces.value.find(s => s.value === form.value.spaceId)
   if (!space) return
-  const o = overrides.value
-  const d = defaultsIn(space.value)
-  const body: Record<string, unknown> = {
-    venueId: space.venueId,
-    spaceId: space.value,
-    startsAt: form.value.startsAt,
-    capacity: o.capacity,
-    intervalCount: o.intervalCount,
-    intervalMinutes: o.intervalMinutes,
-    label: o.label,
-    externalBookingUrl: o.bookedElsewhere ? o.externalBookingUrl.trim() || null : null,
-    // Left empty, the end and doors come from the show's defaults; an edit always sends them, so the end moves with the start.
-    runningMinutes: o.runningMinutes ?? (editing.value ? d.runningMinutes : null),
-    doorsBeforeMinutes: o.doorsBeforeMinutes ?? (editing.value ? d.doorsBeforeMinutes : null),
-  }
-  if (shapeChangeable.value) body.shape = form.value.shape
-  // A drop-in's hours are its own: open from and open until, with no doors or intervals.
-  if (dropIn.value) {
-    Object.assign(body, { endsAt: form.value.endsAt, runningMinutes: null, doorsBeforeMinutes: null, intervalCount: null, intervalMinutes: null })
-  }
+  const body = performanceBody({ space, form: form.value, overrides: overrides.value, defaults: defaultsIn(space.value), editing: !!editing.value, shapeChangeable: shapeChangeable.value })
   const p = editing.value
   if (!p) {
     if (await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/performances` as string, { method: 'POST', body }), 'Performance added', performanceForm.value)) open.value = false
     return
   }
-  if (p.state === 'scheduled') {
-    const kinds: Kind[] = []
-    const endsAt = dropIn.value ? form.value.endsAt! : form.value.startsAt! + (body.runningMinutes as number) * MINUTE
-    if (form.value.startsAt !== p.startsAt || endsAt !== p.endsAt) kinds.push('reschedule')
-    if (form.value.spaceId !== p.spaceId) kinds.push('move')
-    if (o.capacity !== p.capacity) kinds.push('capacity')
-    const reached = await Promise.all(kinds.map(k => reach(p.id, k)))
-    const refused = reached.find(r => r.refusal)?.refusal ?? null
-    const recheck = async () => (await Promise.all(kinds.map(k => reach(p.id, k)))).find(r => r.refusal)?.refusal ?? null
-    if (!await settled(refused, editHeld.value ? editAnswer.value : undefined, recheck, (still) => { editHeld.value = still })) {
-      if (refused && !refused.question) refusal.value = { code: refused.code, reason: refused.reason, remedy: refused.link ?? undefined } as ReturnType<typeof toRefusal>
-      return
-    }
-    const lines = reached.flatMap(r => r.lines)
-    if (lines.length && !await confirm({ verb: 'Change', thing: thing(p), consequence: lines.join(' '), button: 'Change performance' })) return
-  }
+  if (p.state === 'scheduled' && !await confirmChange(p, body)) return
   if (await run(() => call(p.id, '', 'PATCH', body), 'Performance saved', performanceForm.value)) open.value = false
+}
+/** What saving would touch on a scheduled performance and whether a module refuses it: true to go ahead. */
+async function confirmChange(p: Performance, body: Record<string, unknown>): Promise<boolean> {
+  const kinds = changeKinds(p, form.value, overrides.value, body)
+  const reached = await Promise.all(kinds.map(k => reach(p.id, k)))
+  const refused = reached.find(r => r.refusal)?.refusal ?? null
+  const recheck = async () => (await Promise.all(kinds.map(k => reach(p.id, k)))).find(r => r.refusal)?.refusal ?? null
+  if (!await settled(refused, editHeld.value ? editAnswer.value : undefined, recheck, (still) => { editHeld.value = still })) {
+    if (refused && !refused.question) refusal.value = { code: refused.code, reason: refused.reason, remedy: refused.link ?? undefined } as ReturnType<typeof toRefusal>
+    return false
+  }
+  const lines = reached.flatMap(r => r.lines)
+  return !lines.length || await confirm({ verb: 'Change', thing: thing(p), consequence: lines.join(' '), button: 'Change performance' })
 }
 
 // Moves

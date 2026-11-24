@@ -14,7 +14,8 @@ import type { Actor, UnitView } from '#kit'
 import { instantOfLocal } from '#kit/clock'
 import { assertNoBlockingClosure, closuresBetween } from '../places/closures'
 import { dayRule, operatingDayAt, type DayRule } from '../calendar'
-import { cancelPerformance, changeImpact, deletePerformance, firstRefusal, noClash, performanceDefaults, reinstatePerformance, spaceFits, syncProductionDates, turnaroundMs, updatePerformance, whyNotFree } from './performances'
+import { cancelPerformance, changeImpact, deletePerformance, firstRefusal, noClash, performanceDefaults, reinstatePerformance, spaceFits, syncProductionDates, turnaroundMs, whyNotFree } from './performances'
+import { updatePerformance } from './performances-update'
 
 export interface RunPattern {
   venueId: string
