@@ -7,7 +7,7 @@ import { defineRoute, nowMs, refuse, today } from '#kit'
 import { getFormBySlug, getVersion, movedFrom } from '../../../forms'
 import { REASONS, draftOf, shut } from '../../../responses'
 import type { Definition } from '../../../../shared/engine'
-import { withoutWorkflow } from '../../../../shared/engine'
+import { publicDefinition, withoutWorkflow } from '../../../../shared/engine'
 
 export default defineRoute({ public: true, rateLimit: 'default' }, async (event, { actor }) => {
   const form = await getFormBySlug(getRouterParam(event, 'slug'))
@@ -29,7 +29,7 @@ export default defineRoute({ public: true, rateLimit: 'default' }, async (event,
   return {
     ...head,
     state: 'open' as const,
-    definition: withoutWorkflow(JSON.parse(version.definition) as Definition),
+    definition: publicDefinition(withoutWorkflow(JSON.parse(version.definition) as Definition)),
     today: await today(),
     // Somebody not signed in says who they are by an address, unless the form keeps nobody's name.
     asksEmail: !form.anonymous && !actor.accountId,

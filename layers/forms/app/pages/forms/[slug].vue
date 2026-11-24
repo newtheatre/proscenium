@@ -4,7 +4,7 @@
      someone signed out has them kept on this device for a week, unless the form asks for something
      too private to leave on a device. -->
 <script setup lang="ts">
-import type { Answers, Definition } from '../../../shared/engine'
+import type { Answers, Definition, ShownMarking } from '../../../shared/engine'
 import { questionsOf } from '../../../shared/engine'
 import { newResponseId } from '../../../shared/response-id'
 
@@ -58,6 +58,7 @@ const emailBox = useTemplateRef<HTMLElement>('emailBox')
 const challenge = ref('')
 const failure = ref<{ reason: string, remedy?: string } | null>(null)
 const reference = ref('')
+const marking = ref<ShownMarking | null>(null)
 
 // ---- keeping answers ----
 const KEEP_FOR = 7 * 86_400_000 // not-policy: the interface specification's limit for a draft kept on a device
@@ -125,12 +126,13 @@ async function send(kept: Answers): Promise<boolean> {
   if (!emailGiven()) return false
   clearTimeout(timer)
   try {
-    const sent = await $api<{ reference: string }>(`/api/forms/open/${encodeURIComponent(slug.value)}/responses${at.value}` as string, {
+    const sent = await $api<{ reference: string, marking: ShownMarking | null }>(`/api/forms/open/${encodeURIComponent(slug.value)}/responses${at.value}` as string, {
       method: 'POST',
       body: { responseId: responseId.value, answers: kept, ...(form.value.asksEmail ? { email: email.value.trim() } : {}) },
       headers: challenge.value ? { 'cf-turnstile-response': challenge.value } : {},
     })
     reference.value = sent.reference
+    marking.value = sent.marking
     try {
       localStorage.removeItem(storageKey.value)
     }
@@ -236,6 +238,10 @@ async function send(kept: Answers): Promise<boolean> {
         @page="pageId = $event"
       >
         <template #ended="{ ending }">
+          <FormsMarkingResult
+            v-if="reference && marking && (ending === 'sent' || ending.submits)"
+            :marking="marking"
+          />
           <p
             v-if="reference && (ending === 'sent' || ending.submits)"
             class="text-muted"
