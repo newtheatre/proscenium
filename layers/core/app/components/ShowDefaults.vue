@@ -9,6 +9,8 @@ const props = defineProps<{
   defaults: ShowDefaultValues
   /** For a run: no label, and "this run" in the wording. */
   run?: boolean
+  /** A drop-in has opening hours instead: no running time, doors or intervals (C-62). */
+  dropIn?: boolean
   /** Whether anything here sells tickets. When nothing does, every performance is booked elsewhere. */
   sellsHere: boolean
 }>()
@@ -37,9 +39,9 @@ const elsewhereHelp = computed(() => !props.sellsHere
     : 'Tickets are sold on another website, not here.')
 
 const summary = computed(() => [
-  minutesInWords(running.value),
-  intervals.value ? `${intervals.value} interval${intervals.value === 1 ? '' : 's'} of ${minutesInWords(each.value)}` : 'no interval',
-  `doors ${minutesInWords(doors.value)} before`,
+  ...(props.dropIn ? [] : [minutesInWords(running.value)]),
+  ...(props.dropIn ? [] : [intervals.value ? `${intervals.value} interval${intervals.value === 1 ? '' : 's'} of ${minutesInWords(each.value)}` : 'no interval']),
+  ...(props.dropIn ? [] : [`doors ${minutesInWords(doors.value)} before`]),
   ...(seats.value !== null ? [`${seats.value} seats`] : []),
   ...(model.value.label.trim() ? [model.value.label.trim()] : []),
   ...(elsewhere.value ? ['booked elsewhere'] : []),
@@ -73,6 +75,7 @@ const summary = computed(() => [
       <div class="space-y-4 border-t border-default p-3">
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField
+            v-if="!dropIn"
             label="Running time"
             name="runningMinutes"
           >
@@ -84,6 +87,7 @@ const summary = computed(() => [
             />
           </UFormField>
           <UFormField
+            v-if="!dropIn"
             label="Doors open before"
             name="doorsBeforeMinutes"
           >
@@ -95,6 +99,7 @@ const summary = computed(() => [
             />
           </UFormField>
           <UFormField
+            v-if="!dropIn"
             label="Intervals"
             name="intervalCount"
           >
@@ -106,6 +111,7 @@ const summary = computed(() => [
             />
           </UFormField>
           <UFormField
+            v-if="!dropIn"
             label="Each interval"
             name="intervalMinutes"
           >

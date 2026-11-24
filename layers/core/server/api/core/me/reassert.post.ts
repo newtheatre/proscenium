@@ -6,7 +6,7 @@ import { sessionOf } from '../../../identity/guards'
 import { verifyAuthentication } from '../../../identity/passkeys'
 import { reassert } from '../../../identity/sessions'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   ability: 'signed-in',
   rateLimit: 'sign-in',
   input: z.object({ challengeId: z.string().max(40), response: z.looseObject({ id: z.string() }) }), // not-policy: an id is short

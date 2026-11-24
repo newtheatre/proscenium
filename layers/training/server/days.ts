@@ -18,3 +18,9 @@ export async function theatreDay(at: number): Promise<string> {
 export async function endOfLocalDay(date: string): Promise<number> {
   return instantOfLocal(addDays(date), '00:00', await theatreTimeZone()) - 1
 }
+
+/** A local date in words for a message, such as "14 March 2027". */
+export function dayInWords(date: string): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number]
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(Date.UTC(y, m - 1, d))
+}

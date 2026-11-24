@@ -4,6 +4,7 @@
 // stay where they are and it becomes an alias of the survivor. From that commit every read through the
 // account scope finds the whole person. Stage two, the job core.merge-move (merge-move.ts), then
 // re-points every other module's `move` columns and runs their merge handlers in the background.
+import { endPractice } from '../practice/session'
 import { accountScopeSql } from '#kit/accounts'
 import { all, moveAccountColumn, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { accountById, verifiedAddressesOf } from './accounts'
@@ -148,6 +149,8 @@ export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survi
     .expect(1, { code: 'core.merge.already-merged', reason: 'One of these accounts was merged a moment ago.', remedy: 'Reload and try again.' })
   if ((await isOwner(mergedAccountId)) || (await isOwner(survivorId))) guardLastOwner(unit)
   startMergeMove(unit, mergeId)
+  // The merged-away account's practice store ends; the survivor's own is untouched (Practice mode, S9).
+  await endPractice(mergedAccountId, 'merged')
   // Rule 5: every verified address of both accounts is told, read before this unit moves them.
   await queueNotice(unit, 'core.merge-notice', [...await verifiedAddressesOf(survivorId), ...await verifiedAddressesOf(mergedAccountId)])
   unit.announce('core.account.merged', { survivorId, mergedAccountId, mergeId }, { record: ['core.account', survivorId] })
