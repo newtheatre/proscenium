@@ -7,11 +7,12 @@
 import { sql } from 'drizzle-orm'
 import { all, first, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { assertTerm, getPerformance, getTerm, notify } from '#modules/core'
-import { balances, postEntries } from '#modules/finance'
+import { balances, defaultTaxCode, postEntries, vatIn, vatRates } from '#modules/finance'
 import type { OwnerEntry } from '#modules/payments'
 import { cancellations } from './db/schema'
 import { liveLines, ORDER, wordsFor, type OrderRow } from './orders'
 import { refundOrder } from './refunds'
+import { codedLines, uncoded } from './vat'
 
 const DEFERRED = { key: 'box-office.deferred-ticket-income' }
 const INCOME = { key: 'box-office.ticket-income' }
@@ -74,38 +75,64 @@ export function spread(lines: { performance_id: string, amount_minor: number }[]
   return out
 }
 
-/** Ledger entries on one account, performance by performance, each tagged with its production. */
+/**
+ * Ledger entries on one account, performance by performance, each tagged with its production. A key
+ * with a tax code (BO-78) gives the entry that code, for Payments to split the VAT out of it.
+ */
 export async function tagged(account: { key: string }, totals: Map<string, number>, sign: 1 | -1): Promise<OwnerEntry[]> {
-  return Promise.all([...totals].filter(([, amount]) => amount !== 0).map(async ([performanceId, amount]) => ({
-    account,
-    amountMinor: sign * amount,
-    performanceId,
-    productionId: (await getPerformance(performanceId)).productionId,
-  })))
+  return Promise.all([...totals].filter(([, amount]) => amount !== 0).map(async ([key, amount]) => {
+    const { performanceId, taxCode } = uncoded(key)
+    return { account, amountMinor: sign * amount, performanceId, productionId: (await getPerformance(performanceId)).productionId, ...(taxCode ? { taxCode } : {}) }
+  }))
 }
 
 /**
  * Debits for ticket money that is no longer the audience's, performance by performance: off deferred
  * income while the performance still has that much deferred, and off ticket income for whatever the
  * daily task has already recognised, so deferred income never goes below nothing for a performance.
+ * Deferred income holds money without its VAT, so what is owed is grossed up at each key's code.
  */
 export async function takenBack(totals: Map<string, number>): Promise<OwnerEntry[]> {
+  const rates = await vatRates()
   const deferred = new Map<string, number>()
   const recognised = new Map<string, number>()
-  for (const [performanceId, amount] of totals) {
+  const owedNet = new Map<string, number>()
+  for (const [key, amount] of totals) {
+    const { performanceId, taxCode } = uncoded(key)
     // A liability's balance is a credit, so what is still deferred shows as a negative number.
-    const owed = Math.max(0, -(await balances({ systemKeys: [DEFERRED.key], performanceId })).reduce((sum, b) => sum + b.balanceMinor, 0))
-    deferred.set(performanceId, Math.min(amount, owed))
-    recognised.set(performanceId, amount - Math.min(amount, owed))
+    if (!owedNet.has(performanceId)) owedNet.set(performanceId, Math.max(0, -(await balances({ systemKeys: [DEFERRED.key], performanceId })).reduce((sum, b) => sum + b.balanceMinor, 0)))
+    const rate = taxCode ? rates.get(taxCode) ?? 0 : 0
+    const net = amount - vatIn(amount, rate)
+    const takeNet = Math.min(net, owedNet.get(performanceId)!)
+    const take = takeNet === net ? amount : Math.min(amount, Math.round(takeNet * (BASIS + rate) / BASIS))
+    owedNet.set(performanceId, owedNet.get(performanceId)! - takeNet)
+    deferred.set(key, take)
+    recognised.set(key, amount - take)
   }
   return [...await tagged(DEFERRED, deferred, 1), ...await tagged(INCOME, recognised, 1)]
 }
 
-/** What a refund of an order's part takes back off deferred income, by performance. */
+/**
+ * Box office's own transfers of ticket money (a fee kept, an exchange, a pass credit) move it without
+ * its VAT, which was accounted for when it was paid: takenBack's debits at their net amounts, with no
+ * code, and what they come to in all and by performance, for the credits that balance them.
+ */
+export async function takenBackNet(totals: Map<string, number>): Promise<{ entries: OwnerEntry[], totalMinor: number, byPerformance: Map<string, number> }> {
+  const rates = await vatRates()
+  const entries = (await takenBack(totals))
+    .map(({ taxCode, ...e }) => ({ ...e, amountMinor: e.amountMinor - vatIn(e.amountMinor, taxCode ? rates.get(taxCode) ?? 0 : 0) }))
+    .filter(e => e.amountMinor !== 0)
+  const byPerformance = new Map<string, number>()
+  for (const e of entries) byPerformance.set(e.performanceId!, (byPerformance.get(e.performanceId!) ?? 0) + e.amountMinor)
+  return { entries, totalMinor: entries.reduce((sum, e) => sum + e.amountMinor, 0), byPerformance }
+}
+
+const BASIS = 10_000 // not-policy: basis points in a whole
+
 export async function refundEntries(orderId: string, refund: { id: string, amountMinor: number }): Promise<OwnerEntry[]> {
   // A refund of what a paid ticket cost beyond what a pass took of it is for that ticket's performance.
-  const covered = await all<{ performance_id: string, amount_minor: number }>('SELECT l.performance_id, c.refund_minor AS amount_minor FROM box_office_pass_covers c JOIN box_office_order_lines l ON l.id = c.line_id WHERE c.refund_id = ? ORDER BY c.id', refund.id)
-  if (covered.length) return takenBack(spread(covered, refund.amountMinor))
+  const covered = await all<{ id: string, performance_id: string, amount_minor: number }>('SELECT l.id, l.performance_id, c.refund_minor AS amount_minor FROM box_office_pass_covers c JOIN box_office_order_lines l ON l.id = c.line_id WHERE c.refund_id = ? ORDER BY c.id', refund.id)
+  if (covered.length) return takenBack(spread(await codedLines(covered), refund.amountMinor))
   const cancellation = await first<{ line_ids: string }>('SELECT line_ids FROM box_office_cancellations WHERE refund_id = ?', refund.id)
   // A refund asked for with a cancellation is for that cancellation's lines. One asked for on its
   // own, from Payments' screens, is set against the order's cancelled lines first.
@@ -113,9 +140,15 @@ export async function refundEntries(orderId: string, refund: { id: string, amoun
   const lines = await all<{ id: string, performance_id: string, amount_minor: number }>(
     'SELECT id, performance_id, amount_minor FROM box_office_order_lines WHERE kind = \'ticket\' AND (order_id = ?1 OR order_id IN (SELECT id FROM box_office_orders WHERE split_from_id = ?1 AND intent_id = (SELECT intent_id FROM box_office_orders WHERE id = ?1))) ORDER BY (state = \'live\'), id', orderId)
   const ids = cancellation ? new Set(JSON.parse(cancellation.line_ids) as string[]) : null
-  const totals = spread(ids ? lines.filter(l => ids.has(l.id)) : lines, refund.amountMinor)
-  if (!totals.size) return [{ account: DEFERRED, amountMinor: refund.amountMinor, performanceId: null }]
+  const totals = spread(await codedLines(ids ? lines.filter(l => ids.has(l.id)) : lines), refund.amountMinor)
+  if (!totals.size) return [{ account: DEFERRED, amountMinor: refund.amountMinor, performanceId: null, taxCode: await defaultTaxCode() }]
   return takenBack(totals)
+}
+
+/** The fee kept: off what was deferred, net of VAT, and onto booking fee income, performance by performance. */
+async function keptFee(keptBack: Map<string, number>): Promise<OwnerEntry[]> {
+  const { entries, byPerformance } = await takenBackNet(keptBack)
+  return [...entries, ...await tagged(FEES, byPerformance, -1)]
 }
 
 /** Cancels lines of a reserved or confirmed order for a member of staff, with any refund. */
@@ -180,9 +213,10 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
   // The fee kept stops being owed to the audience now. It is whatever of each performance's lines
   // the refund does not take back, so the two together always empty what the lines had deferred.
   if (feeMinor > 0) {
-    const back = spread(chosen, refundMinor)
+    const codedChosen = await codedLines(chosen)
+    const back = spread(codedChosen, refundMinor)
     const keptBack = new Map<string, number>()
-    for (const line of chosen) keptBack.set(line.performance_id, (keptBack.get(line.performance_id) ?? 0) + line.amount_minor)
+    for (const line of codedChosen) keptBack.set(line.performance_id, (keptBack.get(line.performance_id) ?? 0) + line.amount_minor)
     for (const [performanceId, amount] of back) keptBack.set(performanceId, keptBack.get(performanceId)! - amount)
     await postEntries(unit, {
       key: `box-office:cancellation:${cancellationId}:fee`,
@@ -190,7 +224,7 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
       kind: 'transfer',
       currency: order.currency,
       postedBy: input.by,
-      entries: [...await takenBack(keptBack), ...await tagged(FEES, keptBack, -1)],
+      entries: await keptFee(keptBack),
     })
   }
 

@@ -110,7 +110,7 @@ export const NOV_17 = Date.UTC(2026, 10, 17, 12)
 export const author = person(['forms.form.create', 'forms.form.edit', 'forms.form.publish'], { name: 'Ada Author', reassertedAt: NOV_17 })
 
 export async function req<T = any>(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> | null = author): Promise<{ status: number, body: T }> {
-  const headers = method === 'POST' ? { 'idempotency-key': newId('req') } : {}
+  const headers: Record<string, string> = method === 'POST' ? { 'idempotency-key': newId('req') } : {}
   const response = await call(handle, method, path, { actor: actor ?? undefined, body, headers })
   return { status: response.status, body: await response.json() as T }
 }
