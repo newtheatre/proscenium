@@ -7,7 +7,7 @@ export type { NotifyAddressOptions, NotificationType } from './notifications/sen
 export { getBrand } from './brand/theme'
 export { operatingDayOf, dayBounds, operatingDayAt, operatingDayBounds, recentDays, dayRule } from './calendar'
 export type { FigureAnswer, FigureChart, FigureText, HomeFigure } from './points/home-figure'
-export { attachFile, detachFile, fileUrl, storeFile } from './files/service'
+export { attachFile, detachFile, fileUrl, stageUpload, storeFile } from './files/service'
 export type { FileAccess } from './points/file-access'
 export type { RecordResolver } from './points/record-resolver'
 export type { UpcomingItem, UpcomingSource } from './points/upcoming'

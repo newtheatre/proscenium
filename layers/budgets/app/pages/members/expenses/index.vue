@@ -1,10 +1,13 @@
-<!-- Expenses in the members' area (BC-15): the person's own requests to spend, open ones first, each
-     with where it has got to and any note from whoever decided it. "Ask to spend" makes a new one; a
-     request nothing has been spent against can be withdrawn. Claims join this page with their slice. -->
+<!-- Expenses in the members' area (BC-15, BC-19): the person's own claims and requests to spend, open
+     ones first, each with where it has got to. "Make a claim" starts a draft and opens it; "Ask to
+     spend" makes a request; a request nothing has been spent against can be withdrawn. -->
 <script setup lang="ts">
+import type { ClaimState } from '../../../composables/useBudgetText'
+
 type RequestState = 'requested' | 'approved' | 'declined' | 'withdrawn' | 'fulfilled' | 'lapsed'
 interface Mine { id: string, lineName: string, budgetName: string, currency: string, amountMinor: number, description: string, neededBy: string | null, state: RequestState, decisionNote: string | null, fulfilledMinor: number, lapsesOn: string | null, createdAt: number }
 interface OfferedLine { id: string, name: string, budgetId: string, budgetName: string, currency: string }
+interface MyClaim { id: string, number: string | null, title: string, state: ClaimState, currency: string, totalMinor: number, approvedMinor: number | null, createdAt: number }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -12,8 +15,16 @@ const { toRefusal } = useRefusal()
 const { day } = useDates()
 const toast = useToast()
 const text = useBudgetText()
-const { data, status, error, refresh } = await useAPI<{ requests: Mine[], lines: OfferedLine[] }>('/api/budgets/requests', { key: 'budgets:my-requests' })
+const { data, status, error, refresh } = await useAPI<{ canClaim: boolean, canRequest: boolean, claims: MyClaim[], requests: Mine[], lines: OfferedLine[] }>('/api/budgets/expenses', { key: 'budgets:expenses' })
 const asking = ref(false)
+const claiming = ref(false)
+const approvedRequests = computed(() => (data.value?.requests ?? []).filter(r => r.state === 'approved'))
+const empty = computed(() => !!data.value && !data.value.claims.length && !data.value.requests.length)
+const claimName = (c: MyClaim) => c.number ? t('budgets.screens.claims.numbered', { number: c.number, title: c.title }) : c.title
+const actions = computed(() => [
+  ...(data.value?.canClaim ? [{ label: t('budgets.screens.claims.make'), icon: 'i-lucide-receipt', disabled: !data.value.lines.length, onSelect: () => { claiming.value = true } }] : []),
+  ...(data.value?.canRequest ? [{ label: t('budgets.screens.requests.ask'), icon: 'i-lucide-hand-coins', disabled: !data.value.lines.length, onSelect: () => { asking.value = true } }] : []),
+])
 
 function describe(r: Mine) {
   return [
@@ -47,9 +58,7 @@ async function asked() {
     :description="t('budgets.screens.requests.page-help')"
   >
     <template #primary>
-      <PageActions
-        :actions="[{ label: t('budgets.screens.requests.ask'), icon: 'i-lucide-hand-coins', disabled: !data?.lines.length, onSelect: () => { asking = true } }]"
-      />
+      <PageActions :actions="actions" />
     </template>
     <DataBoundary
       :data="data"
@@ -58,34 +67,64 @@ async function asked() {
       @retry="refresh()"
     >
       <EmptyState
-        v-if="data && !data.requests.length"
+        v-if="data && empty"
         icon="i-lucide-receipt"
         :title="t('budgets.screens.requests.none')"
         :description="t(data.lines.length ? 'budgets.screens.requests.none-help' : 'budgets.screens.requests.no-lines')"
       />
-      <RecordList
+      <div
         v-else-if="data"
-        :label="t('budgets.navigation.expenses.label')"
+        class="space-y-6"
       >
-        <RecordListItem
-          v-for="r in data.requests"
-          :key="r.id"
-          icon="i-lucide-hand-coins"
-          :name="text.money(r.amountMinor, r.currency)"
-          :description="describe(r)"
-          :muted="!withdrawable(r) && r.state !== 'fulfilled'"
+        <PageSection
+          v-if="data.claims.length"
+          :title="t('budgets.screens.claims.yours')"
         >
-          <template #below>
-            <StatusBadge v-bind="text.requestState(r.state)" />
-          </template>
-          <RowActions
-            v-if="withdrawable(r)"
-            :items="[{ label: t('budgets.screens.requests.withdraw'), icon: 'i-lucide-x', onSelect: () => withdraw(r) }]"
-            :label="t('budgets.screens.requests.actions')"
-          />
-        </RecordListItem>
-      </RecordList>
+          <RecordList :label="t('budgets.screens.claims.yours')">
+            <RecordListItem
+              v-for="c in data.claims"
+              :key="c.id"
+              icon="i-lucide-receipt"
+              :name="claimName(c)"
+              :description="text.money(c.approvedMinor ?? c.totalMinor, c.currency)"
+              :to="`/members/expenses/claims/${c.id}`"
+            >
+              <template #below>
+                <StatusBadge v-bind="text.claimState(c.state)" />
+              </template>
+            </RecordListItem>
+          </RecordList>
+        </PageSection>
+        <PageSection
+          v-if="data.requests.length"
+          :title="t('budgets.screens.requests.yours')"
+        >
+          <RecordList :label="t('budgets.screens.requests.yours')">
+            <RecordListItem
+              v-for="r in data.requests"
+              :key="r.id"
+              icon="i-lucide-hand-coins"
+              :name="text.money(r.amountMinor, r.currency)"
+              :description="describe(r)"
+              :muted="!withdrawable(r) && r.state !== 'fulfilled'"
+            >
+              <template #below>
+                <StatusBadge v-bind="text.requestState(r.state)" />
+              </template>
+              <RowActions
+                v-if="withdrawable(r)"
+                :items="[{ label: t('budgets.screens.requests.withdraw'), icon: 'i-lucide-x', onSelect: () => withdraw(r) }]"
+                :label="t('budgets.screens.requests.actions')"
+              />
+            </RecordListItem>
+          </RecordList>
+        </PageSection>
+      </div>
     </DataBoundary>
+    <BudgetsClaimNewDialog
+      v-model:open="claiming"
+      :requests="approvedRequests"
+    />
     <BudgetsRequestDialog
       v-model:open="asking"
       :lines="data?.lines ?? []"

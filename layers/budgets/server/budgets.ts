@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { all, first, localDate, newId, nowMs, refuse, today, useSetting, type UnitView } from '#kit'
 import { balances, budgetLineTotals, financeYearOf, rangeOf } from '#modules/finance'
 import { listTerms } from '#modules/core'
+import { pendingOn } from './pending'
 
 export const SCOPES = ['production', 'department', 'season', 'general'] as const
 export const STATES = ['draft', 'proposed', 'approved', 'closed'] as const
@@ -140,6 +141,7 @@ export async function budgetLines(budget: Budget): Promise<{ lines: Line[], subB
   const committed = new Map<string, number>()
   for (const sub of subs) if (LIVE.has(sub.state)) committed.set(sub.parentLineId, (committed.get(sub.parentLineId) ?? 0) + sub.totalMinor)
   for (const r of await approvedRequests(budget.id)) committed.set(r.lineId, (committed.get(r.lineId) ?? 0) + r.amountMinor)
+  const pending = await pendingOn(budget.id)
   const tagged = await budgetLineTotals(rows.map(r => r.id))
   const lines: Line[] = []
   for (const row of rows) {
@@ -150,7 +152,7 @@ export async function budgetLines(budget: Budget): Promise<{ lines: Line[], subB
       continue
     }
     const committedMinor = committed.get(row.id) ?? 0
-    const pendingMinor = 0
+    const pendingMinor = pending.get(row.id) ?? 0
     const actualMinor = tagged.get(row.id) ?? 0
     const remainingMinor = budgetedMinor - committedMinor - pendingMinor - actualMinor
     lines.push({ ...row, figures: { budgetedMinor, committedMinor, pendingMinor, actualMinor, remainingMinor, over: remainingMinor < 0 } })
