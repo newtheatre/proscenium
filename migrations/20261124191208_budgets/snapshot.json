@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "32f15e24-8359-43da-a418-d8b737a7d998",
+  "id": "112b3bb5-4e73-4f6b-bf58-adb7fe0dff70",
   "prevIds": [
     "76c0746f-e613-4c76-a427-8e6102dc74cc",
     "de9215a8-6895-4472-83e2-9416521ad4a8"
@@ -281,6 +281,26 @@
     },
     {
       "name": "box_office_tickets",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_budgets",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_categories",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_line_amounts",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_line_sources",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_lines",
       "entityType": "tables"
     },
     {
@@ -8552,6 +8572,446 @@
       "entityType": "columns"
     },
     {
+      "table": "budgets_budgets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "scope",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "season_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "department_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "year_starts_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "parent_line_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "proposed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "approved_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "approved_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "closed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "description",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "sort_order",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "archived_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "line_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "stage",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "set_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "set_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_sources",
+      "name": "line_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_sources",
+      "name": "account_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budget_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "category_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "sort_order",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "archived_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "calendar_feed_tokens",
       "name": "account_id",
       "type": "text",
@@ -9088,16 +9548,6 @@
       "notNull": true,
       "autoincrement": false,
       "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "companies_companies",
-      "name": "name_key",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "''",
       "generated": null,
       "entityType": "columns"
     },
@@ -30010,6 +30460,166 @@
       "entityType": "indexes"
     },
     {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "production_id IS NOT NULL AND state <> 'closed'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_season",
+      "columns": [
+        {
+          "value": "season_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "season_id IS NOT NULL AND state <> 'closed'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_department",
+      "columns": [
+        {
+          "value": "department_term_id",
+          "isExpression": false
+        },
+        {
+          "value": "year_starts_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "department_term_id IS NOT NULL AND state <> 'closed'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_year",
+      "columns": [
+        {
+          "value": "year_starts_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_parent",
+      "columns": [
+        {
+          "value": "parent_line_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "budgets_categories_slug",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "budgets_categories_name",
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "archived_at IS NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "budgets_line_amounts_line",
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false
+        },
+        {
+          "value": "stage",
+          "isExpression": false
+        },
+        {
+          "value": "set_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_name",
+      "columns": [
+        {
+          "value": "budget_id",
+          "isExpression": false
+        },
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "archived_at IS NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_budget",
+      "columns": [
+        {
+          "value": "budget_id",
+          "isExpression": false
+        },
+        {
+          "value": "sort_order",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "calendar_feed_tokens",
       "name": "calendar_feed_tokens_token",
       "columns": [
@@ -30102,20 +30712,6 @@
       ],
       "isUnique": true,
       "where": "archived_at IS NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "companies_companies",
-      "name": "companies_companies_name_key",
-      "columns": [
-        {
-          "value": "name_key",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -36397,6 +36993,111 @@
       "entityType": "fks"
     },
     {
+      "table": "budgets_budgets",
+      "name": "fk_budgets_budgets_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "fk_budgets_budgets_season_id_core_seasons_id_fk",
+      "columns": [
+        "season_id"
+      ],
+      "tableTo": "core_seasons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "fk_budgets_budgets_department_term_id_core_terms_id_fk",
+      "columns": [
+        "department_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "fk_budgets_line_amounts_line_id_budgets_lines_id_fk",
+      "columns": [
+        "line_id"
+      ],
+      "tableTo": "budgets_lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_line_sources",
+      "name": "fk_budgets_line_sources_line_id_budgets_lines_id_fk",
+      "columns": [
+        "line_id"
+      ],
+      "tableTo": "budgets_lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "fk_budgets_lines_budget_id_budgets_budgets_id_fk",
+      "columns": [
+        "budget_id"
+      ],
+      "tableTo": "budgets_budgets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "fk_budgets_lines_category_id_budgets_categories_id_fk",
+      "columns": [
+        "category_id"
+      ],
+      "tableTo": "budgets_categories",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "companies_agreement_responses",
       "name": "fk_companies_agreement_responses_agreement_id_companies_agreements_id_fk",
       "columns": [
@@ -39552,6 +40253,16 @@
       "entityType": "pks"
     },
     {
+      "table": "budgets_line_sources",
+      "name": "budgets_line_sources_pk",
+      "columns": [
+        "line_id",
+        "account_key"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "calendar_feed_tokens",
       "name": "calendar_feed_tokens_pk",
       "columns": [
@@ -40461,6 +41172,42 @@
     {
       "table": "box_office_tickets",
       "name": "box_office_tickets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "budgets_categories_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "budgets_line_amounts_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_pk",
       "columns": [
         "id"
       ],
@@ -42742,6 +43489,84 @@
       "table": "box_office_tickets",
       "name": "box_office_tickets_requirement",
       "value": "\"requirement_ref\" IS NULL OR \"requirement_account_id\" IS NOT NULL OR \"requirement_evidence_id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_scope",
+      "value": "\"scope\" IN ('production', 'department', 'season', 'general')",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_state",
+      "value": "\"state\" IN ('draft', 'proposed', 'approved', 'closed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_scope_ref",
+      "value": "(\"scope\" = 'production') = (\"production_id\" IS NOT NULL) AND (\"scope\" = 'season') = (\"season_id\" IS NOT NULL) AND (\"scope\" = 'department') = (\"department_term_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "budgets_categories_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "budgets_categories_description_length",
+      "value": "length(\"description\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "budgets_line_amounts_amount",
+      "value": "\"amount_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "budgets_line_amounts_stage",
+      "value": "\"stage\" IN ('draft', 'approved')",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "budgets_line_amounts_reason",
+      "value": "\"reason\" IS NULL OR length(\"reason\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_kind",
+      "value": "\"kind\" IN ('expense', 'income')",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_category",
+      "value": "\"kind\" = 'income' OR \"category_id\" IS NOT NULL",
       "entityType": "checks"
     },
     {

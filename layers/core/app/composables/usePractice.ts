@@ -64,9 +64,9 @@ export function usePractiseThisScreen() {
 export function usePracticeSignals() {
   const overlay = useOverlay()
   return {
-    /** A change committed in the store: the panel is read again. Starting and leaving are not in the store. */
-    changed(request: string, options: unknown) {
-      if (isChangeRequest(options) && !OUTSIDE.some(p => request.startsWith(p))) void refreshNuxtData(PANEL)
+    /** A change committed in the store, or a read that ticked a task: the panel is read again. Starting and leaving are not in the store. */
+    changed(request: string, options: unknown, ticked = false) {
+      if (ticked || (isChangeRequest(options) && !OUTSIDE.some(p => request.startsWith(p)))) void refreshNuxtData(PANEL)
     },
     /** The store has gone under a framed page: the Ended screen says why (PM-S6). */
     ended() {
