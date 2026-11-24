@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "c9b9511e-2003-4fa8-b04f-2db921f3061a",
+  "id": "a54d953e-b170-4d90-86e2-830930257988",
   "prevIds": [
-    "a630e1d2-57da-4fc1-aa64-9ebe4e5b6cab"
+    "7e019a45-0f91-4a78-93c1-035d8a9515b6"
   ],
   "ddl": [
     {
@@ -203,6 +203,10 @@
       "entityType": "tables"
     },
     {
+      "name": "box_office_headcount_taps",
+      "entityType": "tables"
+    },
+    {
       "name": "box_office_holds",
       "entityType": "tables"
     },
@@ -276,6 +280,10 @@
     },
     {
       "name": "box_office_tickets",
+      "entityType": "tables"
+    },
+    {
+      "name": "calendar_feed_tokens",
       "entityType": "tables"
     },
     {
@@ -436,6 +444,10 @@
     },
     {
       "name": "core_performance_effect_exceptions",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_performance_line_ups",
       "entityType": "tables"
     },
     {
@@ -636,10 +648,6 @@
     },
     {
       "name": "front_of_house_assignments",
-      "entityType": "tables"
-    },
-    {
-      "name": "front_of_house_calendar_feeds",
       "entityType": "tables"
     },
     {
@@ -5885,6 +5893,116 @@
       "entityType": "columns"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "reverses_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "reason_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "tapped_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "device_label",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "tapped_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "received_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "offline",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "box_office_holds",
       "name": "id",
       "type": "text",
@@ -8417,6 +8535,46 @@
     {
       "table": "box_office_tickets",
       "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "token_hash",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "generation",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "created_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -11875,6 +12033,116 @@
       "entityType": "columns"
     },
     {
+      "table": "core_performance_line_ups",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "announced",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_performance_runs",
       "name": "id",
       "type": "text",
@@ -12246,6 +12514,16 @@
     },
     {
       "table": "core_performances",
+      "name": "shape",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'timed'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -12511,6 +12789,26 @@
       "notNull": true,
       "autoincrement": false,
       "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "line_up_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -16817,46 +17115,6 @@
     {
       "table": "front_of_house_assignments",
       "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "account_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "token_hash",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "generation",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "1",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "created_at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -28905,6 +29163,38 @@
       "entityType": "indexes"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_performance",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "tapped_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_reverses",
+      "columns": [
+        {
+          "value": "reverses_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "reverses_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "box_office_holds",
       "name": "box_office_holds_order",
       "columns": [
@@ -29616,6 +29906,20 @@
         }
       ],
       "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "calendar_feed_tokens",
+      "name": "calendar_feed_tokens_token",
+      "columns": [
+        {
+          "value": "token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -30341,6 +30645,56 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_order",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "sort",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_once",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"core_performance_line_ups\".\"production_id\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_performance_runs",
       "name": "core_performance_runs_production",
       "columns": [
@@ -30549,6 +30903,20 @@
       ],
       "isUnique": false,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "core_production_credits_performance",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "\"core_production_credits\".\"performance_id\" IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -31694,20 +32062,6 @@
         }
       ],
       "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "front_of_house_calendar_feeds_token",
-      "columns": [
-        {
-          "value": "token_hash",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -35513,6 +35867,36 @@
       "entityType": "fks"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "fk_box_office_headcount_taps_reverses_id_box_office_headcount_taps_id_fk",
+      "columns": [
+        "reverses_id"
+      ],
+      "tableTo": "box_office_headcount_taps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "fk_box_office_headcount_taps_reason_term_id_core_terms_id_fk",
+      "columns": [
+        "reason_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "box_office_holds",
       "name": "fk_box_office_holds_order_id_box_office_orders_id_fk",
       "columns": [
@@ -36175,6 +36559,36 @@
       "entityType": "fks"
     },
     {
+      "table": "core_performance_line_ups",
+      "name": "fk_core_performance_line_ups_performance_id_core_performances_id_fk",
+      "columns": [
+        "performance_id"
+      ],
+      "tableTo": "core_performances",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "fk_core_performance_line_ups_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_performance_runs",
       "name": "fk_core_performance_runs_production_id_core_productions_id_fk",
       "columns": [
@@ -36370,6 +36784,36 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "fk_core_production_credits_performance_id_core_performances_id_fk",
+      "columns": [
+        "performance_id"
+      ],
+      "tableTo": "core_performances",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_credits",
+      "name": "fk_core_production_credits_line_up_id_core_performance_line_ups_id_fk",
+      "columns": [
+        "line_up_id"
+      ],
+      "tableTo": "core_performance_line_ups",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
       "nameExplicit": false,
       "entityType": "fks"
     },
@@ -39313,6 +39757,15 @@
       "entityType": "pks"
     },
     {
+      "table": "calendar_feed_tokens",
+      "name": "calendar_feed_tokens_pk",
+      "columns": [
+        "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_access_profiles",
       "name": "core_access_profiles_pk",
       "columns": [
@@ -39530,15 +39983,6 @@
       "name": "forms_response_drafts_pk",
       "columns": [
         "response_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "front_of_house_calendar_feeds",
-      "name": "front_of_house_calendar_feeds_pk",
-      "columns": [
-        "account_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -40069,6 +40513,15 @@
       "entityType": "pks"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "box_office_holds",
       "name": "box_office_holds_pk",
       "columns": [
@@ -40458,6 +40911,15 @@
     {
       "table": "core_passkeys",
       "name": "core_passkeys_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_pk",
       "columns": [
         "id"
       ],
@@ -42142,6 +42604,30 @@
       "entityType": "checks"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_kind",
+      "value": "\"kind\" IN ('in', 'out', 'undo')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_quantity",
+      "value": "\"quantity\" BETWEEN 1 AND 50",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_reverses",
+      "value": "(\"kind\" = 'undo') = (\"reverses_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_device",
+      "value": "\"device_label\" IS NULL OR length(\"device_label\") <= 40",
+      "entityType": "checks"
+    },
+    {
       "table": "box_office_holds",
       "name": "box_office_holds_kind",
       "value": "\"kind\" IN ('basket', 'payment', 'reservation', 'staff', 'waitlist_offer')",
@@ -42613,6 +43099,24 @@
       "table": "core_performance_access",
       "name": "core_performance_access_detail",
       "value": "\"detail\" IS NULL OR length(\"detail\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_name",
+      "value": "length(\"name\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performance_line_ups",
+      "name": "core_performance_line_ups_minutes",
+      "value": "\"minutes\" IS NULL OR \"minutes\" BETWEEN 1 AND 600",
       "entityType": "checks"
     },
     {
