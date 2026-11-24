@@ -109,7 +109,7 @@ async function myLevels(accountId: string, slots: PollSlot[]): Promise<Record<st
   const dates = slots.map(s => s.date).sort()
   const rows = (await rowsOf([accountId], dates[0]!, dates.at(-1)!)).get(accountId)!
   const fallback = rows.unmarked ?? await useSetting('availability.entry.unmarked-default') as Unmarked
-  return Object.fromEntries(slots.map(s => [s.id, worstBetween(resolveDay(s.date, rows.lines, rows.exceptions, fallback, () => true), s.start, s.end)]))
+  return Object.fromEntries(slots.map(s => [s.id, worstBetween(resolveDay(s.date, rows, { unmarked: fallback, showReason: () => true }), s.start, s.end)]))
 }
 
 /** S8 for the organiser, S9 for a person asked; anyone else is told there is no such poll. */

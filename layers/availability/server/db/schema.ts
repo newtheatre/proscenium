@@ -1,10 +1,10 @@
 // Availability: a person's own word on when they are free (spec part 2). The gate's six tables:
 // profiles, weekly patterns and their lines, dated exceptions, and requests with the people asked.
-// Polls add a find, its people, slots and votes; meetings their invitees; calendar imports come later. Times of day are wall clock.
+// Polls add a find, its people, slots and votes; meetings their invitees; calendar imports a connection and its busy blocks. Times of day are wall clock.
 import { integer, text, check, index, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { col, defineTable } from '#kit/db'
-import { ASKED_STATES, LEVELS, MEETING_STATES, POLL_STATES, REQUEST_STATES, RESPONSES, UNMARKED, VOTES } from '../../shared/levels'
+import { ASKED_STATES, CONNECTION_KINDS, CONNECTION_STATES, IMPORTED_LEVELS, LEVELS, MEETING_STATES, POLL_STATES, REQUEST_STATES, RESPONSES, TENTATIVE_AS, UNMARKED, VOTES } from '../../shared/levels'
 
 const inList = (values: readonly string[]) => sql.raw(values.map(v => `'${v}'`).join(', '))
 const clock = (c: unknown) => sql`(${c} GLOB '[0-2][0-9]:[0-5][0-9]' AND ${c} <= '24:00')`
@@ -295,4 +295,54 @@ export const meetingInvitees = defineTable('availability_meeting_invitees', {
   ],
 })
 
-export const tables = { profiles, patterns, patternLines, exceptions, requests, requestPeople, finds, findPeople, findSlots, findVotes, meetings, meetingInvitees }
+/** A person's own outside calendar, read busy-only (I1 to I5). The address and any token are sealed. */
+export const calendarConnections = defineTable('availability_calendar_connections', {
+  id: col.id(),
+  accountId: col.account('account_id', { role: 'subject' }),
+  kind: col.internal(text('kind', { enum: CONNECTION_KINDS }).notNull()),
+  label: col.freeText(text('label').notNull()),
+  icsUrl: col.special('ics_url'),
+  token: col.special('token'),
+  providerSubject: col.personal(text('provider_subject')),
+  tentativeAs: col.internal(text('tentative_as', { enum: TENTATIVE_AS }).notNull().default('maybe')),
+  state: col.internal(text('state', { enum: CONNECTION_STATES }).notNull().default('active')),
+  lastSyncedAt: col.timestamp('last_synced_at'),
+  lastTriedAt: col.timestamp('last_tried_at'),
+  failures: col.internal(integer('failures').notNull().default(0)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'avcc',
+  realm: 'members',
+  onErasure: 'delete-row',
+  extra: t => [
+    index('availability_calendar_connections_account').on(t.accountId),
+    index('availability_calendar_connections_due').on(t.state, t.lastTriedAt),
+    check('availability_calendar_connections_label', sql`length(${t.label}) BETWEEN 1 AND 40`),
+    check('availability_calendar_connections_kind', sql`${t.kind} IN (${inList(CONNECTION_KINDS)})`),
+    check('availability_calendar_connections_tentative', sql`${t.tentativeAs} IN (${inList(TENTATIVE_AS)})`),
+    check('availability_calendar_connections_state', sql`${t.state} IN (${inList(CONNECTION_STATES)})`),
+    check('availability_calendar_connections_source', sql`(${t.kind} = 'ics' AND ${t.icsUrl} IS NOT NULL) OR (${t.kind} != 'ics' AND ${t.token} IS NOT NULL)`),
+  ],
+})
+
+/** One busy or maybe stretch read from a connection; nothing else about the event (I3). Replaced whole on each refresh. */
+export const importedBlocks = defineTable('availability_imported_blocks', {
+  id: col.id(),
+  connectionId: col.ref('availability_calendar_connections'),
+  startsAt: col.timestamp('starts_at').notNull(),
+  endsAt: col.timestamp('ends_at').notNull(),
+  level: col.internal(text('level', { enum: IMPORTED_LEVELS }).notNull()),
+}, {
+  id: 'avib',
+  realm: 'members',
+  subject: { via: 'connection_id' },
+  onErasure: 'delete-row',
+  extra: t => [
+    index('availability_imported_blocks_connection').on(t.connectionId, t.startsAt),
+    check('availability_imported_blocks_times', sql`${t.endsAt} > ${t.startsAt}`),
+    check('availability_imported_blocks_level', sql`${t.level} IN (${inList(IMPORTED_LEVELS)})`),
+  ],
+})
+
+export const tables = { profiles, patterns, patternLines, exceptions, requests, requestPeople, finds, findPeople, findSlots, findVotes, meetings, meetingInvitees, calendarConnections, importedBlocks }

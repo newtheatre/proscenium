@@ -2,9 +2,11 @@
 // the people the viewer may plan for (A7). Rows are read by their owner through the account scope.
 import { sql, type SQL } from 'drizzle-orm'
 import { nowMs, refuse, theatreTimeZone, useDb, useSetting, type Actor } from '#kit'
-import { localDateOf } from '#kit/clock'
-import type { Level, ShownLevel, Unmarked } from '../shared/levels'
-import { blocksBetween, type ExceptionRow, type LineRow } from './levels'
+import { instantOfLocal, localDateOf } from '#kit/clock'
+import type { ImportedLevel, Level, ShownLevel, Unmarked } from '../shared/levels'
+import { blocksBetween, type ExceptionRow, type ImportSpan, type LineRow } from './levels'
+import { localSpans } from './commitments'
+import { addDays } from '../shared/grid'
 import { plannable, type Who } from './planning'
 
 const DAY = 86_400_000 // not-policy: unit of time
@@ -14,12 +16,12 @@ const WINDOW_DAYS = 62 // not-policy: rule F2's widest window
 const owner = (column: string) => sql.raw(`coalesce((SELECT a.merged_into_id FROM core_accounts a WHERE a.id = ${column}), ${column})`)
 const among = (column: string, people: string[]): SQL => sql`${owner(column)} IN (SELECT value FROM json_each(${JSON.stringify(people)}))`
 
-export interface PersonRows { unmarked: Unmarked | null, changedAt: number | null, checkedTo: string | null, lines: LineRow[], exceptions: ExceptionRow[] }
+export interface PersonRows { unmarked: Unmarked | null, changedAt: number | null, checkedTo: string | null, lines: LineRow[], exceptions: ExceptionRow[], imported: Record<string, ImportSpan[]> }
 
 /** Everything the levels of these people over the dates rest on: one read per table. */
 export async function rowsOf(people: string[], fromDate: string, toDate: string): Promise<Map<string, PersonRows>> {
   const db = useDb()
-  const out = new Map<string, PersonRows>(people.map(p => [p, { unmarked: null, changedAt: null, checkedTo: null, lines: [], exceptions: [] }]))
+  const out = new Map<string, PersonRows>(people.map(p => [p, { unmarked: null, changedAt: null, checkedTo: null, lines: [], exceptions: [], imported: {} }]))
   if (!people.length) return out
   const profiles = await db.all<{ who: string, unmarked_means: Unmarked | null, changed_at: number, checked_to: string | null }>(
     sql`SELECT ${owner('account_id')} AS who, unmarked_means, changed_at, checked_to FROM availability_profiles WHERE ${among('account_id', people)} ORDER BY changed_at`)
@@ -40,7 +42,22 @@ export async function rowsOf(people: string[], fromDate: string, toDate: string)
   for (const e of exceptions) {
     out.get(e.who)!.exceptions.push({ id: e.id, firstDate: e.first_date, lastDate: e.last_date, weekdays: e.weekdays ? JSON.parse(e.weekdays) : null, from: e.from_local, until: e.until_local, level: e.level, reason: e.reason, reasonShared: !!e.reason_shared, createdAt: e.created_at })
   }
+  await addImported(out, people, fromDate, toDate)
   return out
+}
+
+/** I6: each person's imported blocks over the dates, cut into local days. */
+async function addImported(out: Map<string, PersonRows>, people: string[], fromDate: string, toDate: string): Promise<void> {
+  const zone = await theatreTimeZone()
+  const [from, to] = [instantOfLocal(fromDate, '00:00', zone), instantOfLocal(addDays(toDate, 1), '00:00', zone)]
+  const blocks = await useDb().all<{ who: string, starts_at: number, ends_at: number, level: ImportedLevel, label: string }>(
+    sql`SELECT ${owner('c.account_id')} AS who, b.starts_at, b.ends_at, b.level, c.label
+      FROM availability_imported_blocks b JOIN availability_calendar_connections c ON c.id = b.connection_id
+      WHERE ${among('c.account_id', people)} AND b.ends_at > ${from} AND b.starts_at < ${to}`)
+  for (const b of blocks) {
+    const days = out.get(b.who)!.imported
+    for (const s of localSpans(Math.max(b.starts_at, from), Math.min(b.ends_at, to), zone)) (days[s.date] ??= []).push({ start: s.start, end: s.end, level: b.level, label: b.label })
+  }
 }
 
 export interface LevelBlock { accountId: string, from: number, to: number, level: ShownLevel, reason?: string }
@@ -60,7 +77,7 @@ export async function levels(who: Who, from: number, to: number, viewer: Actor):
   for (const accountId of people) {
     const r = rows.get(accountId)!
     const mayRead = accountId === viewer.accountId || reasons.has(accountId)
-    for (const b of blocksBetween({ from, to, zone, lines: r.lines, exceptions: r.exceptions, unmarked: r.unmarked ?? fallback, showReason: e => accountId === viewer.accountId || (mayRead && e.reasonShared) }))
+    for (const b of blocksBetween({ from, to, zone, rows: r, unmarked: r.unmarked ?? fallback, showReason: e => accountId === viewer.accountId || (mayRead && e.reasonShared) }))
       blocks.push({ accountId, ...b })
   }
   return { blocks, hidden }

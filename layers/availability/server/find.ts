@@ -102,7 +102,7 @@ export async function findTime(viewer: Actor, input: FindInput): Promise<FindRes
   for (const id of ids) {
     const r = rows.get(id)!
     const mayRead = id === viewer.accountId || reasons.has(id)
-    weeks[id] = Object.fromEntries(dates.map(d => [d, resolveDay(d, r.lines, r.exceptions, r.unmarked ?? fallback, e => id === viewer.accountId || (mayRead && e.reasonShared))]))
+    weeks[id] = Object.fromEntries(dates.map(d => [d, resolveDay(d, r, { unmarked: r.unmarked ?? fallback, showReason: e => id === viewer.accountId || (mayRead && e.reasonShared) })]))
   }
   await addCommitments(weeks, ids, dates, zone)
   const names = ids.length

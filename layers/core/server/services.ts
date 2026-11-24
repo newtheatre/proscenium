@@ -68,3 +68,5 @@ export { currentVersion as currentPolicyVersion } from './policies/versions'
 export type { PolicyVersion } from './policies/versions'
 export { readMeasure, listMeasures, mayReadMeasure } from './measures/service'
 export type { MeasureAnswer, MeasureListing } from './measures/service'
+// A web address that is HTTPS and not on a private or local network (C-49), for any module that fetches one a person gave.
+export { refusedAddress } from './webhooks/address'

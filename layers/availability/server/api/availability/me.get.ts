@@ -41,7 +41,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     profile: { unmarkedMeans: rows.unmarked, unmarked, changedAt: rows.changedAt, checkedTo: rows.checkedTo },
     patterns: patterns.map(p => ({ id: p.id, label: p.label, startsOn: p.starts_on, endsOn: p.ends_on, lines: lines.filter(l => l.pattern_id === p.id).map(l => ({ weekday: l.weekday, from: l.from_local, until: l.until_local, level: l.level })) })),
     exceptions: exceptions.map(e => ({ id: e.id, firstDate: e.first_date, lastDate: e.last_date, weekdays: e.weekdays ? JSON.parse(e.weekdays as string) : null, from: e.from_local, until: e.until_local, level: e.level, reason: e.reason, reasonShared: !!e.reason_shared, onBehalf: e.entered_by !== me, requestId: e.request_id })),
-    days: dates.map(date => ({ date, pieces: resolveDay(date, rows.lines, rows.exceptions, unmarked, () => true) })),
+    days: dates.map(date => ({ date, pieces: resolveDay(date, rows, { unmarked, showReason: () => true, own: true }) })),
     commitments: (await commitmentsOf([me], dates, await theatreTimeZone()))[me] ?? {},
     requests: await myRequests(me),
   }

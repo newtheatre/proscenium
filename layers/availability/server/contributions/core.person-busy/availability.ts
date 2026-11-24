@@ -14,7 +14,7 @@ export default {
     const out: PersonBusyItem[] = []
     for (const accountId of accountIds) {
       const r = rows.get(accountId)!
-      for (const b of blocksBetween({ from, to, zone, lines: r.lines, exceptions: r.exceptions, unmarked: 'unknown', showReason: () => false })) {
+      for (const b of blocksBetween({ from, to, zone, rows: r, unmarked: 'unknown', showReason: () => false })) {
         if (b.level === 'busy') out.push({ accountId, kind: 'unavailable', from: b.from, to: b.to, firm: false, labelKey: 'availability.unavailable', record: null })
       }
     }

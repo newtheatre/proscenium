@@ -79,6 +79,13 @@ function when(e: Entry): string {
           :label="t('availability.asked.title')"
         />
         <UButton
+          to="/members/availability/calendars"
+          icon="i-lucide-calendar-plus"
+          color="neutral"
+          variant="ghost"
+          :label="t('availability.mine.calendars')"
+        />
+        <UButton
           to="/members/availability/privacy"
           icon="i-lucide-eye"
           color="neutral"

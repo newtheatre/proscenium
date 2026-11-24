@@ -44,7 +44,7 @@ const word = (level: ShownLevel) => t(`availability.levels.${level}`)
 const open = (date: string) => !props.readonly && (!!props.headings || (date >= props.today && date <= props.horizon))
 const named = (date: string) => props.headings?.[date] ?? dates.dayNamed(date)
 
-interface Cell { minute: number, level: ShownLevel, reason?: string, first: boolean, held?: string, heldFirst: boolean, label: string }
+interface Cell { minute: number, level: ShownLevel, reason?: string, imported?: string, first: boolean, held?: string, heldFirst: boolean, label: string }
 const startsIn = (start: number, minute: number) => start >= minute && start < minute + props.step
 const columns = computed(() => props.days.map(d => ({
   date: d.date,
@@ -59,10 +59,11 @@ const columns = computed(() => props.days.map(d => ({
       minute,
       level,
       reason,
+      imported: piece?.imported,
       first: !!piece && startsIn(piece.start, minute),
       held: heldLabel,
       heldFirst: !!held && (startsIn(held.start, minute) || (held.start < minute && minute === 0)),
-      label: t('availability.grid.cell', { day: named(d.date), from: clockOf(minute), until: clockOf(Math.min(minute + props.step, DAY_MINUTES)), level: word(level) }) + (reason ? `, ${reason}` : '') + (heldLabel ? `, ${t('availability.grid.held', { what: heldLabel })}` : ''),
+      label: t('availability.grid.cell', { day: named(d.date), from: clockOf(minute), until: clockOf(Math.min(minute + props.step, DAY_MINUTES)), level: word(level) }) + (reason ? `, ${reason}` : '') + (piece?.imported ? `, ${t('availability.grid.imported', { label: piece.imported })}` : '') + (heldLabel ? `, ${t('availability.grid.held', { what: heldLabel })}` : ''),
     }
   }),
 })))
@@ -213,6 +214,7 @@ function move(event: KeyboardEvent) {
               minute % 60 === 0 ? 'border-t' : '',
               col.open ? 'cursor-pointer' : 'cursor-not-allowed opacity-60',
               inStroke(d, r) ? 'ring-2 ring-inset ring-primary' : '',
+              col.cells[r]!.imported ? 'availability-imported' : '',
             ]"
             @pointerdown="down($event, d, r)"
             @pointerenter="enter(d, r)"
@@ -236,9 +238,9 @@ function move(event: KeyboardEvent) {
               v-if="col.cells[r]!.first && !col.cells[r]!.held"
               class="font-medium"
             >{{ word(col.cells[r]!.level) }}<em
-              v-if="col.cells[r]!.reason"
+              v-if="col.cells[r]!.reason || col.cells[r]!.imported"
               class="ms-1 font-normal"
-            >{{ col.cells[r]!.reason }}</em></span>
+            >{{ col.cells[r]!.reason ?? col.cells[r]!.imported }}</em></span>
           </button>
         </div>
       </div>
@@ -247,6 +249,9 @@ function move(event: KeyboardEvent) {
 </template>
 
 <style scoped>
+.availability-imported {
+  background-image: repeating-linear-gradient(45deg, color-mix(in oklab, currentColor 18%, transparent) 0 2px, transparent 2px 7px);
+}
 .availability-hatch {
   background-image: repeating-linear-gradient(135deg, var(--ui-bg-accented) 0 4px, transparent 4px 8px);
 }
