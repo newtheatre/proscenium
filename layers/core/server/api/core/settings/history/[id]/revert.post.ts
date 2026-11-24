@@ -1,7 +1,7 @@
 // Revert (settings build brief): sets a setting back to the value a history row shows it had before,
 // through the ordinary save, so the same ability, rules and confirmation apply and the change gets
 // its own history row with the reason "Reverted". A sensitive setting has no Revert.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { changeSetting, defineRoute, first, refuse } from '#kit'
 import { defaultValue } from '#kit/settings'
@@ -13,7 +13,7 @@ export default defineRoute({
   rateLimit: 'write',
   input: z.object({ confirm: z.boolean().optional() }),
 }, async (event, { input, actor, unit }) => {
-  const id = getRouterParam(event, 'id') ?? ''
+  const id = getRouterParam(event, 'id', { decode: true }) ?? ''
   const row = await first<{ key: string, old_value: string | null }>('SELECT key, old_value FROM core_setting_changes WHERE id = ?', id)
   if (!row) return refuse('core.not-found', 'There is no such change.', { status: 404 })
   const key = currentKey(row.key)

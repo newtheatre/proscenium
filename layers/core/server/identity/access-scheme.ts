@@ -4,7 +4,7 @@
 // sealed in special columns, never listed or searched, and read by a module only for a purpose the
 // person has switched on, through accessNeedsFor, which audits every read and answers nothing,
 // the same way, whatever the reason.
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { all, can, createUnit, first, isEnabled, log, newId, nowMs, openSpecial, refuse, sealSpecial, usePoint, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
 import { notify } from '../notifications/notify'
 import { notifyAddress } from '../notifications/send'
@@ -608,7 +608,7 @@ export const APPLY_PATH = '/account/access/apply'
  * core.sign-in.invite-lifetime; after that, signing in and pressing "Apply" does the same. The email
  * goes once the unit has committed, so a refused invitation sends nothing.
  */
-export async function inviteToApply(unit: UnitView, event: H3Event, actor: Actor, input: { name: string, address: string }): Promise<{ accountId: string }> {
+export async function inviteToApply(unit: UnitView, event: RequestEvent, actor: Actor, input: { name: string, address: string }): Promise<{ accountId: string }> {
   if (!(await schemeEnabled())) NOT_FOUND()
   const address = normaliseAddress(input.address)
   const found = await findOrCreateAccount(unit, { address, name: input.name, origin: 'invite' })

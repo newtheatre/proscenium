@@ -2,7 +2,7 @@
 // to it. The ability is declared audit: 'read', so every opening is recorded, and nobody opens their
 // own. The needs the form offers come too, so the page can name each tick and apply on their behalf;
 // for a person who has not applied it answers their name and no application, for that purpose.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, refuse, useSetting } from '#kit'
 import { accountById, accountLabel } from '../../../../identity/accounts'
@@ -10,7 +10,7 @@ import { historyOf, needOptions, openForReview } from '../../../../identity/acce
 
 export default defineRoute({
   ability: 'core.access-scheme.read',
-  record: event => ['core.account', getRouterParam(event, 'id')],
+  record: event => ['core.account', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
   input: z.object({}),
 }, async (_event, { record }) => {

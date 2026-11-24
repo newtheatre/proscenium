@@ -1,6 +1,6 @@
 // Change a reservation before taking payment (R-4): tickets off, tickets on, or a ticket's type.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { amendReservation } from '../../../../desk'
 
@@ -8,7 +8,7 @@ const ids = z.array(z.string()).max(50) // not-policy: more lines than any order
 
 export default defineRoute({
   ability: 'box-office.order.take-payment',
-  record: event => ['box-office.order', getRouterParam(event, 'id')],
+  record: event => ['box-office.order', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({

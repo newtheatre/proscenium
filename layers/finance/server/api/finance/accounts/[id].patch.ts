@@ -1,12 +1,12 @@
 // Renames, recodes or retires an account. A module's declared account cannot be retired, and an
 // account is never deleted.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, first, nowMs, refuse } from '#kit'
 
 export default defineRoute({
   ability: 'finance.account.manage',
-  record: event => ['finance.account', getRouterParam(event, 'id')],
+  record: event => ['finance.account', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     code: z.string().trim().min(1).max(40).optional(), // not-policy: a nominal code's bound

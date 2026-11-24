@@ -3,7 +3,7 @@
 // out, it starts today. A second press returns the first renewal (R3). The check runs again only
 // where the scheme says so (V6), and may send the renewal to staff like an application. A renewal of
 // a paid scheme waits for its fee at the renewal price (P1) and starts when paid (A1).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, refuse, today } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
@@ -24,7 +24,7 @@ export default defineRoute({
     reference: z.string().trim().max(254).nullish(), // not-policy: an address's bound
   }),
 }, async (event, { input, actor, unit }) => {
-  const id = getRouterParam(event, 'id')!
+  const id = getRouterParam(event, 'id', { decode: true })!
   const accountId = actor.accountId!
   const old = await first<{ scheme_id: string, ends_on: string | null }>(
     `SELECT scheme_id, ends_on FROM membership_memberships WHERE id = ?1 AND state = 'active' AND account_id IN (${accountScopeSql('?2')})`, id, accountId,

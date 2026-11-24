@@ -2,7 +2,7 @@
 // Each carries the id the device gave it, so a batch sent again after a lost answer admits nobody
 // twice. The answer says, for each, what the server made of it.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { takeOffline } from '../../../../../door-offline'
 
@@ -11,7 +11,7 @@ const MOST = 500 // not-policy: shape bound, a full house sent at once
 
 export default defineRoute({
   ability: 'box-office.ticket.admit',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     deviceLabel: z.string().trim().min(1).max(40).optional(), // not-policy: shape bound

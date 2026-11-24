@@ -1,6 +1,6 @@
 // Joining a scheme (MEM-11, MEM-12, MEM-16): the work is joinScheme's, shared with a request for a
 // manual check made while booking a member ticket.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { joinScheme } from '../../../../join'
@@ -19,4 +19,4 @@ export default defineRoute({
     // The answers to the scheme's application form, when it has one (MEM-12).
     form: z.object({ formId: z.string(), answers: z.record(z.string(), z.unknown()) }).nullish(),
   }),
-}, async (event, { input, actor, unit }) => joinScheme(unit, actor, await requireScheme(getRouterParam(event, 'id')), input))
+}, async (event, { input, actor, unit }) => joinScheme(unit, actor, await requireScheme(getRouterParam(event, 'id', { decode: true })), input))

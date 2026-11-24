@@ -1,5 +1,5 @@
 // Changes a shift's places, times or briefing. People on it are told of a new call time.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, refuse } from '#kit'
 import { getShift } from '../../../../shifts'
@@ -7,7 +7,7 @@ import { updateShift } from '../../../../rota'
 
 export default defineRoute({
   ability: 'front-of-house.shift.manage',
-  record: event => ['front-of-house.shift', getRouterParam(event, 'id')],
+  record: event => ['front-of-house.shift', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     places: z.number().int().min(1).max(50).optional(), // not-policy: shape bound, as the table's CHECK

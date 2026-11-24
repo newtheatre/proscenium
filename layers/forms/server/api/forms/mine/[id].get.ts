@@ -1,6 +1,6 @@
 // A person's own response (FB-304): every answer they gave, including the special-category ones,
 // which are theirs to read. Nobody else's response is ever found here.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, refuse, today } from '#kit'
 import { getForm, getVersion } from '../../../forms'
 import { getResponse, owns, readAnswers, storedFigures, toAnswers } from '../../../responses'
@@ -11,7 +11,7 @@ import { ownHistory, ownRights, ownStatus } from '../../../stages'
 const pick = <T>(from: Record<string, T> | null, ids: Set<string>) => from && Object.fromEntries(Object.entries(from).filter(([id]) => ids.has(id)))
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (event, { actor }) => {
-  const response = await getResponse(getRouterParam(event, 'id') ?? '')
+  const response = await getResponse(getRouterParam(event, 'id', { decode: true }) ?? '')
   if (!response || response.state !== 'submitted' || !await owns(response, actor)) return refuse('forms.response.not-found', 'There is no response here.', { status: 404 })
   const form = (await getForm(response.formId))!
   const version = (await getVersion(response.versionId))!

@@ -2,7 +2,7 @@
 // terms included, marked, so a space that still uses one shows its label), the run presets a space
 // may start from, and the theatre's own preset and doors time its empty fields stand for.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, defineRoute, nowMs, useSetting } from '#kit'
 import { getVenue } from '../../../../places/service'
 import { listTerms } from '../../../../vocabularies/service'
@@ -11,7 +11,7 @@ import { theatreDefaults } from '../../../../programme/performances'
 
 export default defineRoute({
   ability: 'core.venue.manage',
-  record: event => ['core.venue', getRouterParam(event, 'id')],
+  record: event => ['core.venue', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
   input: z.object({}),
 }, async (_event, { record }) => {

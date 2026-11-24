@@ -3,7 +3,7 @@
 // session. The seller is then taken back to the screen that started the sale, such as the till, when
 // the address names one, and otherwise to their till session, with the result.
 import { z } from 'zod'
-import { getQuery, getRouterParam, sendRedirect } from 'h3'
+import { getQuery, getRouterParam, sendRedirect } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { handoffReturned } from '../../../../handoff'
 
@@ -12,9 +12,9 @@ export default defineRoute({
   rateLimit: 'public-form',
   input: z.object({}),
 }, async (event) => {
-  const attemptId = getRouterParam(event, 'attempt') ?? ''
+  const attemptId = getRouterParam(event, 'attempt', { decode: true }) ?? ''
   const query = getQuery(event)
   const text = (name: string) => typeof query[name] === 'string' ? query[name] as string : undefined
-  const { state, intentId, returnTo } = await handoffReturned(attemptId, getRouterParam(event, 'proof') ?? '', { status: text('smp-status'), txCode: text('smp-tx-code'), foreignTxId: text('foreign-tx-id') })
+  const { state, intentId, returnTo } = await handoffReturned(attemptId, getRouterParam(event, 'proof', { decode: true }) ?? '', { status: text('smp-status'), txCode: text('smp-tx-code'), foreignTxId: text('foreign-tx-id') })
   return sendRedirect(event, `${returnTo ?? '/console/payments/sessions'}?${new URLSearchParams({ attempt: attemptId, intent: intentId, result: state })}`)
 })

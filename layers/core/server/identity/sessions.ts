@@ -1,7 +1,7 @@
 // Sessions: one row per signed-in browser. The cookie holds a random token; the row holds its
 // keyed hash. Every request reads the row, so ending a session takes effect on the next request
 // with no cache to wait out (ID-13, "ended session stops on next request").
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { first, newId, nowMs, useContext, useSetting, type UnitView } from '#kit'
 import { digest, randomToken } from './crypto'
 import type { ProviderId } from './providers'
@@ -39,7 +39,7 @@ const SEEN_EVERY = 5 * 60_000 // not-policy: last-used time is shown to the minu
  * Starts a session for a proven account, in the caller's unit. The cookie is set only once the
  * unit has committed, so a refused sign-in never leaves a cookie behind.
  */
-export async function startSession(unit: UnitView, event: H3Event, options: { accountId: string, methods: Method[], assurance: Assurance }): Promise<{ sessionId: string }> {
+export async function startSession(unit: UnitView, event: RequestEvent, options: { accountId: string, methods: Method[], assurance: Assurance }): Promise<{ sessionId: string }> {
   const token = randomToken()
   const at = nowMs()
   const lifetime = await useSetting('core.sessions.lifetime') as number
@@ -54,7 +54,7 @@ export async function startSession(unit: UnitView, event: H3Event, options: { ac
 }
 
 /** Ends this browser's session, in the caller's unit, and clears its cookie. */
-export function endCurrentSession(unit: UnitView, event: H3Event, sessionId: string, reason: 'signed_out' | 'credential_changed' = 'signed_out'): void {
+export function endCurrentSession(unit: UnitView, event: RequestEvent, sessionId: string, reason: 'signed_out' | 'credential_changed' = 'signed_out'): void {
   unit.add({ sql: 'UPDATE core_sessions SET ended_at = ?, ended_reason = ? WHERE id = ? AND ended_at IS NULL', params: [nowMs(), reason, sessionId] })
   unit.afterCommit(() => clearSessionCookie(event))
 }
@@ -71,7 +71,7 @@ export function endSessionsOf(unit: UnitView, accountId: string, reason: 'ended_
  * The session this request carries, if it is live: not ended, not past its lifetime or idle limit,
  * and on an account that can act. Read once per request.
  */
-export async function currentSession(event: H3Event): Promise<CurrentSession | null> {
+export async function currentSession(event: RequestEvent): Promise<CurrentSession | null> {
   const context = useContext()
   // The promise is kept, so calls that arrive together (a page's server render makes several) share one read.
   const found = await ((context.cache.identitySession as Promise<CurrentSession | null> | undefined) ?? (context.cache.identitySession = readSession(event)))
@@ -79,7 +79,7 @@ export async function currentSession(event: H3Event): Promise<CurrentSession | n
   return found
 }
 
-async function readSession(event: H3Event): Promise<CurrentSession | null> {
+async function readSession(event: RequestEvent): Promise<CurrentSession | null> {
   const token = readCookie(event, SESSION_COOKIE)
   if (!token || token.length > 100) return null // not-policy: a session token is 43 characters
   const at = nowMs()

@@ -4,7 +4,7 @@
 // still points at it (V11); an entry missing from the new file stops matching and loses its name,
 // unless staff added it by hand: that one stays until a file holds it too, which makes it the file's.
 // With dryRun nothing is written: the answer says how many rows would load and which would not.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, newId, nowMs, refuse, today } from '#kit'
 import { addDays } from '../../../../dates'
@@ -16,7 +16,7 @@ const MOST_ROWS = 10_000 // not-policy: what one unit of chunks can carry; a lar
 
 export default defineRoute({
   ability: 'membership.verification-list.manage',
-  record: event => ['membership.verification-list', getRouterParam(event, 'id')],
+  record: event => ['membership.verification-list', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'export',
   input: z.object({
     file: z.string().max(2_000_000), // not-policy: the request body D1 can carry

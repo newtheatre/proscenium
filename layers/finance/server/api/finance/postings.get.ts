@@ -3,7 +3,7 @@
 // an account's code or name, or by its source's reference. A row's canReverse says whether the
 // viewer may reverse it: an original posting, for someone allowed to correct.
 import { and, count, sql, type SQL } from 'drizzle-orm'
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { all, can, defineRoute, readListQuery, searchWords, useDb } from '#kit'
 import { accountLabel } from '#modules/core'
 import { performanceNames, sourceRecords } from '../../sources'

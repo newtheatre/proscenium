@@ -1,6 +1,6 @@
 // Identity's access provider: who is asking (from the session cookie), what they hold (from live
 // grants) and which abilities the theatre attached to facts. The kit's `can` does the rest.
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import type { AccessProvider, Actor } from '#kit'
 import { first, useContext } from '#kit'
 import { currentSession } from './sessions'
@@ -12,11 +12,11 @@ import { checkOrigin } from './web'
 const LIMITED_ROUTES = [/^\/api\/core\/me$/, /^\/api\/core\/me\/passkeys(\/options)?$/, /^\/api\/core\/sign-out$/]
 
 export const identityAccess: AccessProvider = {
-  async actor(event: H3Event): Promise<Actor> {
+  async actor(event: RequestEvent): Promise<Actor> {
     await checkOrigin(event)
     const session = await currentSession(event)
     if (!session) return { kind: 'anonymous' }
-    if (session.limited && !LIMITED_ROUTES.some(r => r.test(event.path.split('?')[0]!))) return { kind: 'anonymous' }
+    if (session.limited && !LIMITED_ROUTES.some(r => r.test(event.url.pathname))) return { kind: 'anonymous' }
     const cache = useContext().cache
     const key = `identityName:${session.accountId}`
     const row = await ((cache[key] as Promise<{ name: string | null, preferred_name: string | null } | null> | undefined)

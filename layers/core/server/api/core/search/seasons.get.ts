@@ -1,6 +1,6 @@
 // The command palette's search for seasons (core.search-source), by name. There are a handful, so
 // it filters in memory as the seasons list does.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { listSeasons } from '../../../programme/service'
 

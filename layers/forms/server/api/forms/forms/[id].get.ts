@@ -1,5 +1,5 @@
 // A form for its builder: the form, its draft and the versions published so far.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, can, defineRoute, isRefusal, today, useSetting } from '#kit'
 import { accountLabel } from '#modules/core'
 import type { Definition } from '../../../../shared/engine'
@@ -8,7 +8,7 @@ import { actionList } from '../../../actions'
 import { getLink } from '../../../responses'
 import { accountName, getDraft, getFields, listVersions, requireForm } from '../../../forms'
 
-export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default' }, async (_event, { record, actor }) => {
+export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id', { decode: true })], rateLimit: 'default' }, async (_event, { record, actor }) => {
   const form = await requireForm(record!.id)
   const [draft, versions, fields] = await Promise.all([getDraft(form.id), listVersions(form.id), getFields(form.id)])
   // The operating day, for the preview's date conditions. Unknown until the theatre's time zone is set.

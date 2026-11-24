@@ -13,11 +13,11 @@ import { Refusal } from './refusal'
 import { currentContext } from './context-store'
 import type { Actor, Grant } from './context'
 import type { AbilityName } from './registry-types'
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 
 export interface AccessProvider {
   /** Who is making this request. */
-  actor: (event: H3Event) => Promise<Actor>
+  actor: (event: RequestEvent) => Promise<Actor>
   /** Every grant the actor holds, through roles or directly. */
   grants?: (actor: Actor) => Promise<Grant[]>
   /** The theatre's mapping of facts to abilities. A privileged ability appears only once confirmed. */

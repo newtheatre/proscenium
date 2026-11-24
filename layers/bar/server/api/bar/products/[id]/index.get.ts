@@ -1,7 +1,7 @@
 // One product for its page (S11): its sizes with their prices on every list, the categories it may
 // move to, the choices it may ask, and whether the viewer may set prices and record allergens as well.
 // For someone who sets up stock, each size's recipe and the stock items a recipe may name.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, can, defineRoute, refuse } from '#kit'
 import { catalogue } from '../../../../catalogue'
 import { choiceGroups } from '../../../../choices'
@@ -9,7 +9,7 @@ import { recipe } from '../../../../stock'
 
 export default defineRoute({
   ability: 'bar.product.manage',
-  record: event => ['bar.product', getRouterParam(event, 'id')],
+  record: event => ['bar.product', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record, actor }) => {
   const { categories, lists, currency } = await catalogue()

@@ -1,13 +1,13 @@
 // Renames a term or changes its description or icon (C-20). Records hold the id, so every one
 // shows the new label at once and none is rewritten.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, idSchema } from '#kit'
 import { updateTerm } from '../../../../../../vocabularies/service'
 
 export default defineRoute({
   ability: 'core.vocabulary.manage',
-  record: event => ['core.vocabulary', getRouterParam(event, 'key')],
+  record: event => ['core.vocabulary', getRouterParam(event, 'key', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     label: z.string().trim().min(1).max(80).optional(), // not-policy: the label's bounds
@@ -16,7 +16,7 @@ export default defineRoute({
     groupId: idSchema('tgr').nullable().optional(),
   }),
 }, async (event, { input, unit, record }) => {
-  const id = getRouterParam(event, 'id') ?? ''
+  const id = getRouterParam(event, 'id', { decode: true }) ?? ''
   await updateTerm(unit, record!.id, id, input)
   return { id }
 })

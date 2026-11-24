@@ -1,5 +1,5 @@
 // The latest stock movements, newest first, of one item or at one location.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { movements } from '../../../stock-moves'
 

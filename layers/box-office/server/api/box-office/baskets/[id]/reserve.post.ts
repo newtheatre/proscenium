@@ -2,7 +2,7 @@
 // signed in gives an address, and is sent a link to prove it when the theatre asks for that.
 // No bot check here: holding the seats took one, and only that basket's secret token opens this.
 import { z } from 'zod'
-import { getHeader, getRouterParam } from 'h3'
+import { getRequestHeader, getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { fromRequest } from '../../../../links'
 import { requestReservation } from '../../../../reservations'
@@ -19,5 +19,5 @@ export default defineRoute({
   }).strict(),
 }, async (event, { input, unit }) => {
   await fromRequest(event)
-  return requestReservation(unit.view(), { orderId: getRouterParam(event, 'id')!, token: getHeader(event, 'x-basket-token') ?? '', ...input })
+  return requestReservation(unit.view(), { orderId: getRouterParam(event, 'id', { decode: true })!, token: getRequestHeader(event, 'x-basket-token') ?? '', ...input })
 })

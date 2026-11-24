@@ -1,7 +1,7 @@
 // Imports members into a scheme from a file (MEM-49). With dryRun nothing is written: the answer says
 // how many rows would import, how many of them have already ended, and which would be refused. Otherwise the rows are queued as bulk jobs
 // and the answer says how many were queued; each job checks its rows again before writing.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, newId, refuse, today } from '#kit'
 import { requireScheme } from '../../../../schemes'
@@ -9,7 +9,7 @@ import { MOST_ROWS, ROWS_PER_JOB, checkRows, parseMembers } from '../../../../im
 
 export default defineRoute({
   ability: 'membership.membership.import',
-  record: event => ['membership.scheme', getRouterParam(event, 'id')],
+  record: event => ['membership.scheme', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'export',
   input: z.object({
     file: z.string().max(2_000_000), // not-policy: the request body D1 can carry

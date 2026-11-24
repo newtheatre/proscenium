@@ -1,7 +1,7 @@
 // A run's wheelchair spaces, for its Tickets tab (Matt 2026-11-17, 21:58): the layouts of the spaces
 // its performances are in, the run's choice (a layout or numbers, or none: each space's usual), and
 // how many performances to come have a choice of their own.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, defineRoute } from '#kit'
 import { getProduction, listPerformances, placeName } from '#modules/core'
 import { listLayouts, runChoice } from '../../../../layouts'
@@ -9,7 +9,7 @@ import { listBands } from '../../../../setup'
 
 export default defineRoute({
   ability: 'box-office.performance.manage',
-  record: event => ['core.production', getRouterParam(event, 'id')],
+  record: event => ['core.production', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record }) => {
   const production = await getProduction(record!.id!)

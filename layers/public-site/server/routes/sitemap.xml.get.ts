@@ -2,7 +2,7 @@
 // site/content/pages (less those kept from search engines), what's on and the archive, and every public production, venue and season.
 // Past shows leave it while they are not public; with the public site off it is not found.
 import { bindings } from '#kit/bindings'
-import { defineEventHandler, getHeader, getRequestURL, setResponseHeaders, setResponseStatus } from 'h3'
+import { defineHandler, getRequestHeader, getRequestURL, setResponseStatus } from 'nuxt/server'
 import { queryCollection } from '@nuxt/content/server'
 import { runInContext } from '#kit/context'
 import { isEnabled, siteOrigin, useSetting } from '#kit'
@@ -10,10 +10,10 @@ import { publicProgrammePaths } from '#modules/core'
 
 const escape = (text: string) => text.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
 
-export default defineEventHandler(async (event) => {
+export default defineHandler(async (event) => {
   const env = bindings(event)
   if (!env?.DB) throw new Error('No DB binding on this request')
-  return runInContext({ env, requestId: getHeader(event, 'cf-ray') ?? crypto.randomUUID(), requestOrigin: getRequestURL(event).origin }, async () => {
+  return runInContext({ env, requestId: getRequestHeader(event, 'cf-ray') ?? crypto.randomUUID(), requestOrigin: getRequestURL(event).origin }, async () => {
     if (!await isEnabled('public-site')) {
       setResponseStatus(event, 404) // not-policy: HTTP status
       return 'Not found'
@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
       ...await publicProgrammePaths({ pastVisible }),
     ])]
     const origin = await siteOrigin()
-    setResponseHeaders(event, { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'public, max-age=3600' }) // not-policy: an hour's caching for crawlers
+    for (const [name, value] of Object.entries({ 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'public, max-age=3600' })) event.res.headers.set(name, String(value)) // not-policy: an hour's caching for crawlers
     return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${paths.map(p => `  <url><loc>${escape(origin + p)}</loc></url>`).join('\n')}\n</urlset>\n`
   })
 })

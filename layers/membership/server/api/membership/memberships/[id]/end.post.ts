@@ -1,6 +1,6 @@
 // Staff end a membership, with a note saying why (tab 4, "Ending"). An application's open charge is
 // voided with it.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { charger } from '../../../../charge'
@@ -8,7 +8,7 @@ import { endMembership } from '../../../../ending'
 
 export default defineRoute({
   ability: 'membership.membership.end',
-  record: event => ['membership.membership', getRouterParam(event, 'id')],
+  record: event => ['membership.membership', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({ note: z.string().trim().min(1).max(500) }), // not-policy: the bound of a staff note
 }, async (_event, { input, actor, record, unit }) => {

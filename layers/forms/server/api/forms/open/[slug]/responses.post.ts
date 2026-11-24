@@ -2,7 +2,7 @@
 // twice stores one response and gets the same reply. The server works everything out again from
 // the answers: what is shown, what is required and what is valid (sendResponse, shared with the
 // addResponse service).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { placeIn, placeOf } from '../../../../slots'
 import { z } from 'zod'
 import { defineRoute, idSchema, nowMs, refuse } from '#kit'
@@ -17,7 +17,7 @@ const input = z.object({
 })
 
 export default defineRoute({ public: true, rateLimit: 'public-form', protect: 'turnstile', input }, async (event, { input, actor, unit }) => {
-  const form = await getFormBySlug(getRouterParam(event, 'slug'))
+  const form = await getFormBySlug(getRouterParam(event, 'slug', { decode: true }))
   const link = form ? await placeOf(form, placeIn(event)) : null
   const version = form ? await getVersion(form.liveVersionId) : null
   if (!form || !link || !version) return refuse('forms.form.not-found', 'There is no form here.', { status: 404 })

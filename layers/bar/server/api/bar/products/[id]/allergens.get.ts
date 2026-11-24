@@ -1,13 +1,13 @@
 // A product's allergens as last recorded, and every check of its label, newest first. A size made from
 // stock comes with the answer worked out from its recipe's items, and the items, so the page can say
 // where to record them.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, defineRoute } from '#kit'
 import { allergenAnswers, allergenHistory, answerFor, sizeAnswer, stockLinks } from '../../../../allergens'
 
 export default defineRoute({
   ability: 'bar.allergens.manage',
-  record: event => ['bar.product', getRouterParam(event, 'id')],
+  record: event => ['bar.product', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record }) => {
   const answers = await allergenAnswers()

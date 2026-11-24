@@ -1,11 +1,11 @@
 // One vocabulary for its editing screen: every term, retired ones too, with how many records use each.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, refuse } from '#kit'
 import { getVocabulary, listTermGroupsWithUse, listTerms, termUsage } from '../../../../vocabularies/service'
 
 export default defineRoute({
   ability: 'core.vocabulary.manage',
-  record: event => ['core.vocabulary', getRouterParam(event, 'key')],
+  record: event => ['core.vocabulary', getRouterParam(event, 'key', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record }) => {
   const vocabulary = await getVocabulary(record!.id) ?? refuse('core.vocabulary.not-found', 'There is no such vocabulary.', { status: 404 })

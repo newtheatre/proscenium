@@ -1,6 +1,6 @@
 // One data request for staff (ID-35), with its hand-search checklist and what the viewer may do
 // with it now, so the page offers only those.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, nowMs } from '#kit'
 import { accountLabel } from '../../../../identity/accounts'
@@ -8,7 +8,7 @@ import { checklistOf, requestById } from '../../../../identity/data-requests'
 
 export default defineRoute({
   ability: 'core.data-request.manage',
-  record: event => ['core.data-request', getRouterParam(event, 'id')],
+  record: event => ['core.data-request', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
   input: z.object({}),
 }, async (_event, { record }) => {

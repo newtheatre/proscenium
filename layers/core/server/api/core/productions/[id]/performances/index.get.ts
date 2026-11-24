@@ -6,7 +6,7 @@
 // season's dates. The whole days closed to performances come too, so the date fields can grey them
 // out for someone who may not manage closures (L40).
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, first, nowMs, useSetting } from '#kit'
 import { listPerformances, performanceDefaults, theatreDefaults } from '../../../../../programme/performances'
 import { listRunPresets, theatreRunPreset } from '../../../../../programme/run-presets'
@@ -21,7 +21,7 @@ const DAY = 86_400_000 // not-policy: milliseconds in a day
 
 export default defineRoute({
   ability: 'core.production.view',
-  record: event => ['core.production', getRouterParam(event, 'id')],
+  record: event => ['core.production', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
   input: z.object({}),
 }, async (_event, { record }) => {

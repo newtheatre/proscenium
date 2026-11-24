@@ -1,6 +1,6 @@
 // Schemes for the members list's scheme filter: found by name (?q=) or turned from ids into names
 // (?ids=). Archived schemes are included, since their members are still listed.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { all, defineRoute } from '#kit'
 
 export default defineRoute({ ability: 'membership.membership.view', rateLimit: 'default' }, async (event) => {

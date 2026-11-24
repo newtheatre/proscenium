@@ -1,13 +1,13 @@
 // Checks one value against a list (V19): whether it is on it, until when, and in whose name. Never
 // shows the list. Audited as a read of the list.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, today } from '#kit'
 import { hashValue, normalise, requireList, wellFormed } from '../../../../lists'
 
 export default defineRoute({
   ability: 'membership.verification-list.check',
-  record: event => ['membership.verification-list', getRouterParam(event, 'id')],
+  record: event => ['membership.verification-list', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({ value: z.string().trim().min(1).max(254) }), // not-policy: an address's bound
 }, async (_event, { input, record }) => {

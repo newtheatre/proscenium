@@ -1,6 +1,6 @@
 // Changes a ticket type: rename, reorder, retire or bring back any type, and, for a type a person
 // made, who it is for. A type a module keeps refuses changes to its rules.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { ticketTypeId, updateTicketType } from '../../../ticket-types'
@@ -21,7 +21,7 @@ export default defineRoute({
     channel: z.enum(['all', 'desk', 'online']).optional(),
   }).strict(),
 }, async (event, { input, unit }) => {
-  const id = ticketTypeId(getRouterParam(event, 'id'))
+  const id = ticketTypeId(getRouterParam(event, 'id', { decode: true }))
   await updateTicketType(unit.view(), id, input)
   return { ticketTypeId: id }
 })

@@ -2,7 +2,7 @@
 // sale, past or to come, so last season's production can be the starting point. This production's
 // own come first, then the others, the most recently played first; within each production the
 // performances run in date order, oldest first.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, can, defineRoute } from '#kit'
 import { getPerformance } from '#modules/core'
 
@@ -10,7 +10,7 @@ const MOST = 200 // not-policy: how many performances the picker offers at once
 
 export default defineRoute({
   ability: 'box-office.performance.manage',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record, actor }) => {
   const target = await getPerformance(record!.id!)

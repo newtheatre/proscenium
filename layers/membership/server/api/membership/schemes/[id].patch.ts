@@ -1,6 +1,6 @@
 // Edits a scheme. The address is fixed once the scheme has left draft, and the side once any
 // membership exists (S2). Other changes apply to memberships written afterwards (S3).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, nowMs, refuse } from '#kit'
 import { slotDecides } from '#modules/forms'
 import { getList } from '../../../lists'
@@ -22,7 +22,7 @@ function refuseFeesOff(): never {
 
 export default defineRoute({
   ability: 'membership.scheme.manage',
-  record: event => ['membership.scheme', getRouterParam(event, 'id')],
+  record: event => ['membership.scheme', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: schemeFields.partial(),
 }, async (_event, { input, record, unit }) => {

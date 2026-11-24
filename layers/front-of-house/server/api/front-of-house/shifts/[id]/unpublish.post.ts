@@ -1,5 +1,5 @@
 // Takes a published shift back to draft while nobody is on it.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, refuse } from '#kit'
 import { getShift } from '../../../../shifts'
@@ -7,7 +7,7 @@ import { unpublishShift } from '../../../../rota'
 
 export default defineRoute({
   ability: 'front-of-house.shift.manage',
-  record: event => ['front-of-house.shift', getRouterParam(event, 'id')],
+  record: event => ['front-of-house.shift', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({}).strict(),

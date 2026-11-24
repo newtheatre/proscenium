@@ -1,7 +1,7 @@
 // The night report for a performance: a live view while a draft, the snapshot once signed off, with
 // notes and addenda (FH-31 to FH-33). For those who read reports and for those who write them, and,
 // once signed off, for whoever signed it or led that night.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { can, defineRoute, first, refuse } from '#kit'
 import { accountLabel } from '#modules/core'
 import { readReport, readsSignedReport } from '../../../../../reports'
@@ -10,7 +10,7 @@ export default defineRoute({
   ability: 'signed-in',
   rateLimit: 'default',
 }, async (event, { actor }) => {
-  const id = getRouterParam(event, 'id')!
+  const id = getRouterParam(event, 'id', { decode: true })!
   const record = ['core.performance', id] as const
   if (!(await can(actor, 'front-of-house.night-report.view', record)).allowed && !(await can(actor, 'front-of-house.night-report.write', record)).allowed
     && !(actor.accountId && await readsSignedReport(id, actor.accountId)))

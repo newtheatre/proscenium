@@ -1,11 +1,11 @@
 // Checks the "me" routes make themselves, because a person acting on their own account needs no
 // ability: a fresh re-assertion before changing how they sign in, and the session they are using.
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { nowMs, refuse, useSetting, type Actor } from '#kit'
 import { currentSession, type CurrentSession } from './sessions'
 
 /** The session behind a signed-in request. */
-export async function sessionOf(event: H3Event): Promise<CurrentSession> {
+export async function sessionOf(event: RequestEvent): Promise<CurrentSession> {
   const session = await currentSession(event)
   if (!session) refuse('core.access.signed-out', 'You need to sign in to do this.', { status: 401, remedy: 'Sign in, then try again.' })
   return session

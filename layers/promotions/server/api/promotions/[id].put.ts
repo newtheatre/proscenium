@@ -1,11 +1,11 @@
 // Changes a promotion. What was already sold with it keeps its price.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { promotionInput, updatePromotion } from '../../promotions'
 
 export default defineRoute({
   ability: 'promotions.promotion.manage',
-  record: event => ['promotions.promotion', getRouterParam(event, 'id')],
+  record: event => ['promotions.promotion', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: promotionInput,

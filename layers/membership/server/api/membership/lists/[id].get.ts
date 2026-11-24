@@ -1,12 +1,12 @@
 // One list, without its contents, the schemes that check against it, and how many entries staff
 // added that no file has held yet.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, defineRoute, first } from '#kit'
 import { hasListKey, requireList } from '../../../lists'
 
 export default defineRoute({
   ability: 'membership.verification-list.manage',
-  record: event => ['membership.verification-list', getRouterParam(event, 'id')],
+  record: event => ['membership.verification-list', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record }) => {
   const list = await requireList(record!.id)

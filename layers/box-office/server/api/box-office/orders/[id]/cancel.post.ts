@@ -2,13 +2,13 @@
 // door. Refunding as well needs its own ability, which cancelling does not imply. Staff may leave the
 // buyer unemailed, and may cancel a duplicate whose ticket was already scanned in (it stays admitted).
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, requireAbility } from '#kit'
 import { cancelLines } from '../../../../cancel'
 
 export default defineRoute({
   ability: 'box-office.order.cancel',
-  record: event => ['box-office.order', getRouterParam(event, 'id')],
+  record: event => ['box-office.order', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({

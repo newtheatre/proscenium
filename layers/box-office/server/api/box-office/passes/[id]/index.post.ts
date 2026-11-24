@@ -1,13 +1,13 @@
 // What staff do to a pass someone holds: move it to another person, cancel it or bring it back,
 // record that nothing more is owed for it, or send its holder the code again.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, idSchema, newId } from '#kit'
 import { movePass, sendPass, setPassVoid, settlePass } from '../../../../pass-holding'
 
 export default defineRoute({
   ability: 'box-office.pass.manage',
-  record: event => ['box-office.pass', getRouterParam(event, 'id')],
+  record: event => ['box-office.pass', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.discriminatedUnion('action', [

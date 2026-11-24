@@ -1,12 +1,12 @@
 // Adds one shift to a performance, as a draft, with its window worked out (FH-01).
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { addShift } from '../../../../../shifts'
 
 export default defineRoute({
   ability: 'front-of-house.shift.manage',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({

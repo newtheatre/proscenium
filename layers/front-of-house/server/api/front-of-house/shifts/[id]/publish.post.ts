@@ -1,5 +1,5 @@
 // Publishes a draft shift, so members can see it and sign up (FH-07).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, refuse } from '#kit'
 import { getShift } from '../../../../shifts'
@@ -7,7 +7,7 @@ import { publishShifts } from '../../../../rota'
 
 export default defineRoute({
   ability: 'front-of-house.shift.manage',
-  record: event => ['front-of-house.shift', getRouterParam(event, 'id')],
+  record: event => ['front-of-house.shift', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({}).strict(),

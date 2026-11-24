@@ -1,7 +1,7 @@
 // The site-readiness checklist (C-42; core domain specification, part 6): everything the public site
 // still lacks, each with where it is put right or the file to edit, and whether search engines are
 // being turned away. The theatre's pages are read here; the rest is the core's (coreReadiness).
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { queryCollection } from '@nuxt/content/server'
 import { useSetting } from '#kit'
 import { enabledModules } from '#kit/modules-store'
@@ -39,7 +39,7 @@ function settingAddress(key: string): string | null {
   return to ? `${to}?setting=${encodeURIComponent(key)}` : null
 }
 
-export async function siteReadiness(event: H3Event): Promise<SiteReadiness> {
+export async function siteReadiness(event: RequestEvent): Promise<SiteReadiness> {
   // The collection's types are generated for the app only, so the server names it loosely.
   const pages = await queryCollection(event, 'pages' as never).select('path' as never, 'stem' as never, 'title' as never, 'placeholder' as never, 'body' as never).all() as Parameters<typeof readContent>[0]
   const found = readContent(pages)

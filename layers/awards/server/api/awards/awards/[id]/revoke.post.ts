@@ -1,14 +1,14 @@
 // Takes an award back, with a reason. It leaves the roll and its ticket benefit stops at once;
 // tickets already bought are not cancelled. A revoked award is kept as a record and is not restored:
 // the committee issues a new one.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, nowMs } from '#kit'
 import { requireAward } from '../../../../awards'
 
 export default defineRoute({
   ability: 'awards.award.revoke',
-  record: event => ['awards.award', getRouterParam(event, 'id')],
+  record: event => ['awards.award', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({ reason: z.string().trim().min(1).max(500) }), // not-policy: a sentence or two
 }, async (_event, { input, actor, record, unit }) => {

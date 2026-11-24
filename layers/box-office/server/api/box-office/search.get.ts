@@ -1,7 +1,7 @@
 // The command palette's search for orders (core.search-source): the orders list's own search, by
 // booking reference or by the buyer's name or verified address, answering ids for the resolver.
 import { and, desc, eq, ne, or, sql } from 'drizzle-orm'
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute, searchWords, useDb } from '#kit'
 import { findAccounts } from '#modules/core'
 import { orders } from '../../db/schema'

@@ -1,7 +1,7 @@
 // A form as the person about to answer it sees it (FB-302): its questions if it can be answered
 // now, and otherwise only why not and what would let them through. A signed-in person gets their
 // unsent working copy back, on any device (FB-303).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { aboutOf, placeIn, placeOf } from '../../../slots'
 import { defineRoute, nowMs, refuse, today } from '#kit'
 import { getFormBySlug, getVersion, movedFrom } from '../../../forms'
@@ -10,9 +10,9 @@ import type { Definition } from '../../../../shared/engine'
 import { withoutWorkflow } from '../../../../shared/engine'
 
 export default defineRoute({ public: true, rateLimit: 'default' }, async (event, { actor }) => {
-  const form = await getFormBySlug(getRouterParam(event, 'slug'))
+  const form = await getFormBySlug(getRouterParam(event, 'slug', { decode: true }))
   // An address the form used to have: the page sends the person on to where it is now.
-  const moved = form ? null : await movedFrom(getRouterParam(event, 'slug'))
+  const moved = form ? null : await movedFrom(getRouterParam(event, 'slug', { decode: true }))
   if (moved) return { movedTo: moved }
   const link = form ? await placeOf(form, placeIn(event)) : null
   const version = form ? await getVersion(form.liveVersionId) : null

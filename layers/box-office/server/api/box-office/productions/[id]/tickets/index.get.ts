@@ -2,7 +2,7 @@
 // walkthrough, decision 1): each performance still to come or played, with where its sales stand
 // and how many seats are taken, and whether the production is published, since a production still
 // in draft can be on sale while its public pages are not there yet.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, defineRoute } from '#kit'
 import { getProduction, listPerformances } from '#modules/core'
 import { priceLayers, scheduledPrices, withOwnPrices } from '../../../../../prices'
@@ -11,7 +11,7 @@ import { listBands } from '../../../../../setup'
 
 export default defineRoute({
   ability: 'box-office.performance.manage',
-  record: event => ['core.production', getRouterParam(event, 'id')],
+  record: event => ['core.production', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record }) => {
   const production = await getProduction(record!.id!)

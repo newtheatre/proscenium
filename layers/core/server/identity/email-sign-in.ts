@@ -2,7 +2,7 @@
 // nothing about whether an account exists, writes no account, and is limited per address without
 // saying so. The link works once; the code works once, only in the browser that asked, and dies
 // after a few wrong tries. Neither can make a session strong.
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { all, first, newId, nowMs, refuse, useContext, useSetting, siteUrl, type UnitView } from '#kit'
 import { countAgainstRate, waitRemedy } from '#kit/ratelimit'
 import { digest, randomCode, randomToken, sealValue, sameText } from './crypto'
@@ -42,7 +42,7 @@ export async function isManaged(address: string): Promise<boolean> {
  * only a managed domain is sent to its provider, which says something about the domain and nothing
  * about any account.
  */
-export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: { address: string, next: string | null }): Promise<RequestOutcome> {
+export async function requestEmailSignIn(unit: UnitView, event: RequestEvent, input: { address: string, next: string | null }): Promise<RequestOutcome> {
   const address = normaliseAddress(input.address)
   if (await isManaged(address)) {
     const query = new URLSearchParams({ login_hint: address, ...(input.next ? { next: input.next } : {}) })
@@ -116,7 +116,7 @@ async function shouldOfferPasskey(accountId: string): Promise<boolean> {
   return holdsPrivileged(accountId)
 }
 
-async function finish(unit: UnitView, event: H3Event, row: TokenRow, method: 'link' | 'code'): Promise<SignedIn> {
+async function finish(unit: UnitView, event: RequestEvent, row: TokenRow, method: 'link' | 'code'): Promise<SignedIn> {
   const address = row.address!
   const existing = await addressRow(address)
   if (!existing && !(await useSetting('core.sign-in.open-sign-up')))
@@ -137,7 +137,7 @@ async function finish(unit: UnitView, event: H3Event, row: TokenRow, method: 'li
 }
 
 /** Uses an emailed link. A second use, even a moment later in a race, signs nobody in. */
-export async function useLink(unit: UnitView, event: H3Event, token: string): Promise<SignedIn> {
+export async function useLink(unit: UnitView, event: RequestEvent, token: string): Promise<SignedIn> {
   const row = await tokenByHash(await digest('link', token))
   if (!row) refuse('core.sign-in.link-unknown', 'This link is not valid.', { status: 410, remedy: 'Ask for a new email.' })
   if (row.used_at) refuse('core.sign-in.link-used', 'This link has been used.', { status: 410, remedy: 'Ask for a new email if you need to sign in again.' })
@@ -151,7 +151,7 @@ export async function useLink(unit: UnitView, event: H3Event, token: string): Pr
 
 // Uses a link as its page opens, only in the browser that asked (docs/specs/identity/12-link-without-a-press.md).
 // Any other opening answers null and spends nothing: a scanner, another browser, an unknown or lapsed link.
-export async function useLinkHere(unit: UnitView, event: H3Event, token: string): Promise<SignedIn | null> {
+export async function useLinkHere(unit: UnitView, event: RequestEvent, token: string): Promise<SignedIn | null> {
   const browser = readCookie(event, BROWSER_COOKIE)
   if (!browser || browser.length > 100) return null // not-policy: a browser token is 43 characters
   const row = await tokenByHash(await digest('link', token))
@@ -168,7 +168,7 @@ const WRONG = { code: 'core.sign-in.code-wrong', reason: 'That code is not right
  * code from another browser, counts as a try, and the count is saved even though the request is
  * refused.
  */
-export async function useCode(unit: UnitView, event: H3Event, input: { address: string, code: string }): Promise<SignedIn> {
+export async function useCode(unit: UnitView, event: RequestEvent, input: { address: string, code: string }): Promise<SignedIn> {
   const address = normaliseAddress(input.address)
   // Tries for one address, counted apart from asking for links, so asking again never spends them.
   const rate = await countAgainstRate('sign-in-code', `address:${address}`)

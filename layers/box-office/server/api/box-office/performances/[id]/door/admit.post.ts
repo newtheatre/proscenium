@@ -2,13 +2,13 @@
 // (Box office specification, part 6, "The door"). Admits up to the number asked of the order's
 // tickets for this performance not yet in, and says how many went in.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { admitByName } from '../../../../../door'
 
 export default defineRoute({
   ability: 'box-office.ticket.admit',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     orderId: z.string().min(1).max(64), // not-policy: shape bound

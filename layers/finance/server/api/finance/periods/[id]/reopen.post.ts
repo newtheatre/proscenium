@@ -1,12 +1,12 @@
 // Reopens a closed period, with a reason from the theatre's list. The close stays in the history.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, idSchema } from '#kit'
 import { reopenPeriod } from '../../../../close'
 
 export default defineRoute({
   ability: 'finance.period.reopen',
-  record: event => ['finance.period', getRouterParam(event, 'id')],
+  record: event => ['finance.period', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({ reasonTermId: idSchema('trm') }),
 }, async (_event, { input, record, unit }) => {

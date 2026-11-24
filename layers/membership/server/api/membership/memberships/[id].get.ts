@@ -1,7 +1,7 @@
 // One membership for its console page (tab 5, "A membership"): the person, the scheme, the dates,
 // the derived status, how it started and ended, every check made on it, the application form's
 // response it was applied for with, and whether the reader may change its dates.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, can, defineRoute, first, isEnabled, refuse } from '#kit'
 import { accountLabel } from '#modules/core'
 import { derivedStatus } from '../../../dates'
@@ -9,7 +9,7 @@ import { memberNumber, todayOrNull } from '../../../memberships'
 
 export default defineRoute({
   ability: 'membership.membership.view',
-  record: event => ['membership.membership', getRouterParam(event, 'id')],
+  record: event => ['membership.membership', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { actor, record }) => {
   const m = await first<{ id: string, accountId: string, schemeId: string, schemeName: string, side: string, graceDays: number, holderMayEnd: number, lengthRule: string, state: string, origin: string, lengthName: string | null, startsOn: string | null, endsOn: string | null, activatedAt: number | null, endedAt: number | null, endReason: string | null, note: string | null, createdAt: number, responseId: string | null, awaitingApproval: number }>(

@@ -3,14 +3,14 @@
 // `preview`, says what it would cost or give back and changes nothing. Refunding a cheaper
 // exchange's difference needs box-office.order.refund as well.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, requireAbility } from '#kit'
 import { exchangeLines, exchangeQuote } from '../../../../exchange'
 import { fromRequest } from '../../../../links'
 
 export default defineRoute({
   ability: 'box-office.order.exchange',
-  record: event => ['box-office.order', getRouterParam(event, 'id')],
+  record: event => ['box-office.order', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     performanceId: z.string().min(1).max(64), // not-policy: shape bound

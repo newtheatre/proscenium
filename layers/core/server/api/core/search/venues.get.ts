@@ -1,6 +1,6 @@
 // The command palette's search for venues (core.search-source), by the venue's or a space's name,
 // as the venues list searches.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { listVenues } from '../../../places/service'
 

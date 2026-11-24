@@ -35,6 +35,7 @@ export default defineNuxtConfig({
   srcDir: 'site/app',
   serverDir: 'site/server',
   compatibilityDate: COMPATIBILITY_DATE,
+  nitroLegacy: false,
 
   hooks: {
     // The prerenderer (Nuxt Content's pages) builds its own Nitro from this config and runs it in Node,

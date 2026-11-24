@@ -1,13 +1,13 @@
 // Make some tickets on a reservation complimentary from the till's swap menu, where comps need no approval.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { compReservationLines } from '../../../../comps'
 
 export default defineRoute({
   // Asking for complimentary tickets is checked inside, against the performance.
   ability: 'box-office.order.take-payment',
-  record: event => ['box-office.order', getRouterParam(event, 'id')],
+  record: event => ['box-office.order', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({

@@ -1,7 +1,7 @@
 // Waiving a fee (P9): the membership is marked paid, and activates if nothing else is outstanding;
 // the charge is voided, with any payment still open for it cancelled. The reason is kept as the
 // membership's note, for staff; the audit holds ids only.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, refuse } from '#kit'
 import { markPaid } from '#modules/membership'
@@ -9,7 +9,7 @@ import { voidCharge } from '../../../../charges'
 
 export default defineRoute({
   ability: 'membership-fees.charge.waive',
-  record: event => ['membership-fees.charge', getRouterParam(event, 'id')],
+  record: event => ['membership-fees.charge', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({ note: z.string().trim().min(1).max(500) }).strict(), // not-policy: the bound of a staff note
 }, async (_event, { input, record, unit }) => {

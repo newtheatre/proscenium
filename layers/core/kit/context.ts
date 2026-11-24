@@ -60,6 +60,8 @@ export interface KitContext {
   actor: Actor
   clock?: () => number
   waitUntil?: (promise: Promise<unknown>) => void
+  /** The request in hand, for readers that need one (Nuxt Content's queryCollection). Set by a route. */
+  event?: unknown
   /** Per-request caches. */
   cache: { settings?: Promise<Map<string, unknown>>, modules?: Promise<Map<string, boolean>>, [key: string]: unknown }
   /** Set by a route once its permission check passes, and copied to every audit row. */

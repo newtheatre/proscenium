@@ -1,6 +1,6 @@
 // One order for staff (Box office specification, part 6, "Order"): its tickets with whether each was
 // admitted, its cancellations, and which of release, keep, cancel, refund and recording a late payment the viewer may do.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, can, defineRoute, first, refuse, useSetting } from '#kit'
 import { accountLabel, addressFor, getPerformance, getProduction, getTerm } from '#modules/core'
 import { outsideAccounts, paymentsOf } from '#modules/payments'
@@ -15,7 +15,7 @@ interface Cancellation { id: string, kind: string, reason_term_id: string | null
 
 export default defineRoute({
   ability: 'box-office.order.view',
-  record: event => ['box-office.order', getRouterParam(event, 'id')],
+  record: event => ['box-office.order', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record, actor }) => {
   const id = record!.id!

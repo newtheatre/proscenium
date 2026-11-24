@@ -1,7 +1,7 @@
 // Uploads one file into a slot (C-23, C-36). The body is the file's bytes; the slot, the owner and
 // the file's name come in the query. The file is stored at once and checked by a job; it is not
 // served until it is ready. Uploading needs the ability to edit the owner, which the slot names.
-import { getHeader, readRawBody } from 'h3'
+import { getRequestHeader } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, files as store, newId, nowMs, refuse, requireAbility, useContext } from '#kit'
 import { fileSlot, sha256, slotLimit } from '../../../files/service'
@@ -26,8 +26,8 @@ export default defineRoute({
 
   const limit = await slotLimit(slot)
   const tooLarge = () => refuse('core.files.too-large', 'This file is larger than this place takes.', { status: 413, fields: { file: 'too-large' } })
-  if (Number(getHeader(event, 'content-length') ?? 0) > limit) tooLarge()
-  const body = await readRawBody(event, false)
+  if (Number(getRequestHeader(event, 'content-length') ?? 0) > limit) tooLarge()
+  const body = new Uint8Array(await event.req.arrayBuffer())
   const bytes = body ? new Uint8Array(body) : new Uint8Array()
   if (bytes.length === 0) refuse('core.files.empty', 'The file is empty.', { status: 422, fields: { file: 'empty' } })
   if (bytes.length > limit) tooLarge()

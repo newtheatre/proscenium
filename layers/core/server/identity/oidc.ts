@@ -3,7 +3,7 @@
 // parameter (`providers.ts`); nothing here is particular to one. The ID token comes straight from the
 // provider's token endpoint over TLS, so its signature is not checked again (OpenID Connect Core
 // 3.1.3.7); its issuer, audience, expiry, nonce, verified email and organisation are.
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { first, newId, nowMs, refuse, useSetting, credential, siteUrl, type UnitView } from '#kit'
 import { base64url, fromBase64url, openValue, randomToken, sealValue } from './crypto'
 import { PROVIDER_COOKIE, clearCookie, readCookie, setShortCookie } from './web'
@@ -36,7 +36,7 @@ function organisationOf(provider: SignInProvider, claims: ProviderClaims): strin
 }
 
 /** The address to send the browser to, at the provider. */
-export async function startProvider(event: H3Event, provider: SignInProvider, input: { next: string | null, loginHint?: string }): Promise<string> {
+export async function startProvider(event: RequestEvent, provider: SignInProvider, input: { next: string | null, loginHint?: string }): Promise<string> {
   const client = await clientId(provider)
   const flow: Flow = { provider: provider.id, state: randomToken(), nonce: randomToken(), verifier: randomToken(), next: input.next }
   setShortCookie(event, PROVIDER_COOKIE, await sealValue('provider', flow), FLOW_LIFETIME)
@@ -58,7 +58,7 @@ function decodeClaims(provider: SignInProvider, idToken: string): ProviderClaims
 }
 
 /** Swaps the code for the provider's verdict, and checks it. */
-export async function finishProvider(event: H3Event, provider: SignInProvider, input: { code: string, state: string }): Promise<{ claims: ProviderClaims, next: string | null }> {
+export async function finishProvider(event: RequestEvent, provider: SignInProvider, input: { code: string, state: string }): Promise<{ claims: ProviderClaims, next: string | null }> {
   const client = await clientId(provider)
   const flow = await openValue<Flow>('provider', readCookie(event, PROVIDER_COOKIE))
   clearCookie(event, PROVIDER_COOKIE)
@@ -83,7 +83,7 @@ export async function finishProvider(event: H3Event, provider: SignInProvider, i
  * holding its verified address, else a new one. An address the provider has not verified links to
  * nothing (ID-04).
  */
-export async function signInWithProvider(unit: UnitView, event: H3Event, provider: SignInProvider, claims: ProviderClaims): Promise<{ accountId: string }> {
+export async function signInWithProvider(unit: UnitView, event: RequestEvent, provider: SignInProvider, claims: ProviderClaims): Promise<{ accountId: string }> {
   if (!claims.email || claims.email_verified !== true)
     refuse('core.sign-in.provider-unverified', `${provider.label} has not confirmed this account's email address.`, { status: 422, remedy: `Confirm your address with ${provider.label}, or sign in another way.` })
   const organisation = organisationOf(provider, claims)

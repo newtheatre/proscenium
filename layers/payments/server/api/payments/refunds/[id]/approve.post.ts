@@ -1,12 +1,12 @@
 // Approves a refund someone else asked for.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { approveRefund } from '../../../../refunds'
 
 export default defineRoute({
   ability: 'payments.refund.approve',
-  record: event => ['payments.refund', getRouterParam(event, 'id')],
+  record: event => ['payments.refund', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({}).strict(),
 }, async (_event, { record, actor, unit }) => {

@@ -1,6 +1,6 @@
 // Change a person's name and pronouns for them (ID-46). The audit names
 // the fields that changed, never what they say (0011).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { editableAccount } from '../../../identity/staff-edit'
@@ -10,7 +10,7 @@ const pronouns = z.string().trim().max(40) // not-policy: the column's own lengt
 
 export default defineRoute({
   ability: 'core.account.update',
-  record: event => ['core.account', getRouterParam(event, 'id')],
+  record: event => ['core.account', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({ name: name.optional(), pronouns: pronouns.nullable().optional() }).strict(),
 }, async (_event, { input, unit, record }) => {

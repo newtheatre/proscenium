@@ -1,7 +1,7 @@
 // Imports past awards of one type from a file. A dry run answers what would happen: how many rows
 // would import and which would be refused. Otherwise the rows are queued as bulk jobs and the
 // answer says how many. Nobody is told of an imported award.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, newId, refuse } from '#kit'
 import { MOST_ROWS, ROWS_PER_JOB, checkRows, parseAwards } from '../../../../importing'
@@ -9,7 +9,7 @@ import { requireType } from '../../../../types'
 
 export default defineRoute({
   ability: 'awards.award.issue',
-  record: event => ['awards.type', getRouterParam(event, 'id')],
+  record: event => ['awards.type', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'export',
   input: z.object({
     file: z.string().max(2_000_000), // not-policy: the request body D1 can carry

@@ -3,7 +3,7 @@
 // while no Owner role exists, and it will not finish without a passkey and a recovery code typed
 // back. Between steps, what has been given travels in a sealed cookie; nothing is written until the
 // last step, which writes everything in one batch guarded by "no Owner role yet".
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { first, newId, nowMs, refuse, type UnitView } from '#kit'
 import { openValue, sealValue } from './crypto'
 import { SETUP_COOKIE, clearCookie, readCookie, setShortCookie } from './web'
@@ -38,17 +38,17 @@ export async function requireSetupNeeded(): Promise<void> {
   if (!(await setupNeeded())) refuse('core.setup.done', 'This site is already set up.', { status: 409, remedy: 'Sign in instead.' })
 }
 
-export async function readTicket(event: H3Event): Promise<SetupTicket> {
+export async function readTicket(event: RequestEvent): Promise<SetupTicket> {
   const ticket = await openValue<SetupTicket>('setup', readCookie(event, SETUP_COOKIE))
   if (!ticket) refuse('core.setup.expired', 'Setup took too long, or was started in another browser.', { status: 410, remedy: 'Start again.' })
   return ticket
 }
 
-export async function writeTicket(event: H3Event, ticket: SetupTicket): Promise<void> {
+export async function writeTicket(event: RequestEvent, ticket: SetupTicket): Promise<void> {
   setShortCookie(event, SETUP_COOKIE, await sealValue('setup', ticket), SETUP_LIFETIME)
 }
 
-export function clearTicket(event: H3Event): void {
+export function clearTicket(event: RequestEvent): void {
   clearCookie(event, SETUP_COOKIE)
 }
 

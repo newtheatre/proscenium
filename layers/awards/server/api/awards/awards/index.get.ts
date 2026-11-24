@@ -1,5 +1,5 @@
 // The console's list of awards: every award, newest first, narrowed by type, state or a name.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { can, defineRoute } from '#kit'
 import { listAwards } from '../../../awards'
 

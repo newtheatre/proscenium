@@ -1,12 +1,12 @@
 // Deletes a list and every entry on it. Refused while a scheme checks against it.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, refuse } from '#kit'
 import { requireList } from '../../../lists'
 
 export default defineRoute({
   ability: 'membership.verification-list.manage',
-  record: event => ['membership.verification-list', getRouterParam(event, 'id')],
+  record: event => ['membership.verification-list', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({}),
 }, async (_event, { record, unit }) => {

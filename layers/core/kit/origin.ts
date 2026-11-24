@@ -3,7 +3,7 @@
 // lost old address), else from the setting core.site.origin, which setup records and an
 // administrator changes with a confirmation. Never from a forwarded header. Until either is set, a
 // request's own address stands in, and work outside a request cannot build an address.
-import { getRequestURL, type H3Event } from 'h3'
+import { getRequestURL, type RequestEvent } from 'nuxt/server'
 import { useContext } from './context'
 import { currentContext } from './context-store'
 import { Refusal } from './refusal'
@@ -26,7 +26,7 @@ export function normaliseOrigin(text: unknown): string | null {
 }
 
 /** The address a request arrived on, from the Worker's own request, never from forwarded headers. */
-export function requestUrl(event: H3Event): URL {
+export function requestUrl(event: RequestEvent): URL {
   // Nitro's local fetches during a page render share the platform object, so they see the outer request.
   const request = (event.context.cloudflare as { request?: Request } | undefined)?.request ?? (event as unknown as { req?: Request }).req
   return request ? new URL(request.url) : getRequestURL(event, { xForwardedHost: false, xForwardedProto: false })

@@ -1,7 +1,7 @@
 // The responses as CSV (FB-402), under the same filters as the table. Taking answers out in bulk
 // needs its own ability and is recorded. Special-category answers are left out unless the person
 // may read them and asks for them.
-import { getRouterParam, setResponseHeader } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, refuse, requireAbility, siteUrl, theatreTimeZone, useSetting } from '#kit'
 import { getFields, getVersion, requireForm } from '../../../../../forms'
@@ -21,7 +21,7 @@ const input = z.object({
   special: z.enum(['1']).optional(),
 })
 
-export default defineRoute({ ability: 'forms.response.export', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'export', input }, async (event, { input, record, actor, unit }) => {
+export default defineRoute({ ability: 'forms.response.export', record: event => ['forms.form', getRouterParam(event, 'id', { decode: true })], rateLimit: 'export', input }, async (event, { input, record, actor, unit }) => {
   const form = await requireForm(record!.id)
   const special = input.special === '1'
   if (special) await requireAbility(actor, 'forms.response.read-special', ['forms.form', form.id])
@@ -57,7 +57,7 @@ export default defineRoute({ ability: 'forms.response.export', record: event => 
   }
 
   unit.audit({ action: 'export', record: ['forms.form', form.id], detail: { responses: lines.length, special } })
-  setResponseHeader(event, 'content-type', 'text/csv; charset=utf-8')
-  setResponseHeader(event, 'content-disposition', `attachment; filename="${form.slug}-responses.csv"`)
+  event.res.headers.set('content-type', 'text/csv; charset=utf-8')
+  event.res.headers.set('content-disposition', `attachment; filename="${form.slug}-responses.csv"`)
   return toCsv(['Reference', 'Sent', 'Version', 'From', ...(staged ? ['Stage'] : []), ...columns.map(c => c.retired ? `${c.key} (removed)` : c.key), ...figures.map(c => c.key)], lines)
 })

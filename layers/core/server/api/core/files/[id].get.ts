@@ -1,11 +1,11 @@
 // One file's details, for the person who uploaded it or anyone who may edit its owner.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { sql } from 'drizzle-orm'
 import { defineRoute, can, inAccountScope, refuse, useDb } from '#kit'
 import { fileRow, fileSlot, fileUrl } from '../../../files/service'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (event, { actor }) => {
-  const row = await fileRow(getRouterParam(event, 'id') ?? '')
+  const row = await fileRow(getRouterParam(event, 'id', { decode: true }) ?? '')
   const notFound = () => refuse('core.files.not-found', 'There is no such file.', { status: 404 })
   if (!row) return notFound()
   const slot = await fileSlot(row.slot)

@@ -1,14 +1,14 @@
 // A performance's wheelchair spaces: the layouts its space has, its own choice if it has one, what
 // its run (or its space's usual layout) would give it, and how they stand: how many are booked, the
 // seats each takes, and the seats kept back until when.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, defineRoute, nowMs } from '#kit'
 import { getPerformance } from '#modules/core'
 import { arrangementFor, displacementsFor, listLayouts, type Arrangement } from '../../../../layouts'
 
 export default defineRoute({
   ability: 'box-office.performance.manage',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record }) => {
   const performance = await getPerformance(record!.id)

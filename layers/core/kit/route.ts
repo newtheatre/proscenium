@@ -2,7 +2,7 @@
 // the module is on, the rate limit, the challenge, the permission and then the input, so a caller
 // without the ability learns nothing about the input's shape; it opens the unit
 // of work, commits it after the handler returns, and shapes every refusal the same way.
-import { defineEventHandler, getHeader, getQuery, getRequestIP, getRouterParams, readRawBody, setResponseHeader, setResponseStatus, type H3Event } from 'h3'
+import { defineHandler, getRequestHeader, getQuery, getRequestIP, getRouterParams, setResponseStatus, type RequestEvent } from 'nuxt/server'
 import type { z } from 'zod'
 import { runInContext, useContext, type Actor, type KitContext, type KitEnv } from './context'
 import { Refusal, isRefusal, DeclarationError, type RefusalBody } from './refusal'
@@ -26,7 +26,7 @@ export interface RouteDeclaration<I extends z.ZodType | undefined = undefined> {
   /** Says in so many words that anyone may call this route. */
   public?: true
   /** The record the ability is checked on. */
-  record?: (event: H3Event) => readonly [string, string | undefined] | { type: string, id: string | undefined } | undefined
+  record?: (event: RequestEvent) => readonly [string, string | undefined] | { type: string, id: string | undefined } | undefined
   rateLimit: RateClass
   /** Require a Turnstile challenge (quietly off when the theatre has not set the secret). */
   protect?: 'turnstile'
@@ -68,7 +68,7 @@ export function checkRouteDeclaration(decl: RouteDeclaration<any>): void {
   if (decl.tokens !== undefined && (!Array.isArray(decl.tokens) || !decl.tokens.every(t => typeof t === 'string' && /^[a-z][a-zA-Z0-9]*$/.test(t)))) throw new DeclarationError('tokens', 'names the path parameters that carry a link token')
 }
 
-function refusalResponse(event: H3Event, refusal: Refusal): RefusalBody {
+function refusalResponse(event: RequestEvent, refusal: Refusal): RefusalBody {
   setResponseStatus(event, refusal.status)
   return refusal.toBody()
 }
@@ -78,7 +78,7 @@ async function sha256(text: string): Promise<string> {
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-function envOf(event: H3Event): KitEnv {
+function envOf(event: RequestEvent): KitEnv {
   const env = bindings(event)
   if (!env) throw new Error('No DB binding on this request. Run under wrangler, nuxt dev with the Cloudflare preset, or a test worker')
   return env
@@ -91,7 +91,7 @@ function envOf(event: H3Event): KitEnv {
 const renderCaches = new WeakMap<object, KitContext['cache']>()
 
 /** The per-request cache, shared by every internal call made while serving the same outside request. */
-export function requestCache(event: H3Event): KitContext['cache'] {
+export function requestCache(event: RequestEvent): KitContext['cache'] {
   const platform = (event.context as any)._platform
   if (!platform || typeof platform !== 'object') return {}
   let cache = renderCaches.get(platform)
@@ -107,19 +107,19 @@ function moduleOfPath(path: string): string | undefined {
  * Declares an API route. A route with neither `ability` nor `public: true` fails the build (F-04);
  * a refused request gets the standard body `{ code, reason, remedy?, fields? }`.
  */
-async function bodyText(event: H3Event): Promise<string> {
-  return (await readRawBody(event, 'utf8')) ?? ''
+async function bodyText(event: RequestEvent): Promise<string> {
+  return await event.req.text()
 }
 
 export function defineRoute<I extends z.ZodType | undefined = undefined, R = unknown>(
   decl: RouteDeclaration<I>,
-  handler: (event: H3Event, context: RouteContext<I extends z.ZodType ? z.output<I> : undefined>) => Promise<R> | R,
+  handler: (event: RequestEvent, context: RouteContext<I extends z.ZodType ? z.output<I> : undefined>) => Promise<R> | R,
 ) {
   checkRouteDeclaration(decl)
-  const routeHandler = defineEventHandler(async (event) => {
+  const routeHandler = defineHandler(async (event) => {
     const env = envOf(event)
     const waitUntil = waitUntilOf(event)
-    return runInContext({ env, waitUntil, requestId: getHeader(event, 'cf-ray') ?? crypto.randomUUID(), cache: requestCache(event) }, async () => {
+    return runInContext({ env, waitUntil, event, requestId: getRequestHeader(event, 'cf-ray') ?? crypto.randomUUID(), cache: requestCache(event) }, async () => {
       try {
         return await handle(event)
       }
@@ -135,7 +135,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     })
   })
 
-  async function handle(event: H3Event) {
+  async function handle(event: RequestEvent) {
     const context = useContext()
     if (decl.tokens?.length) {
       const params = getRouterParams(event, { decode: true })
@@ -143,7 +143,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     }
     await ensureMigrated()
     const registry = useRegistry()
-    const module = moduleOfPath(event.path)
+    const module = moduleOfPath(event.url.pathname + event.url.search)
     if (!module || !registry.modules.has(module)) throw new Refusal('core.not-found', 'There is nothing here.', { status: 404 })
     context.module = module
     if (!(await isEnabled(module))) throw new Refusal('core.not-found', 'There is nothing here.', { status: 404 })
@@ -153,24 +153,24 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     context.actor = actor
 
     context.requestOrigin = requestUrl(event).origin
-    context.reads = ['GET', 'HEAD'].includes(event.method.toUpperCase())
-    context.address = getRequestIP(event, { xForwardedFor: true }) ?? getHeader(event, 'cf-connecting-ip') ?? undefined
+    context.reads = ['GET', 'HEAD'].includes(event.req.method.toUpperCase())
+    context.address = getRequestIP(event, { xForwardedFor: true }) ?? getRequestHeader(event, 'cf-connecting-ip') ?? undefined
     const who = actor.accountId ?? context.address ?? 'unknown'
     // Staff (anyone signed in with a role) read under their own, larger allowance.
     const rateClass = decl.rateLimit === 'default' && actor.accountId && actor.grants?.length ? 'staff' : decl.rateLimit
     const rate = await countAgainstRate(rateClass, who)
     if (!rate.allowed) {
-      setResponseHeader(event, 'Retry-After', rate.retryAfter)
+      event.res.headers.set('Retry-After', String(rate.retryAfter))
       throw new Refusal('core.rate-limit.reached', 'Too many requests. Please slow down.', { status: 429, remedy: waitRemedy(rate.retryAfter) })
     }
 
-    const method = event.method.toUpperCase()
+    const method = event.req.method.toUpperCase()
     const reads = method === 'GET' || method === 'HEAD'
     const binary = decl.body === 'binary'
     const rawBody = reads || binary ? '' : await bodyText(event)
 
     if (decl.protect === 'turnstile') {
-      const token = getHeader(event, 'cf-turnstile-response')
+      const token = getRequestHeader(event, 'cf-turnstile-response')
       if (!(await verifyTurnstile(token, who))) throw new Refusal('core.challenge.failed', 'We could not confirm you are a person.', { status: 403, remedy: 'Complete the check, then try again.' })
     }
 
@@ -203,16 +203,16 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
 
     let idempotency: { key: string, route: string, hash: string } | undefined
     if (decl.idempotent) {
-      const key = getHeader(event, 'idempotency-key')
+      const key = getRequestHeader(event, 'idempotency-key')
       if (!key || key.length > 200) throw new Refusal('core.idempotency.key-missing', 'This request needs an Idempotency-Key header.', { status: 400 }) // not-policy: a sane header length
-      const route = withoutTokens(`${method} ${event.path.split('?')[0]}`)
+      const route = withoutTokens(`${method} ${event.url.pathname}`)
       const hash = await sha256(rawBody)
       const stored = await context.env.DB.prepare('SELECT request_hash, status, response, created_at FROM core_idempotency_keys WHERE key = ? AND route = ?').bind(key, route).first<{ request_hash: string, status: number, response: string, created_at: number }>()
       const keepFor = await useSetting('core.idempotency.keep-for') as number
       if (stored && stored.created_at > nowMs() - keepFor * 1000) { // not-policy: seconds to milliseconds
         if (stored.request_hash !== hash) throw new Refusal('core.idempotency.key-reused', 'This Idempotency-Key was already used for a different request.', { status: 422, remedy: 'Use a new key for a new request.' })
         setResponseStatus(event, stored.status)
-        setResponseHeader(event, 'Idempotent-Replay', 'true')
+        event.res.headers.set('Idempotent-Replay', 'true')
         return JSON.parse(stored.response)
       }
       idempotency = { key, route, hash }

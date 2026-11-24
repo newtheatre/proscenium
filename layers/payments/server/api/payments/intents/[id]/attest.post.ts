@@ -1,7 +1,7 @@
 // Records a cash or card machine payment at the desk, in the seller's open session.
 import { z } from 'zod'
 import { receiptTo, resolveReceipt } from '../../../../receipt-input'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, idSchema } from '#kit'
 import { attest } from '../../../../attest'
 
@@ -19,4 +19,4 @@ export default defineRoute({
     note: z.string().max(200).optional(), // not-policy: the column's limit
     succeeded: z.boolean().optional(),
   }).strict(),
-}, async (event, { input }) => attest({ intentId: getRouterParam(event, 'id') ?? '', ...input, receipt: await resolveReceipt(input.receipt) }))
+}, async (event, { input }) => attest({ intentId: getRouterParam(event, 'id', { decode: true }) ?? '', ...input, receipt: await resolveReceipt(input.receipt) }))

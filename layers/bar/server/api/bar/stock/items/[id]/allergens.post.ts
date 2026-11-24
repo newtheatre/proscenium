@@ -1,12 +1,12 @@
 // Records a stock item's allergens from its label, replacing what was listed, and logs the check. Every
 // product whose recipe names the item works its answer out from it.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { allergenInput, recordAllergens } from '../../../../../allergens'
 
 export default defineRoute({
   ability: 'bar.allergens.manage',
-  record: event => ['bar.stock-item', getRouterParam(event, 'id')],
+  record: event => ['bar.stock-item', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: allergenInput,
 }, async (_event, { input, actor, record, unit }) => {

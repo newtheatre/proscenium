@@ -1,7 +1,7 @@
 // Recovering a lost passkey (ID-08; part 3, "Signing in"). A recovery code, or a single-use
 // enrolment link a member of staff issues, opens a session good for one thing: enrolling a new
 // passkey. Every recovery tells all the account's verified addresses.
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { first, newId, nowMs, refuse, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
 import { countAgainstRate } from '#kit/ratelimit'
 import { addressRow, accountById, isUsable, normaliseAddress } from './accounts'
@@ -19,7 +19,7 @@ const WRONG = { code: 'core.recovery.code-wrong', reason: 'That address and code
  * Uses a recovery code. The answer is the same whether the address is unknown or the code wrong, and
  * the code is spent by a conditional write, so it works once even in a race.
  */
-export async function useRecoveryCode(unit: UnitView, event: H3Event, input: { address: string, code: string }): Promise<{ next: string }> {
+export async function useRecoveryCode(unit: UnitView, event: RequestEvent, input: { address: string, code: string }): Promise<{ next: string }> {
   const address = normaliseAddress(input.address)
   if (!(await countAgainstRate('sign-in', `address:${address}`)).allowed) refuse(WRONG.code, WRONG.reason, { status: 422, remedy: WRONG.remedy })
   const row = await addressRow(address)
@@ -41,7 +41,7 @@ export async function useRecoveryCode(unit: UnitView, event: H3Event, input: { a
  * out asks a colleague. The link is shown once to the staff member, who hands it over; the person's
  * verified addresses are told it was issued.
  */
-export async function issueEnrolmentLink(unit: UnitView, event: H3Event, actor: Actor, accountId: string): Promise<{ link: string, expiresAt: number }> {
+export async function issueEnrolmentLink(unit: UnitView, event: RequestEvent, actor: Actor, accountId: string): Promise<{ link: string, expiresAt: number }> {
   const account = await accountById(accountId)
   if (!isUsable(account) || !account.first_signed_in_at) refuse('core.recovery.not-usable', 'This account cannot be recovered.', { status: 409, remedy: 'Check it is enabled and has signed in before.' })
   const token = randomToken()
@@ -61,7 +61,7 @@ export async function issueEnrolmentLink(unit: UnitView, event: H3Event, actor: 
 }
 
 /** Uses an enrolment link: a recovery session for the account it names, spent once. */
-export async function useEnrolmentLink(unit: UnitView, event: H3Event, row: { id: string, account_id: string | null }): Promise<{ accountId: string, next: string }> {
+export async function useEnrolmentLink(unit: UnitView, event: RequestEvent, row: { id: string, account_id: string | null }): Promise<{ accountId: string, next: string }> {
   const account = row.account_id ? await accountById(row.account_id) : null
   if (!isUsable(account)) refuse('core.sign-in.link-unknown', 'This link is not valid.', { status: 410, remedy: 'Ask the theatre for a new one.' })
   await startSession(unit, event, { accountId: account.id, methods: ['recovery'], assurance: 'basic' })

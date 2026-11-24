@@ -1,13 +1,13 @@
 // Undoes an early release (release.post.ts): the seats of the wheelchair spaces still unbooked are
 // kept back again until the keep-back time.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { keepAgain } from '../../../../../layouts'
 
 export default defineRoute({
   ability: 'box-office.performance.manage',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({}).strict(),
 }, async (_event, { record, unit }) => {

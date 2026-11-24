@@ -1,6 +1,6 @@
 // Attaches a published form to a record in a slot, or changes its terms there: who may answer,
 // when, how many and how often. The slot's own ability decides who may, on the record itself.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, nowMs } from '#kit'
 import { requireForm } from '../../../../../forms'
@@ -17,10 +17,10 @@ const input = z.object({
 })
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'write', input }, async (event, { input, actor, unit }) => {
-  const slot = await requireSlot(getRouterParam(event, 'slot'))
-  const subjectId = getRouterParam(event, 'subject')!
+  const slot = await requireSlot(getRouterParam(event, 'slot', { decode: true }))
+  const subjectId = getRouterParam(event, 'subject', { decode: true })!
   await mayAttach(actor, slot, subjectId)
-  const form = await requireForm(getRouterParam(event, 'form'))
+  const form = await requireForm(getRouterParam(event, 'form', { decode: true }))
   const placementId = await attach(unit, { slot, subjectId, form, terms: input, actor, at: nowMs() })
   return { placementId }
 })

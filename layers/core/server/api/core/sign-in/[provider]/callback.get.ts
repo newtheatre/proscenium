@@ -1,6 +1,6 @@
 // The provider sends the browser back here. Signs in and returns to where the person was going
 // (ID-07); on any refusal, back to the sign-in page with the reason's code.
-import { getRouterParam, setResponseHeader, setResponseStatus } from 'h3'
+import { getRouterParam, setResponseStatus } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, isRefusal } from '#kit'
 import { finishProvider, signInWithProvider } from '../../../../identity/oidc'
@@ -11,7 +11,7 @@ export default defineRoute({
   rateLimit: 'sign-in-network',
   input: z.object({ code: z.string().max(2048).optional(), state: z.string().max(200).optional(), error: z.string().max(200).optional() }), // not-policy: lengths providers' values fit in
 }, async (event, { input, unit }) => {
-  const provider = providerById(getRouterParam(event, 'provider') ?? '')
+  const provider = providerById(getRouterParam(event, 'provider', { decode: true }) ?? '')
   let to: string
   try {
     if (!input.code || !input.state) throw Object.assign(new Error('cancelled'), { name: 'Refusal', code: 'core.sign-in.provider-cancelled' })
@@ -24,6 +24,6 @@ export default defineRoute({
     to = `/sign-in?error=${encodeURIComponent((error as { code: string }).code)}`
   }
   setResponseStatus(event, 302) // not-policy: HTTP Found
-  setResponseHeader(event, 'location', to)
+  event.res.headers.set('location', to)
   return ''
 })

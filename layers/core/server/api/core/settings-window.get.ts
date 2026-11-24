@@ -1,7 +1,7 @@
 // The console's settings window: the tabs of modules' pages in Admin that the cog on one console
 // page shows (?for=<entry id>), or every tab of one module (?for=<module>), as far as the viewer may
 // open them, and what the window is called.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute, refuse } from '#kit'
 import { settingsWindow } from '../../interface/navigation'
 

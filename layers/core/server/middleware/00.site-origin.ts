@@ -4,7 +4,7 @@
 // change itself is refused by identity's origin check. Not redirected: the platform's health probe,
 // a provider's webhook and first-run setup. Before an origin is recorded nothing is redirected.
 import { bindings } from '#kit/bindings'
-import { defineEventHandler, sendRedirect } from 'h3'
+import { defineHandler, sendRedirect } from 'nuxt/server'
 import { runInContext, type KitEnv } from '#kit'
 import { requestCache } from '#kit/route'
 import { configuredOrigin, requestUrl } from '#kit/origin'
@@ -12,8 +12,8 @@ import { NOT_HOST_CHECKED } from '../identity/web'
 
 const HEALTH_PROBE = /^\/(api\/core\/health|cdn-cgi)(\/|$)/
 
-export default defineEventHandler(async (event) => {
-  const method = event.method.toUpperCase()
+export default defineHandler(async (event) => {
+  const method = event.req.method.toUpperCase()
   if (method !== 'GET' && method !== 'HEAD') return
   const url = requestUrl(event)
   if (HEALTH_PROBE.test(url.pathname) || NOT_HOST_CHECKED.test(url.pathname)) return

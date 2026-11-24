@@ -9,13 +9,13 @@
 // The kit's address is asked first: the one the site has recorded, or the request's own. So a
 // reservation paid at the till can be confirmed on a site where no booking has yet been made
 // online, which is where a theatre that brought its bookings from another system starts.
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { cache, siteUrl as kitSiteUrl, useContext } from '#kit'
 import { relyingParty } from '#modules/core'
 
 const KEY = 'box-office:site-origin'
 
-export async function fromRequest(event: H3Event): Promise<void> {
+export async function fromRequest(event: RequestEvent): Promise<void> {
   const origin = (await relyingParty(event)).origin
   useContext().cache[KEY] = origin
   if (await cache.get<string>(KEY) === null) await cache.put(KEY, origin)

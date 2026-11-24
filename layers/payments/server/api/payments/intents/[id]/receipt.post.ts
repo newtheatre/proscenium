@@ -1,7 +1,7 @@
 // Sends the receipt for a till sale already paid, to someone who asks for it afterwards: the whole
 // sale, or one person's share of a split sale. One receipt per sale or person; never sent twice.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { createUnit, defineRoute, refuse } from '#kit'
 import { getIntent, partsOf, settlements } from '../../../../intents'
 import { receiptTo, resolveReceipt } from '../../../../receipt-input'
@@ -15,7 +15,7 @@ export default defineRoute({
     split: z.number().int().positive().max(100).optional(), // not-policy: a person's number on the receipt
   }).strict(),
 }, async (event, { input }) => {
-  const intent = await getIntent(getRouterParam(event, 'id') ?? '')
+  const intent = await getIntent(getRouterParam(event, 'id', { decode: true }) ?? '')
   if (!intent || intent.channel !== 'desk') refuse('core.not-found', 'There is no such till sale.', { status: 404 })
   if (intent!.state !== 'succeeded') refuse('payments.intent.not-paid', 'This sale is not paid for.', { status: 409 })
   const rows = await rowsOf(intent!.id)

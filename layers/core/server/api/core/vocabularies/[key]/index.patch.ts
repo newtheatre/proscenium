@@ -1,12 +1,12 @@
 // Renames a vocabulary or changes how its terms are ordered.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { updateVocabulary } from '../../../../vocabularies/service'
 
 export default defineRoute({
   ability: 'core.vocabulary.manage',
-  record: event => ['core.vocabulary', getRouterParam(event, 'key')],
+  record: event => ['core.vocabulary', getRouterParam(event, 'key', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     label: z.string().trim().min(1).max(80).optional(), // not-policy: the label's bounds

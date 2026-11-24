@@ -2,7 +2,7 @@
 // float. Your own session not yet closed needs payments.session.open; anyone else's, or a closed
 // one, needs payments.session.close-any.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { can, defineRoute, first, Refusal } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { getSession, placeSession, summarise } from '../../../../sessions'
@@ -16,7 +16,7 @@ export default defineRoute({
     floatMinor: z.number().int().min(0).optional(),
   }).strict(),
 }, async (event, { input, actor, unit }) => {
-  const id = getRouterParam(event, 'id') ?? ''
+  const id = getRouterParam(event, 'id', { decode: true }) ?? ''
   const session = await getSession(id)
   if (!session) throw new Refusal('core.not-found', 'There is no such session.', { status: 404 })
   const own = !!(await first(`SELECT 1 FROM payments_sessions WHERE id = ?1 AND opened_by IN (${accountScopeSql('?2')})`, session.id, actor.accountId!))

@@ -1,12 +1,12 @@
 // Retires a pass or brings it back, or puts it on sale or takes it off.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { setPassTypeActive, setPassTypeOnSale } from '../../../../passes'
 
 export default defineRoute({
   ability: 'box-office.pass.manage',
-  record: event => ['box-office.pass-type', getRouterParam(event, 'id')],
+  record: event => ['box-office.pass-type', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({ active: z.boolean().optional(), onSale: z.boolean().optional() }).strict().refine(v => (v.active === undefined) !== (v.onSale === undefined), 'Change one of them.'),

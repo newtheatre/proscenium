@@ -1,7 +1,7 @@
 // The archive of past shows (C-43, C-47): one year's past productions, newest year first, or those
 // found by title, company or a public credit. "Not found" while past shows are not public, and
 // nothing before public-site.archive.from-year.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute, refuse, useSetting } from '#kit'
 import { pastProductions } from '#modules/core'
 

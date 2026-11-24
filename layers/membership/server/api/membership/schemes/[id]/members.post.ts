@@ -4,7 +4,7 @@
 // while the fees module is on, staff choose (P9): send the person a link to pay, so the membership
 // waits as pending until they do; or waive the fee with a reason, which needs
 // membership-fees.charge.waive. Taking the fee at the desk is a later slice.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { can, defineRoute, first, ownRecordExempt, refuse, siteUrl, today } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
@@ -21,7 +21,7 @@ const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/) // not-policy: the shape of
 
 export default defineRoute({
   ability: 'membership.membership.add',
-  record: event => ['membership.scheme', getRouterParam(event, 'id')],
+  record: event => ['membership.scheme', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({

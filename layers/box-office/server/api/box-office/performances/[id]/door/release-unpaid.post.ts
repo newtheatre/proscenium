@@ -2,13 +2,13 @@
 // and not marked to keep, lets its seats go at once, so the door can sell them to people waiting.
 // Each booking keeps its record, so its buyer can be seated again if seats are free.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, requireAbility } from '#kit'
 import { releaseReservation, unpaidFor } from '../../../../../release'
 
 export default defineRoute({
   ability: 'signed-in',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({}).strict(),

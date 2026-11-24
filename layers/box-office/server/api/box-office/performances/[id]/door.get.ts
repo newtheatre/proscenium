@@ -6,7 +6,7 @@
 // "arrived", since nobody on it can be admitted until it is paid. One released unpaid stays listed,
 // as Released, so the door can send its buyer to the till to be seated again if seats are free.
 import { and, count, eq, or, sql } from 'drizzle-orm'
-import { getQuery, getRouterParam } from 'h3'
+import { getQuery, getRouterParam } from 'nuxt/server'
 import { defineRoute, readListQuery, searchWords, useDb } from '#kit'
 import { accountLabel, findAccounts, getPerformance } from '#modules/core'
 import { orders } from '../../../../db/schema'
@@ -17,7 +17,7 @@ const REFERENCE = /^[A-Z0-9-]{4,20}$/ // not-policy: the shape a booking referen
 
 export default defineRoute({
   ability: 'box-office.ticket.admit',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (event, { record, actor, unit }) => {
   const performanceId = record!.id!

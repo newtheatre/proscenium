@@ -2,7 +2,7 @@
 // once and counts for nothing until they claim the account; the invitation is a single-use link
 // that signs them in and so claims it. After the link lapses an ordinary sign-in with the same
 // address does the same, because the grant waits on the account, not on the link.
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { newId, nowMs, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
 import { digest, randomToken } from './crypto'
 import { notify } from '../notifications/notify'
@@ -14,7 +14,7 @@ export interface Invitation { tokenId: string, link: string, expiresAt: number }
  * sealed variable: kept encrypted, sent by email only and cleared once sent. The account is unclaimed,
  * so the email goes to the address it was created with, looked up when it is sent.
  */
-export async function createInvitation(unit: UnitView, event: H3Event, actor: Actor, to: { accountId: string, address: string, role: string }): Promise<Invitation> {
+export async function createInvitation(unit: UnitView, event: RequestEvent, actor: Actor, to: { accountId: string, address: string, role: string }): Promise<Invitation> {
   const token = randomToken()
   const tokenId = newId('tok', { random: true })
   const at = nowMs()

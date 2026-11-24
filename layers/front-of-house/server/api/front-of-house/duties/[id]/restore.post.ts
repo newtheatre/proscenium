@@ -1,5 +1,5 @@
 // Brings an archived duty back, so an archive made by mistake is not final (FH-05).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { restoreDuty } from '../../../../rota'
@@ -10,6 +10,6 @@ export default defineRoute({
   idempotent: true,
   input: z.object({}).strict(),
 }, async (event, { unit }) => {
-  await restoreDuty(unit.view(), getRouterParam(event, 'id')!)
-  return { dutyId: getRouterParam(event, 'id') }
+  await restoreDuty(unit.view(), getRouterParam(event, 'id', { decode: true })!)
+  return { dutyId: getRouterParam(event, 'id', { decode: true }) }
 })

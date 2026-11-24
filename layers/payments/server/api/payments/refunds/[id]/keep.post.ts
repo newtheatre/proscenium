@@ -1,13 +1,13 @@
 // Keeps the payment behind a refund the system asked for, instead of handing it back: the buyer had
 // what they paid for anyway, such as being let in at the door. Every refund of that payment is withdrawn.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, first, Refusal } from '#kit'
 import { keepPayment } from '../../../../keep'
 
 export default defineRoute({
   ability: 'payments.refund.approve',
-  record: event => ['payments.refund', getRouterParam(event, 'id')],
+  record: event => ['payments.refund', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({}).strict(),
 }, async (_event, { record, actor, unit }) => {

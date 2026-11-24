@@ -1,7 +1,7 @@
 // One response (FB-401): its answers against the version of the form it was sent on. Special-
 // category answers come back restricted unless the person asks to see them and may; each time they
 // are opened is recorded.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { can, defineRoute, refuse, requireAbility } from '#kit'
 import { getVersion, requireForm } from '../../../../../forms'
@@ -15,9 +15,9 @@ import { aboutOf } from '../../../../../slots'
 
 const input = z.object({ reveal: z.enum(['1']).optional(), revision: z.coerce.number().int().min(1).optional() })
 
-export default defineRoute({ ability: 'forms.response.read', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default', input }, async (event, { input, record, actor, unit }) => {
+export default defineRoute({ ability: 'forms.response.read', record: event => ['forms.form', getRouterParam(event, 'id', { decode: true })], rateLimit: 'default', input }, async (event, { input, record, actor, unit }) => {
   const form = await requireForm(record!.id)
-  const response = await getResponse(getRouterParam(event, 'response') ?? '')
+  const response = await getResponse(getRouterParam(event, 'response', { decode: true }) ?? '')
   if (!response || response.formId !== form.id || response.state !== 'submitted') return refuse('forms.response.not-found', 'There is no response here.', { status: 404 })
   await refuseConflicted(actor, response.id)
   const version = (await getVersion(response.versionId))!

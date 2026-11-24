@@ -1,12 +1,12 @@
 // Adds a follow-up action: something to do about a thing, never about a person (FH-29).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { addAction } from '../../../../../incidents'
 
 export default defineRoute({
   ability: 'front-of-house.incident.manage',
-  record: event => ['front-of-house.incident', getRouterParam(event, 'id')],
+  record: event => ['front-of-house.incident', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({

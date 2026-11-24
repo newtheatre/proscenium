@@ -8,7 +8,7 @@
 // anybody switches it either way), it counts as on while the site has no Owner, and the holding
 // page points whoever is installing it to setup.
 import { bindings } from '#kit/bindings'
-import { defineEventHandler, getRequestURL, setResponseHeader, setResponseStatus } from 'h3'
+import { defineHandler, getRequestURL, setResponseStatus } from 'nuxt/server'
 import { isEnabled, runInContext, usePoint, type KitEnv } from '#kit'
 import { everSwitched } from '#kit/modules-store'
 import { useAccessProvider } from '#kit/access'
@@ -19,7 +19,7 @@ import { noticePage, retryAfter } from '../notice'
 
 const SERVICE_UNAVAILABLE = 503 // not-policy: HTTP's status for a site closed for a while
 
-export default defineEventHandler(async (event) => {
+export default defineHandler(async (event) => {
   const path = getRequestURL(event).pathname
   if (isOpenAddress(path)) return
   const env = bindings(event)
@@ -32,17 +32,17 @@ export default defineEventHandler(async (event) => {
     const actor = await useAccessProvider().actor(event)
     if (actor.kind === 'person' && ((await holdsConsole(actor)) || (await holdsAdmin(actor)) || (await holdsLive(actor)))) return null
     const wait = await retryAfter()
-    const page = isApi(path) || !['GET', 'HEAD'].includes(event.method.toUpperCase()) ? null : await noticePage({ setup: firstRun })
+    const page = isApi(path) || !['GET', 'HEAD'].includes(event.req.method.toUpperCase()) ? null : await noticePage({ setup: firstRun })
     return { wait, page }
   })
   if (!answer) return
   setResponseStatus(event, SERVICE_UNAVAILABLE)
-  setResponseHeader(event, 'retry-after', String(answer.wait))
-  setResponseHeader(event, 'cache-control', 'no-store')
+  event.res.headers.set('retry-after', String(answer.wait))
+  event.res.headers.set('cache-control', 'no-store')
   if (answer.page === null) {
-    setResponseHeader(event, 'content-type', 'application/json')
+    event.res.headers.set('content-type', 'application/json')
     return { code: 'maintenance.closed', reason: 'The site is closed for maintenance for a while.', remedy: 'Try again later, or contact the box office.' }
   }
-  setResponseHeader(event, 'content-type', 'text/html; charset=utf-8')
-  return event.method.toUpperCase() === 'HEAD' ? '' : answer.page
+  event.res.headers.set('content-type', 'text/html; charset=utf-8')
+  return event.req.method.toUpperCase() === 'HEAD' ? '' : answer.page
 })

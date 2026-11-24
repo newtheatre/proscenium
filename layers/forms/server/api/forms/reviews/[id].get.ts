@@ -1,7 +1,7 @@
 // One review, for the reviewer it was asked of (FB-405): the response's answers, what to mark, and
 // their own review. Special-category answers stay shut. The result is here only once the round is
 // released, or from the start where the stage reviews in the open.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, refuse } from '#kit'
 import { getForm, getVersion, accountName } from '../../../forms'
 import { getResponse, readAnswers, storedFigures } from '../../../responses'
@@ -11,7 +11,7 @@ import type { Definition } from '../../../../shared/engine'
 import { questionsOf, stageOf, withoutWorkflow } from '../../../../shared/engine'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (event, { actor }) => {
-  const { assignment, round } = await ownAssignment(getRouterParam(event, 'id') ?? '', actor)
+  const { assignment, round } = await ownAssignment(getRouterParam(event, 'id', { decode: true }) ?? '', actor)
   const response = (await getResponse(assignment.responseId))!
   const definition = JSON.parse((await getVersion(response.versionId))!.definition) as Definition
   const stage = stageOf(definition, round.stageKey)

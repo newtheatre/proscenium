@@ -1,5 +1,5 @@
 // Sets a file's title and alt text. Needs the ability to edit its owner.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, refuse, requireAbility, useContext } from '#kit'
 import { fileRow, fileSlot } from '../../../files/service'
@@ -12,7 +12,7 @@ export default defineRoute({
     altText: z.string().trim().max(300).nullable().optional(), // not-policy: the specification's column limit
   }),
 }, async (event, { input, actor, unit }) => {
-  const row = await fileRow(getRouterParam(event, 'id') ?? '')
+  const row = await fileRow(getRouterParam(event, 'id', { decode: true }) ?? '')
   if (!row || row.state === 'deleted' || row.state === 'rejected') refuse('core.files.not-found', 'There is no such file.', { status: 404 })
   const slot = await fileSlot(row.slot)
   if (!slot) refuse('core.files.not-found', 'There is no such file.', { status: 404 })

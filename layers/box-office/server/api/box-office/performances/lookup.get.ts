@@ -1,7 +1,7 @@
 // Performances for the Orders list's performance filter: those Box office sells, nearest in time
 // first, found by show title (?q=) and narrowed to a show when the show filter is on (?show=), or
 // turned from ids into "Show, date and time" (?ids=).
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { all, defineRoute, nowMs, theatreTimeZone, useSetting } from '#kit'
 
 const MOST = 25 // not-policy: as many as a picker shows

@@ -1,13 +1,13 @@
 // Adds one entry by hand, or changes its end date and name if the value is already there (V19).
 // One added here is kept when a file is loaded that does not hold it, until a file does.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, newId, nowMs, refuse } from '#kit'
 import { hashValue, normalise, requireList, wellFormed } from '../../../../../lists'
 
 export default defineRoute({
   ability: 'membership.verification-list.manage',
-  record: event => ['membership.verification-list', getRouterParam(event, 'id')],
+  record: event => ['membership.verification-list', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     value: z.string().trim().min(1).max(254), // not-policy: an address's bound

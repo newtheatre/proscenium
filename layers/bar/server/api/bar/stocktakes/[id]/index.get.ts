@@ -2,13 +2,13 @@
 // expected once submitted, and what the viewer may do with it: whether they may approve it, or are
 // barred because they submitted it and its difference is large, and the value above which a
 // difference needs a reason.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { can, defineRoute } from '#kit'
 import { approval, stocktake } from '../../../../stocktakes'
 
 export default defineRoute({
   ability: 'bar.stock.count',
-  record: event => ['bar.stocktake', getRouterParam(event, 'id')],
+  record: event => ['bar.stocktake', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { actor, record }) => {
   const approver = (await can(actor, 'bar.stocktake.approve')).allowed

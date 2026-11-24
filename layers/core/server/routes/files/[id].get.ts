@@ -2,20 +2,20 @@
 // cached; anything else answers "not found" to anyone who may not see it, so its existence does not
 // leak. An SVG is served with a policy that stops it running anything, even after cleaning.
 import { bindings } from '#kit/bindings'
-import { defineEventHandler, getHeader, getRouterParam, setResponseHeaders, setResponseStatus } from 'h3'
+import { defineHandler, getRequestHeader, getRouterParam, setResponseStatus } from 'nuxt/server'
 import { runInContext } from '#kit/context'
 import { useAccessProvider } from '#kit/access'
 import { first, isId, nowMs, files as store } from '#kit'
 import { mayReadRecordFile } from '../../files/service'
 
-export default defineEventHandler(async (event) => {
+export default defineHandler(async (event) => {
   const env = bindings(event)
   if (!env?.DB) throw new Error('No DB binding on this request')
-  return runInContext({ env, requestId: getHeader(event, 'cf-ray') ?? crypto.randomUUID() }, async () => {
-    const id = getRouterParam(event, 'id') ?? ''
+  return runInContext({ env, requestId: getRequestHeader(event, 'cf-ray') ?? crypto.randomUUID() }, async () => {
+    const id = getRouterParam(event, 'id', { decode: true }) ?? ''
     const notFound = () => {
       setResponseStatus(event, 404) // not-policy: HTTP status
-      setResponseHeaders(event, { 'cache-control': 'no-store' })
+      for (const [name, value] of Object.entries({ 'cache-control': 'no-store' })) event.res.headers.set(name, String(value))
       return 'Not found'
     }
     if (!isId('fil', id)) return notFound()
@@ -42,9 +42,9 @@ export default defineEventHandler(async (event) => {
       'cache-control': row.access === 'public' ? 'public, max-age=31536000, immutable' : row.access === 'record' ? 'private, no-store' : 'private, max-age=300', // not-policy: a ready file never changes under its id
       'etag': etag,
     }
-    if (getHeader(event, 'if-none-match') === etag) {
+    if (getRequestHeader(event, 'if-none-match') === etag) {
       setResponseStatus(event, 304) // not-policy: HTTP status
-      setResponseHeaders(event, headers)
+      for (const [name, value] of Object.entries(headers)) event.res.headers.set(name, String(value))
       return null
     }
     const object = await store.get(row.object_key)

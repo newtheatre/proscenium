@@ -2,7 +2,7 @@
 // module declares where a form can be attached to one of its records, such as a nomination for an
 // award. Forms never learns what the record is. An attached form is a placement like the form's
 // own link, with its own dates, cap and count, and each response keeps the record it is about.
-import { getQuery, type H3Event } from 'h3'
+import { getQuery, type RequestEvent } from 'nuxt/server'
 import { all, first, newId, refuse, requireAbility, siteUrl, usePoint, type Actor, type UnitView } from '#kit'
 import type { FormRow } from './forms'
 import { LINK_SLOT } from './db/schema'
@@ -46,7 +46,7 @@ export async function requireSlot(id: string | undefined): Promise<FormsSlot> {
 }
 
 /** The place an address names, as `?place=`. */
-export function placeIn(event: H3Event): string | undefined {
+export function placeIn(event: RequestEvent): string | undefined {
   const place = getQuery(event).place
   return typeof place === 'string' && place ? place : undefined
 }

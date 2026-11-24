@@ -1,12 +1,12 @@
 // Approves a submitted count: the levels change by what it found.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { approveStocktake } from '../../../../stocktakes'
 
 export default defineRoute({
   ability: 'bar.stocktake.approve',
-  record: event => ['bar.stocktake', getRouterParam(event, 'id')],
+  record: event => ['bar.stocktake', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({}).strict(),
 }, async (_event, { actor, record, unit }) => {

@@ -4,7 +4,7 @@
 // waiting on anybody, and an archived form is out of the way but keeps its responses, which leave
 // by retention. A form never published can be archived too, in place of deleting it. Nothing is
 // paused any more: a form paused before that went is opened or closed from where it is.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, nowMs, refuse } from '#kit'
 import { requireForm } from '../../../../forms'
@@ -15,7 +15,7 @@ type Status = 'draft' | 'live' | 'paused' | 'closed' | 'archived'
 const OPEN: Record<Status, Status[]> = { draft: ['archived'], live: ['closed'], paused: ['live', 'closed'], closed: ['live', 'archived'], archived: ['closed', 'draft'] }
 const input = z.object({ to: z.enum(['live', 'closed', 'archived', 'draft']) })
 
-export default defineRoute({ ability: 'forms.form.publish', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'write', input }, async (_event, { input, record, unit }) => {
+export default defineRoute({ ability: 'forms.form.publish', record: event => ['forms.form', getRouterParam(event, 'id', { decode: true })], rateLimit: 'write', input }, async (_event, { input, record, unit }) => {
   const form = await requireForm(record!.id)
   if (form.status === input.to) return { status: form.status }
   const published = form.liveVersionId !== null

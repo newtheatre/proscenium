@@ -1,14 +1,14 @@
 // The whole incident: people with their welfare details, actions and the log. Every read is audited.
 // The answer carries the categories a reviewer chooses from and the names of the people its ids
 // point at, so the screen asks nothing more.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { accountLabel, listTerms } from '#modules/core'
 import { readIncident } from '../../../../incidents'
 
 export default defineRoute({
   ability: 'front-of-house.incident.view',
-  record: event => ['front-of-house.incident', getRouterParam(event, 'id')],
+  record: event => ['front-of-house.incident', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record }) => {
   const incident = await readIncident(record!.id!)

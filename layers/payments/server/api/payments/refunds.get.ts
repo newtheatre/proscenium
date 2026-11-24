@@ -2,7 +2,7 @@
 // default; searched by who asked, through findAccounts. Each row says whether a person hands the
 // money back.
 import { and, count, sql } from 'drizzle-orm'
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute, readListQuery, searchWords, useDb } from '#kit'
 import { findAccounts } from '#modules/core'
 import { refunds } from '../../db/schema'

@@ -3,7 +3,7 @@
 // never when it is the mover's own or one they have a conflict on. Those that cannot take it are
 // left alone and named in the reply with the reason. Each move is saved on its own, so a long list
 // never outgrows one save, and one that cannot be saved is named with the rest.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { createUnit, defineRoute, isRefusal, nowMs } from '#kit'
 import { getVersion, requireForm } from '../../../../../forms'
@@ -22,7 +22,7 @@ const input = z.object({
   reason: z.string().trim().max(2000).nullish(), // not-policy: shape bound
 })
 
-export default defineRoute({ ability: 'forms.response.move', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'write', input }, async (_event, { input, record, actor }) => {
+export default defineRoute({ ability: 'forms.response.move', record: event => ['forms.form', getRouterParam(event, 'id', { decode: true })], rateLimit: 'write', input }, async (_event, { input, record, actor }) => {
   const form = await requireForm(record!.id)
   const defs = new Map<string, Definition>()
   const moved: string[] = []

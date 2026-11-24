@@ -1,13 +1,13 @@
 // A production's credits (C-09), with the sections a credit can be put in.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { listCredits } from '../../../../../programme/credits'
 import { listTerms } from '../../../../../vocabularies/service'
 
 export default defineRoute({
   ability: 'core.production.view',
-  record: event => ['core.production', getRouterParam(event, 'id')],
+  record: event => ['core.production', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
   input: z.object({}),
 }, async (_event, { record }) => {

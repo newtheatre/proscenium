@@ -1,6 +1,6 @@
 // Opens, closes and archives a scheme (MEM-02; tab 3, "States of a scheme"). Opening is refused
 // while anything on the checklist is missing (S4); closing and archiving say how many are affected.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { all, defineRoute, nowMs, refuse } from '#kit'
 import { todayOrNull } from '../../../../memberships'
@@ -10,7 +10,7 @@ const MAY_GO = { draft: ['open'], open: ['closed'], closed: ['open', 'archived']
 
 export default defineRoute({
   ability: 'membership.scheme.manage',
-  record: event => ['membership.scheme', getRouterParam(event, 'id')],
+  record: event => ['membership.scheme', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({ to: z.enum(['open', 'closed', 'archived']) }),
 }, async (_event, { input, record, unit }) => {

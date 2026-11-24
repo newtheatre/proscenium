@@ -1,5 +1,5 @@
 // Archives a rota template.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { archiveTemplate } from '../../../../templates'
@@ -10,6 +10,6 @@ export default defineRoute({
   idempotent: true,
   input: z.object({}).strict(),
 }, (event, { unit }) => {
-  archiveTemplate(unit.view(), getRouterParam(event, 'id')!)
-  return { templateId: getRouterParam(event, 'id') }
+  archiveTemplate(unit.view(), getRouterParam(event, 'id', { decode: true })!)
+  return { templateId: getRouterParam(event, 'id', { decode: true }) }
 })

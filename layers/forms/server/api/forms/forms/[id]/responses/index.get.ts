@@ -2,7 +2,7 @@
 // ever had, with retired questions marked. The filters arrive in the address, so a view can be
 // shared. A special-category answer always shows here as restricted; it is opened one response at
 // a time.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { can, defineRoute, useSetting } from '#kit'
 import { getFields, getVersion, requireForm } from '../../../../../forms'
@@ -22,7 +22,7 @@ const input = z.object({
   stage: z.string().max(64).optional(), // not-policy: shape bound
 })
 
-export default defineRoute({ ability: 'forms.response.read', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default', input }, async (_event, { input, record, actor }) => {
+export default defineRoute({ ability: 'forms.response.read', record: event => ['forms.form', getRouterParam(event, 'id', { decode: true })], rateLimit: 'default', input }, async (_event, { input, record, actor }) => {
   const form = await requireForm(record!.id)
   const live = await getVersion(form.liveVersionId)
   const columns = columnsOf(await getFields(form.id), live ? JSON.parse(live.definition) as Definition : null)

@@ -1,7 +1,7 @@
 // Staff correct a membership's dates (D7, MEM-28): a mid-year correction, or what the students'
 // union's records show. Only an active membership; the end not before the start; never overlapping
 // the membership that renews it. The audit entry holds the dates before and after, and the note why.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, nowMs, refuse } from '#kit'
 
@@ -9,7 +9,7 @@ const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/) // not-policy: the shape of
 
 export default defineRoute({
   ability: 'membership.membership.update',
-  record: event => ['membership.membership', getRouterParam(event, 'id')],
+  record: event => ['membership.membership', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     startsOn: DATE,

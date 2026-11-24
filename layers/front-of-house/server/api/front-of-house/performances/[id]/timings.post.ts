@@ -1,5 +1,5 @@
 // Records house open, curtain up and the other moments of the night (FH-22).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { TIMING_KINDS } from '../../../../db/schema'
@@ -7,7 +7,7 @@ import { recordTiming } from '../../../../night'
 
 export default defineRoute({
   ability: 'front-of-house.assignment.check-in',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({ kind: z.enum(TIMING_KINDS), at: z.number().int().positive().optional() }).strict(),

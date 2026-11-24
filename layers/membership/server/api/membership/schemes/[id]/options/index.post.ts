@@ -1,13 +1,13 @@
 // Adds a length a scheme can be held for (MEM-56): "1 year", "3 years". Counted in scheme years for
 // a fixed scheme and months for a rolling one; an indefinite scheme has none.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, newId, nowMs, refuse } from '#kit'
 import { requireScheme } from '../../../../../schemes'
 
 export default defineRoute({
   ability: 'membership.scheme.manage',
-  record: event => ['membership.scheme', getRouterParam(event, 'id')],
+  record: event => ['membership.scheme', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({

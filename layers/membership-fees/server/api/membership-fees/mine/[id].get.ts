@@ -1,13 +1,13 @@
 // The Pay page (tab 5, "Pay"): the holder's application, what it costs and whether it is waiting for
 // the payment now, and whether this site takes payment online.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { methodsFor } from '#modules/payments'
 import { chargeOf } from '../../../charges'
 import { ownApplication } from '../../../paying'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (event, { actor }) => {
-  const application = await ownApplication(getRouterParam(event, 'id')!, actor.accountId!)
+  const application = await ownApplication(getRouterParam(event, 'id', { decode: true })!, actor.accountId!)
   const charge = await chargeOf(application.id)
   const membershipState = application.state
   return {

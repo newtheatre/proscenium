@@ -1,14 +1,14 @@
 // Asking for a refund of a fee (P7). Payments' own rule decides whether a second person must approve
 // it. When the money has gone back, the settlement handler reverses the income and, on a full refund,
 // ends the membership where membership-fees.refunds.end-on-full-refund says so.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, refuse } from '#kit'
 import { intentStatus, requestRefund } from '#modules/payments'
 
 export default defineRoute({
   ability: 'membership-fees.refund.request',
-  record: event => ['membership-fees.charge', getRouterParam(event, 'id')],
+  record: event => ['membership-fees.charge', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({ amountMinor: z.number().int().min(1) }).strict(),
 }, async (_event, { input, actor, record, unit }) => {

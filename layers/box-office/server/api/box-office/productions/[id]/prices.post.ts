@@ -2,14 +2,14 @@
 // each is a new row, so baskets and orders already written keep the price they were given and the
 // history shows who changed it and when.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, defineRoute, idSchema, nowMs, refuse, useSetting } from '#kit'
 import { getPerformance, getProduction } from '#modules/core'
 import { setPrices } from '../../../../prices'
 
 export default defineRoute({
   ability: 'box-office.pricing.manage',
-  record: event => ['core.production', getRouterParam(event, 'id')],
+  record: event => ['core.production', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({

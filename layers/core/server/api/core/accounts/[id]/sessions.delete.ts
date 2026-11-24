@@ -1,12 +1,12 @@
 // Sign a person out of every browser.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { endSessionsOf } from '../../../../identity/sessions'
 
 export default defineRoute({
   ability: 'core.session.end',
-  record: event => ['core.account', getRouterParam(event, 'id')],
+  record: event => ['core.account', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({}),
 }, async (_event, { unit, record, actor }) => {

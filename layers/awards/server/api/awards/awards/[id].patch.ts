@@ -1,6 +1,6 @@
 // Corrects an award: the printed name, the date, what it is for, the citation, the decision, or
 // where it is listed. Who holds it and which award it is never change; a wrong one is revoked.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, first, nowMs, refuse } from '#kit'
 import { awardFields, requireAward } from '../../../awards'
 
@@ -11,7 +11,7 @@ const COLUMN: Record<string, string> = {
 
 export default defineRoute({
   ability: 'awards.award.update',
-  record: event => ['awards.award', getRouterParam(event, 'id')],
+  record: event => ['awards.award', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: awardFields.partial(),
 }, async (_event, { input, record, unit }) => {

@@ -1,14 +1,14 @@
 // The front of house section of Tonight for one performance (FH-19, FH-20), with what this viewer
 // may do on it, their own place if they have one, and the count of open incidents for those who
 // may see incidents. Someone leading also gets who is coming needing help (AC-1).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { can, defineRoute, first } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { board, tonightNeeds } from '../../../../night'
 
 export default defineRoute({
   ability: 'front-of-house.shift.view',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record, actor, unit }) => {
   const id = record!.id!

@@ -1,7 +1,7 @@
 // Edits an award type, or archives and restores it. The address is fixed once anybody holds the
 // award, because the roll of honour may be linked by it. Archiving keeps every holder and their
 // ticket benefit; it only stops new awards.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, nowMs, refuse } from '#kit'
 import { hasAwards, requireType, typeFields } from '../../../types'
 
@@ -11,7 +11,7 @@ const COLUMN: Record<string, string> = {
 
 export default defineRoute({
   ability: 'awards.type.manage',
-  record: event => ['awards.type', getRouterParam(event, 'id')],
+  record: event => ['awards.type', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: typeFields.partial(),
 }, async (_event, { input, record, unit }) => {

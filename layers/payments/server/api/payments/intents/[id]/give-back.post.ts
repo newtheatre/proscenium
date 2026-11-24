@@ -3,7 +3,7 @@
 // confirms, by asking, that they have handed back the cash and refunded on any standalone machine or
 // in the SumUp app; a card the provider refunds is sent afterwards.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { confirmHandBacks, giveBack } from '../../../../giveback'
 
@@ -12,7 +12,7 @@ export default defineRoute({
   rateLimit: 'write',
   input: z.object({}).strict(),
 }, async (event, { actor, unit }) => {
-  const { refundIds, attempts } = await giveBack(unit.view(), getRouterParam(event, 'id') ?? '', actor)
+  const { refundIds, attempts } = await giveBack(unit.view(), getRouterParam(event, 'id', { decode: true }) ?? '', actor)
   await unit.commit()
   return { givenBack: true, ...await confirmHandBacks(refundIds, attempts, actor.accountId!) }
 })

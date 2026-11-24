@@ -2,7 +2,7 @@
 // format, the nearest respond-by date first, filtered by kind, state, closed and overdue, and
 // searched by the person's name or verified address through findAccounts.
 import { and, count, sql } from 'drizzle-orm'
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute, nowMs, readListQuery, searchWords, useDb } from '#kit'
 import { dataRequests } from '../../../db/identity'
 import { findAccounts } from '../../../identity/find'

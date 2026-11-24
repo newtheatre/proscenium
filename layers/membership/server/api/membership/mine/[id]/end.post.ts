@@ -1,13 +1,13 @@
 // A holder ends their own membership, where the scheme allows it (holder_may_end). It ends today and
 // returns no fee by itself.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, refuse } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { endMembership } from '../../../../ending'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { actor, unit }) => {
-  const id = getRouterParam(event, 'id')
+  const id = getRouterParam(event, 'id', { decode: true })
   const mine = await first<{ may: number }>(
     `SELECT s.holder_may_end AS may FROM membership_memberships m JOIN membership_schemes s ON s.id = m.scheme_id WHERE m.id = ?1 AND m.state = 'active' AND m.account_id IN (${accountScopeSql('?2')})`,
     id, actor.accountId,

@@ -2,7 +2,7 @@
 // order with nothing to pay is confirmed here and now, and its tickets come back in the answer.
 // No bot check here: holding the seats took one, and only that basket's secret token opens this.
 import { z } from 'zod'
-import { getHeader, getRouterParam } from 'h3'
+import { getRequestHeader, getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { startCheckout } from '../../../../checkout'
 import { fromRequest } from '../../../../links'
@@ -19,5 +19,5 @@ export default defineRoute({
   }).strict(),
 }, async (event, { input, unit }) => {
   await fromRequest(event)
-  return startCheckout(unit.view(), { orderId: getRouterParam(event, 'id')!, token: getHeader(event, 'x-basket-token') ?? '', ...input })
+  return startCheckout(unit.view(), { orderId: getRouterParam(event, 'id', { decode: true })!, token: getRequestHeader(event, 'x-basket-token') ?? '', ...input })
 })

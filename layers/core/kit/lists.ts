@@ -5,7 +5,7 @@
 // and the checks can find them. A data route reads its address with readList and nothing else.
 import { and, asc, desc, eq, gte, inArray, lt, lte, sql, type SQL } from 'drizzle-orm'
 import { getTableConfig } from 'drizzle-orm/sqlite-core'
-import { getQuery, type H3Event } from 'h3'
+import { getQuery, type RequestEvent } from 'nuxt/server'
 import { decodeList, type DatesValue, type FilterKind, type FilterValue, type ListDeclaration } from '../shared/list'
 import { DeclarationError, refuse } from './refusal'
 import { tableMeta, type TableMeta } from './db'
@@ -197,7 +197,7 @@ export interface ListRead<L extends ListDeclaration = ListDeclaration> {
 type Query = Record<string, string | string[] | null | undefined>
 
 /** Reads a list's address from the request. The one way a data route reads it. */
-export async function readList<L extends ListDeclaration>(event: H3Event, source: ListSource<L>): Promise<ListRead<L>> {
+export async function readList<L extends ListDeclaration>(event: RequestEvent, source: ListSource<L>): Promise<ListRead<L>> {
   return readListQuery(getQuery(event) as Query, source)
 }
 

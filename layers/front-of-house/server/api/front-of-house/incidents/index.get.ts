@@ -1,7 +1,7 @@
 // Incidents for reviewers (Front of house specification, part 5, "Incidents"): number, date, kind,
 // severity, state and venue, with no free text or people. Search finds an incident by its number.
 import { and, count, eq, sql } from 'drizzle-orm'
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { all, defineRoute, readListQuery, useDb } from '#kit'
 import { incidents } from '../../../db/schema'
 import { reference } from '../../../incidents'

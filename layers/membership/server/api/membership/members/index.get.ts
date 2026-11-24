@@ -1,5 +1,5 @@
 // Members for staff (tab 5, "Members"): one page of the list. See server/members.ts.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { readMembers } from '../../../members'
 

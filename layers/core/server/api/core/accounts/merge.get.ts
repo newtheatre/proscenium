@@ -1,5 +1,5 @@
 // What a merge would do: both accounts side by side, and how many rows would move (ID-32).
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, requireAbility } from '#kit'
 import { mergePreview } from '../../../identity/merge'

@@ -1,14 +1,14 @@
 // One checklist for a performance: its run's items and entries, or its items when no one has started it.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, refuse } from '#kit'
 import { getChecklist, readRun } from '../../../../../../checklists'
 
 export default defineRoute({
   ability: 'front-of-house.shift.view',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (event, { record }) => {
-  const checklistId = getRouterParam(event, 'checklistId')!
+  const checklistId = getRouterParam(event, 'checklistId', { decode: true })!
   const run = await readRun(checklistId, record!.id!)
   if (run) return run
   const checklist = await getChecklist(checklistId)

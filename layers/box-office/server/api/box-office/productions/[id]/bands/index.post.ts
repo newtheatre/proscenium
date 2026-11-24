@@ -1,13 +1,13 @@
 // Adds a band to a production: a priced part of the house.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { getProduction } from '#modules/core'
 import { createBand } from '../../../../../setup'
 
 export default defineRoute({
   ability: 'box-office.pricing.manage',
-  record: event => ['core.production', getRouterParam(event, 'id')],
+  record: event => ['core.production', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({

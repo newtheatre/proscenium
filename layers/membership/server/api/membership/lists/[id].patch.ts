@@ -1,12 +1,12 @@
 // Renames a list, or changes its label, noun, shape or the date after which it matches nothing.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, refuse } from '#kit'
 import { listInput } from '../../../list-input'
 import { requireList } from '../../../lists'
 
 export default defineRoute({
   ability: 'membership.verification-list.manage',
-  record: event => ['membership.verification-list', getRouterParam(event, 'id')],
+  record: event => ['membership.verification-list', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: listInput.omit({ keyKind: true }).partial(),
 }, async (_event, { input, record, unit }) => {

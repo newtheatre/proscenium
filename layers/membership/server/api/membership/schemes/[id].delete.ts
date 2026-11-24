@@ -1,12 +1,12 @@
 // Deletes a draft that nobody has held (S1). After that a scheme is closed or archived, never deleted.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, refuse } from '#kit'
 import { hasMemberships, requireScheme } from '../../../schemes'
 
 export default defineRoute({
   ability: 'membership.scheme.manage',
-  record: event => ['membership.scheme', getRouterParam(event, 'id')],
+  record: event => ['membership.scheme', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({}),
 }, async (_event, { record, unit }) => {

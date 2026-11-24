@@ -1,5 +1,5 @@
 // Deletes a ticket type a person made that has never been priced or sold. Anything else is retired.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { deleteTicketType, ticketTypeId } from '../../../ticket-types'
@@ -9,6 +9,6 @@ export default defineRoute({
   rateLimit: 'write',
   input: z.object({}),
 }, async (event, { unit }) => {
-  deleteTicketType(unit.view(), ticketTypeId(getRouterParam(event, 'id')))
+  deleteTicketType(unit.view(), ticketTypeId(getRouterParam(event, 'id', { decode: true })))
   return { deleted: true }
 })

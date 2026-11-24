@@ -1,5 +1,5 @@
 // Cancels a shift with a reason. Everyone on it is released and told.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, refuse } from '#kit'
 import { getShift } from '../../../../shifts'
@@ -7,7 +7,7 @@ import { cancelShift } from '../../../../rota'
 
 export default defineRoute({
   ability: 'front-of-house.shift.manage',
-  record: event => ['front-of-house.shift', getRouterParam(event, 'id')],
+  record: event => ['front-of-house.shift', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({ reason: z.string().trim().min(1).max(200) }).strict(), // not-policy: shape bound, as the table's CHECK

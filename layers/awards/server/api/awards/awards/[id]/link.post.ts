@@ -5,7 +5,7 @@
 // link is refused with the one they hold, and `merge: true` folds this one into it instead: their
 // award takes the earlier date, and what it lacks (what it was for, the citation) from this one,
 // which is then revoked as merged.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { can, defineRoute, first, nowMs, ownRecordExempt, refuse } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
@@ -21,7 +21,7 @@ const input = z.object({
 
 export default defineRoute({
   ability: 'awards.award.update',
-  record: event => ['awards.award', getRouterParam(event, 'id')],
+  record: event => ['awards.award', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input,

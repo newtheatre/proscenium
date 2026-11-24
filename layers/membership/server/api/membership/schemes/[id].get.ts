@@ -1,6 +1,6 @@
 // One scheme for its console screen: its fields, lengths, what opening it still needs, how many
 // hold it, the lists it may check against, and the dates a membership taken today would run to (MEM-01's live example).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, can, defineRoute } from '#kit'
 import { charger } from '../../../charge'
 import { listSetsEnd, schemeList } from '../../../lists'
@@ -9,7 +9,7 @@ import { exampleDates, hasMemberships, lengthOptions, openChecklist, requireSche
 
 export default defineRoute({
   ability: 'membership.scheme.view',
-  record: event => ['membership.scheme', getRouterParam(event, 'id')],
+  record: event => ['membership.scheme', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record, actor }) => {
   const scheme = await requireScheme(record!.id)

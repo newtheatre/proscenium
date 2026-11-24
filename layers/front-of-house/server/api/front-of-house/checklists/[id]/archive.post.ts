@@ -1,5 +1,5 @@
 // Archives a checklist. Runs that used it keep their entries (FH-24).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { archiveChecklist } from '../../../../checklists'
@@ -10,6 +10,6 @@ export default defineRoute({
   idempotent: true,
   input: z.object({}).strict(),
 }, (event, { unit }) => {
-  archiveChecklist(unit.view(), getRouterParam(event, 'id')!)
+  archiveChecklist(unit.view(), getRouterParam(event, 'id', { decode: true })!)
   return { archived: true }
 })

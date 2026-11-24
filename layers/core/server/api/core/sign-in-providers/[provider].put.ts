@@ -1,7 +1,7 @@
 // Saves a provider's set-up in one change: its client id, the organisations it accepts and, when
 // typed, its client secret. Switching it on is a separate step, the setting itself, so it comes last
 // and the rules that need the id and secret are met by then.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { changeSettings, clearCredential, credentialEntry, defineRoute, refuse, requireAbility, setCredential, useContext, useSetting } from '#kit'
 import { mayChangeSetting } from '../../../settings/save'
@@ -19,7 +19,7 @@ export default defineRoute({
     confirm: z.boolean().optional(),
   }).strict(),
 }, async (event, { input, actor, unit }) => {
-  const provider = providerById(getRouterParam(event, 'provider') ?? '')
+  const provider = providerById(getRouterParam(event, 'provider', { decode: true }) ?? '')
   const wanted: [string, unknown][] = [[provider.settings.clientId, input.clientId || null], [provider.settings.domains, [...new Set(input.domains)]]]
   const changes = []
   for (const [key, value] of wanted) {

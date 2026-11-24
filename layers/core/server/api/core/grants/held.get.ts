@@ -2,7 +2,7 @@
 // end, filtered by state, role, reach and module, and searched by the holder's name or verified
 // address through findAccounts. A grant given to an account later merged away shows its survivor.
 import { and, count, eq, sql } from 'drizzle-orm'
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute, nowMs, readListQuery, searchWords, useDb, useSetting } from '#kit'
 import { grants, roles } from '../../../db/identity'
 import { findAccounts } from '../../../identity/find'

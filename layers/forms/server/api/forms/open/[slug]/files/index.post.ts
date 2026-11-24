@@ -3,7 +3,7 @@
 // page already made, so the file belongs to the response it will be sent with. A file can be added
 // to a response not yet sent, or to one sent back for changes by the person it is from; core checks
 // it, and the page waits for that before it can be sent.
-import { getHeader, getRouterParam, readRawBody } from 'h3'
+import { getRequestHeader, getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, idSchema, nowMs, refuse } from '#kit'
 import { placeIn, placeOf } from '../../../../../slots'
@@ -23,7 +23,7 @@ const input = z.object({
 
 export default defineRoute({ public: true, rateLimit: 'write', body: 'binary', input }, async (event, { input, actor, unit }) => {
   const notFound = () => refuse('forms.form.not-found', 'There is no form here.', { status: 404 })
-  const form = await getFormBySlug(getRouterParam(event, 'slug'))
+  const form = await getFormBySlug(getRouterParam(event, 'slug', { decode: true }))
   const link = form ? await placeOf(form, placeIn(event)) : null
   const live = form ? await getVersion(form.liveVersionId) : null
   if (!form || !link || !live || form.status === 'draft' || form.status === 'archived') return notFound()
@@ -54,8 +54,8 @@ export default defineRoute({ public: true, rateLimit: 'write', body: 'binary', i
 
   const limit = await questionLimit(question)
   const tooLarge = () => refuse('forms.files.too-large', 'This file is larger than this question takes.', { status: 413, fields: { file: 'forms.files.too-large' } }) // not-policy: HTTP status
-  if (Number(getHeader(event, 'content-length') ?? 0) > limit) return tooLarge()
-  const body = await readRawBody(event, false)
+  if (Number(getRequestHeader(event, 'content-length') ?? 0) > limit) return tooLarge()
+  const body = new Uint8Array(await event.req.arrayBuffer())
   const bytes = body ? new Uint8Array(body) : new Uint8Array()
   return uploadAnswerFile(unit, { responseId: input.response, question, actor, name: input.name, type: input.type, bytes })
 })

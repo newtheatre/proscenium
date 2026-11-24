@@ -1,7 +1,7 @@
 // Gives a form its link, or changes it (FB-301): the audience, the dates it opens and closes, a cap
 // on responses and whether each person may answer once. Publishing rights are needed, because this
 // is what puts the form in front of people.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, newId, nowMs, refuse } from '#kit'
 import { requireForm } from '../../../../forms'
@@ -17,7 +17,7 @@ const input = z.object({
   status: z.enum(['active', 'paused']),
 })
 
-export default defineRoute({ ability: 'forms.form.publish', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'write', input }, async (_event, { input, record, actor, unit }) => {
+export default defineRoute({ ability: 'forms.form.publish', record: event => ['forms.form', getRouterParam(event, 'id', { decode: true })], rateLimit: 'write', input }, async (_event, { input, record, actor, unit }) => {
   const form = await requireForm(record!.id)
   if (form.mode === 'record') refuse('forms.link.record', 'Custom fields are filled in on their record, so they have no link.', { status: 409 }) // not-policy: HTTP status
   if (input.opensAt !== null && input.closesAt !== null && input.closesAt <= input.opensAt)

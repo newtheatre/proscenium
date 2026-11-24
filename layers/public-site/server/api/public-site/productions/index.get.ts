@@ -1,7 +1,7 @@
 // What's on (C-38): published, listed productions with a scheduled performance still to come,
 // narrowed by category, season, venue or month, and at most `limit` of them. A filter that is not
 // well formed is ignored rather than refused, as a hand-typed address should still show something.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { currentProductions } from '#modules/core'

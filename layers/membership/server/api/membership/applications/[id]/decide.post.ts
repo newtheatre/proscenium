@@ -4,7 +4,7 @@
 // Passing an ID the list did not hold can add it to the list (addToList), as an entry staff added:
 // claimed by this membership, ending when it ends, and kept through file loads until a file holds it.
 // Staff may set the end date on passing (endsOn), such as when the union's membership ends.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, newId, nowMs, refuse, today, useSetting, type UnitView } from '#kit'
 import { activatePending } from '../../../../memberships'
@@ -14,7 +14,7 @@ import { recordOutcome } from '../../../../verify'
 
 export default defineRoute({
   ability: 'membership.membership.verify',
-  record: event => ['membership.membership', getRouterParam(event, 'id')],
+  record: event => ['membership.membership', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     outcome: z.enum(['pass', 'decline']),

@@ -1,6 +1,6 @@
 // The command palette's search for members (tab 4, core.search-source): the members list's own search,
 // by name, address or member number, answering membership ids for the resolver to show.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { readMembers } from '../../members'
 

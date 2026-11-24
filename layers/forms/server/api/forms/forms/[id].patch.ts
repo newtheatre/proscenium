@@ -1,7 +1,7 @@
 // Changes a form's own fields: its title, its address and how long its answers are kept. The address
 // it had is kept, and sends anybody who follows an old link on to the new one. Whether it is anonymous
 // is fixed once it has been published, because answers already given were promised one or the other.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, nowMs, refuse } from '#kit'
 import { SLUG_LENGTH, TITLE_LENGTH, addressTaken, requireForm } from '../../../forms'
@@ -11,7 +11,7 @@ const slug = z.string().trim().toLowerCase().min(1).max(SLUG_LENGTH).regex(/^[a-
 const input = z.object({ slug, title: z.string().trim().min(1).max(TITLE_LENGTH), retentionDays: days, retentionDeclinedDays: days, anonymous: z.boolean(), allowEdits: z.boolean() }).partial()
 const COLUMN = { slug: 'slug', title: 'title', retentionDays: 'retention_days', retentionDeclinedDays: 'retention_declined_days', anonymous: 'anonymous', allowEdits: 'allow_edits' } as const
 
-export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'write', input }, async (_event, { input, record, unit }) => {
+export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id', { decode: true })], rateLimit: 'write', input }, async (_event, { input, record, unit }) => {
   const form = await requireForm(record!.id)
   if (input.anonymous !== undefined && input.anonymous !== form.anonymous && form.liveVersionId)
     refuse('forms.form.anonymous-fixed', 'Whether a form is anonymous cannot change once it has been published.', { status: 409, fields: { anonymous: 'forms.form.anonymous-fixed' } })

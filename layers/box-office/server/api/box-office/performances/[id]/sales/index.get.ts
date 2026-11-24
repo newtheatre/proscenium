@@ -1,6 +1,6 @@
 // A performance's sales set-up, with the checklist that names anything missing before it can go on
 // sale, the performance itself, and every band of its production.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, useSetting } from '#kit'
 import { getPerformance, getProduction } from '#modules/core'
 import { houseOf } from '../../../../../layouts'
@@ -10,7 +10,7 @@ import { checklist, laidOut, listBands, salesOf } from '../../../../../setup'
 
 export default defineRoute({
   ability: 'box-office.performance.manage',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record }) => {
   const [sales, list, houseCapacity, performance] = await Promise.all([salesOf(record!.id), checklist(record!.id), houseOf(record!.id), getPerformance(record!.id)])

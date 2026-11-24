@@ -1,6 +1,6 @@
 // A reviewer hands in their review, or changes it while the round is open and not yet released
 // (FB-405): marks against the criteria or a vote, and a comment. Only ever their own.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, nowMs, refuse } from '#kit'
 import { getVersion } from '../../../forms'
@@ -16,7 +16,7 @@ const input = z.object({
 })
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'write', input }, async (event, { input, actor, unit }) => {
-  const { assignment, round } = await ownAssignment(getRouterParam(event, 'id') ?? '', actor)
+  const { assignment, round } = await ownAssignment(getRouterParam(event, 'id', { decode: true }) ?? '', actor)
   const response = (await getResponse(assignment.responseId))!
   const definition = JSON.parse((await getVersion(response.versionId))!.definition) as Definition
   const review = stageOf(definition, round.stageKey)?.review

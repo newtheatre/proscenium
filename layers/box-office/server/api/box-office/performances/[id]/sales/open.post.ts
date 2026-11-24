@@ -1,12 +1,12 @@
 // Puts a performance on sale, or resumes paused sales (BO-01, BO-05). Refused with what is missing.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { openSales } from '../../../../../setup'
 
 export default defineRoute({
   ability: 'box-office.performance.manage',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({}).strict(),
 }, async (_event, { record, unit }) => {

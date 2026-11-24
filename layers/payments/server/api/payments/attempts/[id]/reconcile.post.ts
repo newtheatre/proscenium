@@ -2,14 +2,14 @@
 // recorded under their name, and settles or fails the payment as a provider's answer would. Money taken
 // for a payment the till had already given up on is returned, unless they say to keep it.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, first, Refusal, requireAbility } from '#kit'
 import { recordAnswer } from '../../../../answers'
 import { keepPayment } from '../../../../keep'
 
 export default defineRoute({
   ability: 'payments.attempt.reconcile',
-  record: event => ['payments.attempt', getRouterParam(event, 'id')],
+  record: event => ['payments.attempt', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     outcome: z.enum(['succeeded', 'failed']),

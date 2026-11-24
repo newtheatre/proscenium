@@ -1,5 +1,5 @@
 // End a grant (ID-23, ID-29). Refused if it would leave no Owner who can sign in.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { endGrant } from '../../../../identity/roles'
@@ -7,7 +7,7 @@ import { roleNotice } from '../../../../identity/notices'
 
 export default defineRoute({
   ability: 'core.grant.manage',
-  record: event => ['core.grant', getRouterParam(event, 'id')],
+  record: event => ['core.grant', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({}),
 }, async (_event, { unit, actor, record }) => {

@@ -1,7 +1,7 @@
 // Records an award the committee has decided: pick a person, or give a name and address, which finds
 // the account that has it or makes an unclaimed one. With a name alone it is a historical award: it
 // is listed, and gives no ticket benefit until an account is linked. Nobody issues their own.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, ownRecordExempt, refuse, siteUrl, useSetting } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
@@ -17,7 +17,7 @@ const input = awardFields.partial({ awardedFor: true, citation: true, production
 
 export default defineRoute({
   ability: 'awards.award.issue',
-  record: event => ['awards.type', getRouterParam(event, 'id')],
+  record: event => ['awards.type', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input,

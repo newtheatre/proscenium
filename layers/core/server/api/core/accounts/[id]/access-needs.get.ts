@@ -1,14 +1,14 @@
 // Read a person's access needs for a purpose (ID-39): the welfare lead's, or any a module declares
 // whose reader works in the console. accessNeedsFor answers only for an accepted application, a
 // purpose switched on and an actor holding its ability, and the same way whichever test failed.
-import { getRouterParam, getQuery } from 'h3'
+import { getRouterParam, getQuery } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { accessNeedsFor } from '../../../../identity/access-scheme'
 
 export default defineRoute({
   ability: 'core.access-profile.read',
-  record: event => ['core.account', getRouterParam(event, 'id')],
+  record: event => ['core.account', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
   input: z.object({}),
 }, async (event, { record, unit, actor }) => {

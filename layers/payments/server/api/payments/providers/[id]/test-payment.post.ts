@@ -1,7 +1,7 @@
 // Guided setup's test payment on a test-mode account (PAY-01): a payment Payments owns, for a small
 // amount, that sells nothing and posts nothing.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { createUnit, defineRoute, newId, nowMs, Refusal, siteOrigin } from '#kit'
 import { createIntent } from '../../../../intents'
 import { providerAccount } from '../../../../providers'
@@ -16,7 +16,7 @@ export default defineRoute({
   idempotent: true,
   input: z.object({ method: z.enum(['card_online', 'card_reader']), readerId: z.string().optional() }).strict(),
 }, async (event, { input }) => {
-  const account = await providerAccount(getRouterParam(event, 'id') ?? '')
+  const account = await providerAccount(getRouterParam(event, 'id', { decode: true }) ?? '')
   if (!account) throw new Refusal('core.not-found', 'There is no such provider account.', { status: 404 })
   if (account.mode !== 'test') throw new Refusal('payments.provider.not-test-mode', 'A test payment is made on an account in test mode.', { status: 409 })
   const channel = input.method === 'card_reader' ? 'desk' : 'online'

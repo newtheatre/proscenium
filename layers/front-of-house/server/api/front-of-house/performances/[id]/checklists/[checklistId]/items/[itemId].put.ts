@@ -1,13 +1,13 @@
 // Enters one checklist item: done, an exception with its reason, or not applicable (FH-25). A queued
 // write from a phone without signal carries the time it was entered.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { enterItem } from '../../../../../../../checklists'
 
 export default defineRoute({
   ability: 'front-of-house.checklist.complete',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({
@@ -19,9 +19,9 @@ export default defineRoute({
   }).strict(),
 }, async (event, { input, record, actor, unit }) => {
   await enterItem(unit.view(), {
-    checklistId: getRouterParam(event, 'checklistId')!,
+    checklistId: getRouterParam(event, 'checklistId', { decode: true })!,
     performanceId: record!.id!,
-    itemId: getRouterParam(event, 'itemId')!,
+    itemId: getRouterParam(event, 'itemId', { decode: true })!,
     ...input,
     by: actor.accountId!,
   })

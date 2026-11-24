@@ -2,7 +2,7 @@
 // first, filtered by state and how it was sold, and searched by booking reference or by the buyer's
 // name or verified address through findAccounts.
 import { and, count, eq, ne, or, sql } from 'drizzle-orm'
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute, first, readListQuery, searchWords, useDb } from '#kit'
 import { accountLabel, findAccounts, getPerformance, getProduction } from '#modules/core'
 import { orders } from '../../../db/schema'

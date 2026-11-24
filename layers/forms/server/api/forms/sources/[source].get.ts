@@ -2,7 +2,7 @@
 // already chosen (to show a kept answer again). Open to anybody answering a form, signed in or
 // not: each source decides what this person may see, and one it does not open to them answers
 // nothing and says so.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, refuse } from '#kit'
 import { sourceOf } from '../../../sources'
@@ -22,7 +22,7 @@ const input = z.object({
 })
 
 export default defineRoute({ public: true, rateLimit: 'default', input }, async (event, { input, actor }) => {
-  const source = await sourceOf(getRouterParam(event, 'source'))
+  const source = await sourceOf(getRouterParam(event, 'source', { decode: true }))
   if (!source) return refuse('forms.source.not-found', 'There is nothing to choose from here.', { status: 404 }) // not-policy: HTTP status
   if (!await source.allowed(actor)) {
     // The author of a published form may open one of its questions to anybody signed in: they find

@@ -1,6 +1,6 @@
 // The command palette's search for productions (core.search-source): the productions list's own
 // search, by title or company, answering ids for the resolver to show.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { listProductions } from '../../../programme/service'
 

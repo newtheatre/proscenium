@@ -1,7 +1,7 @@
 // The command palette's search for responses (core.search-source): by reference, among the forms
 // whose responses this person may read. Nothing anybody answered is searched, so the palette
 // cannot be used to look for words in forms the person may not open.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { all, can, defineRoute } from '#kit'
 
 const MOST = 8 // not-policy: one palette group

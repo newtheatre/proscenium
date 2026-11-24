@@ -1,6 +1,6 @@
 // Closes a session being counted, with the cash counted and, for any difference, the reason.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { can, defineRoute, Refusal } from '#kit'
 import { closeSession, getSession, summarise } from '../../../../sessions'
 
@@ -13,7 +13,7 @@ export default defineRoute({
     varianceNote: z.string().trim().max(200).optional(), // not-policy: the column's own limit
   }).strict(),
 }, async (event, { input, actor, unit }) => {
-  const id = getRouterParam(event, 'id') ?? ''
+  const id = getRouterParam(event, 'id', { decode: true }) ?? ''
   const session = await getSession(id)
   if (!session) throw new Refusal('core.not-found', 'There is no such session.', { status: 404 })
   const canCloseAny = (await can(actor, 'payments.session.close-any', { type: 'payments.session', id: session.id })).allowed

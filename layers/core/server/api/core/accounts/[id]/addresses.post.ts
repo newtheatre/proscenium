@@ -1,6 +1,6 @@
 // Add an email address for a person (ID-46). It is sent its link and does nothing until that is
 // used; every verified address is told a way in was added by staff.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute } from '#kit'
 import { addAddress } from '../../../../identity/my-addresses'
@@ -9,7 +9,7 @@ import { editableAccount } from '../../../../identity/staff-edit'
 
 export default defineRoute({
   ability: 'core.account.update',
-  record: event => ['core.account', getRouterParam(event, 'id')],
+  record: event => ['core.account', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({ address: z.email().max(254) }).strict(), // not-policy: the longest address SMTP allows
 }, async (event, { input, unit, record }) => {

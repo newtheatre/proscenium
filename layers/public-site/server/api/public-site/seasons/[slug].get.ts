@@ -1,6 +1,6 @@
 // A season's public page (part 6): a published or archived season and its productions. An archived
 // season, and the past shows in any season, answer as past shows do while they are not public (C-47).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, refuse, useSetting } from '#kit'
 import { publicSeason } from '#modules/core'
 

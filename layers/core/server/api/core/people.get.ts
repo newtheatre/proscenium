@@ -3,7 +3,7 @@
 // accounts are hidden unless looked for, and the answer says how many the search left out so the
 // page can offer them. A merged-away account is never a row of its own: its survivor is.
 import { and, count, isNull, sql, type SQL } from 'drizzle-orm'
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute, readListQuery, searchWords, useDb } from '#kit'
 import { accounts } from '../../db/identity'
 import { findAccounts } from '../../identity/find'

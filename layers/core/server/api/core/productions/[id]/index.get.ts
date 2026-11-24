@@ -1,7 +1,7 @@
 // One production with its content warnings and staging effects, what publishing still needs, the theatre's
 // defaults its empty fields stand for, and the lists its pickers offer.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { getProduction, listSeasons, publishingNeeds } from '../../../../programme/service'
 import { listTermGroups, listTerms } from '../../../../vocabularies/service'
@@ -11,7 +11,7 @@ import { usualSpaceOptions } from '../../../../programme/usual-space'
 
 export default defineRoute({
   ability: 'core.production.view',
-  record: event => ['core.production', getRouterParam(event, 'id')],
+  record: event => ['core.production', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
   input: z.object({}),
 }, async (_event, { record }) => {

@@ -1,9 +1,9 @@
 // One award, with what the viewer may do to it.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { can, defineRoute, first } from '#kit'
 import { requireAward } from '../../../awards'
 
-export default defineRoute({ ability: 'awards.award.view', record: event => ['awards.award', getRouterParam(event, 'id')], rateLimit: 'default' }, async (_event, { actor, record }) => {
+export default defineRoute({ ability: 'awards.award.view', record: event => ['awards.award', getRouterParam(event, 'id', { decode: true })], rateLimit: 'default' }, async (_event, { actor, record }) => {
   const award = await requireAward(record!.id)
   const production = award.productionId ? await first<{ title: string }>('SELECT title FROM core_productions WHERE id = ?', award.productionId) : null
   // The nomination it came from, for the link back: forms resolves the record for whoever may read it.

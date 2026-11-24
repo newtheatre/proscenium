@@ -2,7 +2,7 @@
 // to its new address with a permanent redirect, before any page is drawn. The list is part of the
 // build, so it is read once and kept.
 import { bindings } from '#kit/bindings'
-import { defineEventHandler, getRequestURL, sendRedirect } from 'h3'
+import { defineHandler, getRequestURL, sendRedirect } from 'nuxt/server'
 import { queryCollection } from '@nuxt/content/server'
 import { findRedirect, type Redirect } from '../../shared/redirects'
 
@@ -16,8 +16,8 @@ const NEVER = /^\/(api|files|cdn-cgi)(\/|$)|^\/_/
 // The list once read, never the promise reading it: a Worker may not settle one request's promise in another.
 let loaded: Redirect[] | null = null
 
-export default defineEventHandler(async (event) => {
-  if (event.method !== 'GET' && event.method !== 'HEAD') return
+export default defineHandler(async (event) => {
+  if (event.req.method !== 'GET' && event.req.method !== 'HEAD') return
   const url = getRequestURL(event)
   if (NEVER.test(url.pathname)) return
   if (!bindings(event)) return // prerendering

@@ -2,7 +2,7 @@
 // against the cash counted; searched by who opened the session, through findAccounts. A row's canClose
 // says whether the viewer may close it: a session left being counted, for someone allowed to.
 import { and, count, sql } from 'drizzle-orm'
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { can, defineRoute, readListQuery, searchWords, useDb } from '#kit'
 import { findAccounts } from '#modules/core'
 import { sessions } from '../../db/schema'

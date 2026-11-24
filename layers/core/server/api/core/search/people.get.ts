@@ -1,6 +1,6 @@
 // The command palette's search for people (core.search-source): the person picker's search, by
 // name or by an address typed in full. Offered to whoever may open a person's page.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { searchAccounts } from '../../../identity/search'
 

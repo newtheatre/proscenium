@@ -3,7 +3,7 @@
 // then for core.privacy.cooling-off, then for every module's hold to clear, and runs once. Staff see
 // every request with its respond-by date and close it once each table that may hold rows linked to
 // no account has been searched by hand.
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { all, createUnit, first, isEnabled, newId, nowMs, refuse, useSetting, siteUrl, type Actor, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { formatDuration } from '#kit/duration'
@@ -52,7 +52,7 @@ export async function requestById(id: string): Promise<DataRequestRow | null> {
  * Asks for an erasure: the request is written, and a link to confirm it goes to the person's
  * audience address. Nothing else happens until it is used. The link lasts until the respond-by date.
  */
-export async function requestErasure(unit: UnitView, event: H3Event, actor: Actor, input: { accountId: string, identityCheck?: IdentityCheck }): Promise<{ id: string }> {
+export async function requestErasure(unit: UnitView, event: RequestEvent, actor: Actor, input: { accountId: string, identityCheck?: IdentityCheck }): Promise<{ id: string }> {
   if (!(await privacyReady())) refuse('core.privacy.contact-unset', 'Erasure is not available yet.', { status: 409, remedy: 'The theatre needs to say who to contact about personal data first.' })
   const account = await accountById(input.accountId)
   if (!account || account.anonymised_at || account.merged_into_id) refuse('core.not-found', 'There is no such person.', { status: 404 })

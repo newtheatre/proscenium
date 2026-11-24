@@ -1,14 +1,14 @@
 // Cancels a price change set for later (BO-03): what was in force before it carries on. The table
 // is append-only, so this adds a row at the same moment that repeats the earlier price.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, idSchema, refuse, useSetting } from '#kit'
 import { getProduction } from '#modules/core'
 import { cancelScheduledPrice } from '../../../../../prices'
 
 export default defineRoute({
   ability: 'box-office.pricing.manage',
-  record: event => ['core.production', getRouterParam(event, 'id')],
+  record: event => ['core.production', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   idempotent: true,
   input: z.object({

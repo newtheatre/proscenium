@@ -3,7 +3,7 @@
 // on, and only once, by the job payments.handle-webhook, which asks the provider for the truth rather
 // than trusting the body. The body itself is never stored.
 import { z } from 'zod'
-import { getRequestHeaders, getRequestURL, getRouterParam, readRawBody, setResponseStatus } from 'h3'
+import { getRequestHeaders, getRequestURL, getRouterParam, setResponseStatus } from 'nuxt/server'
 import { credential, defineRoute, first, newId, nowMs, Refusal } from '#kit'
 import { providerAccount, providers } from '../../../providers'
 
@@ -15,12 +15,12 @@ export default defineRoute({
   body: 'binary',
   input: z.object({}),
 }, async (event, { unit }) => {
-  const account = await providerAccount(getRouterParam(event, 'account') ?? '')
+  const account = await providerAccount(getRouterParam(event, 'account', { decode: true }) ?? '')
   const provider = account?.active ? (await providers()).get(account.provider) : undefined
   if (!account || !provider?.verifyWebhook || !provider.capabilities.includes('webhooks'))
     throw new Refusal('core.not-found', 'There is nothing here.', { status: 404 })
 
-  const body = (await readRawBody(event, 'utf8')) ?? ''
+  const body = await event.req.text()
   const secret = provider.webhookSecret ? await credential(provider.webhookSecret, account.id) ?? undefined : undefined
   const verified = await provider.verifyWebhook({ body, headers: getRequestHeaders(event) as Record<string, string>, secret, url: getRequestURL(event).href, providerAccountId: account.id })
   if (!verified?.eventId) {

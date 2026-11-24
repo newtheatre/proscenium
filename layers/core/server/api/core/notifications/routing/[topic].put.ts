@@ -1,5 +1,5 @@
 // Chooses the sender a topic's mail comes from; null goes back to the default (C-32).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, refuse, usePoint } from '#kit'
 
@@ -8,7 +8,7 @@ export default defineRoute({
   rateLimit: 'write',
   input: z.object({ sender: z.string().nullable() }),
 }, async (event, { input, unit }) => {
-  const topic = getRouterParam(event, 'topic') ?? ''
+  const topic = getRouterParam(event, 'topic', { decode: true }) ?? ''
   const topics = ['transactional', ...(await usePoint<{ id: string }>('core.notification-topic')).map(t => t.value.id)]
   if (!topics.includes(topic)) refuse('core.notifications.unknown-topic', `There is no topic called ${topic}.`, { status: 404 })
   if (input.sender === null) {

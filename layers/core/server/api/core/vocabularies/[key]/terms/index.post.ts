@@ -1,12 +1,12 @@
 // Adds a term (C-20). Refused when a live term of the vocabulary has the label, ignoring case.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { defineRoute, idSchema } from '#kit'
 import { addTerm } from '../../../../../vocabularies/service'
 
 export default defineRoute({
   ability: 'core.vocabulary.manage',
-  record: event => ['core.vocabulary', getRouterParam(event, 'key')],
+  record: event => ['core.vocabulary', getRouterParam(event, 'key', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     label: z.string().trim().min(1).max(80), // not-policy: the label's bounds

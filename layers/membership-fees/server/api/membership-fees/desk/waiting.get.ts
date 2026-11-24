@@ -1,5 +1,5 @@
 // Applications waiting only for their fee, for the till's membership panel (P8): found by name or address.
-import { getQuery } from 'h3'
+import { getQuery } from 'nuxt/server'
 import { defineRoute } from '#kit'
 import { waitingFees } from '../../../desk'
 

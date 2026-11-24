@@ -3,7 +3,7 @@
 // holds is never revealed: an unclaimed account's address can be added and verifying it merges that
 // account in; a claimed account's verified address cannot, and the refusal says only how to ask for
 // a merge.
-import type { H3Event } from 'h3'
+import { type RequestEvent } from 'nuxt/server'
 import { all, first, newId, nowMs, refuse, useSetting, siteUrl, type UnitView } from '#kit'
 import { countAgainstRate } from '#kit/ratelimit'
 import { accountById, addressRow, isUsable, normaliseAddress, type AccountRow, type AddressRow } from './accounts'
@@ -65,7 +65,7 @@ async function claimOn(held: AddressRow): Promise<'merge' | 'take'> {
  * Adds an address and sends its verification link. Nothing else is ever sent to it until it is
  * verified. Staff adding one for a person see whose account already holds it, so they can merge.
  */
-export async function addAddress(unit: UnitView, event: H3Event, accountId: string, typed: string, by: 'self' | 'staff' = 'self'): Promise<{ id: string | null, created: boolean }> {
+export async function addAddress(unit: UnitView, event: RequestEvent, accountId: string, typed: string, by: 'self' | 'staff' = 'self'): Promise<{ id: string | null, created: boolean }> {
   const address = normaliseAddress(typed)
   if (!(await countAgainstRate('sign-in', `address:${address}`)).allowed) refuse('core.rate-limited', 'Too many tries for this address.', { status: 429, remedy: 'Wait a while, then try again.' })
   const existing = await addressRow(address)

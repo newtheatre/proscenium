@@ -1,5 +1,5 @@
 // Adds or changes a sender identity: a display name and the part before the @ (C-32).
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, refuse } from '#kit'
 
@@ -15,7 +15,7 @@ export default defineRoute({
     state: z.enum(['active', 'retired']).optional(),
   }),
 }, async (event, { input, unit }) => {
-  const key = getRouterParam(event, 'key') ?? ''
+  const key = getRouterParam(event, 'key', { decode: true }) ?? ''
   if (!KEY.test(key)) refuse('core.senders.bad-key', 'A sender key is lower-case letters, digits and hyphens.', { status: 422, fields: { key: 'invalid' } })
   if (key === 'default' && input.state === 'retired') refuse('core.senders.default-required', 'The default sender cannot be retired.', { status: 409 })
   unit.add({

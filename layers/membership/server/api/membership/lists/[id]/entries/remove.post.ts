@@ -1,6 +1,6 @@
 // Removes one entry, found by typing its value (V19). An entry a membership was verified by is kept
 // as that record, ended and without its name.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, refuse, today } from '#kit'
 import { addDays } from '../../../../../dates'
@@ -8,7 +8,7 @@ import { hashValue, requireList } from '../../../../../lists'
 
 export default defineRoute({
   ability: 'membership.verification-list.manage',
-  record: event => ['membership.verification-list', getRouterParam(event, 'id')],
+  record: event => ['membership.verification-list', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({ value: z.string().trim().min(1).max(254) }), // not-policy: an address's bound
 }, async (_event, { input, record, unit }) => {

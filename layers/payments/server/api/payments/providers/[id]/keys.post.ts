@@ -2,13 +2,13 @@
 // is a Payments credential saved for this account, encrypted; a value is never sent back. A key not
 // named is left as it is; null removes the saved one. Managing providers is privileged, so this asks for a fresh sign-in.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { clearCredential, credentialStatus, defineRoute, refuse, setCredential } from '#kit'
 import { providerAccount, providers } from '../../../../providers'
 
 export default defineRoute({
   ability: 'payments.provider.manage',
-  record: event => ['payments.provider-account', getRouterParam(event, 'id')],
+  record: event => ['payments.provider-account', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     keys: z.record(z.string(), z.string().trim().min(1).max(500).nullable()), // not-policy: a provider's key is well under this

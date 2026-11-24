@@ -2,7 +2,7 @@
 // for joining, renewing or both. A price is never edited: the new one replaces it from its date, so a
 // charge already made keeps the price it was made at (P1). A date in the past is refused for the same
 // reason.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, first, newId, nowMs, refuse, today, useSetting } from '#kit'
 import { APPLIES_TO } from '../../../../db/schema'
@@ -11,7 +11,7 @@ const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/) // not-policy: the shape of
 
 export default defineRoute({
   ability: 'membership-fees.price.manage',
-  record: event => ['membership.scheme', getRouterParam(event, 'id')],
+  record: event => ['membership.scheme', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'write',
   input: z.object({
     lengthOptionId: z.string().nullable(),

@@ -1,6 +1,6 @@
 // Checks a provider's saved client id and secret with the provider itself, before anyone relies on
 // them: the provider either accepts the pair or says it does not know it. Nothing is saved.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { credential, defineRoute, refuse, useSetting } from '#kit'
 import { checkProvider, providerById } from '../../../../identity/providers'
@@ -10,7 +10,7 @@ export default defineRoute({
   rateLimit: 'write',
   input: z.object({}).strict(),
 }, async (event) => {
-  const provider = providerById(getRouterParam(event, 'provider') ?? '')
+  const provider = providerById(getRouterParam(event, 'provider', { decode: true }) ?? '')
   const clientId = await useSetting(provider.settings.clientId) as string | null
   const secret = await credential(provider.secret)
   if (!clientId || !secret) refuse('core.sign-in.provider-incomplete', `Save ${provider.label}'s client ID and client secret first.`, { status: 409 })

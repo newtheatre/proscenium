@@ -1,5 +1,5 @@
 // One period, its totals, and what stops it being closed: the close checklist.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { can, defineRoute, refuse, today } from '#kit'
 import { previousDate } from '#kit/clock'
 import { getPeriod } from '../../../periods'
@@ -8,7 +8,7 @@ import { balances } from '../../../ledger'
 
 export default defineRoute({
   ability: 'finance.ledger.view',
-  record: event => ['finance.period', getRouterParam(event, 'id')],
+  record: event => ['finance.period', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record, actor }) => {
   const period = await getPeriod(record!.id)

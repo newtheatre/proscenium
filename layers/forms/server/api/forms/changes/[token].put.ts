@@ -2,7 +2,7 @@
 // The answers are checked as a first send is and kept as a new revision, and the response takes the
 // form's move back, exactly as PUT /api/forms/mine/:id does for somebody signed in. Sending spends
 // the link.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { defineRoute, nowMs, refuse } from '#kit'
 import { getForm, getVersion } from '../../../forms'
@@ -15,7 +15,7 @@ const input = z.object({ answers: z.record(z.string().max(200), z.unknown()) }) 
 
 export default defineRoute({ public: true, rateLimit: 'public-form', protect: 'turnstile', tokens: ['token'], input }, async (event, { input, actor, unit }) => {
   const at = nowMs()
-  const found = await responseByChangeLink(getRouterParam(event, 'token') ?? '', at)
+  const found = await responseByChangeLink(getRouterParam(event, 'token', { decode: true }) ?? '', at)
   if (!found) return refuse('forms.changes.not-found', 'This link has run out or has already been used.', { status: 404, remedy: 'Reply to the email the theatre sent you and quote your reference.' })
   if (JSON.stringify(input.answers).length > await answersLimit()) return refuse('forms.response.too-large', 'These answers are too long to send.', { status: 413, remedy: 'Shorten the longest answers.' }) // not-policy: HTTP status
   const { response, hash } = found

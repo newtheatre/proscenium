@@ -2,7 +2,7 @@
 // roles and standings. Opening it is audited. Emergency contacts and access needs are not here: each
 // is read on its own route, with its own ability and audit, and this answer only says whether the
 // viewer may ask (Identity Doc part 5, "Account").
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { z } from 'zod'
 import { all, can, defineRoute, first, nowMs, refuse } from '#kit'
 import { accountById } from '../../../identity/accounts'
@@ -12,7 +12,7 @@ import { profileOf } from '../../../identity/access-scheme'
 
 export default defineRoute({
   ability: 'core.account.read',
-  record: event => ['core.account', getRouterParam(event, 'id')],
+  record: event => ['core.account', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
   input: z.object({}),
 }, async (_event, { record, unit, actor }) => {

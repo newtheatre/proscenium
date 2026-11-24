@@ -1,6 +1,6 @@
 // One performance's rota, for whoever runs it (Front of house specification, part 5, "Performance
 // rota"): each shift with its people and their states, and the templates that could be applied.
-import { getRouterParam } from 'h3'
+import { getRouterParam } from 'nuxt/server'
 import { all, defineRoute, first } from '#kit'
 import { accountLabel } from '#modules/core'
 import { shiftsOf } from '../../../../shifts'
@@ -8,7 +8,7 @@ import { listTemplates } from '../../../../templates'
 
 export default defineRoute({
   ability: 'front-of-house.shift.view',
-  record: event => ['core.performance', getRouterParam(event, 'id')],
+  record: event => ['core.performance', getRouterParam(event, 'id', { decode: true })],
   rateLimit: 'default',
 }, async (_event, { record }) => {
   const shifts = await shiftsOf(record!.id!)
