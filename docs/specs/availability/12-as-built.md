@@ -62,7 +62,7 @@ Tests: `layers/availability/tests/integration/gate.test.ts` (through the routes 
 - **Rooms (F5)** come from the occupancy service, so Availability now requires `occupancy` (a support module, on while Availability is on). A slot overlapping a taken stretch is not a best time unless "Room optional" is ticked; the side panel says what holds the room where the reader may see it.
 - **Commitments (F4).** Availability requires `person-busy` too. One `personsBusy` read covers everyone in the find over its dates; Availability's own stated busy rows are dropped (its meetings are kept), and each other row is laid over the person's day where it is worse than what they said (`overlay` in `shared/find.ts`): firm as busy, not firm as maybe. Such a stretch carries the row's translation key, and "Who" shows it in place of a reason.
 - **Stated busy time (AV-07)** is contributed to `core.person-busy` (`server/contributions/core.person-busy/availability.ts`): busy stretches only, kind `unavailable`, label `availability.unavailable`, never firm, never a reason. Arranged meetings add theirs (below); imports will when built.
-- **Not yet:** commitments shown beside a person's own grid (A5, on My availability), under-18 warnings (F6, after C-74) and "Turn into…" (AV-17).
+- **Not yet:** under-18 warnings (F6, after C-74) and "Turn into…" (AV-17).
 - The gallery fixture contributes a "Gallery company" group so the browser test can plan for someone.
 
 ## Polls (AV-15, AV-16, S8, S9), 24 November 2026
@@ -83,3 +83,9 @@ Tests: `layers/availability/tests/integration/gate.test.ts` (through the routes 
 - **Busy (M5).** Each invitee not saying not going is busy, firm, kind `meeting`, label `availability.meeting`, with the meeting as the record, through the same `core.person-busy` contribution.
 - **Retention.** The daily task deletes meetings that ended longer ago than `retention.history`, with their invitees, and clears a poll's link to them.
 - **Not yet:** the calendar feed (M6, C-70: keyed by the meeting id alone so a move keeps the UID, public-safe titles, cancelled meetings sent as cancelled; waits for lane A's calendar-feed module), the production schedule entry, and under-18 warnings.
+
+## Commitments on My availability (A5, S1), 24 November 2026
+
+- **Read.** `GET /api/availability/me` returns `commitments`, by date, from one `personsBusy` read over the days shown (`server/commitments.ts`, shared with Find a time). Availability's own stated busy rows are left out; its arranged meetings and every other module's rows stay in. Each carries its translation key and whether it is firm, never a record title.
+- **Shown.** The week grid draws each commitment over the levels as an outlined block, with a lock and its label where it starts, and each cell's accessible name adds "…, a commitment". The key gains "Held elsewhere" when the week has one. Painting still works underneath: it changes what the person states, never the commitment.
+- **From a meeting.** A meeting's page links to "See it on my week", which opens My availability on the meeting's date.
