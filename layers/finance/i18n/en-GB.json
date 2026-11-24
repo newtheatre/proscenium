@@ -1,7 +1,6 @@
 {
   "finance.module.name": "Finance",
   "finance.module.description": "The ledger: every sale, refund, fee and payout as a balanced, sealed posting, with periods a treasurer closes.",
-
   "finance.settings-sections.periods": "Accounting periods",
   "finance.settings-sections.year": "Financial year",
   "finance.settings-sections.tax": "Tax",
@@ -11,15 +10,22 @@
   "finance.settings.periods.length.options.quarter": "A quarter",
   "finance.settings.year.starts.label": "First day of the financial year",
   "finance.settings.year.starts.help": "A day and a month, such as 1 August. Periods start on this day of the month. This is Finance's own date and is not the committee year end.",
-  "finance.settings.tax.registered.label": "Charges tax on sales",
-  "finance.settings.tax.registered.help": "Whether the theatre is registered to charge tax, such as VAT. Not supported yet: it must stay off in this release.",
-  "finance.settings.rules.tax-not-yet": "Charging tax on sales is not supported yet, so this must stay off.",
-
+  "finance.settings.tax.registered.label": "Registered for VAT",
+  "finance.settings.tax.registered.help": "Turn this on once HMRC has registered the theatre for VAT. Prices, invoices and bills then carry tax codes, and VAT goes to its own two ledger accounts. Leave it off if you are not registered.",
+  "finance.settings.tax.number.label": "VAT registration number",
+  "finance.settings.tax.number.help": "GB followed by 9 digits, or 12 for a group or branch registration. It is printed on every VAT invoice.",
+  "finance.settings.tax.scheme.label": "VAT accounting scheme",
+  "finance.settings.tax.scheme.help": "The scheme HMRC agreed with you. The VAT report counts tax by this scheme.",
+  "finance.settings.tax.scheme.options.standard": "Standard accounting: VAT is due when you invoice",
+  "finance.settings.tax.scheme.options.cash": "Cash accounting: VAT is due when you are paid",
+  "finance.settings.rules.tax-number-needed": "Add the theatre's VAT registration number before you turn on VAT.",
   "finance.abilities.ledger.view.label": "See the ledger",
   "finance.abilities.ledger.export.label": "Export the ledger as a spreadsheet",
   "finance.abilities.posting.correct.label": "Reverse a posting to correct a mistake",
   "finance.abilities.account.manage.label": "Rename, recode and add ledger accounts",
   "finance.abilities.period.close.label": "Close an accounting period",
   "finance.abilities.period.reopen.label": "Reopen a closed accounting period",
-  "finance.abilities.settings.manage.label": "Change finance settings"
+  "finance.abilities.settings.manage.label": "Change finance settings",
+  "finance.settings.tax.default-code.label": "Usual tax code for sales",
+  "finance.settings.tax.default-code.help": "Bar products and ticket types sell at this code unless they name their own. Prices include the VAT, which is split out when each sale is recorded."
 }

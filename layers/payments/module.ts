@@ -34,12 +34,15 @@ export default defineModule({
     // For a test instance only: a provider account in test mode takes payment for real sales, which
     // then post to the ledger as live money would, so the whole journey can be tried with test cards.
     'test-mode.takes-sales': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
+    // Bank details nobody has been paid with for this long are cleared (P-A1).
+    'payees.keep-for': setting.duration({ default: '730d', min: '30d', max: '2190d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
   }),
 
   // R-37: every other group sits on the module's own page, its Settings tab in Admin; how long
   // webhook bodies are kept is upkeep, on the shared Advanced page.
   settingGroups: {
     'retention': { advanced: true },
+    'payees': { advanced: true },
     'test-mode': { advanced: true },
   },
 
@@ -49,6 +52,8 @@ export default defineModule({
     'attempt': { table: 'payments_attempts' },
     'refund': { table: 'payments_refunds', owner: 'requested_by' },
     'session': { table: 'payments_sessions', owner: 'opened_by' },
+    'payee': { table: 'payments_payees', owner: 'account_id' },
+    'disbursement': { table: 'payments_disbursements' },
   }),
   abilities: defineAbilities('payments', {
     'provider.manage': ability({ risk: 'privileged' }),
@@ -60,6 +65,10 @@ export default defineModule({
     'session.view': ability({ on: 'payments.session', owner: 'grants', implies: ['core.account.find'] }),
     'session.close-any': ability({ on: 'payments.session', risk: 'privileged', owner: 'refuses', implies: ['session.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
+    // Money going out (P-A1): recording a payment made, and reading the bank details to make it.
+    'disbursement.record': ability({ risk: 'privileged' }),
+    'payee.read': ability({ risk: 'privileged', audit: 'read' }),
+    'payee.manage': ability({ risk: 'privileged' }),
   }),
 
   tables,
@@ -70,6 +79,8 @@ export default defineModule({
     'payments.desk-basket': point({ kind: 'code', contract: 'desk-basket' }),
     // What prices a sale before it is written: Promotions. Nobody contributing means list prices.
     'payments.pricing': point({ kind: 'code', contract: 'pricing' }),
+    // Money paid out against an owner's record, such as a claim or a bill (P-A1). One per owner module.
+    'payments.disbursement': point({ kind: 'code', contract: 'disbursement' }),
   },
 
   events: {
@@ -96,6 +107,7 @@ export default defineModule({
     // Asks providers about attempts still waiting, and marks unknown those past the time allowed.
     'payments.reconcile-attempts': task({ every: '5m' }),
     'payments.prune-webhooks': task({ dailyAt: '03:40' }),
+    'payments.prune-payees': task({ dailyAt: '03:45' }),
   },
 
   calls: {
@@ -141,6 +153,8 @@ export default defineModule({
       { id: 'provider-fees', name: 'Payment provider fees', kind: 'expense' },
       { id: 'cash-variance', name: 'Cash over and short', kind: 'expense' },
       { id: 'unfulfilled', name: 'Payments to return', kind: 'liability' },
+      // What a parent body, such as a students' union, holds for the theatre and pays out on its behalf.
+      { id: 'parent-body', name: 'Held by the parent body', kind: 'asset' },
     ],
     'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }, { id: 'other' }, { id: 'stripe' }, { id: 'sumup' }, { id: 'sumup-handoff' }],
     // Payments' own part: guided setup's test payment.
@@ -156,7 +170,12 @@ export default defineModule({
       { id: 'payments.stripe', name: 'Stripe', purpose: 'Takes card payments', when: 'fact="payments.stripe" is="true"', cookies: { when: 'Only on the payment page', purpose: 'To take your payment securely and prevent fraud' }, order: 20 },
       { id: 'payments.sumup', name: 'SumUp', purpose: 'Takes card payments', when: 'fact="payments.sumup" is="true"', cookies: { when: 'Only on the payment page', purpose: 'To take your payment securely and prevent fraud' }, order: 21 },
     ],
+    // Bank details are on My account only for somebody who has saved some; a claim links to the form.
+    'core.account-section': [
+      { id: 'payments.bank-details', target: 'account' as const, side: 'members' as const, ability: 'signed-in', component: 'PaymentsBankDetails', order: 80, to: '/account/bank-details', icon: 'i-lucide-landmark', count: 'payments.bank-details', hideEmpty: true },
+    ],
     'core.privacy-record': [
+      { id: 'payments.payees', holds: 'Your bank account name, sort code and account number, if you give them to be paid back', why: 'To pay you money the theatre owes you, such as an expense claim', basis: 'To carry out our contract with you', keptFor: 'payments.payees.keep-for', order: 122 },
       { id: 'payments.payments', holds: 'Payments and refunds: the amount, the type of card and its last four digits', why: 'To match payments to orders and make refunds', basis: 'To carry out our contract with you, and a legal duty (tax and accounting law)', keptFor: 'For as long as tax and accounting law requires', order: 120 },
       { id: 'payments.till-receipts', holds: 'An email address you give at the till for your receipt, or your account if you are found there', why: 'To send you a receipt for what you paid', basis: 'To carry out our contract with you', keptFor: 'A typed address until the receipt is sent; the account with the payment', order: 121 },
     ],
@@ -204,6 +223,8 @@ export default defineModule({
       { id: 'payments.providers', menu: 'admin', group: 'modules', to: '/admin/modules/payments/providers', icon: 'i-lucide-credit-card', ability: 'payments.provider.manage', order: 10 },
       // The combined till's tile on the Tonight hub.
       { id: 'payments.live-till', menu: 'live', to: '/live/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 20 },
+      // Bank details for being paid back (P-A1), listed only once given; the page is reached from a claim too.
+      { id: 'payments.bank-details', menu: 'account', group: 'account', to: '/account/bank-details', icon: 'i-lucide-landmark', ability: 'signed-in', order: 45, count: 'payments.bank-details', hideEmpty: true },
     ],
     // Titles and addresses for Payments' records, so the ledger can name where a posting came from.
     'core.record-resolver': [
@@ -216,6 +237,7 @@ export default defineModule({
     'core.count': [
       { id: 'payments.attention', file: 'attention' },
       { id: 'payments.refunds-waiting', file: 'refunds-waiting' },
+      { id: 'payments.bank-details', file: 'bank-details' },
     ],
     // On the console home for whoever can act on them: payments that need settling, and refunds to approve.
     'core.home-card': [

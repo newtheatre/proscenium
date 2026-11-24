@@ -3,9 +3,9 @@
 import { getRouterParam } from 'h3'
 import { defineRoute, refuse, today } from '#kit'
 import { getForm, getVersion } from '../../../forms'
-import { getResponse, owns, readAnswers, storedFigures, toAnswers } from '../../../responses'
+import { getResponse, markingOf, owns, readAnswers, storedFigures, toAnswers } from '../../../responses'
 import type { Definition } from '../../../../shared/engine'
-import { questionsOf, withoutWorkflow } from '../../../../shared/engine'
+import { publicDefinition, questionsOf, shownMarking, withoutWorkflow } from '../../../../shared/engine'
 import { ownHistory, ownRights, ownStatus } from '../../../stages'
 
 const pick = <T>(from: Record<string, T> | null, ids: Set<string>) => from && Object.fromEntries(Object.entries(from).filter(([id]) => ids.has(id)))
@@ -20,6 +20,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
   const answers = (await readAnswers([response.id], types, true)).get(response.id)!
   const progress = ownStatus(definition, response)
   const rights = ownRights(form, definition, response)
+  const marked = await markingOf(response, definition)
   return {
     // While it is back with them, their answers in the shape the form takes, to change and send again.
     values: progress?.canChange || rights.canEdit ? toAnswers(definition, answers) : null,
@@ -27,12 +28,14 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     rights,
     response: { id: response.id, reference: response.reference, submittedAt: response.submittedAt },
     form: { title: form.title, slug: form.slug },
-    definition: withoutWorkflow(definition),
+    definition: publicDefinition(withoutWorkflow(definition)),
     answers,
     // The calculated values they were shown on the form's pages, as the server worked them out.
     calculated: pick(storedFigures(definition, response.calculated, true), new Set((definition.calculations ?? []).filter(c => c.page !== undefined).map(c => c.id))),
     // Where it is now, in the words the form chose for the person, and whether it is back with them to change.
     progress,
+    // Their score, as much as the form says to show them (MK4).
+    marking: marked ? shownMarking(definition, marked) : null,
     history: await ownHistory(definition, response),
     today: await today(),
   }

@@ -102,10 +102,4 @@ export function useEnv(): KitEnv {
   return useContext().env
 }
 
-/** Forget what this request has read, after it changes settings or module states itself. */
-export function forgetCached(...keys: ('settings' | 'modules')[]): void {
-  const cache = currentContext()?.cache
-  if (cache) for (const key of keys) cache[key] = undefined
-}
-
 export { currentContext }
