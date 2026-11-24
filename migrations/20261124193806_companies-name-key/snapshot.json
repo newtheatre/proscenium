@@ -1,10 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "32f15e24-8359-43da-a418-d8b737a7d998",
+  "id": "d186d0cf-3c0d-4659-96f0-d7af0ce70887",
   "prevIds": [
-    "76c0746f-e613-4c76-a427-8e6102dc74cc",
-    "de9215a8-6895-4472-83e2-9416521ad4a8"
+    "71c4e4d4-d0a6-4d9d-a8a8-2afcf3699102"
   ],
   "ddl": [
     {
@@ -281,6 +280,26 @@
     },
     {
       "name": "box_office_tickets",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_budgets",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_categories",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_line_amounts",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_line_sources",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_lines",
       "entityType": "tables"
     },
     {
@@ -789,6 +808,62 @@
     },
     {
       "name": "front_of_house_timings",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_categories",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_category_inspections",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_departments",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_disposals",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_faults",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_inspection_dues",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_inspection_kinds",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_inspections",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_item_events",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_item_tags",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_items",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_loan_lines",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_loans",
+      "entityType": "tables"
+    },
+    {
+      "name": "inventory_locations",
       "entityType": "tables"
     },
     {
@@ -8543,6 +8618,446 @@
     },
     {
       "table": "box_office_tickets",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "scope",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "season_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "department_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "year_starts_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "parent_line_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "proposed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "approved_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "approved_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "closed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "description",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "sort_order",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "archived_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "line_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "stage",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "set_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "set_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_sources",
+      "name": "line_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_line_sources",
+      "name": "account_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budget_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "category_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "sort_order",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "archived_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_lines",
       "name": "updated_at",
       "type": "integer",
       "notNull": true,
@@ -21052,6 +21567,1786 @@
       "entityType": "columns"
     },
     {
+      "table": "inventory_categories",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_categories",
+      "name": "department_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_categories",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_categories",
+      "name": "requirements",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_categories",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_categories",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_categories",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_categories",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_category_inspections",
+      "name": "category_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_category_inspections",
+      "name": "kind_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "tag_prefix",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "next_tag_number",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "lends_to",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'members'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "requirements",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "guidance",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "contact",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "department_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "item_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'proposed'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "method",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "recipient",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "police_reference",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "value_at_disposal",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "proposed_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "decided_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "done_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "item_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'open'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "takes_out_of_service",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "description",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "loan_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "inspection_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "reported_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "resolution",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "closed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "closed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "item_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "kind_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "applies",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "next_due_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "last_inspection_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "interval_days",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "inspector_requirements",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "contractor_allowed",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "certificate",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'optional'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "blocks_when_overdue",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "item_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "kind_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "done_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "result",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "readings",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "contractor",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "next_due_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "supersedes_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "requirement_overridden_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "recorded_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "item_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "loan_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "inspection_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "fault_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "disposal_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "from_location_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "to_location_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "condition",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "actor",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_tags",
+      "name": "item_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_item_tags",
+      "name": "term_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "category_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "tag",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "tracking",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "home_location_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "current_location_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "container_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "out_of_service_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "condition",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'good'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "lendable",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "requirements",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "make",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "model",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "serial_number",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "acquired_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "replacement_value",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "ownership",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'owned'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "owner_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "owner_company_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "owner_due_back_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_items",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "loan_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "item_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "wanted",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "with_line_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "out_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "returned_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "out_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "returned_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "out_condition",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "returned_condition",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "returned_quantity",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "fault_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "requirement_overridden_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "department_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "responsible_account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "borrower_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "borrower_email",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "borrower_phone",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "company_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "purpose",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "due_back_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "due_back_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "due_back_set",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'by-person'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "requested_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "decided_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "decline_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "out_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "returned_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "cancel_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "last_reminded_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "parent_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "venue_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "invoicing_export_codes",
       "name": "id",
       "type": "text",
@@ -30010,6 +32305,166 @@
       "entityType": "indexes"
     },
     {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "production_id IS NOT NULL AND state <> 'closed'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_season",
+      "columns": [
+        {
+          "value": "season_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "season_id IS NOT NULL AND state <> 'closed'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_department",
+      "columns": [
+        {
+          "value": "department_term_id",
+          "isExpression": false
+        },
+        {
+          "value": "year_starts_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "department_term_id IS NOT NULL AND state <> 'closed'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_year",
+      "columns": [
+        {
+          "value": "year_starts_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_parent",
+      "columns": [
+        {
+          "value": "parent_line_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "budgets_categories_slug",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "budgets_categories_name",
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "archived_at IS NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "budgets_line_amounts_line",
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false
+        },
+        {
+          "value": "stage",
+          "isExpression": false
+        },
+        {
+          "value": "set_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_name",
+      "columns": [
+        {
+          "value": "budget_id",
+          "isExpression": false
+        },
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "archived_at IS NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_budget",
+      "columns": [
+        {
+          "value": "budget_id",
+          "isExpression": false
+        },
+        {
+          "value": "sort_order",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "calendar_feed_tokens",
       "name": "calendar_feed_tokens_token",
       "columns": [
@@ -33029,6 +35484,382 @@
         }
       ],
       "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_categories",
+      "name": "inventory_categories_name",
+      "columns": [
+        {
+          "value": "department_id",
+          "isExpression": false
+        },
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": "state = 'active'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "inventory_departments_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": "state = 'active'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "inventory_departments_prefix",
+      "columns": [
+        {
+          "value": "tag_prefix",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "inventory_disposals_open",
+      "columns": [
+        {
+          "value": "item_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "state IN ('proposed', 'approved')",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "inventory_faults_item",
+      "columns": [
+        {
+          "value": "item_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "inventory_inspection_dues_next",
+      "columns": [
+        {
+          "value": "next_due_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "applies = 1",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "inventory_inspection_kinds_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": "state = 'active'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "inventory_inspections_item",
+      "columns": [
+        {
+          "value": "item_id",
+          "isExpression": false
+        },
+        {
+          "value": "kind_id",
+          "isExpression": false
+        },
+        {
+          "value": "done_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "inventory_inspections_supersedes",
+      "columns": [
+        {
+          "value": "supersedes_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "supersedes_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "inventory_item_events_item",
+      "columns": [
+        {
+          "value": "item_id",
+          "isExpression": false
+        },
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_item_tags",
+      "name": "inventory_item_tags_term",
+      "columns": [
+        {
+          "value": "term_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_tag",
+      "columns": [
+        {
+          "value": "tag",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_category",
+      "columns": [
+        {
+          "value": "category_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_home",
+      "columns": [
+        {
+          "value": "home_location_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_container",
+      "columns": [
+        {
+          "value": "container_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "inventory_loan_lines_item",
+      "columns": [
+        {
+          "value": "item_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "inventory_loan_lines_loan",
+      "columns": [
+        {
+          "value": "loan_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_due",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "due_back_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_department",
+      "columns": [
+        {
+          "value": "department_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_responsible",
+      "columns": [
+        {
+          "value": "responsible_account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "inventory_locations_name",
+      "columns": [
+        {
+          "value": "coalesce(\"parent_id\", '')",
+          "isExpression": true
+        },
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": "state = 'active'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "inventory_locations_parent",
+      "columns": [
+        {
+          "value": "parent_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -36397,6 +39228,111 @@
       "entityType": "fks"
     },
     {
+      "table": "budgets_budgets",
+      "name": "fk_budgets_budgets_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "fk_budgets_budgets_season_id_core_seasons_id_fk",
+      "columns": [
+        "season_id"
+      ],
+      "tableTo": "core_seasons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "fk_budgets_budgets_department_term_id_core_terms_id_fk",
+      "columns": [
+        "department_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "fk_budgets_line_amounts_line_id_budgets_lines_id_fk",
+      "columns": [
+        "line_id"
+      ],
+      "tableTo": "budgets_lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_line_sources",
+      "name": "fk_budgets_line_sources_line_id_budgets_lines_id_fk",
+      "columns": [
+        "line_id"
+      ],
+      "tableTo": "budgets_lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "fk_budgets_lines_budget_id_budgets_budgets_id_fk",
+      "columns": [
+        "budget_id"
+      ],
+      "tableTo": "budgets_budgets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "fk_budgets_lines_category_id_budgets_categories_id_fk",
+      "columns": [
+        "category_id"
+      ],
+      "tableTo": "budgets_categories",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "companies_agreement_responses",
       "name": "fk_companies_agreement_responses_agreement_id_companies_agreements_id_fk",
       "columns": [
@@ -38098,6 +41034,561 @@
       "entityType": "fks"
     },
     {
+      "table": "inventory_categories",
+      "name": "fk_inventory_categories_department_id_inventory_departments_id_fk",
+      "columns": [
+        "department_id"
+      ],
+      "tableTo": "inventory_departments",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_category_inspections",
+      "name": "fk_inventory_category_inspections_category_id_inventory_categories_id_fk",
+      "columns": [
+        "category_id"
+      ],
+      "tableTo": "inventory_categories",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_category_inspections",
+      "name": "fk_inventory_category_inspections_kind_id_inventory_inspection_kinds_id_fk",
+      "columns": [
+        "kind_id"
+      ],
+      "tableTo": "inventory_inspection_kinds",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "fk_inventory_departments_department_term_id_core_terms_id_fk",
+      "columns": [
+        "department_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "fk_inventory_disposals_item_id_inventory_items_id_fk",
+      "columns": [
+        "item_id"
+      ],
+      "tableTo": "inventory_items",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "fk_inventory_faults_item_id_inventory_items_id_fk",
+      "columns": [
+        "item_id"
+      ],
+      "tableTo": "inventory_items",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "fk_inventory_faults_loan_id_inventory_loans_id_fk",
+      "columns": [
+        "loan_id"
+      ],
+      "tableTo": "inventory_loans",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "fk_inventory_faults_inspection_id_inventory_inspections_id_fk",
+      "columns": [
+        "inspection_id"
+      ],
+      "tableTo": "inventory_inspections",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "fk_inventory_faults_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "fk_inventory_inspection_dues_item_id_inventory_items_id_fk",
+      "columns": [
+        "item_id"
+      ],
+      "tableTo": "inventory_items",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "fk_inventory_inspection_dues_kind_id_inventory_inspection_kinds_id_fk",
+      "columns": [
+        "kind_id"
+      ],
+      "tableTo": "inventory_inspection_kinds",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "fk_inventory_inspection_dues_last_inspection_id_inventory_inspections_id_fk",
+      "columns": [
+        "last_inspection_id"
+      ],
+      "tableTo": "inventory_inspections",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "fk_inventory_inspections_item_id_inventory_items_id_fk",
+      "columns": [
+        "item_id"
+      ],
+      "tableTo": "inventory_items",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "fk_inventory_inspections_kind_id_inventory_inspection_kinds_id_fk",
+      "columns": [
+        "kind_id"
+      ],
+      "tableTo": "inventory_inspection_kinds",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "fk_inventory_inspections_supersedes_id_inventory_inspections_id_fk",
+      "columns": [
+        "supersedes_id"
+      ],
+      "tableTo": "inventory_inspections",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "fk_inventory_item_events_item_id_inventory_items_id_fk",
+      "columns": [
+        "item_id"
+      ],
+      "tableTo": "inventory_items",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "fk_inventory_item_events_loan_id_inventory_loans_id_fk",
+      "columns": [
+        "loan_id"
+      ],
+      "tableTo": "inventory_loans",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "fk_inventory_item_events_inspection_id_inventory_inspections_id_fk",
+      "columns": [
+        "inspection_id"
+      ],
+      "tableTo": "inventory_inspections",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "fk_inventory_item_events_fault_id_inventory_faults_id_fk",
+      "columns": [
+        "fault_id"
+      ],
+      "tableTo": "inventory_faults",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "fk_inventory_item_events_disposal_id_inventory_disposals_id_fk",
+      "columns": [
+        "disposal_id"
+      ],
+      "tableTo": "inventory_disposals",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "fk_inventory_item_events_from_location_id_inventory_locations_id_fk",
+      "columns": [
+        "from_location_id"
+      ],
+      "tableTo": "inventory_locations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "fk_inventory_item_events_to_location_id_inventory_locations_id_fk",
+      "columns": [
+        "to_location_id"
+      ],
+      "tableTo": "inventory_locations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_item_tags",
+      "name": "fk_inventory_item_tags_item_id_inventory_items_id_fk",
+      "columns": [
+        "item_id"
+      ],
+      "tableTo": "inventory_items",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_item_tags",
+      "name": "fk_inventory_item_tags_term_id_core_terms_id_fk",
+      "columns": [
+        "term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "fk_inventory_items_category_id_inventory_categories_id_fk",
+      "columns": [
+        "category_id"
+      ],
+      "tableTo": "inventory_categories",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "fk_inventory_items_home_location_id_inventory_locations_id_fk",
+      "columns": [
+        "home_location_id"
+      ],
+      "tableTo": "inventory_locations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "fk_inventory_items_current_location_id_inventory_locations_id_fk",
+      "columns": [
+        "current_location_id"
+      ],
+      "tableTo": "inventory_locations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "fk_inventory_items_container_id_inventory_items_id_fk",
+      "columns": [
+        "container_id"
+      ],
+      "tableTo": "inventory_items",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "fk_inventory_loan_lines_loan_id_inventory_loans_id_fk",
+      "columns": [
+        "loan_id"
+      ],
+      "tableTo": "inventory_loans",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "fk_inventory_loan_lines_item_id_inventory_items_id_fk",
+      "columns": [
+        "item_id"
+      ],
+      "tableTo": "inventory_items",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "fk_inventory_loan_lines_with_line_id_inventory_loan_lines_id_fk",
+      "columns": [
+        "with_line_id"
+      ],
+      "tableTo": "inventory_loan_lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "fk_inventory_loan_lines_fault_id_inventory_faults_id_fk",
+      "columns": [
+        "fault_id"
+      ],
+      "tableTo": "inventory_faults",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "fk_inventory_loans_department_id_inventory_departments_id_fk",
+      "columns": [
+        "department_id"
+      ],
+      "tableTo": "inventory_departments",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "fk_inventory_loans_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "fk_inventory_locations_parent_id_inventory_locations_id_fk",
+      "columns": [
+        "parent_id"
+      ],
+      "tableTo": "inventory_locations",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "fk_inventory_locations_venue_id_core_venues_id_fk",
+      "columns": [
+        "venue_id"
+      ],
+      "tableTo": "core_venues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "fk_inventory_locations_space_id_core_spaces_id_fk",
+      "columns": [
+        "space_id"
+      ],
+      "tableTo": "core_spaces",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "invoicing_export_codes",
       "name": "fk_invoicing_export_codes_profile_id_invoicing_export_profiles_id_fk",
       "columns": [
@@ -39552,6 +43043,16 @@
       "entityType": "pks"
     },
     {
+      "table": "budgets_line_sources",
+      "name": "budgets_line_sources_pk",
+      "columns": [
+        "line_id",
+        "account_key"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "calendar_feed_tokens",
       "name": "calendar_feed_tokens_pk",
       "columns": [
@@ -39798,6 +43299,36 @@
       "columns": [
         "template_id",
         "duty_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_category_inspections",
+      "name": "inventory_category_inspections_pk",
+      "columns": [
+        "category_id",
+        "kind_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "inventory_inspection_dues_pk",
+      "columns": [
+        "item_id",
+        "kind_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_item_tags",
+      "name": "inventory_item_tags_pk",
+      "columns": [
+        "item_id",
+        "term_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -40461,6 +43992,42 @@
     {
       "table": "box_office_tickets",
       "name": "box_office_tickets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "budgets_categories_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "budgets_line_amounts_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_pk",
       "columns": [
         "id"
       ],
@@ -41352,6 +44919,105 @@
     {
       "table": "front_of_house_timings",
       "name": "front_of_house_timings_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_categories",
+      "name": "inventory_categories_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "inventory_departments_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "inventory_disposals_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "inventory_faults_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "inventory_inspection_kinds_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "inventory_inspections_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "inventory_item_events_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "inventory_loan_lines_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "inventory_locations_pk",
       "columns": [
         "id"
       ],
@@ -42745,6 +46411,84 @@
       "entityType": "checks"
     },
     {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_scope",
+      "value": "\"scope\" IN ('production', 'department', 'season', 'general')",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_state",
+      "value": "\"state\" IN ('draft', 'proposed', 'approved', 'closed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_budgets",
+      "name": "budgets_budgets_scope_ref",
+      "value": "(\"scope\" = 'production') = (\"production_id\" IS NOT NULL) AND (\"scope\" = 'season') = (\"season_id\" IS NOT NULL) AND (\"scope\" = 'department') = (\"department_term_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "budgets_categories_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_categories",
+      "name": "budgets_categories_description_length",
+      "value": "length(\"description\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "budgets_line_amounts_amount",
+      "value": "\"amount_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "budgets_line_amounts_stage",
+      "value": "\"stage\" IN ('draft', 'approved')",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_line_amounts",
+      "name": "budgets_line_amounts_reason",
+      "value": "\"reason\" IS NULL OR length(\"reason\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_kind",
+      "value": "\"kind\" IN ('expense', 'income')",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_lines",
+      "name": "budgets_lines_category",
+      "value": "\"kind\" = 'income' OR \"category_id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
       "table": "companies_agreement_responses",
       "name": "companies_agreement_responses_answer",
       "value": "\"answer\" IN ('accepted', 'declined')",
@@ -44110,6 +47854,396 @@
       "table": "front_of_house_timings",
       "name": "front_of_house_timings_kind_check",
       "value": "\"kind\" IN ('house_open', 'curtain_up', 'interval_start', 'interval_end', 'curtain_down', 'house_clear')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_categories",
+      "name": "inventory_categories_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_categories",
+      "name": "inventory_categories_state",
+      "value": "\"state\" IN ('active', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "inventory_departments_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "inventory_departments_prefix_shape",
+      "value": "\"tag_prefix\" GLOB '[A-Z]*' AND length(\"tag_prefix\") BETWEEN 1 AND 4 AND \"tag_prefix\" NOT GLOB '*[^A-Z]*'",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "inventory_departments_counter",
+      "value": "\"next_tag_number\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "inventory_departments_lends_to",
+      "value": "\"lends_to\" IN ('productions', 'members', 'anyone')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "inventory_departments_guidance",
+      "value": "\"guidance\" IS NULL OR length(\"guidance\") <= 2000",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "inventory_departments_contact",
+      "value": "\"contact\" IS NULL OR length(\"contact\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_departments",
+      "name": "inventory_departments_state",
+      "value": "\"state\" IN ('active', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "inventory_disposals_quantity",
+      "value": "\"quantity\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "inventory_disposals_state",
+      "value": "\"state\" IN ('proposed', 'approved', 'declined', 'done')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "inventory_disposals_method",
+      "value": "\"method\" IN ('sold', 'donated', 'recycled', 'scrapped', 'lost', 'stolen', 'returned-to-owner')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "inventory_disposals_recipient",
+      "value": "\"recipient\" IS NULL OR length(\"recipient\") <= 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_disposals",
+      "name": "inventory_disposals_police",
+      "value": "\"police_reference\" IS NULL OR (\"method\" = 'stolen' AND length(\"police_reference\") <= 40)",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "inventory_faults_state",
+      "value": "\"state\" IN ('open', 'repaired', 'written-off')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "inventory_faults_source",
+      "value": "\"source\" IN ('report', 'return', 'inspection', 'show-report')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "inventory_faults_description",
+      "value": "length(\"description\") BETWEEN 1 AND 2000",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "inventory_faults_resolution",
+      "value": "\"resolution\" IS NULL OR length(\"resolution\") <= 1000",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_faults",
+      "name": "inventory_faults_closed",
+      "value": "(\"state\" = 'open') = (\"closed_at\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "inventory_inspection_dues_source",
+      "value": "\"source\" IN ('category', 'item')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_inspection_dues",
+      "name": "inventory_inspection_dues_excused",
+      "value": "\"applies\" = 1 OR \"next_due_on\" IS NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "inventory_inspection_kinds_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "inventory_inspection_kinds_description",
+      "value": "\"description\" IS NULL OR length(\"description\") <= 2000",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "inventory_inspection_kinds_interval",
+      "value": "\"interval_days\" BETWEEN 1 AND 3650",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "inventory_inspection_kinds_certificate",
+      "value": "\"certificate\" IN ('none', 'optional', 'required')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_inspection_kinds",
+      "name": "inventory_inspection_kinds_state",
+      "value": "\"state\" IN ('active', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "inventory_inspections_result",
+      "value": "\"result\" IN ('pass', 'fail')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "inventory_inspections_readings",
+      "value": "\"readings\" IS NULL OR length(\"readings\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "inventory_inspections_contractor",
+      "value": "\"contractor\" IS NULL OR length(\"contractor\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_inspections",
+      "name": "inventory_inspections_fail_sets_no_date",
+      "value": "\"result\" = 'pass' OR \"next_due_on\" IS NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "inventory_item_events_kind",
+      "value": "\"kind\" IN ('added', 'edited', 'recategorised', 'moved', 'condition-changed', 'out-of-service', 'back-in-service', 'checked-out', 'returned', 'inspected', 'fault-reported', 'fault-closed', 'marked-missing', 'found', 'disposed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_item_events",
+      "name": "inventory_item_events_reason",
+      "value": "\"reason\" IS NULL OR \"reason\" GLOB '[a-z]*' AND \"reason\" NOT GLOB '*[^a-z-]*'",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_description",
+      "value": "\"description\" IS NULL OR length(\"description\") <= 4000",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_tracking",
+      "value": "\"tracking\" IN ('individual', 'counted')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_quantity",
+      "value": "(\"tracking\" = 'individual' AND \"quantity\" = 1) OR (\"tracking\" = 'counted' AND \"quantity\" >= 0)",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_state",
+      "value": "\"state\" IN ('active', 'out-of-service', 'missing', 'disposed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_out_of_service",
+      "value": "(\"state\" = 'out-of-service') = (\"out_of_service_reason\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_condition",
+      "value": "\"condition\" IN ('as-new', 'good', 'worn', 'damaged')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_not_own_container",
+      "value": "\"container_id\" IS NULL OR \"container_id\" <> \"id\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_details",
+      "value": "coalesce(length(\"make\"), 0) <= 80 AND coalesce(length(\"model\"), 0) <= 80 AND coalesce(length(\"serial_number\"), 0) <= 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_value",
+      "value": "\"replacement_value\" IS NULL OR \"replacement_value\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_ownership",
+      "value": "\"ownership\" IN ('owned', 'hired-in', 'borrowed-in')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_items",
+      "name": "inventory_items_owner",
+      "value": "\"ownership\" = 'owned' OR (\"owner_name\" IS NOT NULL AND length(\"owner_name\") BETWEEN 1 AND 120 AND \"owner_due_back_on\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "inventory_loan_lines_state",
+      "value": "\"state\" IN ('wanted', 'listed', 'promised', 'out', 'returned', 'lost', 'cancelled')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "inventory_loan_lines_wanted",
+      "value": "(\"state\" = 'wanted' AND \"item_id\" IS NULL) OR (\"state\" <> 'wanted' AND (\"item_id\" IS NOT NULL OR \"state\" = 'cancelled'))",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "inventory_loan_lines_wanted_text",
+      "value": "\"item_id\" IS NOT NULL OR (\"wanted\" IS NOT NULL AND length(\"wanted\") BETWEEN 1 AND 200)",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "inventory_loan_lines_quantity",
+      "value": "\"quantity\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loan_lines",
+      "name": "inventory_loan_lines_returned",
+      "value": "\"returned_quantity\" IS NULL OR \"returned_quantity\" BETWEEN 0 AND \"quantity\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_kind",
+      "value": "\"kind\" IN ('production', 'member', 'outside')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_state",
+      "value": "\"state\" IN ('draft', 'requested', 'approved', 'out', 'returned', 'declined', 'cancelled')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_draft",
+      "value": "\"state\" <> 'draft' OR \"kind\" = 'production'",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_production",
+      "value": "(\"kind\" = 'production') = (\"production_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_linked",
+      "value": "\"responsible_account_id\" IS NOT NULL OR \"borrower_email\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_responsible_kind",
+      "value": "\"kind\" = 'outside' OR \"responsible_account_id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_name",
+      "value": "\"borrower_name\" IS NULL OR length(\"borrower_name\") <= 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_phone",
+      "value": "\"borrower_phone\" IS NULL OR length(\"borrower_phone\") <= 40",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_purpose",
+      "value": "\"purpose\" IS NULL OR length(\"purpose\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_decline_note",
+      "value": "\"decline_note\" IS NULL OR length(\"decline_note\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_window",
+      "value": "\"due_back_at\" > \"starts_at\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_due_back_set",
+      "value": "\"due_back_set\" IN ('by-person', 'from-production')",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_loans",
+      "name": "inventory_loans_cancel_reason",
+      "value": "(\"state\" = 'cancelled') = (\"cancel_reason\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "inventory_locations_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "inventory_locations_not_own_parent",
+      "value": "\"parent_id\" IS NULL OR \"parent_id\" <> \"id\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "inventory_locations",
+      "name": "inventory_locations_state",
+      "value": "\"state\" IN ('active', 'archived')",
       "entityType": "checks"
     },
     {
