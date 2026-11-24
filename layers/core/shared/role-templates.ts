@@ -53,6 +53,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'bar.sale.view',
       'budgets.budget.view', 'budgets.budget.manage', 'budgets.budget.approve', 'budgets.category.manage',
       'invoicing.export.manage', 'invoicing.settings.manage',
+      'fundraising.donation.view', 'fundraising.fund.manage', 'fundraising.settings.manage',
     ],
   },
 ]
