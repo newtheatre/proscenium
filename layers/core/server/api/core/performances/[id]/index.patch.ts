@@ -2,7 +2,8 @@
 // apply again and each kind of change is announced.
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
-import { inInstants, updatePerformance } from '../../../../programme/performances'
+import { inInstants } from '../../../../programme/performances'
+import { updatePerformance } from '../../../../programme/performances-update'
 import { performancePatch } from '../../../../programme/input'
 
 export default defineRoute({

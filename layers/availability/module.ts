@@ -25,6 +25,7 @@ export default defineModule({
     'requests.default-due': setting.duration({ default: '7d', min: '1d', max: '60d', units: ['day'], change, audience: 'staff' }),
     'requests.first-reminder': setting.duration({ default: '3d', min: '0d', max: '14d', units: ['day'], change, audience: 'staff' }),
     'requests.second-reminder': setting.duration({ default: '1d', min: '0d', max: '7d', units: ['day'], change, audience: 'staff' }),
+    'safeguarding.one-to-one': setting.boolean({ default: true, change, audience: 'staff' }),
     'polls.abandon-after': setting.duration({ default: '14d', min: '1d', max: '60d', units: ['day'], change, audience: 'staff' }),
     'retention.past': setting.duration({ default: '90d', min: '0d', max: '730d', units: ['day'], change, audience: 'staff', onChange: 'confirm' }),
     'retention.history': setting.duration({ default: '12mo', min: '3mo', max: '36mo', units: ['month'], change, audience: 'staff', onChange: 'confirm' }),

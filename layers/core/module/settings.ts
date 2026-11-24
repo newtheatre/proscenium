@@ -17,6 +17,8 @@ export const settingPages: Record<string, SettingPageDecl> = {
   // Tabs of Core's page in Admin's Modules; console staff open them from the cog on Programme's and People's pages.
   'programme': { place: 'admin', group: 'modules', order: 10, icon: 'i-lucide-calendar-days', to: '/admin/modules/core', settingsIn: ['programme'] },
   'people': { place: 'admin', group: 'modules', order: 20, icon: 'i-lucide-users', to: '/admin/modules/core/people', settingsIn: ['people'] },
+  // Admin > Practice (Practice mode, PM-S9).
+  'practice': { place: 'admin', group: 'access', order: 50, icon: 'i-lucide-graduation-cap' },
 }
 const on = (page: string): SettingGroupDecl => ({ page })
 const advanced: SettingGroupDecl = { advanced: true }
@@ -50,6 +52,8 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   // Delivery limits, not day-to-day choices: the Webhooks screen is the list alone (Matt, 21 November 2026).
   'webhooks': advanced,
   'lists': advanced,
+  // Only the calendar feed's site marker, which nobody sets by hand (C-70).
+  'calendar': advanced,
   'measures': advanced,
   'programme': on('programme'),
   'grants': on('people'),
@@ -58,6 +62,7 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   'emergency-contacts': on('people'),
   'merge': on('people'),
   'under-18': on('people'),
+  'practice': on('practice'),
 }
 
 const change = 'core.settings.manage'

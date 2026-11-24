@@ -2,7 +2,8 @@
      is, which performance, whether the device can reach the server, and the way out; the page's own
      task fills the rest. Leaving a screen goes back to the Tonight hub; leaving the hub (a worded
      "Leave" button) goes back to where the person works sitting down. A screen that works offline keeps a device copy of its data
-     (useLiveData) and queues its writes (useLiveQueue); the strip says how many are waiting to be sent. -->
+     (useLiveData) and queues its writes (useLiveQueue); the strip says how many are waiting to be sent.
+     To someone a training course opens it to, the strip offers "Practise this screen" (PM-12). -->
 <script setup lang="ts">
 import { useOnline } from '@vueuse/core'
 
@@ -21,10 +22,14 @@ const online = useOnline()
 const waiting = useLiveWaiting()
 useHead({ title: () => props.context ? `${props.title}: ${props.context}` : props.title })
 
-const hub = '/live'
+// In practice the hub is the framed one, and leaving is the panel's Leave practice, so the hub has no exit of its own.
+const { framed } = usePractising()
+const practise = usePractiseThisScreen()
+const hub = computed(() => framed.value ? '/practice/live' : '/live')
 const out = computed(() => {
   if (props.back) return { to: props.back, label: t('core.live.back'), leaves: false }
-  if (useRoute().path.replace(/\/$/, '') !== hub) return { to: hub, label: t('core.live.back'), leaves: false }
+  if (useRoute().path.replace(/\/$/, '') !== hub.value) return { to: hub.value, label: t('core.live.back'), leaves: false }
+  if (framed.value) return null
   const to = has('console') ? '/console' : has('members') ? '/members' : '/account'
   return { to, label: t('core.live.leave'), leaves: true }
 })
@@ -34,9 +39,9 @@ const out = computed(() => {
   <div class="flex min-h-full flex-1 flex-col">
     <!-- The strip lines up with the page below it and stands as tall as the console's navbar. Going
          back is at the start, as a trail's back is; leaving live mode is an exit, so it sits at the end. -->
-    <header class="sticky top-0 z-10 flex min-h-(--ui-header-height) items-center gap-3 border-b border-default bg-elevated px-4 py-2 sm:px-6">
+    <header class="sticky top-[var(--practice-banner,0px)] z-10 flex min-h-(--ui-header-height) items-center gap-3 border-b border-default bg-elevated px-4 py-2 sm:px-6">
       <IconButton
-        v-if="!out.leaves"
+        v-if="out && !out.leaves"
         :to="out.to"
         icon="i-lucide-arrow-left"
         size="xl"
@@ -54,6 +59,13 @@ const out = computed(() => {
           {{ context }}
         </p>
       </div>
+      <IconButton
+        v-if="practise"
+        :to="practise"
+        icon="i-lucide-graduation-cap"
+        size="xl"
+        :label="t('core.practice.practise-screen')"
+      />
       <UBadge
         v-if="waiting"
         color="warning"
@@ -72,7 +84,7 @@ const out = computed(() => {
       />
       <!-- Worded, because an icon alone is easy to miss on a phone. -->
       <UButton
-        v-if="out.leaves"
+        v-if="out?.leaves"
         :to="out.to"
         icon="i-lucide-log-out"
         color="neutral"
