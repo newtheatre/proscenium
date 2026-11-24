@@ -19,6 +19,7 @@ import { accountScopeSql } from '#kit/accounts'
 import type { ErasureHandler } from '../points/erasure-handler'
 import type { ErasureHold } from '../points/erasure-hold'
 import { accountById, verifiedAddressesOf } from './accounts'
+import { allOf } from './all-of'
 import { guardLastOwner, isOwner, LIVE } from './grants'
 import { endSessionsOf } from './sessions'
 
@@ -153,10 +154,10 @@ function statementOf(step: ErasureStep, params: unknown[]): { sql: string, param
 
 /** SQL that is true while none of `steps` has anything left to erase. */
 function noneLeft(steps: ErasureStep[]): string {
-  return steps.filter(s => s.table !== 'core_accounts' && (s.action === 'delete' || s.set.length)).map(s =>
+  return allOf(steps.filter(s => s.table !== 'core_accounts' && (s.action === 'delete' || s.set.length)).map(s =>
     s.action === 'delete'
       ? `NOT EXISTS (SELECT 1 FROM ${q(s.table)} WHERE ${s.match})`
-      : `NOT EXISTS (SELECT 1 FROM ${q(s.table)} WHERE (${s.match}) AND (${s.set.map(leftOver).join(' OR ')}))`).join(' AND ') || '1'
+      : `NOT EXISTS (SELECT 1 FROM ${q(s.table)} WHERE (${s.match}) AND (${s.set.map(leftOver).join(' OR ')}))`))
 }
 
 const INCOMPLETE = { code: 'core.erasure.incomplete', reason: 'The erasure did not clear everything, so nothing was changed.', remedy: 'Report this; the request will be tried again.' }
