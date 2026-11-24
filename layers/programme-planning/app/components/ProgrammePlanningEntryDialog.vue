@@ -9,10 +9,7 @@ const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ added: [] }>()
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { toRefusal, fieldErrors } = useRefusal()
-const toast = useToast()
-const formEl = useFormRef('formEl')
-const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const { formEl, refusal, submit } = usePlanDialog(open, () => emit('added'))
 
 const blank = () => ({ title: '', kind: 'own' as EntryKind, minutes: null as number | null, getInMinutes: null as number | null, getOutMinutes: null as number | null, performancesWanted: 1 })
 const form = ref(blank())
@@ -24,21 +21,15 @@ watch(open, (v) => {
 })
 const kinds = computed(() => ENTRY_KINDS.map(value => ({ value, label: t(`programme-planning.entry.kind.${value}`) })))
 
-async function save() {
-  refusal.value = null
-  try {
-    await $api(`/api/programme-planning/plans/${props.planId}/entries` as string, {
+function save() {
+  const title = form.value.title.trim()
+  return submit(
+    () => $api(`/api/programme-planning/plans/${props.planId}/entries` as string, {
       method: 'POST',
-      body: { ...form.value, title: form.value.title.trim(), getInMinutes: form.value.getInMinutes ?? 0, getOutMinutes: form.value.getOutMinutes ?? 0 },
-    })
-    toast.add({ title: t('programme-planning.entry.added', { title: form.value.title.trim() }), color: 'success' })
-    emit('added')
-    open.value = false
-  }
-  catch (e) {
-    refusal.value = toRefusal(e)
-    formEl.value?.setErrors(fieldErrors(refusal.value))
-  }
+      body: { ...form.value, title, getInMinutes: form.value.getInMinutes ?? 0, getOutMinutes: form.value.getOutMinutes ?? 0 },
+    }),
+    t('programme-planning.entry.added', { title }),
+  )
 }
 </script>
 

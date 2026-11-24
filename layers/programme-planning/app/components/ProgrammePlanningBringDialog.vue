@@ -9,10 +9,7 @@ const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ added: [] }>()
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { toRefusal, fieldErrors } = useRefusal()
-const toast = useToast()
-const formEl = useFormRef('formEl')
-const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const { formEl, refusal, toRefusal, submit } = usePlanDialog(open, () => emit('added'))
 const productions = ref<Bringable[] | null>(null)
 const form = ref({ productionId: undefined as string | undefined, performancesWanted: 1 })
 
@@ -31,18 +28,11 @@ watch(open, async (v) => {
 const items = computed(() => (productions.value ?? []).map(p => ({ value: p.id, label: p.title })))
 const chosen = computed(() => productions.value?.find(p => p.id === form.value.productionId))
 
-async function save() {
-  refusal.value = null
-  try {
-    await $api(`/api/programme-planning/plans/${props.planId}/bring` as string, { method: 'POST', body: form.value })
-    toast.add({ title: t('programme-planning.entry.brought', { title: chosen.value?.title ?? '' }), color: 'success' })
-    emit('added')
-    open.value = false
-  }
-  catch (e) {
-    refusal.value = toRefusal(e)
-    formEl.value?.setErrors(fieldErrors(refusal.value))
-  }
+function save() {
+  return submit(
+    () => $api(`/api/programme-planning/plans/${props.planId}/bring` as string, { method: 'POST', body: form.value }),
+    t('programme-planning.entry.brought', { title: chosen.value?.title ?? '' }),
+  )
 }
 </script>
 
