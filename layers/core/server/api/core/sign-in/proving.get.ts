@@ -3,7 +3,7 @@
 import { defineRoute } from '#kit'
 import { pendingLink } from '../../../identity/oidc'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   public: true,
   rateLimit: 'sign-in-network',
 }, async (event) => {

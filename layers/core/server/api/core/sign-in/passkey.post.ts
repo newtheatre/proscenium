@@ -6,7 +6,7 @@ import { accountById, isUsable } from '../../../identity/accounts'
 import { startSession } from '../../../identity/sessions'
 import { safeNext } from '../../../identity/web'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   public: true,
   rateLimit: 'sign-in-network',
   input: z.object({ challengeId: z.string().max(40), response: z.looseObject({ id: z.string() }), next: z.string().max(512).optional() }), // not-policy: an id and a return path are short
