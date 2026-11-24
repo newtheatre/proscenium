@@ -230,10 +230,10 @@ export function syncProductionDates(unit: UnitView, productionId: string): void 
 // ---------------------------------------------------------------------------------------------
 // Writes
 
-type Times<T> = Omit<T, 'startsAt' | 'endsAt' | 'doorsAt'> & { startsAt?: number | string, endsAt?: number | string, doorsAt?: number | string | null }
+type Times<T> = Omit<T, 'startsAt' | 'endsAt' | 'doorsAt'> & { startsAt?: number | string | null, endsAt?: number | string, doorsAt?: number | string | null }
 
 /** Turns local date-times from the console into instants in the theatre's time zone. */
-export async function inInstants<T extends PerformancePatch>(input: Times<T>): Promise<T> {
+export async function inInstants<T extends object>(input: Times<T>): Promise<T> {
   const local = (['startsAt', 'endsAt', 'doorsAt'] as const).filter(k => typeof input[k] === 'string')
   if (!local.length) return input as T
   const rule = await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet.', { status: 409, remedy: TIME_ZONE_REMEDY })

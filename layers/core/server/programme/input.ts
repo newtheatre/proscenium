@@ -180,10 +180,26 @@ const creditFields = z.object({
   accountId: z.string().min(1).nullable(),
   visibility: VISIBILITY,
 })
-export const creditInput = creditFields.partial({ accountId: true, visibility: true })
+export const creditInput = creditFields.partial({ accountId: true, visibility: true }).extend({
+  performanceId: z.string().min(1).nullish(),
+  lineUpId: z.string().min(1).nullish(),
+})
 export const creditPatch = creditFields.partial()
 export const creditOrderInput = z.object({
   sectionTermId: z.string().min(1),
   ids: z.array(z.string().min(1)).min(1).max(500), // not-policy: a section's ceiling
+  performanceId: z.string().min(1).nullish(),
 })
+
+const lineUpFields = {
+  name: z.string().trim().min(1).max(120), // not-policy: the column's bound
+  note: z.string().trim().max(200).nullish(), // not-policy: the column's bound
+  startsAt: instant.nullish(),
+  minutes: z.number().int().min(1).max(600).nullish(), // not-policy: the column's bound
+  announced: z.boolean().optional(),
+}
+export const lineUpInput = z.object({ ...lineUpFields, name: lineUpFields.name.optional(), productionId: z.string().min(1).nullish(), after: z.string().min(1).nullish() })
+  .refine(v => v.name || v.productionId, { path: ['name'], message: 'Give a name.' })
+export const lineUpPatch = z.object(lineUpFields).partial()
+export const lineUpMove = z.object({ after: z.string().min(1).nullable() })
 export const ownCreditInput = z.object({ visibility: VISIBILITY })
