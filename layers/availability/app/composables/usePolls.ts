@@ -7,7 +7,7 @@ export type { PollState, Vote }
 export interface PollSlot { id: string, date: string, start: number, end: number }
 export interface PollRow { id: string, title: string, answersBy: number, state: PollState, open: boolean, answered: number, asked: number }
 export interface PollView {
-  poll: { id: string, title: string, length: number, answersBy: number, state: PollState, open: boolean, decidedSlotId: string | null, organiser: string }
+  poll: { id: string, title: string, length: number, answersBy: number, state: PollState, open: boolean, decidedSlotId: string | null, organiser: string, meetingId: string | null }
   slots: PollSlot[]
   organiser: boolean
   asked: boolean

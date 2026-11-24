@@ -83,3 +83,25 @@ export const voteInput = z.object({
 }).strict()
 
 export const decideInput = z.object({ slotId: z.string().min(1).max(40) }).strict() // not-policy: an id's length
+
+const meetingTime = {
+  date,
+  start: z.number().int().min(0).max(1439), // not-policy: minutes in a day
+  end: z.number().int().min(1).max(1440), // not-policy: minutes in a day
+  title: z.string().trim().min(1).max(80), // not-policy: as the table's CHECK
+  place: z.string().trim().max(120).nullable(), // not-policy: as the table's CHECK
+  notes: z.string().trim().max(2000).nullable(), // not-policy: as the table's CHECK
+}
+
+export const arrangeInput = z.object({
+  ...meetingTime,
+  groupIds: z.array(z.string().max(200)).max(20), // not-policy: shape bound
+  accountIds: z.array(z.string().max(40)).max(200), // not-policy: rule F1's ceiling
+  findId: z.string().min(1).max(40).nullable(), // not-policy: an id's length
+}).strict()
+
+export const changeInput = z.object({ ...meetingTime, tell: z.boolean() }).strict()
+
+export const respondInput = z.object({ response: z.enum(['going', 'not-going']) }).strict()
+
+export const cancelInput = z.object({ reason: z.string().trim().max(200).nullable() }).strict() // not-policy: as the table's CHECK
