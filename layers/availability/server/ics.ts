@@ -61,12 +61,8 @@ function occurrences(event: ICAL.Event, o: ReadOptions): { start: ICAL.Time, end
   return out
 }
 
-/** The busy and maybe stretches of a calendar file within the window, sorted; throws if it is not a calendar. */
-export function readCalendar(text: string, o: ReadOptions): ReadBlock[] {
-  const root = new ICAL.Component(ICAL.parse(text))
-  if (root.name !== 'vcalendar') throw new Error('not a calendar')
-  for (const tz of root.getAllSubcomponents('vtimezone')) ICAL.TimezoneService.register(tz)
-  const owner = ownerOf(root)
+/** Each event's master by UID, with its moved or changed instances related to it. */
+function mastersOf(root: ICAL.Component): Map<string, ICAL.Event> {
   const vevents = root.getAllSubcomponents('vevent')
   const masters = new Map<string, ICAL.Event>()
   let unnamed = 0
@@ -78,17 +74,34 @@ export function readCalendar(text: string, o: ReadOptions): ReadBlock[] {
     if (master) master.relateException(v)
     else masters.set(`${uid}#${unnamed++}`, new ICAL.Event(v))
   }
+  return masters
+}
+
+/** The level an occurrence gives its time, or null when it gives none. */
+function levelOf(kind: Kind, o: ReadOptions): ImportedLevel | null {
+  if (kind === 'busy') return 'busy'
+  return kind === 'tentative' && o.tentativeAs !== 'ignore' ? o.tentativeAs : null
+}
+
+/** One event's blocks within the window. */
+function blocksOf(event: ICAL.Event, owner: string | null, o: ReadOptions): ReadBlock[] {
   const out: ReadBlock[] = []
-  for (const [uid, event] of masters) {
-    if (o.ours?.(uid)) continue
-    for (const { start, end, item } of occurrences(event, o)) {
-      const kind = kindOf(item.component, owner)
-      const level: ImportedLevel | null = kind === 'busy' ? 'busy' : kind === 'tentative' && o.tentativeAs !== 'ignore' ? o.tentativeAs : null
-      if (!level) continue
-      const from = Math.max(o.from, instantOf(start, o.zone))
-      const to = Math.min(o.to, instantOf(end ?? start, o.zone))
-      if (to > from) out.push({ from, to, level })
-    }
+  for (const { start, end, item } of occurrences(event, o)) {
+    const level = levelOf(kindOf(item.component, owner), o)
+    const from = Math.max(o.from, instantOf(start, o.zone))
+    const to = Math.min(o.to, instantOf(end ?? start, o.zone))
+    if (level && to > from) out.push({ from, to, level })
   }
+  return out
+}
+
+/** The busy and maybe stretches of a calendar file within the window, sorted; throws if it is not a calendar. */
+export function readCalendar(text: string, o: ReadOptions): ReadBlock[] {
+  const root = new ICAL.Component(ICAL.parse(text))
+  if (root.name !== 'vcalendar') throw new Error('not a calendar')
+  for (const tz of root.getAllSubcomponents('vtimezone')) ICAL.TimezoneService.register(tz)
+  const owner = ownerOf(root)
+  const out: ReadBlock[] = []
+  for (const [uid, event] of mastersOf(root)) if (!o.ours?.(uid)) out.push(...blocksOf(event, owner, o))
   return out.sort((a, b) => a.from - b.from || a.to - b.to)
 }

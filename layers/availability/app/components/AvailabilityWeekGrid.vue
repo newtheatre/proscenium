@@ -46,27 +46,32 @@ const named = (date: string) => props.headings?.[date] ?? dates.dayNamed(date)
 
 interface Cell { minute: number, level: ShownLevel, reason?: string, imported?: string, first: boolean, held?: string, heldFirst: boolean, label: string }
 const startsIn = (start: number, minute: number) => start >= minute && start < minute + props.step
-const columns = computed(() => props.days.map(d => ({
-  date: d.date,
-  open: open(d.date),
-  cells: rows.value.map<Cell>((minute) => {
-    const piece = pieceAt(d.pieces, minute)
-    const level = piece?.level ?? 'unknown'
-    const reason = piece?.reason
-    const held = props.commitments?.[d.date]?.find(c => c.start < minute + props.step && minute < c.end)
-    const heldLabel = held ? t(held.labelKey) : undefined
-    return {
-      minute,
-      level,
-      reason,
-      imported: piece?.imported,
-      first: !!piece && startsIn(piece.start, minute),
-      held: heldLabel,
-      heldFirst: !!held && (startsIn(held.start, minute) || (held.start < minute && minute === 0)),
-      label: t('availability.grid.cell', { day: named(d.date), from: clockOf(minute), until: clockOf(Math.min(minute + props.step, DAY_MINUTES)), level: word(level) }) + (reason ? `, ${reason}` : '') + (piece?.imported ? `, ${t('availability.grid.imported', { label: piece.imported })}` : '') + (heldLabel ? `, ${t('availability.grid.held', { what: heldLabel })}` : ''),
-    }
-  }),
-})))
+function cellLabel(date: string, minute: number, level: ShownLevel, extras: { reason?: string, imported?: string, held?: string }): string {
+  const parts = [t('availability.grid.cell', { day: named(date), from: clockOf(minute), until: clockOf(Math.min(minute + props.step, DAY_MINUTES)), level: word(level) })]
+  if (extras.reason) parts.push(extras.reason)
+  if (extras.imported) parts.push(t('availability.grid.imported', { label: extras.imported }))
+  if (extras.held) parts.push(t('availability.grid.held', { what: extras.held }))
+  return parts.join(', ')
+}
+
+function cellOf(d: Day, minute: number): Cell {
+  const piece = pieceAt(d.pieces, minute)
+  const level = piece?.level ?? 'unknown'
+  const held = props.commitments?.[d.date]?.find(c => c.start < minute + props.step && minute < c.end)
+  const heldLabel = held ? t(held.labelKey) : undefined
+  return {
+    minute,
+    level,
+    reason: piece?.reason,
+    imported: piece?.imported,
+    first: !!piece && startsIn(piece.start, minute),
+    held: heldLabel,
+    heldFirst: !!held && (startsIn(held.start, minute) || (held.start < minute && minute === 0)),
+    label: cellLabel(d.date, minute, level, { reason: piece?.reason, imported: piece?.imported, held: heldLabel }),
+  }
+}
+
+const columns = computed(() => props.days.map(d => ({ date: d.date, open: open(d.date), cells: rows.value.map(minute => cellOf(d, minute)) })))
 
 // One stroke under way: on one day, from one row to another.
 const stroke = ref<{ day: number, from: number, to: number, mode: 'drag' | 'tap' } | null>(null)

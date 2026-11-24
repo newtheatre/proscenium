@@ -32,35 +32,49 @@ interface Piece { start: number, end: number, level: ShownLevel, reason?: string
 /** The imported span ruling a stretch: busy beats maybe where blocks overlap (I3). */
 const importedAt = (spans: ImportSpan[], start: number, end: number) => spans.filter(x => x.start <= start && end <= x.end).sort((a, b) => (a.level === 'busy' ? 0 : 1) - (b.level === 'busy' ? 0 : 1))[0]
 
-/** One local day's pieces, in minutes past midnight, adjacent equal pieces joined. */
-export function resolveDay(date: string, rows: DayRows, o: DayOptions): Piece[] {
-  const { lines, exceptions } = rows
-  const imported = rows.imported?.[date] ?? []
+interface DaySources { covering: ExceptionRow[], today: DayRows['lines'], imported: ImportSpan[] }
+
+/** What rules one date: the exceptions covering it, newest first; its pattern lines; its imported spans. */
+function sourcesOf(date: string, rows: DayRows): DaySources {
   const weekday = weekdayOf(date)
-  const covering = exceptions
+  const covering = rows.exceptions
     .filter(e => e.firstDate <= date && date <= e.lastDate && (!e.weekdays || e.weekdays.includes(weekday)))
     .sort((a, b) => b.createdAt - a.createdAt || (a.id < b.id ? 1 : -1))
-  const pattern = lines.filter(l => l.startsOn <= date && (l.endsOn === null || date <= l.endsOn))
+  const pattern = rows.lines.filter(l => l.startsOn <= date && (l.endsOn === null || date <= l.endsOn))
   // Overlapping patterns only arise from a merge read through the scope: the latest changed wins.
   const newest = pattern.reduce((m, l) => Math.max(m, l.changedAt), 0)
-  const today = pattern.filter(l => l.changedAt === newest && l.weekday === weekday)
+  return { covering, today: pattern.filter(l => l.changedAt === newest && l.weekday === weekday), imported: rows.imported?.[date] ?? [] }
+}
+
+/** Every minute where something starts or ends, sorted. */
+function cutsOf(s: DaySources): number[] {
   const cuts = new Set([0, DAY_MINUTES])
-  for (const e of covering) span(e.from, e.until).forEach(m => cuts.add(m))
-  for (const l of today) span(l.from, l.until).forEach(m => cuts.add(m))
-  for (const x of imported) [x.start, x.end].forEach(m => cuts.add(m))
-  const points = [...cuts].sort((a, b) => a - b)
+  for (const x of [...s.covering, ...s.today]) span(x.from, x.until).forEach(m => cuts.add(m))
+  for (const x of s.imported) [x.start, x.end].forEach(m => cuts.add(m))
+  return [...cuts].sort((a, b) => a - b)
+}
+
+/** The level of one stretch: an exception, else an import (busy beats maybe), else the pattern, else unmarked. */
+function pieceAt(s: DaySources, start: number, end: number, o: DayOptions): Piece {
+  const inside = ([a, b]: [number, number]) => a <= start && end <= b
+  const e = s.covering.find(x => inside(span(x.from, x.until)))
+  const im = e ? undefined : importedAt(s.imported, start, end)
+  const l = e || im ? undefined : s.today.find(x => inside(span(x.from, x.until)))
+  const piece: Piece = { start, end, level: e?.level ?? im?.level ?? l?.level ?? o.unmarked }
+  if (e?.reason && o.showReason(e)) piece.reason = e.reason
+  if (im && o.own) piece.imported = im.label
+  return piece
+}
+
+/** One local day's pieces, in minutes past midnight, adjacent equal pieces joined. */
+export function resolveDay(date: string, rows: DayRows, o: DayOptions): Piece[] {
+  const s = sourcesOf(date, rows)
+  const points = cutsOf(s)
   const out: Piece[] = []
   for (let i = 0; i < points.length - 1; i++) {
-    const [start, end] = [points[i]!, points[i + 1]!]
-    const inside = ([a, b]: [number, number]) => a <= start && end <= b
-    const e = covering.find(x => inside(span(x.from, x.until)))
-    const im = e ? undefined : importedAt(imported, start, end)
-    const l = e || im ? undefined : today.find(x => inside(span(x.from, x.until)))
-    const piece: Piece = { start, end, level: e?.level ?? im?.level ?? l?.level ?? o.unmarked }
-    if (e?.reason && o.showReason(e)) piece.reason = e.reason
-    if (im && o.own) piece.imported = im.label
+    const piece = pieceAt(s, points[i]!, points[i + 1]!, o)
     const last = out[out.length - 1]
-    if (last && last.level === piece.level && last.reason === piece.reason && last.imported === piece.imported) last.end = end
+    if (last && last.level === piece.level && last.reason === piece.reason && last.imported === piece.imported) last.end = piece.end
     else out.push(piece)
   }
   return out
