@@ -17,7 +17,7 @@ export default defineModule({
   stability: 'experimental',
   requires: ['payments', 'finance'],
   // Form builder joins this list with the checkout questions (R-17), once its module id exists.
-  uses: ['front-of-house', 'communications', 'promotions', 'maintenance'],
+  uses: ['front-of-house', 'communications', 'promotions', 'maintenance', 'reports'],
 
   settings: defineSettings('box-office', {
     'baskets.hold-for': setting.duration({ default: '10m', min: '2m', max: '60m', change, audience: 'public', quotable: true }),
@@ -71,6 +71,11 @@ export default defineModule({
     // the start, then go on general sale (show walkthrough, decision 6). Nought keeps none back.
     'wheelchair.keep-seats-before': setting.duration({ default: '24h', min: '0m', max: '7d', change, audience: 'staff' }),
     'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    // The door counter (BO-73): Out for timed performances too, how long a press can be undone from
+    // the device, and the share of capacity at which it starts to warn.
+    'door.count-out': setting.boolean({ default: false, change, audience: 'staff' }),
+    'door.undo-within': setting.duration({ default: '2m', min: '0m', max: '15m', change, audience: 'staff' }),
+    'door.full-warning': setting.integer({ default: 90, min: 50, max: 100, unit: 'box-office.units.percent-of-house', change, audience: 'staff' }),
   }),
 
   records: defineRecords('box-office', {
@@ -104,6 +109,8 @@ export default defineModule({
     'order.import': ability({ risk: 'privileged' }),
     // The door finds a booking by the buyer's name as well as by its reference.
     'ticket.admit': ability({ on: 'core.performance', implies: ['core.account.find'] }),
+    // Undoing a door count after the undo window, with a reason (BO-73, HC5).
+    'headcount.correct': ability({ on: 'core.performance', implies: ['ticket.admit'] }),
     // Sales reports, by grant on a production for a visiting company's manager.
     'report.view': ability({ on: 'core.production' }),
     'report.export': ability({ on: 'core.production', implies: ['report.view'] }),
@@ -158,6 +165,8 @@ export default defineModule({
       'box-office.order.exchanged': event({ version: 1, payload: z.object({ orderId: z.string(), cancellationId: z.string() }), internal: false }),
       'box-office.comp-request.requested': event({ version: 1, payload: z.object({ requestId: z.string() }), internal: true }),
       'box-office.comp-request.decided': event({ version: 1, payload: z.object({ requestId: z.string(), state: z.enum(['issued', 'declined', 'withdrawn']) }), internal: true }),
+      // Once, when the people counted inside first reach the performance's capacity (BO-73).
+      'box-office.headcount.full': event({ version: 1, payload: z.object({ performanceId: z.string(), inside: z.number().int(), capacity: z.number().int() }), internal: false }),
       'box-office.order.cancelled': event({ version: 1, payload: z.object({ orderId: z.string(), cancellationId: z.string() }), internal: false }),
     },
     // The decision recorded for the bookings is carried out when the core's change goes through (R-11).
@@ -190,6 +199,22 @@ export default defineModule({
   },
 
   contributes: {
+    // Figures for Reports (REP-02): tickets from Box office's tables, money from its own ledger accounts.
+    // Its ready-made report for Reports (REP-04), when Reports is on.
+    'reports.report': [{
+      id: 'box-office.sales-and-attendance',
+      label: 'box-office.ready-made.sales-and-attendance',
+      description: 'box-office.ready-made.sales-and-attendance.description',
+      area: 'box-office',
+      scope: 'production',
+      period: 'scope',
+      breakdown: 'performance',
+      figures: ['box-office.tickets-sold', 'box-office.tickets-comp', 'box-office.admitted', 'box-office.capacity', 'box-office.capacity-filled', 'box-office.gross', 'box-office.net'],
+      chart: 'bar',
+      ability: 'box-office.report.view',
+      order: 10,
+    }],
+    'core.measure': ['tickets-sold', 'tickets-comp', 'tickets-issued', 'admitted', 'orders', 'bookers', 'capacity', 'capacity-filled', 'gross', 'refunds', 'net', 'net-of-vat'].map(file => ({ id: `box-office.${file}`, file })),
     // Links already sent by email keep working while maintenance mode closes the site: a booking's
     // tickets (and cancelling from them) and confirming a reservation.
     'maintenance.open-address': [
@@ -362,6 +387,15 @@ export default defineModule({
         { slug: 'membership-shown', label: 'Membership shown in person' },
         { slug: 'proof-shown', label: 'Proof shown in person' },
         { slug: 'manager-decision', label: 'Manager\'s decision' },
+        { slug: 'other', label: 'Other' },
+      ],
+    }, {
+      id: 'box-office.headcount-correction',
+      label: 'Reasons for correcting a door count',
+      terms: [
+        { slug: 'counted-twice', label: 'Counted twice' },
+        { slug: 'wrong-button', label: 'Pressed the wrong button' },
+        { slug: 'wrong-performance', label: 'Counted on the wrong performance' },
         { slug: 'other', label: 'Other' },
       ],
     }, {
