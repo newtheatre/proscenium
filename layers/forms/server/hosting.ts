@@ -8,7 +8,7 @@
 import { all, first, newId, nowMs, refuse, today, type Actor, type UnitView } from '#kit'
 import { ERASED } from '#kit/db'
 import type { Answers, DataClass, Definition, QuestionType, Value, Marked } from '../shared/engine'
-import { publicDefinition, questionsOf, withoutWorkflow } from '../shared/engine'
+import { hasAnswerKey, publicDefinition, questionsOf, withoutWorkflow } from '../shared/engine'
 import { VERSION, getForm, getVersion, type VersionRow } from './forms'
 import { PLACE, draftOf, readAnswers, sendResponse, shut, words, type LinkRow, type Shut, type StoredPlace } from './responses'
 import { EVERY, attachedTo, modeOf, slotOf, type FormsSlot } from './slots'
@@ -116,6 +116,20 @@ export async function slotFormVersion(placementId: string, versionId: string): P
   const version = place ? await versionOf(place.formId, versionId) : null
   if (!version) return refuse('forms.version-not-of-form', 'That version is not one of this form\'s.', { status: 404 }) // not-policy: HTTP status
   return { version: version.number, definition: publicDefinition(withoutWorkflow(JSON.parse(version.definition) as Definition)) }
+}
+
+/**
+ * A form attached to the host's record in a slot, as a quiz: its placement, its live version, and
+ * whether that version is marked (correct answers and a pass mark), so a host can pin it (FB-513).
+ */
+export async function slotQuiz(slotId: string, subjectId: string, formId: string): Promise<{ placementId: string, versionId: string, marked: boolean } | null> {
+  const slot = await slotIn(slotId, 'submission')
+  const place = (await attachedTo(slot.id, subjectId)).find(p => p.formId === formId)
+  const form = place ? await getForm(formId) : null
+  const version = form && form.status !== 'draft' && form.status !== 'archived' ? await getVersion(form.liveVersionId) : null
+  if (!place || !version) return null
+  const def = JSON.parse(version.definition) as Definition
+  return { placementId: place.id, versionId: version.id, marked: hasAnswerKey(def) && def.marking?.passMark !== undefined }
 }
 
 // ---- custom fields, for the host's lists and exports ----

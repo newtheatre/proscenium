@@ -70,6 +70,7 @@
   "training.abilities.settings.manage.label": "Change Training's settings",
   "training.facts.course-trainer.label": "A trainer of the course",
   "training.facts.competent.label": "Holds the competency",
+  "training.forms.quiz.label": "Quiz on this course",
   "training.notification-topics.records.label": "Your training",
   "training.notification-topics.records.description": "When you complete a course.",
   "training.notification-topics.sessions.label": "Training sessions",
