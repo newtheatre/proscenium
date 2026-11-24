@@ -30,7 +30,7 @@ const route = useRoute()
 const id = computed(() => String(route.params.id))
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { toRefusal, fieldErrors } = useRefusal()
+const { toRefusal } = useRefusal()
 const { dateTime } = useDates()
 const toast = useToast()
 const { offer } = useUndo()
@@ -113,15 +113,6 @@ function move(l: Line, by: -1 | 1) {
   if (from + by < 0 || from + by >= group.length) return
   reorder(l.kind, { id: l.id, from, to: from + by })
 }
-async function onHandleKey(event: KeyboardEvent, l: Line) {
-  const by = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
-  if (!by) return
-  event.preventDefault()
-  move(l, by)
-  await nextTick()
-  document.querySelector<HTMLElement>(`[data-drag-handle="${l.id}"]`)?.focus()
-}
-
 // Adding and editing lines.
 const lineOpen = ref(false)
 const lineEditing = ref<Line | null>(null)
@@ -146,36 +137,18 @@ async function setArchived(l: Line, archived: boolean) {
   }
 }
 
-// Revising an approved line: below what is spent and committed, the treasurer confirms.
 const revising = ref<Line | null>(null)
-const revise = reactive({ amountMinor: 0 as number | null, reason: '', confirm: false })
-const reviseEl = useFormRef('reviseEl')
-const reviseRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-function openRevise(l: Line) {
-  Object.assign(revise, { amountMinor: l.figures.budgetedMinor, reason: '', confirm: false })
-  reviseRefusal.value = null
-  revising.value = l
+async function revised() {
+  revising.value = null
+  toast.add({ title: t('budgets.screens.revise.done'), color: 'success' })
+  await reload()
 }
-async function saveRevise() {
-  reviseRefusal.value = null
-  try {
-    await $api(`/api/budgets/lines/${revising.value!.id}/revise` as string, { method: 'POST', body: { amountMinor: revise.amountMinor ?? 0, reason: revise.reason.trim(), confirm: revise.confirm || undefined } })
-    revising.value = null
-    toast.add({ title: t('budgets.screens.revise.done'), color: 'success' })
-    await reload()
-  }
-  catch (e) {
-    reviseRefusal.value = toRefusal(e)
-    reviseEl.value?.setErrors(fieldErrors(reviseRefusal.value))
-  }
-}
-const belowSpent = computed(() => reviseRefusal.value?.code === 'budgets.line.below-spent')
 const historyOf = (lineId: string) => (data.value?.history ?? []).filter(h => h.lineId === lineId)
 
 function lineActions(l: Line): DropdownMenuItem[] {
   if (!editable.value) return []
   const items: DropdownMenuItem[] = [{ label: t('budgets.screens.line.edit'), icon: 'i-lucide-pencil', onSelect: () => editLine(l) }]
-  if (b.value?.state === 'approved') items.push({ label: t('budgets.screens.revise.title'), icon: 'i-lucide-scale', onSelect: () => openRevise(l) })
+  if (b.value?.state === 'approved') items.push({ label: t('budgets.screens.revise.title'), icon: 'i-lucide-scale', onSelect: () => { revising.value = l } })
   const group = ordered.value.filter(x => x.kind === l.kind)
   const at = group.findIndex(x => x.id === l.id)
   items.push(
@@ -198,47 +171,10 @@ async function step(path: string, done: string) {
   }
 }
 const noting = ref<'send-back' | 'reopen' | null>(null)
-const note = ref('')
-const noteEl = useFormRef('noteEl')
-const noteRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-function openNote(kind: 'send-back' | 'reopen') {
-  note.value = ''
-  noteRefusal.value = null
-  noting.value = kind
-}
-async function saveNote() {
-  noteRefusal.value = null
-  try {
-    await $api(`/api/budgets/budgets/${id.value}/${noting.value}` as string, { method: 'POST', body: { note: note.value.trim() } })
-    toast.add({ title: t(`budgets.screens.${noting.value}.done`), color: 'success' })
-    noting.value = null
-    await reload()
-  }
-  catch (e) {
-    noteRefusal.value = toRefusal(e)
-    noteEl.value?.setErrors(fieldErrors(noteRefusal.value))
-  }
-}
 const renaming = ref(false)
-const rename = ref('')
-const renameEl = useFormRef('renameEl')
-const renameRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
-function openRename() {
-  rename.value = b.value?.name ?? ''
-  renameRefusal.value = null
-  renaming.value = true
-}
-async function saveRename() {
-  renameRefusal.value = null
-  try {
-    await $api(`/api/budgets/budgets/${id.value}` as string, { method: 'PATCH', body: { name: rename.value.trim() } })
-    renaming.value = false
-    await reload()
-  }
-  catch (e) {
-    renameRefusal.value = toRefusal(e)
-    renameEl.value?.setErrors(fieldErrors(renameRefusal.value))
-  }
+async function noted(kind: 'send-back' | 'reopen') {
+  toast.add({ title: t(`budgets.screens.${kind}.done`), color: 'success' })
+  await reload()
 }
 
 const pageActions = computed(() => {
@@ -249,11 +185,11 @@ const pageActions = computed(() => {
   if (state === 'draft' && v.canManage) out.push({ label: t('budgets.screens.propose.action'), icon: 'i-lucide-send', disabled: !expenses.value.concat(incomes.value).some(l => l.draftMinor > 0), onSelect: () => step('propose', 'budgets.screens.propose.done') })
   if (state === 'proposed' && v.canApprove) {
     if (!v.ownProposal) out.push({ label: t('budgets.screens.approve.action'), icon: 'i-lucide-check', onSelect: () => step('approve', 'budgets.screens.approve.done') })
-    out.push({ label: t('budgets.screens.send-back.action'), icon: 'i-lucide-undo-2', lesser: true, onSelect: () => openNote('send-back') })
+    out.push({ label: t('budgets.screens.send-back.action'), icon: 'i-lucide-undo-2', lesser: true, onSelect: () => { noting.value = 'send-back' } })
   }
   if (state === 'approved' && v.canApprove) out.push({ label: t('budgets.screens.close.action'), icon: 'i-lucide-lock', lesser: true, onSelect: () => step('close', 'budgets.screens.close.done') })
-  if (state === 'closed' && v.canApprove) out.push({ label: t('budgets.screens.reopen.action'), icon: 'i-lucide-lock-open', lesser: true, onSelect: () => openNote('reopen') })
-  if (state !== 'closed' && v.canManage) out.push({ label: t('budgets.screens.rename.action'), icon: 'i-lucide-pencil', lesser: true, onSelect: openRename })
+  if (state === 'closed' && v.canApprove) out.push({ label: t('budgets.screens.reopen.action'), icon: 'i-lucide-lock-open', lesser: true, onSelect: () => { noting.value = 'reopen' } })
+  if (state !== 'closed' && v.canManage) out.push({ label: t('budgets.screens.rename.action'), icon: 'i-lucide-pencil', lesser: true, onSelect: () => { renaming.value = true } })
   return out
 })
 </script>
@@ -302,150 +238,35 @@ const pageActions = computed(() => {
         />
         <FactStrip :facts="facts" />
 
-        <PageSection :title="t('budgets.screens.budget.spending')">
-          <template
-            v-if="editable"
-            #actions
-          >
-            <UButton
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-plus"
-              :label="t('budgets.screens.line.add-expense')"
-              @click="addLine('expense')"
-            />
-          </template>
-          <p
-            v-if="!expenses.length"
-            class="text-muted"
-          >
-            {{ t('budgets.screens.budget.no-spending') }}
-          </p>
-          <SortableList
-            v-else-if="editable"
-            :label="t('budgets.screens.budget.spending')"
-            @reorder="reorder('expense', $event)"
-          >
-            <SortableRow
-              v-for="(l, position) in expenses"
-              :id="l.id"
-              :key="l.id"
-              :index="position"
-              :name="l.name"
-              :description="describe(l)"
-            >
-              <template #leading>
-                <IconButton
-                  :data-drag-handle="l.id"
-                  icon="i-lucide-grip-vertical"
-                  size="sm"
-                  class="cursor-grab touch-none"
-                  :label="t('budgets.screens.line.handle', { name: l.name })"
-                  @keydown="onHandleKey($event, l)"
-                />
-              </template>
-              <template #below>
-                <UProgress
-                  :model-value="share(l)"
-                  :color="l.figures.over ? 'warning' : 'primary'"
-                  size="xs"
-                  class="mt-2 max-w-64"
-                  :aria-label="describe(l)"
-                />
-              </template>
-              <RowActions
-                :items="lineActions(l)"
-                :label="t('budgets.screens.line.actions', { name: l.name })"
-              />
-            </SortableRow>
-          </SortableList>
-          <RecordList
-            v-else
-            :label="t('budgets.screens.budget.spending')"
-          >
-            <RecordListItem
-              v-for="l in expenses"
-              :key="l.id"
-              :name="l.name"
-              :description="describe(l)"
-            >
-              <template #below>
-                <UProgress
-                  :model-value="share(l)"
-                  :color="l.figures.over ? 'warning' : 'primary'"
-                  size="xs"
-                  class="mt-2 max-w-64"
-                  :aria-label="describe(l)"
-                />
-              </template>
-            </RecordListItem>
-          </RecordList>
-        </PageSection>
-
-        <PageSection
+        <BudgetsLineSection
+          :lines="expenses"
+          :title="t('budgets.screens.budget.spending')"
+          :empty="t('budgets.screens.budget.no-spending')"
+          :add-label="t('budgets.screens.line.add-expense')"
+          :editable="editable"
+          bars
+          :describe="describe"
+          :share="share"
+          :actions="lineActions"
+          @add="addLine('expense')"
+          @reorder="reorder('expense', $event)"
+          @move="move"
+        />
+        <BudgetsLineSection
           v-if="incomes.length || editable"
+          :lines="incomes"
           :title="t('budgets.screens.budget.income')"
           :description="t('budgets.screens.budget.income-help')"
-        >
-          <template
-            v-if="editable"
-            #actions
-          >
-            <UButton
-              color="neutral"
-              variant="outline"
-              icon="i-lucide-plus"
-              :label="t('budgets.screens.line.add-income')"
-              @click="addLine('income')"
-            />
-          </template>
-          <p
-            v-if="!incomes.length"
-            class="text-muted"
-          >
-            {{ t('budgets.screens.budget.no-income') }}
-          </p>
-          <SortableList
-            v-else-if="editable"
-            :label="t('budgets.screens.budget.income')"
-            @reorder="reorder('income', $event)"
-          >
-            <SortableRow
-              v-for="(l, position) in incomes"
-              :id="l.id"
-              :key="l.id"
-              :index="position"
-              :name="l.name"
-              :description="describe(l)"
-            >
-              <template #leading>
-                <IconButton
-                  :data-drag-handle="l.id"
-                  icon="i-lucide-grip-vertical"
-                  size="sm"
-                  class="cursor-grab touch-none"
-                  :label="t('budgets.screens.line.handle', { name: l.name })"
-                  @keydown="onHandleKey($event, l)"
-                />
-              </template>
-              <RowActions
-                :items="lineActions(l)"
-                :label="t('budgets.screens.line.actions', { name: l.name })"
-              />
-            </SortableRow>
-          </SortableList>
-          <RecordList
-            v-else
-            :label="t('budgets.screens.budget.income')"
-          >
-            <RecordListItem
-              v-for="l in incomes"
-              :key="l.id"
-              :name="l.name"
-              :description="describe(l)"
-            />
-          </RecordList>
-        </PageSection>
+          :empty="t('budgets.screens.budget.no-income')"
+          :add-label="t('budgets.screens.line.add-income')"
+          :editable="editable"
+          :describe="describe"
+          :share="share"
+          :actions="lineActions"
+          @add="addLine('income')"
+          @reorder="reorder('income', $event)"
+          @move="move"
+        />
 
         <CollapsibleDivider
           v-model:open="showArchived"
@@ -521,139 +342,24 @@ const pageActions = computed(() => {
       @saved="reload()"
     />
 
-    <UModal
-      :open="!!revising"
-      :title="t('budgets.screens.revise.title')"
-      :description="revising ? t('budgets.screens.revise.help', { name: revising.name }) : undefined"
-      @update:open="(v: boolean) => { if (!v) revising = null }"
-    >
-      <template #body>
-        <UForm
-          id="budgets-revise"
-          ref="reviseEl"
-          :state="revise"
-          :validate="() => needs({ amountMinor: revise.amountMinor, reason: revise.reason, confirm: belowSpent ? revise.confirm : true })"
-          class="space-y-4"
-          novalidate
-          @submit="saveRevise"
-        >
-          <RefusalNotice :refusal="reviseRefusal" />
-          <UFormField
-            name="amountMinor"
-            :label="t('budgets.screens.revise.amount')"
-            required
-          >
-            <FieldMoney
-              v-model="revise.amountMinor"
-              :currency="b?.currency"
-            />
-          </UFormField>
-          <UFormField
-            name="reason"
-            :label="t('budgets.screens.revise.reason')"
-            required
-          >
-            <UInput
-              v-model="revise.reason"
-              maxlength="200"
-            />
-          </UFormField>
-          <UFormField
-            v-if="belowSpent"
-            name="confirm"
-          >
-            <UCheckbox
-              v-model="revise.confirm"
-              :label="t('budgets.screens.revise.confirm', { amount: money(Number(reviseRefusal?.detail?.floorMinor ?? 0)) })"
-            />
-          </UFormField>
-        </UForm>
-      </template>
-      <template #footer>
-        <UButton
-          type="submit"
-          form="budgets-revise"
-          :loading="reviseEl?.loading"
-          :label="t('budgets.screens.revise.save')"
-        />
-      </template>
-    </UModal>
-
-    <UModal
-      :open="!!noting"
-      :title="noting ? t(`budgets.screens.${noting}.title`) : undefined"
-      :description="noting ? t(`budgets.screens.${noting}.help`) : undefined"
-      @update:open="(v: boolean) => { if (!v) noting = null }"
-    >
-      <template #body>
-        <UForm
-          id="budgets-note"
-          ref="noteEl"
-          :state="{ note }"
-          :validate="() => needs({ note })"
-          class="space-y-4"
-          novalidate
-          @submit="saveNote"
-        >
-          <RefusalNotice :refusal="noteRefusal" />
-          <UFormField
-            name="note"
-            :label="t('budgets.screens.note')"
-            required
-          >
-            <UTextarea
-              v-model="note"
-              :rows="3"
-              maxlength="300"
-            />
-          </UFormField>
-        </UForm>
-      </template>
-      <template #footer>
-        <UButton
-          type="submit"
-          form="budgets-note"
-          :loading="noteEl?.loading"
-          :label="noting ? t(`budgets.screens.${noting}.action`) : ''"
-        />
-      </template>
-    </UModal>
-
-    <UModal
+    <BudgetsReviseDialog
+      :line="revising ? { id: revising.id, name: revising.name, budgetedMinor: revising.figures.budgetedMinor } : null"
+      :currency="b?.currency ?? 'GBP'"
+      @close="revising = null"
+      @revised="revised"
+    />
+    <BudgetsNoteDialog
+      v-if="b"
+      v-model:kind="noting"
+      :budget-id="b.id"
+      @done="noted"
+    />
+    <BudgetsRenameDialog
+      v-if="b"
       v-model:open="renaming"
-      :title="t('budgets.screens.rename.action')"
-    >
-      <template #body>
-        <UForm
-          id="budgets-rename"
-          ref="renameEl"
-          :state="{ name: rename }"
-          :validate="() => needs({ name: rename })"
-          class="space-y-4"
-          novalidate
-          @submit="saveRename"
-        >
-          <RefusalNotice :refusal="renameRefusal" />
-          <UFormField
-            name="name"
-            :label="t('budgets.screens.new.name')"
-            required
-          >
-            <UInput
-              v-model="rename"
-              maxlength="80"
-            />
-          </UFormField>
-        </UForm>
-      </template>
-      <template #footer>
-        <UButton
-          type="submit"
-          form="budgets-rename"
-          :loading="renameEl?.loading"
-          :label="t('budgets.screens.line.save')"
-        />
-      </template>
-    </UModal>
+      :budget-id="b.id"
+      :name="b.name"
+      @renamed="reload()"
+    />
   </PageFrame>
 </template>
