@@ -6,6 +6,7 @@ import { queryCollection } from '@nuxt/content/server'
 import { runInContext } from '#kit/context'
 import { isEnabled, siteOrigin, useSetting } from '#kit'
 import { publicProgrammePaths } from '#modules/core'
+import { productionBase } from '../shape'
 
 const escape = (text: string) => text.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
 
@@ -25,7 +26,7 @@ export default defineEventHandler(async (event) => {
       '/whats-on',
       '/venues',
       ...(pastVisible ? ['/shows'] : []),
-      ...await publicProgrammePaths({ pastVisible }),
+      ...await publicProgrammePaths({ pastVisible, productionBase: await productionBase() }),
     ])]
     const origin = await siteOrigin()
     setResponseHeaders(event, { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'public, max-age=3600' }) // not-policy: an hour's caching for crawlers

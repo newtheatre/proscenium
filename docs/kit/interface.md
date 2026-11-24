@@ -643,6 +643,32 @@ office's "Tickets held 8:41" while a basket is held. It names a global component
 nothing when it has nothing to say. On a phone, while such an item shows a link, it takes the place of
 the signed-out Sign in icon, which the menu repeats.
 
+## What other modules add to the public site
+
+Public-site declares five points for a module that adds to, or reshapes, the public site (spec 15,
+C-69 to C-73), and core declares one for billing lines (C-75). Each is a code contribution, a file
+under the module's `server/contributions/<point>/`, typed by the contract in the owner's
+`server/points/`. A contributor that throws counts as not applying, so the theatre's own site always shows.
+
+| Point | Contract | What it does |
+| --- | --- | --- |
+| `public-site.production-section` | `{ component, order?, appliesTo(productionId) }` | A block after the credits on a show's page. |
+| `public-site.venue-section` | `{ component, order?, appliesTo(venueId) }` | A block at the end of a venue's page. |
+| `public-site.front-page` | `{ component, appliesWhen() }` | Draws `/` in place of the theatre's `index.md`. The first applying contributor wins. |
+| `public-site.menu` | `{ order?, entries(), footer(), appliesWhen() }` | Menu and footer entries `{ labelKey, to, order? }`, placed before the theatre's own. |
+| `public-site.production-address` | `{ base, appliesWhen() }` | Show pages live at `/<base>/<slug>`; `/whats-on` and `/shows` redirect there (302). |
+| `core.public-lines` | `{ read(productionId) }` returning `{ text, placement, order? }[]` | Plain billing lines under the title, in the credits or at the foot of a show's page, cut to 200 characters. |
+
+A section's component lives in the module's `app/public-sections/` folder, which is registered
+globally; it receives `productionId` or `venueId` and fetches its own public data. The front page's
+component is any global component. A module that moves show pages owns the page at its base, which
+renders `<PublicSiteProduction :slug prefix="<base>" />`; the canonical link and the sitemap follow
+the base, while emails and other links rely on the redirect. More than one applying contributor for
+the front page or the address gives a health warning; the first in manifest order is used.
+
+The public-site plugin reads `/api/public-site/shape` once, before the first page with the default
+layout, into core's `usePublicShape()`, which `layouts/default.vue` and the catch-all page read.
+
 ## Seams for Identity
 
 Until Identity lands, `layers/core/server/interface/viewer.ts` describes the viewer from the

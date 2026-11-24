@@ -109,9 +109,13 @@ export const requests = defineTable('availability_requests', {
   toDate: col.localDate('to_date').notNull(),
   dueOn: col.localDate('due_on').notNull(),
   groupRefs: col.internal(text('group_refs', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`)),
+  // People named beside the groups, so the daily task never withdraws them as leavers (R6).
+  accountRefs: col.internal(text('account_refs', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`)),
   sourceRef: col.internal(text('source_ref')),
   openedBy: col.account('opened_by', { role: 'actor' }),
   state: col.internal(text('state', { enum: REQUEST_STATES }).notNull().default('open')),
+  // "Remind now" goes at most once a day (S11).
+  remindedAt: col.timestamp('reminded_at'),
   closedAt: col.timestamp('closed_at'),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),

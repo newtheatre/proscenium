@@ -14,7 +14,10 @@ const emit = defineEmits<{ save: [choice: Choice] }>()
 const { t } = useT()
 
 const state = reactive({ use: 'inherit' as Choice['use'], layoutId: undefined as string | undefined, wheelchairSpaces: 2, seatsPerSpace: 2, seatsBandId: undefined as string | undefined })
-watch(() => props.current, (c) => {
+// Reset only when the saved choice itself changes: a parent's reload hands over an equal new
+// object, which must not undo a choice being made.
+watch(() => JSON.stringify(props.current), () => {
+  const c = props.current
   state.use = c.use
   state.layoutId = c.use === 'layout' ? c.layoutId : undefined
   if (c.use === 'numbers') Object.assign(state, { wheelchairSpaces: c.wheelchairSpaces, seatsPerSpace: c.seatsPerSpace, seatsBandId: c.seatsBandId ?? undefined })

@@ -15,6 +15,8 @@ export type { BookingAction, BookingAnswer, BookingState, BookingSubject, PriceS
 export { bookingActions, priceSummaries } from './programme/booking'
 export type { BookingTarget, ShownBooking } from './programme/booking'
 export { publicProduction, currentProductions, whatsOnFilters } from './programme/public'
+export { productionPublicLines } from './programme/public-lines'
+export type { ProductionPublicLines, PublicLine } from './points/public-lines'
 export { pastProductions } from './programme/archive'
 export { publicVenue, publicVenues, publicSeason } from './programme/public-places'
 export { publicProgrammePaths } from './programme/sitemap'

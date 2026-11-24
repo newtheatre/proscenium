@@ -35,6 +35,18 @@ What the build settled that the parts above leave open, and where it differs fro
 - **Copy to other days.** A shift not tied to a performance copies to other nights at the same local times, as drafts outside any batch. A performance's shift refuses `front-of-house.copy.performance`.
 - **Not done.** The Availability soft use (maybe, busy, unknown in the grid and the assign dialog) waits for Availability's first release: no `availability.levels` exists yet.
 
+## C-69, C-71 to C-73, C-75: what other modules add to the public site
+
+- **Where it lives.** Contracts in `layers/public-site/server/points/` and `layers/core/server/points/public-lines.ts`; reading them in `layers/public-site/server/shape.ts` and `layers/core/server/programme/public-lines.ts`. `docs/kit/interface.md` ("What other modules add to the public site") is the guide for a contributor.
+- **Name.** The spec's `core.production.public-lines` became `core.public-lines`, because a point is `<module>.<noun>`.
+- **Failing contributors.** A contributor that throws counts as not applying (and a menu that throws adds nothing), so the theatre's own site always shows.
+- **Shape.** `/api/public-site/shape` answers `{ frontPage, menu, footer, productionBase }`. The public-site plugin reads it once, before the first page with the default layout, into core's `usePublicShape()`; the layout puts the menu and footer entries before the theatre's own, and the catch-all page draws the front page's component at `/`.
+- **Address (C-73).** While a contributor applies, the show page answers `base`; `PublicSiteProduction` redirects `/whats-on` and `/shows` there (302), and the canonical link, event data and the sitemap use it. The contributor owns the page at its base. Emails and in-app links still name `/whats-on` and `/shows` and rely on the redirect, since core cannot read a public-site point.
+- **Health.** More than one applying contributor for the front page or the address gives a warning on the health page; the first in manifest order is used.
+- **Lines (C-75).** Trimmed, cut to 200 characters, empty ones dropped, ordered; drawn as plain text under the title, at the end of the credits (which then shows even with no credits) or at the foot of the page.
+- **Not done.** Dropping a menu entry that points at a switched-off module's page is left to the contributor, which only applies while its own module is on.
+- **Tests.** `layers/public-site/tests/integration/site-shape.test.ts`, through the `festive` fixture module.
+
 ## FB-514: moves the system makes
 
 - **Where it lives.** `systemMove` in `layers/forms/shared/engine/evaluate.ts`; `followSystemMoves` and `arrive` in `layers/forms/server/stages.ts`, called after a submission (the public route and `addResponse`), a staff move and a resubmission. Checks in `shared/engine/checks.ts`. `docs/specs/form-builder/14-changes-2026-11-24.md` rows 12 to 17 record what was built.

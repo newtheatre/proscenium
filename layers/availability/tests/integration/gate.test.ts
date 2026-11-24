@@ -7,6 +7,7 @@ import { call, inContext, person, rows, server, setModule } from '../../../../te
 import { crews } from '../../../../tests/fixtures/modules/crews/server/contributions/availability.group/crews'
 import me from '../../server/api/availability/me.get'
 import newPattern from '../../server/api/availability/patterns/index.post'
+import listPatterns from '../../server/api/availability/patterns/index.get'
 import putPattern from '../../server/api/availability/patterns/[id].put'
 import newException from '../../server/api/availability/exceptions/index.post'
 import dropException from '../../server/api/availability/exceptions/[id].delete'
@@ -19,6 +20,7 @@ import { closeRequest, openRequest, requestStatus, sweepRequests } from '../../s
 const app = server({
   'GET /api/availability/me': me,
   'POST /api/availability/patterns': newPattern,
+  'GET /api/availability/patterns': listPatterns,
   'PUT /api/availability/patterns/:id': putPattern,
   'POST /api/availability/exceptions': newException,
   'DELETE /api/availability/exceptions/:id': dropException,
@@ -244,5 +246,16 @@ describe('requests (R1 to R7)', () => {
     setClock(Date.UTC(2026, 11, 6, 9))
     await attempt(unit => sweepRequests(unit))
     expect(await rows('SELECT state FROM availability_requests WHERE id = ?', id)).toEqual([{ state: 'closed' }])
+  })
+})
+
+describe('my patterns (S2)', () => {
+  it('lists my patterns, newest first, with their lines, and none of anyone else\'s', async () => {
+    const sam = person([])
+    await req(sam, 'POST', '/api/availability/patterns', { ...tuesdayEvenings, endsOn: '2027-03-31' })
+    await req(sam, 'POST', '/api/availability/patterns', { ...tuesdayEvenings, label: 'Summer', startsOn: '2027-04-01', lines: [] })
+    await req(person([]), 'POST', '/api/availability/patterns', tuesdayEvenings)
+    const mine = await req(sam, 'GET', '/api/availability/patterns')
+    expect(mine.body.patterns.map((p: any) => [p.label, p.lines.length])).toEqual([['Summer', 0], ['Term', 1]])
   })
 })

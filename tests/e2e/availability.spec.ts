@@ -1,5 +1,5 @@
-// My availability (AV-04) in a real browser: drag down a day to paint it, tap where a stretch starts
-// and ends with the keyboard, paint a whole day from its heading, and add a change for some dates.
+// My availability (AV-04) in a real browser: painting by drag, keyboard and heading, a change for some
+// dates, weekly patterns, and a request answered by the member and followed by its organiser.
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { test, expect, type Page } from '@playwright/test'
@@ -7,6 +7,7 @@ import AxeBuilder from '@axe-core/playwright'
 
 const owner = { kind: 'person', accountId: 'acc_e2eowner', name: 'Browser Tests', assurance: 'strong', reassertedAt: Date.now(), grants: ['core.modules.manage', 'core.settings.manage'].map(ability => ({ ability, via: 'test' })) }
 const member = { kind: 'person', accountId: `acc_avail${Date.now() % 1_000_000}`, name: 'Ada Available', assurance: 'strong', reassertedAt: Date.now(), grants: [] }
+const organiser = { kind: 'person', accountId: `acc_organ${Date.now() % 1_000_000}`, name: 'Olly Organiser', assurance: 'strong', reassertedAt: Date.now(), grants: ['availability.request.send', 'availability.find.anyone'].map(ability => ({ ability, via: 'test' })) }
 const output = fileURLToPath(new URL('../../.output', import.meta.url))
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 // A Monday three to four weeks ahead, so every day in view can be painted.
@@ -26,13 +27,15 @@ const cell = (page: Page, day: string, from: string) => page.getByRole('gridcell
 test.describe.configure({ mode: 'serial' })
 
 test.beforeAll(async ({ playwright }) => {
-  // A member: an account holding a role that opens the members' area, written as the Admin screens would.
+  // A member and an organiser: accounts holding a role that opens the members' area, written as the Admin screens would.
   const id = member.accountId.slice(4)
   const at = Date.now() - 60_000
   const sql = [
     `INSERT INTO core_accounts (id, name, origin, created_at, first_signed_in_at) VALUES ('${member.accountId}', '${member.name}', 'self', ${at}, ${at})`,
     `INSERT INTO core_roles (id, key, name, fixed, opens_members_area, needs_managed_identity, expiry_rule, created_at) VALUES ('rol_${id}', 'avail-${id}', 'Availability tests', 0, 1, 0, 'none', ${at})`,
     `INSERT INTO core_grants (id, account_id, role_id, scope, starts_at, granted_by, granted_at) VALUES ('grt_${id}', '${member.accountId}', 'rol_${id}', 'site', ${at}, 'acc_e2eowner', ${at})`,
+    `INSERT INTO core_accounts (id, name, origin, created_at, first_signed_in_at) VALUES ('${organiser.accountId}', '${organiser.name}', 'self', ${at}, ${at})`,
+    `INSERT INTO core_grants (id, account_id, role_id, scope, starts_at, granted_by, granted_at) VALUES ('grt_o${id}', '${organiser.accountId}', 'rol_${id}', 'site', ${at}, 'acc_e2eowner', ${at})`,
   ].join('; ')
   execFileSync('bunx', ['wrangler', 'd1', 'execute', 'DB', '--local', '--persist-to', '../.wrangler/e2e', '--config', 'server/wrangler.json', '--command', sql], { cwd: output, stdio: 'pipe' })
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(owner) })
@@ -81,7 +84,6 @@ test.describe('a member', () => {
     await expect(cell(page, 'Thu', '12:00')).toHaveAccessibleName(/Free$/)
     await page.getByRole('tab', { name: 'Clear' }).click()
     await cell(page, 'Thu', '12:00').click()
-    await cell(page, 'Thu', '12:00').click()
     await expect(cell(page, 'Thu', '12:00')).toHaveAccessibleName(/Not known$/)
     await expect(cell(page, 'Thu', '12:30')).toHaveAccessibleName(/Free$/)
   })
@@ -96,5 +98,83 @@ test.describe('a member', () => {
     await panel.getByRole('button', { name: 'Save change' }).click()
     await expect(page.getByText('Change saved', { exact: true })).toBeVisible()
     await expect(page.getByRole('list').filter({ hasText: 'Exams' })).toContainText('Reason shared')
+  })
+})
+
+test.describe('a member with a weekly pattern', () => {
+  test.use(as(member))
+
+  test('makes a pattern, paints its week, and is asked once what a stroke on a pattern day changes', async ({ page }) => {
+    await visit(page, '/members/availability/patterns')
+    await page.getByRole('button', { name: 'New pattern' }).first().click()
+    const panel = page.getByRole('dialog', { name: 'New pattern' })
+    await panel.getByRole('textbox', { name: 'Name' }).fill('Spring term')
+    await panel.getByRole('button', { name: 'Create pattern' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Spring term' })).toBeVisible()
+    await page.getByRole('tab', { name: 'Busy' }).click()
+    await cell(page, 'Tuesday', '18:00').hover()
+    await page.mouse.down()
+    await cell(page, 'Tuesday', '19:30').hover()
+    await page.mouse.up()
+    await expect(cell(page, 'Tuesday', '19:00')).toHaveAccessibleName(/Busy$/)
+    await noViolations(page)
+    await page.getByRole('button', { name: 'Save pattern' }).click()
+    await expect(page.getByText('Pattern saved', { exact: true })).toBeVisible()
+
+    await visit(page, WEEK)
+    await expect(cell(page, 'Tue', '19:00')).toHaveAccessibleName(/Busy$/)
+    await page.getByRole('tab', { name: 'Free' }).click()
+    await cell(page, 'Tue', '19:00').click()
+    const ask = page.getByRole('dialog', { name: 'Just these days, or every week?' })
+    await ask.getByRole('button', { name: 'Just these days' }).click()
+    await expect(cell(page, 'Tue', '19:00')).toHaveAccessibleName(/Free$/)
+    await expect(cell(page, 'Tue', '18:30')).toHaveAccessibleName(/Busy$/)
+  })
+})
+
+test.describe('a request to check availability', () => {
+  let requestId = ''
+
+  test.beforeAll(async ({ playwright }) => {
+    const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(organiser) })
+    const made = await api.post('/api/availability/requests', {
+      headers: { 'idempotency-key': `e2e-${Date.now()}` },
+      data: { title: 'Spring rehearsals', message: 'Please mark your exams.', groupIds: [], accountIds: [member.accountId], from: monday, to: monday, dueOn: monday },
+    })
+    expect(made.status(), await made.text()).toBe(200)
+    requestId = (await made.json()).requestId
+    await api.dispose()
+  })
+
+  test.describe('the member asked', () => {
+    test.use(as(member))
+
+    test('finds it under Asked of me, reads the message, and answers it', async ({ page }) => {
+      await visit(page, '/members/availability/requests')
+      await page.getByRole('link', { name: /Spring rehearsals/ }).click()
+      await expect(page.getByRole('heading', { level: 1, name: 'Spring rehearsals' })).toBeVisible()
+      await expect(page.getByText('Please mark your exams.')).toBeVisible()
+      await expect(cell(page, 'Mon', '12:00')).toBeVisible()
+      await noViolations(page)
+      await page.getByRole('button', { name: 'This is right' }).click()
+      await expect(page.getByText('Answered', { exact: true }).first()).toBeVisible()
+    })
+  })
+
+  test.describe('its organiser', () => {
+    test.use(as(organiser))
+
+    test('sees who has answered and can stop asking someone', async ({ page }) => {
+      await visit(page, '/members/find-a-time/requests')
+      await expect(page.getByRole('link', { name: /Spring rehearsals/ }).first()).toContainText('1 of 1 answered')
+      await visit(page, `/members/find-a-time/requests/${requestId}`)
+      const people = page.getByRole('list').filter({ hasText: member.name })
+      await expect(people).toContainText('Answered')
+      await noViolations(page)
+      await page.getByRole('button', { name: `Actions for ${member.name}` }).click()
+      await page.getByRole('menuitem', { name: 'Stop asking' }).click()
+      await page.getByRole('dialog').getByRole('button', { name: 'Stop asking' }).click()
+      await expect(people).toContainText('No longer asked')
+    })
   })
 })
