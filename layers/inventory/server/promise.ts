@@ -36,7 +36,7 @@ export function heldSql(itemId: SQL | string, w: Window, e: Except, at = nowMs()
  * (L2), not proposed for disposal (D1), and not overdue on a blocking inspection before the window
  * starts (N7).
  */
-export function usableSql(itemId: SQL | string, departmentId: string, w: Window): SQL {
+export function usableSql(itemId: SQL | string, departmentId: SQL | string, w: Window): SQL {
   return sql`EXISTS (SELECT 1 FROM inventory_items i JOIN inventory_categories c ON c.id = i.category_id
       WHERE i.id = ${itemId} AND i.state = 'active' AND i.lendable = 1 AND c.department_id = ${departmentId})
     AND NOT EXISTS (SELECT 1 FROM inventory_disposals d WHERE d.item_id = ${itemId} AND d.state IN ('proposed', 'approved'))

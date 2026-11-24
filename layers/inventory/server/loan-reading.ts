@@ -6,15 +6,15 @@ import { windowFor } from './loans'
 import { whyNotFree } from './promise'
 
 // The borrower in words: the production, the member's name, or the outside borrower's.
-const LOAN_SELECT = `SELECT o.id, o.kind, o.state, o.department_id, d.name AS department, o.starts_at, o.due_back_on, o.due_back_at,
+export const LOAN_SELECT = `SELECT o.id, o.kind, o.state, o.department_id, d.name AS department, o.starts_at, o.due_back_on, o.due_back_at,
     coalesce(p.title, CASE WHEN a.anonymised_at IS NULL THEN a.name END, o.borrower_name, '') AS borrower,
     (SELECT count(*) FROM inventory_loan_lines l WHERE l.loan_id = o.id AND l.state <> 'cancelled' AND l.with_line_id IS NULL) AS lines
   FROM inventory_loans o JOIN inventory_departments d ON d.id = o.department_id
   LEFT JOIN core_productions p ON p.id = o.production_id LEFT JOIN core_accounts a ON a.id = o.responsible_account_id`
 
-interface Row { id: string, kind: LoanRow['kind'], state: LoanRow['state'], department_id: string, department: string, starts_at: number, due_back_on: string, due_back_at: number, borrower: string, lines: number }
+export interface Row { id: string, kind: LoanRow['kind'], state: LoanRow['state'], department_id: string, department: string, starts_at: number, due_back_on: string, due_back_at: number, borrower: string, lines: number }
 
-const toRow = (r: Row): LoanRow => ({
+export const toRow = (r: Row): LoanRow => ({
   id: r.id, kind: r.kind, state: r.state, departmentId: r.department_id, department: r.department, borrower: r.borrower,
   startsAt: r.starts_at, dueBackOn: r.due_back_on, dueBackAt: r.due_back_at, lines: r.lines,
 })
