@@ -22,6 +22,11 @@
       "count": 1
     }
   },
+  "layers/availability/server/meetings.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
   "layers/availability/server/paint.ts": {
     "max-params": {
       "count": 1
