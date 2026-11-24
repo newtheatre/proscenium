@@ -1,6 +1,6 @@
 // Rule G1: adds a company; a name already used by an unarchived company refuses, naming it.
 import { defineRoute } from '#kit'
-import { companyInput, createCompany } from '../../contacts'
+import { companyInput, createCompany } from '../../companies'
 
 export default defineRoute({
   ability: 'companies.company.manage',

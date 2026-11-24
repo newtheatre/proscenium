@@ -1,7 +1,7 @@
 // Rules E1 and E6: opens an engagement for the company, in enquiry.
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
-import { requireCompany } from '../../../contacts'
+import { requireCompany } from '../../../companies'
 import { engagementInput, openEngagement } from '../../../engagements'
 
 export default defineRoute({

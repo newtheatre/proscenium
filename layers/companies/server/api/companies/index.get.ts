@@ -1,8 +1,9 @@
-// The companies list (CO-01): unarchived companies by name, with how many live engagements each has.
-import { all, defineRoute } from '#kit'
+// The Companies list (part 5): every company, archived ones last, with its live engagements, the kinds
+// of engagement it has had, its primary contact and its last date.
+import { can, defineRoute } from '#kit'
+import { listCompanies } from '../../views'
 
-export default defineRoute({ ability: 'companies.company.view', rateLimit: 'default' }, async () => ({
-  companies: await all(`SELECT c.id, c.name, c.public_name AS publicName,
-    (SELECT count(*) FROM companies_engagements e WHERE e.company_id = c.id AND e.state NOT IN ('cancelled', 'settled')) AS live
-    FROM companies_companies c WHERE c.archived_at IS NULL ORDER BY c.name COLLATE NOCASE`),
+export default defineRoute({ ability: 'companies.company.view', rateLimit: 'default' }, async (_event, { actor }) => ({
+  companies: await listCompanies(),
+  canManage: (await can(actor, 'companies.company.manage')).allowed,
 }))

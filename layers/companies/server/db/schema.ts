@@ -17,6 +17,7 @@ const atMost = (name: string, c: unknown, n: number) => check(name, sql`${c} IS 
 export const companies = defineTable('companies_companies', {
   id: col.id(),
   name: col.perRow(text('name').notNull(), { classColumn: 'data_class' }),
+  nameKey: col.perRow(text('name_key').notNull().default(''), { classColumn: 'data_class' }),
   publicName: col.perRow(text('public_name'), { classColumn: 'data_class' }),
   legalName: col.perRow(text('legal_name'), { classColumn: 'data_class' }),
   registration: col.internal(text('registration')),
@@ -41,6 +42,7 @@ export const companies = defineTable('companies_companies', {
   subject: { account: 'individual_account_id', unlinked: 'staff' },
   extra: t => [
     uniqueIndex('companies_companies_name').on(sql`lower(${t.name})`).where(sql`archived_at IS NULL`),
+    index('companies_companies_name_key').on(t.nameKey),
     check('companies_companies_name_length', sql`length(${t.name}) BETWEEN 1 AND 160`),
     atMost('companies_companies_public_name', t.publicName, 160),
     atMost('companies_companies_legal_name', t.legalName, 200),

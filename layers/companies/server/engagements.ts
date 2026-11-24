@@ -5,7 +5,7 @@ import { first, newId, nowMs, refuse, useSetting } from '#kit'
 import type { Actor, UnitOfWork } from '#kit'
 import { ENGAGEMENT_KINDS, LIMITS, MOVES } from '../shared/companies'
 import type { EngagementKind, EngagementState, Move } from '../shared/companies'
-import type { Company } from './contacts'
+import type { Company } from './companies'
 
 export interface Engagement {
   id: string

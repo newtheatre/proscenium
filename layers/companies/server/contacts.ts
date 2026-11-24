@@ -1,71 +1,83 @@
-// Companies and contacts (spec part 3, rules G1, G4): adding a company, adding and ending the people
-// who act for it, and which company a record belongs to, for the fact `companies.contact-of`.
+// Contacts (spec part 3, rules G2 and G4): adding and ending the people who act for a company, and
+// which company a record belongs to, for the fact `companies.contact-of`.
 import { z } from 'zod'
 import { sql } from 'drizzle-orm'
 import { all, first, inAccountScope, newId, nowMs, refuse, useDb } from '#kit'
 import type { Actor, UnitOfWork } from '#kit'
+import { findOrCreateAccount } from '#modules/core'
 import { LIMITS, RECEIVES } from '../shared/companies'
+import type { Company } from './companies'
 
-export interface Company { id: string, name: string, publicName: string | null, archivedAt: number | null }
+export type { Company } from './companies'
+
 export interface Contact { id: string, companyId: string, accountId: string, isPrimary: boolean, endedAt: number | null }
 
 const LIVE_ENGAGEMENT = 'state NOT IN (\'cancelled\', \'settled\')'
 
-export const companyInput = z.object({
-  name: z.string().trim().min(1).max(LIMITS.name),
-  publicName: z.string().trim().min(1).max(LIMITS.name).optional(),
-  legalName: z.string().trim().min(1).max(LIMITS.legalName).optional(),
-  website: z.string().trim().max(LIMITS.website).startsWith('https://').optional(),
-  description: z.string().trim().max(LIMITS.description).optional(),
-})
-
+/** Rule G2: someone already found by account, or an email address (with their name) that finds or makes one. */
 export const contactInput = z.object({
-  accountId: z.string().min(1),
+  accountId: z.string().min(1).optional(),
+  email: z.email().max(LIMITS.email).optional(),
+  name: z.string().trim().min(1).max(LIMITS.personName).optional(),
   role: z.string().trim().max(LIMITS.role).optional(),
   primary: z.boolean().optional(),
   receives: z.array(z.enum(RECEIVES)).default([...RECEIVES]),
   dayPhone: z.string().trim().max(LIMITS.phone).optional(),
-})
+}).refine(c => !!c.accountId !== !!c.email, { path: ['email'], message: 'Give an email address.' })
 
 export const endInput = z.object({ primaryId: z.string().optional() })
 
-export async function requireCompany(id: string): Promise<Company> {
-  const company = await first<Company>('SELECT id, name, public_name AS publicName, archived_at AS archivedAt FROM companies_companies WHERE id = ?', id)
-  if (!company) refuse('core.not-found', 'There is no such company.', { status: 404 })
-  return company!
-}
-
-/** Rule G1: a name unique among unarchived companies, ignoring case. */
-export async function createCompany(unit: UnitOfWork, actor: Actor, input: z.infer<typeof companyInput>): Promise<string> {
-  const id = newId('cpy')
-  const at = nowMs()
-  const taken = await first<{ name: string }>('SELECT name FROM companies_companies WHERE lower(name) = lower(?) AND archived_at IS NULL', input.name)
-  if (taken) refuse('companies.company.name-taken', `There is already a company called ${taken.name}.`, { status: 409, remedy: 'Open that company, or give this one a different name.' })
-  unit.add({
-    sql: `INSERT INTO companies_companies (id, name, public_name, legal_name, website, description, individual, data_class, created_at, updated_at)
-          SELECT ?, ?, ?, ?, ?, ?, 0, 'public', ?, ? WHERE NOT EXISTS (SELECT 1 FROM companies_companies WHERE lower(name) = lower(?) AND archived_at IS NULL)`,
-    params: [id, input.name, input.publicName ?? null, input.legalName ?? null, input.website ?? null, input.description ?? null, at, at, input.name],
-  }).expect(1, { code: 'companies.company.name-taken', reason: 'Someone added a company with this name just now.', remedy: 'Open that company, or give this one a different name.' })
-  unit.audit({ action: 'create', record: ['companies.company', id], detail: { by: actor.accountId ?? null } })
-  return id
-}
+export const contactChangeInput = z.object({
+  role: z.string().trim().max(LIMITS.role).transform(v => v || null).nullable().optional(),
+  primary: z.literal(true).optional(),
+  receives: z.array(z.enum(RECEIVES)).optional(),
+  dayPhone: z.string().trim().max(LIMITS.phone).transform(v => v || null).nullable().optional(),
+})
 
 /** Adds a contact. The first live contact of a company is its primary unless another is named (G4). */
 export async function addContact(unit: UnitOfWork, actor: Actor, company: Company, input: z.infer<typeof contactInput>): Promise<string> {
   if (company.archivedAt !== null) refuse('companies.company.archived', 'This company is archived.', { status: 409, remedy: 'Restore it first.' })
-  if (!(await first('SELECT 1 FROM core_accounts WHERE id = ? AND anonymised_at IS NULL', input.accountId))) refuse('core.not-found', 'There is no such person.', { status: 404 })
+  const accountId = await contactAccount(unit, input)
   const id = newId('cpc')
   const at = nowMs()
   const primary = await first<{ id: string }>('SELECT id FROM companies_contacts WHERE company_id = ? AND ended_at IS NULL AND is_primary = 1', company.id)
   const isPrimary = input.primary ?? !primary
   if (isPrimary && primary) unit.add({ sql: 'UPDATE companies_contacts SET is_primary = 0, updated_at = ? WHERE id = ? AND is_primary = 1 AND ended_at IS NULL', params: [at, primary.id] }).expect(1, MOVED)
   unit.add(sql`INSERT INTO companies_contacts (id, company_id, account_id, role, is_primary, receives, day_phone, added_by, created_at, updated_at)
-    SELECT ${id}, ${company.id}, ${input.accountId}, ${input.role ?? null}, ${isPrimary ? 1 : 0}, ${JSON.stringify(input.receives)}, ${input.dayPhone ?? null}, ${actor.accountId ?? null}, ${at}, ${at}
-    WHERE NOT EXISTS (SELECT 1 FROM companies_contacts WHERE company_id = ${company.id} AND ended_at IS NULL AND ${inAccountScope('account_id', input.accountId)})`)
+    SELECT ${id}, ${company.id}, ${accountId}, ${input.role ?? null}, ${isPrimary ? 1 : 0}, ${JSON.stringify(input.receives)}, ${input.dayPhone ?? null}, ${actor.accountId ?? null}, ${at}, ${at}
+    WHERE NOT EXISTS (SELECT 1 FROM companies_contacts WHERE company_id = ${company.id} AND ended_at IS NULL AND ${inAccountScope('account_id', accountId)})`)
     .expect(1, { code: 'companies.contact.already', reason: 'This person is already a contact of this company.', remedy: 'Change their existing contact details instead.' })
   unit.audit({ action: 'create', record: ['companies.company', company.id], detail: { contactId: id, primary: isPrimary } })
   unit.announce('companies.contact.changed', { companyId: company.id, contactId: id }, { record: ['companies.company', company.id] })
   return id
+}
+
+/**
+ * Rule G2: the account a new contact is. An address finds the account that verified it, or the
+ * unclaimed one made with it, and otherwise makes an unclaimed account; it never joins an unverified address.
+ */
+async function contactAccount(unit: UnitOfWork, input: z.infer<typeof contactInput>): Promise<string> {
+  if (input.email) return (await findOrCreateAccount(unit, { address: input.email, name: input.name ?? null, origin: 'invite' })).accountId
+  if (!(await first('SELECT 1 FROM core_accounts WHERE id = ? AND anonymised_at IS NULL', input.accountId))) refuse('core.not-found', 'There is no such person.', { status: 404 })
+  return input.accountId!
+}
+
+/** Changes what a contact is called, is sent and whether they are the primary (G4: one at most, so the old one steps down in the same batch). */
+export function changeContact(unit: UnitOfWork, company: Company, contactId: string, input: z.infer<typeof contactChangeInput>): void {
+  const at = nowMs()
+  if (input.primary)
+    unit.add({ sql: 'UPDATE companies_contacts SET is_primary = 0, updated_at = ? WHERE company_id = ? AND ended_at IS NULL AND is_primary = 1 AND id <> ?', params: [at, company.id, contactId] })
+  const changes: [string, unknown][] = []
+  if (input.role !== undefined) changes.push(['role = ?', input.role])
+  if (input.receives !== undefined) changes.push(['receives = ?', JSON.stringify(input.receives)])
+  if (input.dayPhone !== undefined) changes.push(['day_phone = ?', input.dayPhone])
+  if (input.primary) changes.push(['is_primary = ?', 1])
+  const sets = changes.map(([set]) => set)
+  const params = changes.map(([, value]) => value)
+  unit.add({ sql: `UPDATE companies_contacts SET ${[...sets, 'updated_at = ?'].join(', ')} WHERE id = ? AND company_id = ? AND ended_at IS NULL`, params: [...params, at, contactId, company.id] })
+    .expect(1, { code: 'core.not-found', reason: 'There is no such contact.', remedy: 'Reload the page.' })
+  unit.audit({ action: 'update', record: ['companies.company', company.id], detail: { contactId, fields: Object.keys(input) } })
+  unit.announce('companies.contact.changed', { companyId: company.id, contactId }, { record: ['companies.company', company.id] })
 }
 
 const MOVED = { code: 'companies.contact.changed-elsewhere', reason: 'Someone changed this company\'s contacts just now.', remedy: 'Reload the page and try again.' }
