@@ -6,6 +6,8 @@ import { changeSetting, createUnit, newId, setClock } from '#kit'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 import { balances, ensureSystemAccounts, postEntries } from '../../../finance/server/services'
 import { ensureVocabularies, removeTermGroup } from '../../../core/server/vocabularies/service'
+import { ensureModuleDefaults } from '../../../core/server/identity/defaults'
+import { kitGrantsOf } from '../../../core/server/identity/grants'
 import seed from '../../server/listeners/categories'
 import budgetsGet from '../../server/api/budgets/budgets/index.get'
 import budgetsPost from '../../server/api/budgets/budgets/index.post'
@@ -25,6 +27,9 @@ import categoriesGet from '../../server/api/budgets/categories/index.get'
 import categoriesPost from '../../server/api/budgets/categories/index.post'
 import categoryPatch from '../../server/api/budgets/categories/[id].patch'
 import sourcesGet from '../../server/api/budgets/sources.get'
+import holdersPost from '../../server/api/budgets/budgets/[id]/holders.post'
+import holderDelete from '../../server/api/budgets/budgets/[id]/holders/[grantId].delete'
+import productionGet from '../../server/api/budgets/productions/[id].get'
 
 const handle = server({
   'GET /api/budgets/budgets': budgetsGet,
@@ -45,6 +50,9 @@ const handle = server({
   'POST /api/budgets/categories': categoriesPost,
   'PATCH /api/budgets/categories/:id': categoryPatch,
   'GET /api/budgets/sources': sourcesGet,
+  'POST /api/budgets/budgets/:id/holders': holdersPost,
+  'DELETE /api/budgets/budgets/:id/holders/:grantId': holderDelete,
+  'GET /api/budgets/productions/:id': productionGet,
 })
 
 const NOV_24 = Date.UTC(2026, 10, 24, 12)
@@ -120,6 +128,7 @@ beforeAll(async () => {
     await seed({ payload: { moduleId: 'budgets' } } as any, unit.view())
     await unit.commit()
     await ensureVocabularies('core')
+    await ensureModuleDefaults('budgets')
   })
 })
 
@@ -364,5 +373,91 @@ describe('closing (BC-13)', () => {
     expect(budgets.length).toBeGreaterThan(3)
     const states = budgets.map((b: { state: string }) => b.state)
     expect(states.indexOf('closed')).toBeGreaterThan(states.lastIndexOf('approved'))
+  })
+})
+
+/** A signed-in account in the database, with a role of these abilities at the whole site if any. */
+async function account(name: string, abilities: string[] = []): Promise<string> {
+  const id = newId('acc')
+  await env.DB.prepare("INSERT INTO core_accounts (id, name, origin, created_at, first_signed_in_at) VALUES (?, ?, 'invite', ?, ?)").bind(id, name, NOV_24, NOV_24).run()
+  if (abilities.length) {
+    const roleId = newId('rol')
+    await env.DB.prepare("INSERT INTO core_roles (id, key, name, fixed, opens_members_area, needs_managed_identity, expiry_rule, created_at) VALUES (?, ?, 'Test role', 0, 1, 0, 'none', ?)").bind(roleId, `role-${roleId.slice(-10)}`, NOV_24).run()
+    for (const a of abilities) await env.DB.prepare('INSERT INTO core_role_abilities (role_id, ability) VALUES (?, ?)').bind(roleId, a).run()
+    await env.DB.prepare("INSERT INTO core_grants (id, account_id, role_id, scope, starts_at, granted_by, granted_at) VALUES (?, ?, ?, 'site', ?, 'acc_testgranter', ?)").bind(newId('gra'), id, roleId, NOV_24 - 1000, NOV_24 - 1000).run()
+  }
+  return id
+}
+
+describe('holders (BC-14)', () => {
+  it('the preset role brings budget.hold, and a manager gives it on one budget only', async () => {
+    const preset = await rows<{ key: string, ability: string }>("SELECT r.key, a.ability FROM core_roles r JOIN core_role_abilities a ON a.role_id = r.id WHERE r.key = 'budget-holder' ORDER BY a.ability")
+    expect(preset.map(p => p.ability)).toEqual(['budgets.budget.hold', 'budgets.budget.view'])
+    const managerId = await account('Tess Treasurer', ['budgets.budget.manage', 'budgets.budget.hold'])
+    const manager = person(ALL, { accountId: managerId, reassertedAt: NOV_24 })
+    const headId = await account('Sam Setdesigner')
+    const { budgetId } = await approved()
+    const other = await approved()
+    const given = await ok('POST', `/api/budgets/budgets/${budgetId}/holders`, { accountId: headId }, manager)
+    const { holders } = await view(budgetId)
+    expect(holders).toMatchObject([{ id: given.grantId, accountId: headId, name: 'Sam Setdesigner', roleName: 'Budget holder' }])
+    expect((await view(other.budgetId)).holders).toEqual([])
+    const grants = await inContext(() => kitGrantsOf(headId))
+    expect(grants.filter(g => g.ability === 'budgets.budget.hold').map(g => g.record)).toEqual([{ type: 'budgets.budget', id: budgetId }])
+    const head = { ...person([], { accountId: headId, reassertedAt: NOV_24 }), grants }
+    expect((await ok('GET', `/api/budgets/budgets/${budgetId}`, undefined, head)).holds).toBe(true)
+    expect((await req('GET', `/api/budgets/budgets/${other.budgetId}`, undefined, head)).status).toBe(403)
+    expect((await view(budgetId)).holds).toBe(false)
+  })
+
+  it('refuses giving it to oneself, or by someone who does not hold it', async () => {
+    const managerId = await account('Moira Manager', ['budgets.budget.manage'])
+    const manager = person(ALL, { accountId: managerId, reassertedAt: NOV_24 })
+    const { budgetId } = await approved()
+    expect((await req('POST', `/api/budgets/budgets/${budgetId}/holders`, { accountId: managerId }, manager)).body.code).toBe('core.grant.self')
+    const refused = await req('POST', `/api/budgets/budgets/${budgetId}/holders`, { accountId: await account('Nat Noone') }, manager)
+    expect(refused.body.code).toBe('core.role.not-held')
+  })
+
+  it('ends a holder\'s grant on this budget, and not through another budget', async () => {
+    const managerId = await account('Una Undoer', ['budgets.budget.manage', 'budgets.budget.hold'])
+    const manager = person(ALL, { accountId: managerId, reassertedAt: NOV_24 })
+    const { budgetId } = await approved()
+    const other = await approved()
+    const { grantId } = await ok('POST', `/api/budgets/budgets/${budgetId}/holders`, { accountId: await account('Hal Holder') }, manager)
+    expect((await req('DELETE', `/api/budgets/budgets/${other.budgetId}/holders/${grantId}`, undefined, manager)).status).toBe(404)
+    await ok('DELETE', `/api/budgets/budgets/${budgetId}/holders/${grantId}`, undefined, manager)
+    expect((await view(budgetId)).holders).toEqual([])
+  })
+})
+
+describe('the production\'s Budget tab (BC-11) and the offer to close (BC-13)', () => {
+  it('shows the production\'s budget with its totals, or none', async () => {
+    const productionId = await production()
+    expect((await ok('GET', `/api/budgets/productions/${productionId}`)).budget).toBeNull()
+    const { budgetId } = await ok('POST', '/api/budgets/budgets', { scope: 'production', productionId })
+    await line(budgetId, { amountMinor: 25_000 })
+    const tab = await ok('GET', `/api/budgets/productions/${productionId}`)
+    expect(tab.budget.id).toBe(budgetId)
+    expect(tab.totals.budgetedMinor).toBe(25_000)
+    expect(tab.lines).toHaveLength(1)
+    expect(tab.closeDue).toBe(false)
+    expect(tab.canManage).toBe(true)
+  })
+
+  it('offers an approved budget for closing once its last performance is budgets.close.after ago', async () => {
+    const productionId = await production(Date.UTC(2026, 9, 1, 19))
+    await env.DB.prepare('UPDATE core_productions SET last_ends_at = ? WHERE id = ?').bind(Date.UTC(2026, 9, 3, 22), productionId).run()
+    const { budgetId } = await ok('POST', '/api/budgets/budgets', { scope: 'production', productionId })
+    await line(budgetId)
+    await ok('POST', `/api/budgets/budgets/${budgetId}/propose`, {})
+    await ok('POST', `/api/budgets/budgets/${budgetId}/approve`, {}, treasurer)
+    expect((await view(budgetId)).closeDue).toBe(false)
+    setClock(Date.UTC(2026, 11, 3, 12))
+    try {
+      expect((await view(budgetId)).closeDue).toBe(true)
+      expect((await ok('GET', `/api/budgets/productions/${productionId}`)).closeDue).toBe(true)
+    }
+    finally { setClock(NOV_24) }
   })
 })

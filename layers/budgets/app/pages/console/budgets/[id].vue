@@ -21,8 +21,11 @@ interface View {
   totals: Totals
   history: History[]
   subject: { label: string, to: string | null } | null
+  holders: { id: string, accountId: string, name: string, roleName: string, expiresAt: number | null }[]
+  closeDue: boolean
   canManage: boolean
   canApprove: boolean
+  holds: boolean
   ownProposal: boolean
 }
 
@@ -54,6 +57,7 @@ const facts = computed(() => {
     { label: t('budgets.screens.figures.remaining'), value: v.totals.remainingMinor < 0 ? t('budgets.screens.over-by', { amount: money(-v.totals.remainingMinor) }) : money(v.totals.remainingMinor) },
     ...(v.lines.some(l => l.kind === 'income') ? [{ label: t('budgets.screens.figures.income'), value: t('budgets.screens.figures.income-of', { received: money(v.totals.incomeActualMinor), planned: money(v.totals.incomeBudgetedMinor) }) }] : []),
     { label: t('budgets.screens.budget.year'), value: text.year(b.value.yearStartsOn) },
+    ...(v.holds ? [{ label: t('budgets.screens.holders.title'), value: t('budgets.screens.holders.you') }] : []),
     ...(v.subject ? [{ label: t(`budgets.screens.scopes.${b.value.scope}`), value: v.subject.label, to: v.subject.to ?? undefined }] : []),
     ...(v.parent ? [{ label: t('budgets.screens.budget.funded-from'), value: `${v.parent.budgetName}: ${v.parent.lineName}`, to: `/console/budgets/${v.parent.budgetId}` }] : []),
   ]
@@ -300,6 +304,14 @@ const pageActions = computed(() => {
           icon="i-lucide-users"
           :title="t('budgets.screens.budget.own-proposal')"
         />
+        <UAlert
+          v-if="data.closeDue && data.canApprove"
+          color="info"
+          variant="subtle"
+          icon="i-lucide-lock"
+          :title="t('budgets.screens.close.due')"
+          :description="t('budgets.screens.close.due-help')"
+        />
         <FactStrip :facts="facts" />
 
         <PageSection :title="t('budgets.screens.budget.spending')">
@@ -485,6 +497,14 @@ const pageActions = computed(() => {
             />
           </RecordList>
         </PageSection>
+
+        <BudgetsHolders
+          v-if="b.state !== 'closed' || data.holders.length"
+          :budget-id="b.id"
+          :holders="data.holders"
+          :can-manage="data.canManage && b.state !== 'closed'"
+          @changed="refresh()"
+        />
 
         <PageSection
           v-if="data.history.some(h => h.reason)"

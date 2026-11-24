@@ -14,7 +14,10 @@ watch(data, (d) => { if (d && !year.value) year.value = d.year }, { immediate: t
 const years = computed(() => (data.value?.years ?? []).map(y => ({ value: y, label: text.year(y) })))
 const open = computed(() => (data.value?.budgets ?? []).filter(b => b.state !== 'closed'))
 const closed = computed(() => (data.value?.budgets ?? []).filter(b => b.state === 'closed'))
-const creating = ref(false)
+// A production's Budget tab links here with ?new=production&productionId=… to start its budget.
+const route = useRoute()
+const forProduction = computed(() => route.query.new === 'production' && typeof route.query.productionId === 'string' ? route.query.productionId : undefined)
+const creating = ref(!!forProduction.value)
 
 function describe(b: Row) {
   const parts = [t(`budgets.screens.scopes.${b.scope}`), b.subject && b.subject !== b.name ? b.subject : null, text.state(b.state).label]
@@ -105,6 +108,7 @@ const share = (b: Row) => b.totals.budgetedMinor ? Math.min(100, Math.round(100 
     </DataBoundary>
     <BudgetsNewDialog
       v-model:open="creating"
+      :production-id="forProduction"
       @created="(id: string) => navigateTo(`/console/budgets/${id}`)"
     />
   </PageFrame>
