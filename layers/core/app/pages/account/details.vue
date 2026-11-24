@@ -1,10 +1,12 @@
 <!-- Details (ID-11, ID-12; identity spec part 6): the name and pronouns, the email addresses
-     (Matt, 21 November: one page, not two), and for a member their emergency contacts (ID-17).
+     (Matt, 21 November: one page, not two), for a member their emergency contacts (ID-17), and
+     whether they are under 18 (C-74).
      Everything that shows the person reads the account, so after saving the app's data is fetched
      again and the header shows the new name at once. -->
 <script setup lang="ts">
 import { z } from 'zod'
 import type { RefusalView } from '../../utils/refusal'
+import type { AgeMarkerValue } from '../../components/AgeMarker.vue'
 
 interface Me { signedIn: boolean, account?: { name: string | null, pronouns: string | null } }
 
@@ -13,6 +15,7 @@ const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<Me>('/api/core/me', { key: 'core:me' })
+const { data: age, refresh: refreshAge } = await useAPI<{ marker: AgeMarkerValue | null }>('/api/core/me/age', { key: 'core:me-age' })
 
 // The same limits as the route's.
 const schema = z.object({
@@ -93,6 +96,13 @@ async function save() {
         </PageSection>
         <MyEmailAddresses />
         <MyEmergencyContacts />
+        <AgeMarker
+          v-if="age"
+          :marker="age.marker"
+          endpoint="/api/core/me/age"
+          side="self"
+          @saved="refreshAge()"
+        />
       </div>
     </DataBoundary>
   </PageFrame>

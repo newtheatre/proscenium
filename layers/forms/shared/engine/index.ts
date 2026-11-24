@@ -4,7 +4,7 @@
 export * from './types'
 export { parseDefinition, questionsOf, conditionsOf, conditionDepth } from './definition'
 export type { Fault, Parsed } from './definition'
-export { evaluate, issuesOnPage, nextStep } from './evaluate'
+export { evaluate, issuesOnPage, nextStep, systemMove } from './evaluate'
 export { RULES_FOR, checkDefinition, publishable } from './checks'
 export type { Problem, ProblemCode, CheckOptions } from './checks'
 export { operatorsFor, kindOfQuestion, isEmpty } from './values'

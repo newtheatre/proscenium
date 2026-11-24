@@ -152,6 +152,8 @@ export default defineModule({
     ],
     'core.record-resolver': [{ id: 'forms.form', file: 'form' }, { id: 'forms.response', file: 'response' }, { id: 'forms.template', file: 'template' }],
     'core.erasure-handler': [{ id: 'forms', file: 'answers' }],
+    // A form whose live version moved a response round the system's own moves until the chain stopped (FB-514, AT3).
+    'core.health-check': [{ id: 'forms.system-loops', file: 'system-loops' }],
     // Responses are found by reference from the palette; the route answers only those the person may read.
     'core.search-source': [{ id: 'forms.responses', record: 'forms.response', ability: ['forms.response.read', 'forms.form.edit'], route: '/api/forms/search', shells: ['console'] }],
     // File answers: held in core's store under their response, checked as any upload is, and read only

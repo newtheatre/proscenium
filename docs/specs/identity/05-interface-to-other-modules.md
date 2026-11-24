@@ -41,6 +41,10 @@ Each is a named export other modules import. A service that writes adds its stat
 
 `notSelf` remains for a check inside a service; on a route the ability's `owner: 'refuses'` does the same job by declaration.
 
+## Under 18: ageStatus
+
+`ageStatus(accountId, on?)` and `ageStatuses(accountIds, on?)`, from the core's services alias, answer `'under-18'` when a recorded day the person turns 18 is still to come on that date (the theatre's today by default), and `'unknown'` otherwise (C-74, ruling R3-25). Unknown is never adult: the Bar keeps its Challenge 25 check for everyone it does not know is under 18. Modules never read the date. Only people who act on it see the marker: never public pages, member directories or exports. The setting `core.under-18.latest-finish` (a time, unset by default, on People's settings) is the one time Rehearsals and Productions warn against.
+
 ## Access needs: the purpose point
 
 A module that wants to read access needs declares a purpose through the point `core.access-purpose`. The core knows no module's purpose in advance, so a new module joins without a change to the core.
