@@ -28,34 +28,43 @@ export function toShown(answer: FigureAnswer | null | undefined): Shown {
   return answer
 }
 
+type Namer = (key: string, answer: OkAnswer) => { label: string, sortBy: string | number }
+
+function addAmounts(row: ReportRow, figureId: string, r: OkAnswer['rows'][number]) {
+  const cell = row.cells[figureId] as Cell | undefined
+  row.cells[figureId] = { state: 'ok', amounts: [...(cell?.amounts ?? []), ...amountsOf([r])] }
+}
+
+function nought(f: FigureColumn, answer: FigureAnswer | null | undefined): Shown {
+  return answer && answer.state !== 'ok' ? toShown(answer) : { state: 'ok', amounts: f.unit === 'money' ? [] : [{ value: 0 }] }
+}
+
+function rowsByBreakdown(visible: FigureColumn[], answers: Answers, by: string, name: Namer): ReportRow[] {
+  const out = new Map<string, ReportRow>()
+  for (const f of visible) {
+    const answer = answers[f.id]!.rows
+    if (answer?.state !== 'ok') continue
+    for (const r of answer.rows) {
+      const key = r.keys[by] ?? ''
+      const row = out.get(key) ?? { key, ...name(key, answer), cells: {} }
+      addAmounts(row, f.id, r)
+      out.set(key, row)
+    }
+  }
+  for (const row of out.values()) {
+    for (const f of visible) row.cells[f.id] ??= nought(f, answers[f.id]!.rows)
+  }
+  return [...out.values()].sort((a, b) => a.sortBy < b.sortBy ? -1 : a.sortBy > b.sortBy ? 1 : 0)
+}
+
 /**
  * The table for `figures` (every readable column) from their answers. `name` gives a row's label
  * and sort order for one key; a figure that answered nothing for a row has nought there, and one
  * that could not answer says so, never nought (REP-08).
  */
-export function layOut(figures: FigureColumn[], answers: Answers, by: string | undefined, name: (key: string, answer: OkAnswer) => { label: string, sortBy: string | number }): ReportTable {
+export function layOut(figures: FigureColumn[], answers: Answers, by: string | undefined, name: Namer): ReportTable {
   const visible = figures.filter(f => answers[f.id] && answers[f.id]!.total.state !== 'hidden')
   const totals = Object.fromEntries(visible.map(f => [f.id, toShown(answers[f.id]!.total)]))
-  const out = new Map<string, ReportRow>()
-  if (by) {
-    for (const f of visible) {
-      const answer = answers[f.id]!.rows
-      if (!answer || answer.state !== 'ok') continue
-      for (const r of answer.rows) {
-        const key = r.keys[by] ?? ''
-        const row = out.get(key) ?? { key, ...name(key, answer), cells: {} }
-        const cell = row.cells[f.id] as Cell | undefined
-        row.cells[f.id] = { state: 'ok', amounts: [...(cell?.amounts ?? []), ...amountsOf([r])] }
-        out.set(key, row)
-      }
-    }
-    for (const row of out.values()) {
-      for (const f of visible) {
-        const answer = answers[f.id]!.rows
-        if (!row.cells[f.id]) row.cells[f.id] = answer && answer.state !== 'ok' ? toShown(answer) : { state: 'ok', amounts: f.unit === 'money' ? [] : [{ value: 0 }] }
-      }
-    }
-  }
-  const rows = [...out.values()].sort((a, b) => a.sortBy < b.sortBy ? -1 : a.sortBy > b.sortBy ? 1 : 0)
+  const rows = by ? rowsByBreakdown(visible, answers, by, name) : []
   return { visible, hidden: figures.length - visible.length, totals, rows }
 }
