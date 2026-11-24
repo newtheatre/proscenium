@@ -136,7 +136,7 @@ export async function approve(unit: UnitView, actor: Actor, claim: Claim, input:
   logEvent(unit, claim.id, { action: 'approved', by: actor.accountId ?? null, at, amountMinor: total, postingId })
   unit.audit({ action: 'state', record: ['budgets.claim', claim.id], detail: { from: 'submitted', to: 'approved', approvedMinor: total } })
   unit.announce('budgets.claim.decided', { claimId: claim.id, decision: 'approved', amountMinor: total }, { record: ['budgets.claim', claim.id] })
-  await tellClaimant(unit, claim, 'approved', total, decided.some(i => i.partReason) ? 'Part of it was approved; the reasons are on the claim.' : 'It will be paid by the route you chose.')
+  await tellClaimant(unit, claim, { decision: 'approved', amountMinor: total, note: decided.some(i => i.partReason) ? 'Part of it was approved; the reasons are on the claim.' : 'It will be paid by the route you chose.' })
   return { state: 'approved' }
 }
 
@@ -178,7 +178,8 @@ function fulfil(unit: UnitView, claim: Claim, amountMinor: number, at: number): 
   })
 }
 
-async function tellClaimant(unit: UnitView, claim: Claim, decision: string, amountMinor: number, note: string): Promise<void> {
+async function tellClaimant(unit: UnitView, claim: Claim, told: { decision: string, amountMinor: number, note: string }): Promise<void> {
+  const { decision, amountMinor, note } = told
   if (!claim.claimantId) return
   await notify(unit, 'budgets.claim-decided', {
     to: claim.claimantId,
@@ -203,7 +204,7 @@ export async function reject(unit: UnitView, actor: Actor, claim: Claim, input: 
   logEvent(unit, claim.id, { action: state, by: actor.accountId ?? null, at, note: input.note })
   unit.audit({ action: 'state', record: ['budgets.claim', claim.id], detail: { from: 'submitted', to: state } })
   unit.announce('budgets.claim.decided', { claimId: claim.id, decision: state, amountMinor: 0 }, { record: ['budgets.claim', claim.id] })
-  await tellClaimant(unit, claim, input.decline ? 'declined' : 'sent back to you', claim.totalMinor, input.note)
+  await tellClaimant(unit, claim, { decision: input.decline ? 'declined' : 'sent back to you', amountMinor: claim.totalMinor, note: input.note })
 }
 
 /** Voids an approved claim nothing has been paid on (BC-25): the treasurer, never on their own; the expense is reversed. */
@@ -227,7 +228,7 @@ export async function voidClaim(unit: UnitView, actor: Actor, claim: Claim, inpu
   logEvent(unit, claim.id, { action: 'voided', by: actor.accountId ?? null, at, note: input.note, postingId })
   unit.audit({ action: 'state', record: ['budgets.claim', claim.id], detail: { from: 'approved', to: 'voided' } })
   unit.announce('budgets.claim.decided', { claimId: claim.id, decision: 'voided', amountMinor: claim.approvedMinor ?? 0 }, { record: ['budgets.claim', claim.id] })
-  await tellClaimant(unit, claim, 'voided', claim.approvedMinor ?? 0, input.note)
+  await tellClaimant(unit, claim, { decision: 'voided', amountMinor: claim.approvedMinor ?? 0, note: input.note })
 }
 
 export interface WaitingClaim { id: string, number: string | null, title: string, claimantId: string | null, currency: string, totalMinor: number, submittedAt: number | null, overMinor: number, late: boolean, notAskedFirst: boolean }

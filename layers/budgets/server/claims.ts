@@ -210,7 +210,8 @@ export async function requireItem(claim: Claim, itemId: string | undefined): Pro
   return item!
 }
 
-export async function updateItem(unit: UnitView, actor: Actor, claim: Claim, item: Item, input: ItemInput): Promise<void> {
+export async function updateItem(unit: UnitView, actor: Actor, on: { claim: Claim, item: Item }, input: ItemInput): Promise<void> {
+  const { claim, item } = on
   await requireOwnEditable(actor, claim)
   const categoryId = await checkItem(input)
   unit.add({
@@ -238,7 +239,8 @@ export async function receiptLimit(): Promise<number> {
 }
 
 /** Stores a receipt photo or PDF on an item and asks core to check it (BC-19). */
-export async function uploadReceipt(unit: UnitView, actor: Actor, claim: Claim, item: Item, input: { name: string, bytes: Uint8Array }): Promise<{ id: string, state: 'pending' }> {
+export async function uploadReceipt(unit: UnitView, actor: Actor, on: { claim: Claim, item: Item }, input: { name: string, bytes: Uint8Array }): Promise<{ id: string, state: 'pending' }> {
+  const { claim, item } = on
   await requireOwnEditable(actor, claim)
   if (input.bytes.length === 0) refuse('core.files.empty', 'The file is empty.', { status: 422, fields: { file: 'empty' } })
   if (input.bytes.length > await receiptLimit()) refuse('core.files.too-large', 'This file is larger than a receipt may be.', { status: 413, fields: { file: 'too-large' } })
@@ -258,7 +260,8 @@ export async function uploadReceipt(unit: UnitView, actor: Actor, claim: Claim, 
   return { id, state: 'pending' }
 }
 
-export async function removeReceipt(unit: UnitView, actor: Actor, claim: Claim, item: Item, fileId: string): Promise<void> {
+export async function removeReceipt(unit: UnitView, actor: Actor, on: { claim: Claim, item: Item }, fileId: string): Promise<void> {
+  const { claim, item } = on
   await requireOwnEditable(actor, claim)
   if (!item.receipts.some(r => r.id === fileId)) refuse('core.not-found', 'There is no such receipt.', { status: 404 })
   const at = nowMs()

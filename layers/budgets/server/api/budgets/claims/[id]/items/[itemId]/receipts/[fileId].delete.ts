@@ -7,6 +7,6 @@ import { removeReceipt, requireClaim, requireItem } from '../../../../../../../c
 export default defineRoute({ ability: 'signed-in', rateLimit: 'write', input: z.object({}) }, async (event, { unit, actor }) => {
   const claim = await requireClaim(getRouterParam(event, 'id'))
   const item = await requireItem(claim, getRouterParam(event, 'itemId'))
-  await removeReceipt(unit, actor, claim, item, getRouterParam(event, 'fileId') ?? '')
+  await removeReceipt(unit, actor, { claim, item }, getRouterParam(event, 'fileId') ?? '')
   return { itemId: item.id }
 })
