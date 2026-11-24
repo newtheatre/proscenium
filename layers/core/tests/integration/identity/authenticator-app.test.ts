@@ -11,6 +11,11 @@ beforeEach(reset)
 
 /** The code the app would show, `ahead` steps from now. */
 const codeFor = (secret: string, ahead = 0) => codeAt(fromBase32(secret), stepAt(Date.now()) + ahead)
+// A code one step behind is refused if the step ends before the server checks it, so start clear of the edge.
+async function clearOfStepEdge() {
+  const left = 30_000 - (Date.now() % 30_000) // not-policy: RFC 6238's 30-second step
+  if (left < 3_000) await new Promise(resolve => setTimeout(resolve, left + 50)) // not-policy: time for a few requests
+}
 
 async function staffWithApp() {
   const browser = new Browser()
@@ -19,6 +24,7 @@ async function staffWithApp() {
   const started = await browser.post('/api/core/me/authenticator/start')
   expect(started.status).toBe(200)
   expect(started.body.uri).toMatch(/^otpauth:\/\/totp\/.+\?secret=[A-Z2-7]+&/)
+  await clearOfStepEdge()
   const added = await browser.post('/api/core/me/authenticator/confirm', { code: await codeFor(started.body.secret, -1) })
   expect(added.status).toBe(200)
   return { browser, accountId, secret: started.body.secret as string }
