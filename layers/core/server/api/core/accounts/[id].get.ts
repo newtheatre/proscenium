@@ -9,6 +9,7 @@ import { accountById } from '../../../identity/accounts'
 import { liveGrantsOf } from '../../../identity/grants'
 import { standingOf } from '../../../identity/standings'
 import { profileOf } from '../../../identity/access-scheme'
+import { ageMarkerFor } from '../../../identity/age'
 
 export default defineRoute({
   ability: 'core.account.read',
@@ -41,6 +42,8 @@ export default defineRoute({
     accessScheme: false,
     // Staff ask for their own erasure from their own account, like anybody else.
     erase: actor.accountId !== id && (await can(actor, 'core.data-request.manage')).allowed,
+    // Recording the day someone under 18 turns 18 (C-74); only those who may record it see it here.
+    age: !account.anonymised_at && !account.merged_into_id && await may('core.age.record'),
   }
   const standings = await standingOf(id)
   // Emergency contacts are offered only for a person with a standing (ID-17).
@@ -68,6 +71,7 @@ export default defineRoute({
     liveSessions: sessions[0]?.n ?? 0,
     grants: grants.map(g => ({ id: g.id, roleId: g.role_id, role: g.role_key, scope: g.scope, expiresAt: g.expires_at })),
     standings,
+    ...(actions.age ? { age: await ageMarkerFor(id) } : {}),
     ...(actions.accessScheme ? { accessScheme: profile ? { status: profile.status, submittedAt: profile.submitted_at } : null } : {}),
     actions,
   }

@@ -140,6 +140,11 @@ export const points = {
   // A registered count, shown beside a menu entry or on a card. A module registers its own; another
   // module's is named by it. The contribution says how to count for the person asking.
   'core.count': point({ kind: 'code', contract: 'count' }),
+  // A figure a module answers about its own records, as keys and numbers, read only through
+  // readMeasure so core checks the question, the reader and the answer (Reports spec, M1 to M11).
+  'core.measure': point({ kind: 'code', contract: 'measure' }),
+  // Figures per person, members-side only, read by Reports alone with every read audited (R3-27).
+  'core.person-measure': point({ kind: 'code', contract: 'person-measure' }),
   // A figure beside each of tonight's performances on the Tonight hub (sold, in, taken at the tills),
   // read for one performance and left out for anyone without its ability there.
   'core.tonight-figure': point({ kind: 'code', contract: 'tonight-figure' }),
@@ -151,6 +156,8 @@ export const points = {
   // What the person has coming (a performance they hold tickets for, a shift they are on), for My
   // account's Upcoming card, so core lists other modules' things without importing them.
   'core.upcoming': point({ kind: 'code', contract: 'upcoming' }),
+  // Short billing lines on a production's public page, such as "By arrangement with" (C-75). Public data only.
+  'core.public-lines': point({ kind: 'code', contract: 'public-lines' }),
   'core.setup-step': point({
     kind: 'data',
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),

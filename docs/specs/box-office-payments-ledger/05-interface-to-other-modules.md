@@ -39,6 +39,9 @@ Every service that writes takes the caller's unit of work and adds statements to
 | `intentStatus(intentId)` | read | State, amounts paid and refunded by part, and whether anything is pending or unknown |
 | `methodsFor(channel)` | read | The payment methods on offer, from active provider accounts and their capabilities |
 | `openSession(unit, …)`, `closeSession(unit, …)` | write | Till sessions |
+| `recordDisbursement(unit, { owner: { module, record }, amountMinor, method, paidOn, reference?, payeeId? })` | write | Records money already paid out against the owner's record (P-A1): calls the owner's `payments.disbursement` handler and posts one transfer with the purpose `disbursement`. Never sends money |
+| `reverseDisbursement(unit, id)`, `disbursementsOf({ module, record })` | write, read | Undo one recorded by mistake, once; list a record's payments with whether each was reversed |
+| `savePayee(unit, party, details)`, `clearPayee(unit, party)`, `payeeFor(party)`, `maskedPayees(ids)`, `readPayee(unit, id)` | write, read | Bank details, sealed. `payeeFor` and `maskedPayees` give only the first letter and last two digits; `readPayee` gives them in full and audits the read, for a caller that has checked `payments.payee.read` |
 
 `startAttempt` is the only service here that commits on its own, and it does so through `externalCall`, because a call to a provider cannot sit inside a database batch. Payments' manifest declares each provider's calls under `calls`, as Foundations requires. `answerAttempt` is an ordinary write: the answer, the settlement and the posting are one batch in the caller's unit of work.
 
@@ -59,8 +62,9 @@ Every service that writes takes the caller's unit of work and adds statements to
 | Point | Kind | A contribution is |
 | --- | --- | --- |
 | `payments.provider` | code | A payment provider. Contract below |
-| `payments.settlement` | code | An owner module's handlers for its parts: `settle(unit, part)` and `refunded(unit, part, refund)`. Each adds its own statements and returns its ledger entries. Box office contributes one for orders; Bar and Membership fees contribute their own |
+| `payments.settlement` | code | An owner module's handlers for its parts: `settle(unit, part)` and `refunded(unit, part, refund)`. Each adds its own statements and returns its ledger entries; an entry may name the tax code its amount includes (`taxCode`), and Payments splits the VAT out (FIN-07). Box office contributes one for orders; Bar and Membership fees contribute their own |
 | `payments.desk-basket` | code | A module's panel in the till, with `prepare` and an optional `attach`. Contract under "One payment with several owners" below |
+| `payments.disbursement` | code | An owner module's handlers for money paid out against its records (P-A1): `settle(unit, part)` marks the record paid and returns its debits totalling the amount, `reversed(unit, part)` marks it owed again, and an optional `payee(record)` names whom it pays. One per module; Budgets contributes one for claims and Invoices one for bills |
 | `finance.system-account` | data | A ledger account a module posts to: `{ key, name, kind, taxCode? }`. Finance creates it locked, keyed `<module>.<key>` |
 
 **The provider contract.** A provider declares what it can do and implements only that.
@@ -248,6 +252,7 @@ All are on the audience side except the two staff alarms, and all are service me
 | `payments.expire-intents` | task, every 5 minutes | Expires open intents past `expires_at` with no attempt pending or unknown, and calls `release` for each part. The backstop for a sale prepared and never paid |
 | `payments.fetch-fees` | task, daily | Fees and payouts from providers that report them |
 | `payments.prune-webhooks` | task, daily | Deletes webhook rows past retention |
+| `payments.prune-payees` | task, daily | Clears bank details unused for `payments.payees.keep-for`, keeping the row |
 | `box-office.cancel-order` | job | One order of a bulk cancellation |
 | `box-office.send-tickets` | job | Builds and sends one order's tickets |
 | `payments.handle-webhook` | job | Processes one stored webhook event |

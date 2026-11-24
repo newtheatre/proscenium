@@ -7,6 +7,7 @@ import { LIVE_STATES } from './db/schema'
 import { getShift, type Shift } from './shifts'
 import { eligibility, type Eligibility } from './assignments'
 import { calendarKey } from './words'
+import { questionsWaiting } from './crew-calls'
 
 const live = LIVE_STATES.map(s => `'${s}'`).join(', ')
 const LIMIT = 200 // not-policy: a members' list of coming shifts, not a report
@@ -128,6 +129,13 @@ export interface ShiftView extends Shift {
   clash: Clash | null
   /** Someone else's place that needs cover, which the person could take. */
   coverFor: string | null
+  /** The crew call whose questions come first (CC1), while this person has not answered them. */
+  questionsFirst: { crewCallId: string, name: string } | null
+}
+
+async function waitingFor(shift: Shift, accountId: string): Promise<ShiftView['questionsFirst']> {
+  const call = await questionsWaiting(shift, accountId)
+  return call ? { crewCallId: call.id, name: call.name } : null
 }
 
 /** One shift for a member: what it is, who else is on it (names only) and the person's own place. */
@@ -155,5 +163,6 @@ export async function shiftView(id: string, accountId: string): Promise<ShiftVie
     mine: mine ? { assignmentId: mine.id, state: mine.state, calendar: `/api/front-of-house/assignments/${encodeURIComponent(mine.id)}/calendar.ics?k=${encodeURIComponent(await calendarKey(mine.id))}`, freeRelease: mine.moved_at !== null } : null,
     clash: mine ? null : clashing(await liveClashes(accountId), shift),
     coverFor: people.find(p => p.state === 'release_requested' && !p.mine)?.id ?? null,
+    questionsFirst: await waitingFor(shift, accountId),
   }
 }
