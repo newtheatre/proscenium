@@ -1,74 +1,9 @@
 // PP-01 and PP-02 (rules E1, E2, W9): starting a season's plan and filling its tray.
-import { beforeAll, describe, expect, it } from 'vitest'
-import { changeSetting, createUnit, newId, setClock } from '#kit'
+import { describe, expect, it } from 'vitest'
+import { newId } from '#kit'
 import type { Actor } from '#kit'
-import { resetRateLimits } from '#kit/ratelimit'
-import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
-import plansGet from '../../server/api/programme-planning/plans/index.get'
-import seasonGet from '../../server/api/programme-planning/seasons/[season]/index.get'
-import planPost from '../../server/api/programme-planning/seasons/[season]/plan.post'
-import entriesGet from '../../server/api/programme-planning/plans/[id]/entries.get'
-import entriesPost from '../../server/api/programme-planning/plans/[id]/entries.post'
-import productionsGet from '../../server/api/programme-planning/plans/[id]/productions.get'
-import bringPost from '../../server/api/programme-planning/plans/[id]/bring.post'
-import createVenue from '../../../core/server/api/core/venues/index.post'
-
-const app = server({
-  'GET /api/programme-planning/plans': plansGet,
-  'GET /api/programme-planning/seasons/:season': seasonGet,
-  'POST /api/programme-planning/seasons/:season/plan': planPost,
-  'GET /api/programme-planning/plans/:id/entries': entriesGet,
-  'POST /api/programme-planning/plans/:id/entries': entriesPost,
-  'GET /api/programme-planning/plans/:id/productions': productionsGet,
-  'POST /api/programme-planning/plans/:id/bring': bringPost,
-  'POST /api/core/venues': createVenue,
-})
-
-const NOV_24 = Date.UTC(2026, 10, 24, 12)
-const programmer = person(['programme-planning.plan.manage'])
-const looker = person(['programme-planning.plan.view'])
-
-async function req<T = any>(actor: Actor, method: string, path: string, body?: unknown): Promise<{ status: number, body: T }> {
-  const response = await call(app, method, path, { actor, body, headers: { 'idempotency-key': newId('req') } })
-  return { status: response.status, body: await response.json() as T }
-}
-
-async function setting(key: string, value: unknown) {
-  await inContext(async () => {
-    const unit = createUnit()
-    await changeSetting(unit.view(), key, value, { reason: 'test', confirm: true })
-    await unit.commit()
-  })
-}
-
-let n = 0
-async function season(fields: { startsOn?: string, endsOn?: string, state?: string } = {}): Promise<{ id: string, slug: string }> {
-  n++
-  const id = newId('sea')
-  const slug = `plan-season-${n}`
-  await rows('INSERT INTO core_seasons (id, slug, name, starts_on, ends_on, state, created_at) VALUES (?, ?, ?, ?, ?, ?, 0)', id, slug, `Plan season ${n}`, fields.startsOn ?? '2027-01-10', fields.endsOn ?? '2027-03-20', fields.state ?? 'draft')
-  return { id, slug }
-}
-
-async function production(seasonId: string | null, fields: { title?: string, state?: string, minutes?: number } = {}): Promise<string> {
-  const id = newId('prd')
-  await env.DB.prepare('INSERT INTO core_productions (id, slug, title, kind, season_id, running_minutes, state, listed, credits_public, interval_count, advisories_confirmed_none, created_at) VALUES (?, ?, ?, \'visiting\', ?, ?, ?, 1, 1, 0, 0, 0)')
-    .bind(id, id, fields.title ?? 'Twelfth Night', seasonId, fields.minutes ?? 150, fields.state ?? 'draft').run()
-  return id
-}
-
-async function started(slug: string): Promise<string> {
-  const made = await req(programmer, 'POST', `/api/programme-planning/seasons/${slug}/plan`, {})
-  expect(made.status, JSON.stringify(made.body)).toBe(200)
-  return made.body.planId
-}
-
-beforeAll(async () => {
-  setClock(NOV_24)
-  resetRateLimits()
-  await setModule('programme-planning', true)
-  await setting('core.locale.time-zone', 'Europe/London')
-})
+import { env, person, rows } from '../../../../tests/integration/helpers'
+import { looker, NOV_24, production, programmer, req, season, setting, started, venue } from './stage'
 
 describe('starting a plan (PP-01, E1)', () => {
   it('makes one plan with the season\'s dates and the settings\' day hours', async () => {
@@ -175,10 +110,10 @@ describe('the tray (PP-02, E2, W9)', () => {
     const planId = await started(spring.slug)
     const twelfth = await production(spring.id)
     const entryId = (await req(programmer, 'POST', `/api/programme-planning/plans/${planId}/bring`, { productionId: twelfth, performancesWanted: 1 })).body.entryId
-    const venue = (await req(person(['core.venue.manage']), 'POST', '/api/core/venues', { name: 'Planning venue' })).body as { venueId: string, spaceId: string }
+    const place = await venue()
     const performanceId = newId('perf')
     await env.DB.batch([
-      env.DB.prepare('INSERT INTO core_performances (id, production_id, venue_id, space_id, starts_at, ends_at, operating_day, state, created_at) VALUES (?, ?, ?, ?, ?, ?, \'2027-01-12\', \'draft\', 0)').bind(performanceId, twelfth, venue.venueId, venue.spaceId, NOV_24, NOV_24 + 9_000_000),
+      env.DB.prepare('INSERT INTO core_performances (id, production_id, venue_id, space_id, starts_at, ends_at, operating_day, state, created_at) VALUES (?, ?, ?, ?, ?, ?, \'2027-01-12\', \'draft\', 0)').bind(performanceId, twelfth, place.venueId, place.spaceId, NOV_24, NOV_24 + 9_000_000),
       env.DB.prepare('INSERT INTO programme_planning_placements (performance_id, entry_id, created_at, updated_at) VALUES (?, ?, 0, 0)').bind(performanceId, entryId),
     ])
     const list = await req(programmer, 'GET', `/api/programme-planning/plans/${planId}/entries`)

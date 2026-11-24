@@ -4,7 +4,7 @@ import { defineRoute, refuse } from '#kit'
 import { requireRecoverySecret } from '../../identity/owner-recovery'
 import { addPasskey, verifyRegistration } from '../../identity/passkeys'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   public: true,
   rateLimit: 'sign-in',
   input: z.object({ secret: z.string().max(500), challengeId: z.string().max(40), response: z.looseObject({ id: z.string() }) }), // not-policy: lengths that fit any secret and id

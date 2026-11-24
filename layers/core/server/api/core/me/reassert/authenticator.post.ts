@@ -5,7 +5,7 @@ import { defineRoute } from '#kit'
 import { sessionOf } from '../../../../identity/guards'
 import { confirmWithAuthenticator } from '../../../../identity/authenticator'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   ability: 'signed-in',
   rateLimit: 'sign-in',
   input: z.object({ code: z.string().trim().regex(/^\d{6}$/) }).strict(), // not-policy: an app shows six digits

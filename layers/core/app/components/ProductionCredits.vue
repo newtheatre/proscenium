@@ -4,7 +4,8 @@ import { watchDebounced } from '@vueuse/core'
 
 // A production's credits (C-09): who made the show, by section, each with a printed name and a role,
 // linked to a person's account or not. Credits are dragged into order within their section. A linked person
-// is told, and may change who sees their own credit from their account.
+// is told, and may change who sees their own credit from their account. Given a performance, it lists
+// the credits for that date only (C-61), each for the whole performance or for one act in its line-up.
 type Visibility = 'public' | 'members' | 'hidden'
 interface Credit {
   id: string
@@ -15,15 +16,22 @@ interface Credit {
   sectionTermId: string
   visibility: Visibility
   sort: number
+  lineUpId?: string | null
 }
 interface Section { id: string, label: string, retired: boolean }
 interface Person { id: string, label: string }
 
-const props = defineProps<{ productionId: string, creditsPublic: boolean }>()
+const props = defineProps<{ productionId: string, creditsPublic: boolean, performanceId?: string, acts?: { id: string, name: string }[] }>()
 
 const { $api } = useNuxtApp()
 const base = computed(() => `/api/core/productions/${props.productionId}/credits`)
-const { data, status, error, refresh } = await useAPI<{ credits: Credit[], sections: Section[] }>(base, { key: `core:production:${props.productionId}:credits` })
+const { data, status, error, refresh } = await useAPI<{ credits: Credit[], sections: Section[] }>(base, {
+  key: `core:production:${props.productionId}:credits${props.performanceId ? `:${props.performanceId}` : ''}`,
+  query: props.performanceId ? { performanceId: props.performanceId } : undefined,
+})
+const actName = (c: Credit) => c.lineUpId ? props.acts?.find(a => a.id === c.lineUpId)?.name ?? 'An act no longer listed' : null
+const WHOLE = '' // the act select's value for a credit for the whole performance
+const actItems = computed(() => [{ value: WHOLE, label: 'The whole performance' }, ...(props.acts ?? []).map(a => ({ value: a.id, label: a.name }))])
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -60,13 +68,13 @@ async function act(fn: () => Promise<unknown>, done?: string) {
 // Adding and editing
 const open = ref(false)
 const editing = ref<Credit | null>(null)
-const form = ref({ creditedName: '', role: '', sectionTermId: '', visibility: 'public' as Visibility, person: undefined as Person | undefined })
+const form = ref({ creditedName: '', role: '', sectionTermId: '', visibility: 'public' as Visibility, person: undefined as Person | undefined, act: WHOLE })
 function start(credit?: Credit, sectionTermId?: string) {
   editing.value = credit ?? null
   refusal.value = null
   form.value = credit
-    ? { creditedName: credit.creditedName, role: credit.role, sectionTermId: credit.sectionTermId, visibility: credit.visibility, person: credit.accountId ? { id: credit.accountId, label: credit.accountLabel ?? 'Unnamed person' } : undefined }
-    : { creditedName: '', role: '', sectionTermId: sectionTermId ?? sectionItems.value[0]?.value ?? '', visibility: 'public', person: undefined }
+    ? { creditedName: credit.creditedName, role: credit.role, sectionTermId: credit.sectionTermId, visibility: credit.visibility, person: credit.accountId ? { id: credit.accountId, label: credit.accountLabel ?? 'Unnamed person' } : undefined, act: credit.lineUpId ?? WHOLE }
+    : { creditedName: '', role: '', sectionTermId: sectionTermId ?? sectionItems.value[0]?.value ?? '', visibility: 'public', person: undefined, act: WHOLE }
   open.value = true
 }
 
@@ -107,9 +115,10 @@ async function save() {
     visibility: form.value.visibility,
     accountId: form.value.person?.id ?? null,
   }
+  const scope = form.value.act ? { lineUpId: form.value.act } : { performanceId: props.performanceId ?? null }
   const ok = editing.value
     ? await act(() => $api<{ id: string }>(`${base.value}/${editing.value!.id}` as string, { method: 'PATCH', body }), 'Credit saved')
-    : await act(() => $api<{ id: string }>(base.value as string, { method: 'POST', body }), 'Credit added')
+    : await act(() => $api<{ id: string }>(base.value as string, { method: 'POST', body: { ...body, ...scope } }), 'Credit added')
   if (ok) open.value = false
 }
 
@@ -132,7 +141,7 @@ async function place(section: Grouped, from: number, to: number) {
     const rest = data.value.credits.filter(c => c.sectionTermId !== section.id)
     data.value = { ...data.value, credits: [...rest, ...ids.map(i => section.credits.find(c => c.id === i)!)] }
   }
-  const ok = await act(() => $api<{ id: string }>(`${base.value}/order` as string, { method: 'PUT', body: { sectionTermId: section.id, ids } }))
+  const ok = await act(() => $api<{ id: string }>(`${base.value}/order` as string, { method: 'PUT', body: { sectionTermId: section.id, ids, performanceId: props.performanceId ?? null } }))
   if (ok) moved.value = `${credit.creditedName} is now ${to + 1} of ${ids.length}`
   else await refresh()
 }
@@ -164,8 +173,10 @@ function actions(section: Grouped, c: Credit, i: number): DropdownMenuItem[][] {
 
 <template>
   <PageSection
-    title="Credits"
-    description="Who made the show. A credit linked to someone's account tells them, and they can choose who sees it."
+    :title="performanceId ? 'Credits for this date' : 'Credits'"
+    :description="performanceId
+      ? 'People credited at this performance only, such as an understudy going on or an act\'s company. The production\'s own credits are on its Credits tab.'
+      : 'Who made the show. A credit linked to someone\'s account tells them, and they can choose who sees it.'"
   >
     <template #actions>
       <UButton
@@ -198,7 +209,7 @@ function actions(section: Grouped, c: Credit, i: number): DropdownMenuItem[][] {
           v-if="data && !data.credits.length"
           icon="i-lucide-scroll-text"
           title="No credits yet"
-          description="Add the cast, creative team and crew."
+          :description="performanceId ? 'Add anyone credited at this performance only.' : 'Add the cast, creative team and crew.'"
         />
         <section
           v-for="section in grouped.filter(s => s.credits.length)"
@@ -223,7 +234,7 @@ function actions(section: Grouped, c: Credit, i: number): DropdownMenuItem[][] {
               :index="i"
               :icon="c.accountId ? 'i-lucide-user-round-check' : 'i-lucide-user-round'"
               :name="`${c.creditedName}, ${c.role}`"
-              :description="c.accountId ? `Linked to ${c.accountLabel ?? 'an account'}` : 'Not linked to an account'"
+              :description="[actName(c) && `For ${actName(c)}`, c.accountId ? `Linked to ${c.accountLabel ?? 'an account'}` : 'Not linked to an account'].filter(Boolean).join(' · ')"
             >
               <template #leading>
                 <IconButton
@@ -275,6 +286,17 @@ function actions(section: Grouped, c: Credit, i: number): DropdownMenuItem[][] {
           @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
+          <UFormField
+            v-if="performanceId && acts?.length"
+            label="For"
+            :help="editing ? 'To credit a different act, remove this credit and add it again.' : undefined"
+          >
+            <USelect
+              v-model="form.act"
+              :items="actItems"
+              :disabled="!!editing"
+            />
+          </UFormField>
           <UFormField
             label="Person"
             help="Optional. Linking tells them and lets them choose who sees the credit."
