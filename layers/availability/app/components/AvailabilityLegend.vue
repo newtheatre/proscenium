@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import type { ShownLevel } from '../../shared/levels'
 
+defineProps<{ commitments?: boolean }>()
 const { t } = useT()
 const LEGEND: ShownLevel[] = ['free', 'maybe', 'busy', 'unknown']
 const SWATCH: Record<ShownLevel, string> = { free: 'bg-success/25', maybe: 'bg-warning/30', busy: 'bg-error/25', unknown: 'availability-hatch' }
@@ -21,6 +22,15 @@ const SWATCH: Record<ShownLevel, string> = { free: 'bg-success/25', maybe: 'bg-w
         class="inline-block size-3.5 rounded-sm border border-default"
         :class="SWATCH[level]"
       />{{ t(`availability.levels.${level}`) }}
+    </li>
+    <li
+      v-if="commitments"
+      class="flex items-center gap-1.5"
+    >
+      <UIcon
+        name="i-lucide-lock"
+        class="size-3.5"
+      />{{ t('availability.mine.commitment') }}
     </li>
   </ul>
 </template>

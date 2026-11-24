@@ -405,7 +405,7 @@ export const contributes = {
   ],
   // Credited people are busy for each timed performance of the production (C-66).
   'core.person-busy': [{ id: 'core.credits', file: 'credits' }],
-  'core.record-resolver': ['performance', 'production', 'season', 'venue', 'account'].map(n => ({ id: `core.${n}`, file: n })),
+  'core.record-resolver': ['performance', 'production', 'season', 'venue', 'account', 'practice-scenario'].map(n => ({ id: `core.${n}`, file: n })),
   // What the command palette finds by name (H9): each type through its own list's search.
   'core.search-source': [
     { id: 'core.productions', record: 'core.production', ability: 'core.production.view', route: '/api/core/search/productions', shells: ['console' as const] },

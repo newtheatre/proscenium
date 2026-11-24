@@ -190,6 +190,8 @@ export default defineModule({
   },
 
   contributes: {
+    // Figures for Reports (REP-02): tickets from Box office's tables, money from its own ledger accounts.
+    'core.measure': ['tickets-sold', 'tickets-comp', 'tickets-issued', 'admitted', 'orders', 'bookers', 'capacity', 'capacity-filled', 'gross', 'refunds', 'net', 'net-of-vat'].map(file => ({ id: `box-office.${file}`, file })),
     // Links already sent by email keep working while maintenance mode closes the site: a booking's
     // tickets (and cancelling from them) and confirming a reservation.
     'maintenance.open-address': [

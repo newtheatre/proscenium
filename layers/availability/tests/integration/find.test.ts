@@ -11,12 +11,14 @@ import createVenue from '../../../core/server/api/core/venues/index.post'
 import findPost from '../../server/api/availability/find/index.post'
 import options from '../../server/api/availability/find/options.get'
 import newException from '../../server/api/availability/exceptions/index.post'
+import mine from '../../server/api/availability/me.get'
 
 const app = server({
   'POST /api/core/venues': createVenue,
   'POST /api/availability/find': findPost,
   'GET /api/availability/find/options': options,
   'POST /api/availability/exceptions': newException,
+  'GET /api/availability/me': mine,
 })
 
 const NOV_24 = Date.UTC(2026, 10, 24, 9)
@@ -119,6 +121,8 @@ describe('commitments elsewhere (F4, AV-07)', () => {
     expect(found.body.weeks[ana.accountId!][TUESDAY]).toContainEqual({ start: 1080, end: 1200, level: 'busy' })
     const withBen = await req(planner, 'POST', '/api/availability/find', ask({ groupIds: ['crews:find'], must: [ben.accountId] }))
     expect(withBen.body.best.some((s: { start: number }) => s.start === 1020)).toBe(false)
+    expect((await req(ben, 'GET', `/api/availability/me?from=${TUESDAY}&to=${TUESDAY}`)).body.commitments).toEqual({ [TUESDAY]: [{ start: 1020, end: 1080, labelKey: 'crewcall.call', firm: true }] })
+    expect((await req(ana, 'GET', `/api/availability/me?from=${TUESDAY}&to=${TUESDAY}`)).body.commitments).toEqual({})
     crew.calls = []
   })
 
