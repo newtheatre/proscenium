@@ -8,6 +8,8 @@ definePageMeta({ layout: 'console' })
 const { t } = useT()
 const { dateTime } = useDates()
 const questionText = useQuestionText()
+const { words, keyName } = useReportWords()
+const questionOf = (q: RunListed['question']) => questionText(q.scope.title, q.period, { by: q.rowsBy ? keyName(q.rowsBy, q.keyLabels) : undefined, across: q.acrossBy ? keyName(q.acrossBy, q.keyLabels) : undefined })
 const { badge } = useRunState()
 const { data, status, error, refresh } = await useAPI<{ runs: RunListed[] }>('/api/reports/runs', { key: 'reports:runs' })
 </script>
@@ -39,8 +41,8 @@ const { data, status, error, refresh } = await useAPI<{ runs: RunListed[] }>('/a
           :key="run.id"
           :to="`/console/reports/runs/${run.id}`"
           icon="i-lucide-file-chart-column"
-          :name="t(run.label)"
-          :description="`${questionText(run.question.scope.title, run.question.period.from, run.question.period.to, run.question.by)}. ${t(run.mine ? 'reports.runs.made-by-me' : 'reports.runs.made', { when: dateTime(run.createdAt) })}`"
+          :name="words(run.name)"
+          :description="`${questionOf(run.question)}. ${t(run.mine ? 'reports.runs.made-by-me' : 'reports.runs.made', { when: dateTime(run.createdAt) })}`"
         >
           <template #trailing>
             <UBadge

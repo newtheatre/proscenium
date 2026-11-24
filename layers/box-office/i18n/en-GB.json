@@ -176,5 +176,10 @@
   "box-office.measures.net-of-vat": "Net takings less VAT",
   "box-office.measures.net-of-vat.help": "What was kept, less the VAT within it.",
   "box-office.ready-made.sales-and-attendance": "Sales and attendance",
-  "box-office.ready-made.sales-and-attendance.description": "Tickets sold and complimentary, who came, capacity filled and takings, by performance."
+  "box-office.ready-made.sales-and-attendance.description": "Tickets sold and complimentary, who came, capacity filled and takings, by performance.",
+  "box-office.report-keys.ticket-type": "Ticket type",
+  "box-office.report-keys.channel": "Where it was sold",
+  "box-office.report-keys.channels.online": "Online",
+  "box-office.report-keys.channels.desk": "At the desk",
+  "box-office.report-keys.channels.phone": "By phone"
 }

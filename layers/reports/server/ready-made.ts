@@ -2,7 +2,8 @@
 // module is on and the reader holds its ability; each figure is still checked when it is read.
 import { can, log, nowMs, refuse, usePoint, useSetting, type Actor, type MeasureScope } from '#kit'
 import { getProduction, getVenue, listMeasures, listPerformances, listSeasons, operatingDayOf, type MeasureListing } from '#modules/core'
-import { PAGE_BREAKDOWNS, type FigureColumn, type PageBreakdown, type PeriodRule, type ReadyMade, type ReportView, type ScopeKind } from '../shared/reports'
+import { keyLabels, nameable } from './keys'
+import type { FigureColumn, PeriodRule, ReadyMade, ReportColumn, ReportView, ScopeKind } from '../shared/reports'
 import { previousDate } from '#kit/clock'
 
 const WEEK_STARTS = { monday: 1, sunday: 0, saturday: 6 } as const // not-policy: days of the week
@@ -33,24 +34,46 @@ export async function readyMadeFor(actor: Actor): Promise<{ report: ReadyMade, m
 
 export interface ViewQuery { scope?: { kind: ScopeKind, id: string } | null, period?: PeriodRule, from?: string, to?: string }
 
-/** A report as the page draws it: its figures, the breakdowns they share and the dates asked for. */
+/** A ready-made report as the page draws it: its figures, the breakdowns they share and its dates. */
 export async function reportView(id: string, actor: Actor, query: ViewQuery): Promise<ReportView> {
   const found = (await readyMadeFor(actor)).find(r => r.report.id === id) ?? refuse('reports.report.unknown', 'There is no such report, or you cannot open it.', { status: 404 })
   const { report, module } = found
-  const all = new Map((await listMeasures(null)).map(m => [m.id, m]))
-  const readable = new Set((await listMeasures(actor)).map(m => m.id))
-  const figures: FigureColumn[] = report.figures.map(fid => column(all.get(fid)!, readable.has(fid)))
-  const shown = figures.filter(f => f.readable)
-  const breakdowns = PAGE_BREAKDOWNS.filter(k => shown.length > 0 && shown.every(f => f.by.includes(k)))
-  const kind = query.scope?.kind ?? report.scope
-  const scope = { kind, id: query.scope?.id ?? null, title: query.scope ? await scopeTitle(query.scope.kind, query.scope.id) : null }
-  const rule = query.period ?? report.period
-  return { report, module, figures, breakdowns: breakdowns as PageBreakdown[], period: { rule, ...await periodOf(rule, query) }, scope }
+  const columns = await figureColumns(report.figures, actor)
+  const base = await viewBase(columns, actor, query, { scopeKind: report.scope, periodRule: report.period })
+  return {
+    ...base, source: 'ready-made', id: report.id, name: { key: report.label }, description: { key: report.description }, module,
+    usualBy: report.breakdown ?? null, chart: report.chart ?? null, acrossBy: null, filter: null, saved: null,
+  }
 }
 
-const column = (m: MeasureListing, readable: boolean): FigureColumn => ({ id: m.id, label: m.label, unit: m.unit, combine: m.combine, by: m.by, readable })
+/** Figure columns for measure ids, each marked readable or not; one no module offers now is marked gone (D3). */
+export async function figureColumns(ids: string[], actor: Actor): Promise<FigureColumn[]> {
+  const all = new Map((await listMeasures(null)).map(m => [m.id, m]))
+  const readable = new Set((await listMeasures(actor)).map(m => m.id))
+  return ids.map(fid => all.has(fid)
+    ? column(all.get(fid)!, readable.has(fid))
+    : { kind: 'figure', id: fid, label: 'reports.figure-gone', unit: 'count', combine: 'sum', by: [], filters: [], readable: false, gone: true })
+}
 
-async function scopeTitle(kind: ScopeKind, id: string): Promise<string | null> {
+/** What every view shares: the breakdowns its readable figures allow, the scope and the dates. */
+export async function viewBase(columns: ReportColumn[], actor: Actor, query: ViewQuery, usual: { scopeKind: ScopeKind, periodRule: PeriodRule }) {
+  const shown = columns.filter((c): c is FigureColumn => c.kind === 'figure' && c.readable)
+  const candidates = shown.length ? shown[0]!.by.filter(k => shown.every(f => f.by.includes(k))) : []
+  const breakdowns: string[] = []
+  for (const k of candidates) if (await nameable(k)) breakdowns.push(k)
+  const kind = query.scope?.kind ?? usual.scopeKind
+  const scope = { kind, id: query.scope?.id ?? null, title: query.scope ? await scopeTitle(query.scope.kind, query.scope.id) : null }
+  const rule = query.period ?? usual.periodRule
+  // Until the record is chosen, "all of it" has no dates of its own: the page asks for the record first.
+  const waiting = rule === 'scope' && kind !== 'none' && !scope.id
+  const period = waiting ? { from: await operatingDayOf(nowMs()), to: await operatingDayOf(nowMs()) } : await periodOf(rule, query)
+  const mayCreate = (await can(actor, 'reports.report.create' as never)).allowed
+  return { columns, breakdowns, mayCreate, keyLabels: await keyLabels(breakdowns), scopeKind: usual.scopeKind, periodRule: usual.periodRule, period: { rule, ...period }, scope }
+}
+
+const column = (m: MeasureListing, readable: boolean): FigureColumn => ({ kind: 'figure', id: m.id, label: m.label, unit: m.unit, combine: m.combine, by: m.by, filters: m.filters, readable })
+
+export async function scopeTitle(kind: ScopeKind, id: string): Promise<string | null> {
   if (kind === 'production') return (await getProduction(id)).title
   if (kind === 'season') return (await listSeasons()).find(s => s.id === id)?.name ?? refuse('reports.scope.unknown', 'There is no such season.', { status: 404 })
   if (kind === 'venue') return (await getVenue(id)).name

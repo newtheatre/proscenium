@@ -23,7 +23,7 @@ Forty-five stories, REP-01 to REP-45 (a new prefix, REP, unused elsewhere): 5 ga
 | REP-09 | I download a report as a CSV | Makes a run through the bulk job; idempotent; the file has the question in words in its first rows and a note row for each unavailable figure; audited as `export`; rate class `export` |
 | REP-10 | I keep a copy and open it later | Saved copies lists runs I may open; a copy shows the figures as they stood and its question; opening checks today's abilities (R6) |
 | REP-11 | Copies do not pile up | `reports.expire-runs` deletes files past `reports.runs.keep-for`, set-wise, keeping the row as expired |
-| REP-12 | I build and save my own report | Figures from those I may read, grouped by module; one breakdown every figure allows; scope kind and period rule; at most `reports.builder.max-figures`; inline validation |
+| REP-12 | I build and save my own report | Figures from those I may read, grouped by module; one breakdown every figure allows; scope kind and period rule; at most `reports.builder.max-columns`; inline validation |
 | REP-13 | I share a saved report with my role, and archive it | Shared reports appear in that role's list; archiving says which schedules and pins it affects and pauses those schedules; Undo in the toast |
 | REP-14 | A report runs itself every week | Weekly, monthly, season end, committee year end; a slot runs once under two concurrent ticks (S2); a missed slot runs once (S3); at most `reports.schedules.per-owner` |
 | REP-15 | The people who need it get it by email | Email with up to six headline figures and a link; never the table or a file (S8); optional notification type, so a recipient can switch it off |
@@ -144,3 +144,30 @@ Deviations: a run keeps no `job_id`, and its file columns are plain ids rather t
 because the files sweep deletes expired files. `reports_definitions` is created now for the
 builder. See `layers/reports/tests/integration/copies.test.ts`.
 
+
+REP-12, REP-13, REP-33, REP-42 and REP-43 are built in Reports. `/console/reports/new` (or "Save a copy
+to change" on a ready-made report, which starts from its figures, K2) and `/console/reports/<id>/edit`
+build a report from figures in the catalogue and formula columns, in an order set by dragging or the
+row menu; moving a column renumbers the formulas that name it. A report has one key down the side, an
+optional key across the top (a shared key every figure allows), one filter on a key every figure
+declares, a scope kind with an optional usual record, a period rule, a chart and an optional role to
+share with. `POST` and `PUT /api/reports/definitions` check every rule at once (B1 to B6, D1) and
+refuse `reports.definition.invalid` with each fault under its field (`columns.<i>`, `rowsBy`,
+`acrossBy`, `filter`); a name already used by an active report refuses `reports.definition.name-taken`.
+Formulas are parsed and their units checked by `layers/reports/shared/formula.ts` on save, and worked
+out by the same module in `layOut` in the browser and in a copy: count over count is a percent,
+money over count stays money, and division by nought or two currencies is a dash. A saved report is
+seen by its maker, by holders of the role it is shared with and by holders of `reports.report.manage`
+(D4); its maker may change or archive it while they hold `reports.report.create`, and archiving
+offers Undo. A figure a saved report names that is no longer offered keeps its place (so C-numbers
+hold) and is counted under the table. A pivot whose copy would be wider than
+`reports.builder.max-columns` is refused with `reports.run.too-wide`. Module keys (Box office's
+ticket type and where it was sold) are named and listed through a new point, `reports.key`, which a
+module contributes to for each key it breaks down or filters by. It only names a key and lists its
+values: which keys a figure honours is still declared once, on the figure's own `by` and `filters` in
+`core.measure`, which core enforces. A key whose values are account ids or email addresses is refused
+with `reports.key.lists-people`, because figures per person go only through `core.person-measure`
+(R3-27). Deviations: the filter on a shared
+record key (venue, production) takes one record; archiving says nothing of schedules or pins, which
+do not exist yet; the builder has no live preview, as the saved report opens straight after saving.
+See `layers/reports/tests/integration/builder.test.ts` and `layers/reports/tests/unit/formula.test.ts`.

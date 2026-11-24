@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import listReports from '../../server/api/reports/definitions/index.get'
-import oneReport from '../../server/api/reports/definitions/[id].get'
+import oneReport from '../../server/api/reports/definitions/[id]/index.get'
 import readFigure from '../../server/api/reports/figures.get'
 import { call, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 import { house, NOV_16, ready, type House } from '../../../box-office/tests/integration/stage'
@@ -55,8 +55,8 @@ describe('a report\'s question', () => {
     expect(seen.status, JSON.stringify(seen.body)).toBe(200)
     expect(seen.body.period).toEqual({ rule: 'scope', from: day, to: day })
     expect(seen.body.scope).toMatchObject({ kind: 'production', id: h.productionId, title: expect.any(String) })
-    expect(seen.body.breakdowns).toEqual(['performance', 'production', 'season', 'venue', 'day', 'month'])
-    expect(seen.body.figures.map((f: { id: string, readable: boolean }) => [f.id, f.readable])).toContainEqual(['box-office.gross', true])
+    expect(seen.body.breakdowns).toEqual(expect.arrayContaining(['performance', 'production', 'season', 'venue', 'day', 'month']))
+    expect(seen.body.columns.map((f: { id: string, readable: boolean }) => [f.id, f.readable])).toContainEqual(['box-office.gross', true])
   })
   it('works out last month and the committee year in show nights, and refuses chosen dates that run backwards', async () => {
     expect((await get(`/api/reports/definitions/${SALES}?scope=production:${h.productionId}&period=last-month`)).body.period).toEqual({ rule: 'last-month', from: '2026-10-01', to: '2026-10-31' })

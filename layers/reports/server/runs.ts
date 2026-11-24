@@ -7,8 +7,10 @@ import { can, createUnit, first, inAccountScope, isRefusal, log, newId, nowMs, r
 import { listMeasures, storedFileBytes, storeFile } from '#modules/core'
 import { readFigure } from './figures'
 import { reportView, type ViewQuery } from './ready-made'
-import { layOut, type Answers, type OkAnswer, type ReportTable } from '../shared/table'
-import type { FigureColumn, PageBreakdown, PeriodRule, ScopeKind } from '../shared/reports'
+import { savedView } from './definitions'
+import { gather, readsFor } from '../shared/plan'
+import { cellKey, layOut, type OkAnswer, type ReportTable } from '../shared/table'
+import type { FigureAnswer, FigureColumn, PeriodRule, ReportColumn, ReportView, ScopeKind, Words } from '../shared/reports'
 
 export const RUN_CSV = 'reports.run-csv'
 export const RUN_DATA = 'reports.run-data'
@@ -17,10 +19,14 @@ const HEADLINE_MAX = 6 // not-policy: the spec's headline width, which an email 
 
 /** Exactly what a run answers (R4), stored when it is queued. */
 export interface RunQuestion {
+  source: ReportView['source']
   report: string
-  label: string
-  figures: FigureColumn[]
-  by?: PageBreakdown
+  name: Words
+  columns: ReportColumn[]
+  rowsBy?: string
+  acrossBy?: string
+  filter: ReportView['filter']
+  keyLabels: Record<string, string>
   scope: { kind: ScopeKind, id: string | null, title: string | null }
   period: { rule: PeriodRule, from: string, to: string }
 }
@@ -28,6 +34,7 @@ export interface RunQuestion {
 export interface RunRow {
   id: string
   report_key: string | null
+  definition_id: string | null
   question: string
   requested_by: string
   state: 'queued' | 'running' | 'done' | 'failed' | 'expired' | 'stale'
@@ -44,21 +51,30 @@ export interface RunRow {
 export interface Headline { measure: string, value: number, currency?: string }
 export interface Unavailable { measure: string, reason: string }
 
-/** Queues a copy of a ready-made report as the reader sees it now (R1, R4). */
-export async function queueRun(unit: UnitView, actor: Actor, reportId: string, query: ViewQuery & { by?: PageBreakdown }): Promise<{ id: string }> {
-  const view = await reportView(reportId, actor, query)
-  if (view.report.scope !== 'none' && !view.scope.id) refuse('reports.run.no-scope', 'Choose what the report is about first.', { status: 422, fields: { scope: 'Choose one.' } })
-  if (query.by && !view.breakdowns.includes(query.by)) refuse('reports.run.breakdown', 'This report cannot be broken down that way.', { status: 422, fields: { by: 'Choose another breakdown.' } })
-  const figures = view.figures.filter(f => f.readable)
-  if (!figures.length) refuse('reports.run.nothing-readable', 'You cannot see any of this report\'s figures.', { status: 403 })
-  const question: RunQuestion = { report: view.report.id, label: view.report.label, figures, by: query.by, scope: view.scope, period: view.period }
+/** A report as the reader sees it now: a saved one by its rpd_ id, else a ready-made one. */
+export const viewOf = (id: string, actor: Actor, query: ViewQuery) => id.startsWith('rpd_') ? savedView(id, actor, query) : reportView(id, actor, query)
+
+const wordsOf = (words: Words) => 'key' in words ? siteWords()(words.key) : words.text
+
+/** Queues a copy of a report as the reader sees it now (R1, R4). */
+export async function queueRun(unit: UnitView, actor: Actor, reportId: string, query: ViewQuery & { by?: string[] }): Promise<{ id: string }> {
+  const view = await viewOf(reportId, actor, query)
+  if (view.scopeKind !== 'none' && !view.scope.id) refuse('reports.run.no-scope', 'Choose what the report is about first.', { status: 422, fields: { scope: 'Choose one.' } })
+  const rowsBy = query.by?.[0]
+  if (rowsBy && !view.breakdowns.includes(rowsBy)) refuse('reports.run.breakdown', 'This report cannot be broken down that way.', { status: 422, fields: { by: 'Choose another breakdown.' } })
+  if (!view.columns.some(c => c.kind === 'figure' && c.readable)) refuse('reports.run.nothing-readable', 'You cannot see any of this report\'s figures.', { status: 403 })
+  const question: RunQuestion = {
+    source: view.source, report: view.id, name: view.name, columns: view.columns, rowsBy, acrossBy: view.acrossBy ?? undefined,
+    filter: view.filter, keyLabels: view.keyLabels, scope: view.scope, period: view.period,
+  }
   const id = newId('rpr')
+  const saved = view.source === 'saved'
   unit.add({
-    sql: "INSERT INTO reports_runs (id, report_key, question, requested_by, state, unavailable, created_at) VALUES (?, ?, ?, ?, 'queued', '[]', ?)",
-    params: [id, view.report.id, JSON.stringify(question), actor.accountId!, nowMs()],
+    sql: "INSERT INTO reports_runs (id, report_key, definition_id, question, requested_by, state, unavailable, created_at) VALUES (?, ?, ?, ?, ?, 'queued', '[]', ?)",
+    params: [id, saved ? null : view.id, saved ? view.id : null, JSON.stringify(question), actor.accountId!, nowMs()],
   })
   unit.enqueue('reports.run-report', { runId: id })
-  unit.audit({ action: 'create', record: [OWNER, id], detail: { report: view.report.id, figures: figures.length } })
+  unit.audit({ action: 'create', record: [OWNER, id], detail: { report: view.id, columns: view.columns.length } })
   return { id }
 }
 
@@ -86,12 +102,12 @@ export async function runReport(runId: string): Promise<void> {
     const at = nowMs()
     const unit = createUnit()
     const view = unit.view()
-    const kept = { ownerType: OWNER, ownerId: runId, title: siteWords()(question.label), expiresAt: await filesExpireAt(at) }
+    const kept = { ownerType: OWNER, ownerId: runId, title: wordsOf(question.name), expiresAt: await filesExpireAt(at) }
     const fileId = await storeFile(view, { ...kept, slot: RUN_CSV, bytes: new TextEncoder().encode(await csvOf(question, table)), mediaType: 'text/csv' })
     const dataFileId = await storeFile(view, { ...kept, slot: RUN_DATA, bytes: new TextEncoder().encode(JSON.stringify(table)), mediaType: 'application/json' })
     view.add({
       sql: "UPDATE reports_runs SET state = 'done', rows_count = ?, unavailable = ?, headline = ?, file_id = ?, data_file_id = ?, finished_at = ? WHERE id = ? AND state = 'running'",
-      params: [table.rows.length, JSON.stringify(unavailableOf(question, table)), JSON.stringify(headlineOf(table)), fileId, dataFileId, at, runId],
+      params: [table.rows.length, JSON.stringify(unavailableOf(table)), JSON.stringify(headlineOf(table)), fileId, dataFileId, at, runId],
     }).expect(1)
     await unit.commit()
   }
@@ -107,51 +123,54 @@ async function failRun(runId: string, code: string): Promise<void> {
   await unit.commit()
 }
 
-/** Every figure by the breakdown and as a total, read as `actor`, laid out as the page does. */
+/** Every read the question needs, as `actor`, laid out as the page does (B7). */
 export async function workOut(actor: Actor, question: RunQuestion): Promise<ReportTable> {
-  const base = { from: question.period.from, to: question.period.to, scope: question.scope.id ? { kind: question.scope.kind, id: question.scope.id } as ViewQuery['scope'] : undefined }
-  const answers: Answers = {}
-  await Promise.all(question.figures.map(async (f) => {
-    const [rows, total] = await Promise.all([question.by ? readFigure(actor, { ...base, id: f.id, by: question.by }) : null, readFigure(actor, { ...base, id: f.id })])
-    answers[f.id] = { rows, total }
-  }))
-  return layOut(question.figures, answers, question.by, await namer(question.by))
+  const base = { from: question.period.from, to: question.period.to, filter: question.filter ? { key: question.filter.key, values: question.filter.values } : null, scope: question.scope.id ? { kind: question.scope.kind, id: question.scope.id } as ViewQuery['scope'] : undefined }
+  const reads = readsFor(question.columns, question.rowsBy, question.acrossBy)
+  const answers: FigureAnswer[] = await Promise.all(reads.map(r => readFigure(actor, { ...base, id: r.figure, by: r.by })))
+  const max = await useSetting('reports.builder.max-columns') as number
+  const table = layOut(question.columns, gather(reads, answers), { rowsBy: question.rowsBy, acrossBy: question.acrossBy, name: await namer(), totalLabel: siteWords()('reports.total') })
+  const cells = table.groups.length * table.columns.filter(c => c.shown).length
+  if (question.acrossBy && cells > max) refuse('reports.run.too-wide', `This would make ${cells} columns across, more than ${max}.`, { status: 422 })
+  return table
 }
 
-/** Names a row on the server as the page would, in the theatre's language and time zone. */
-async function namer(by: PageBreakdown | undefined): Promise<(key: string, answer: OkAnswer) => { label: string, sortBy: string | number }> {
+/** Names a row or group on the server as the page would, in the theatre's language and time zone. */
+async function namer(): Promise<(key: string, value: string, answer: OkAnswer) => { label: string, sortBy: string | number }> {
   const language = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
   const timeZone = await theatreTimeZone()
   const day = new Intl.DateTimeFormat(language, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
   const month = new Intl.DateTimeFormat(language, { month: 'long', year: 'numeric', timeZone: 'UTC' })
   const when = new Intl.DateTimeFormat(language, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone })
-  return (key, answer) => {
-    if (by === 'day') return { label: day.format(new Date(`${key}T12:00:00Z`)), sortBy: key }
-    if (by === 'month') return { label: month.format(new Date(`${key}-15T12:00:00Z`)), sortBy: key }
-    const title = answer.labels[key] ?? key
-    const starts = answer.starts?.[key]
+  return (key, value, answer) => {
+    if (key === 'day') return { label: day.format(new Date(`${value}T12:00:00Z`)), sortBy: value }
+    if (key === 'month') return { label: month.format(new Date(`${value}-15T12:00:00Z`)), sortBy: value }
+    const title = answer.labels[value] ?? value
+    const starts = key === 'performance' ? answer.starts?.[value] : undefined
     return starts ? { label: `${title}, ${when.format(starts)}`, sortBy: starts } : { label: title, sortBy: title.toLowerCase() }
   }
 }
 
-function unavailableOf(question: RunQuestion, table: ReportTable): Unavailable[] {
-  const shown = new Set(table.visible.map(f => f.id))
-  const out: Unavailable[] = question.figures.filter(f => !shown.has(f.id)).map(f => ({ measure: f.id, reason: 'hidden' }))
-  for (const f of table.visible) {
-    const total = table.totals[f.id]
-    if (total && total.state !== 'ok') out.push({ measure: f.id, reason: total.state === 'unsupported' ? 'unsupported' : total.reason })
-  }
+/** Figures that could not answer, or that the requester may not see, by their totals. */
+function unavailableOf(table: ReportTable): Unavailable[] {
+  const out: Unavailable[] = []
+  table.columns.forEach((c, i) => {
+    if (c.kind !== 'figure') return
+    if (!c.shown) return void out.push({ measure: c.id, reason: c.gone ? 'gone' : 'hidden' })
+    const total = table.totals[cellKey(i, null)]
+    if (total && total.state !== 'ok') out.push({ measure: c.id, reason: total.state === 'unsupported' ? 'unsupported' : total.reason })
+  })
   return out
 }
 
-/** The totals row, for the list of copies and a schedule's email: never a person (M2). */
+/** The totals row's figures, for the list of copies and a schedule's email: never a person (M2). */
 function headlineOf(table: ReportTable): Headline[] {
   const out: Headline[] = []
-  for (const f of table.visible) {
-    const total = table.totals[f.id]
-    if (total?.state !== 'ok') continue
-    for (const a of total.amounts.length ? total.amounts : [{ value: 0 }]) out.push({ measure: f.id, value: a.value, ...(a.currency ? { currency: a.currency } : {}) })
-  }
+  table.columns.forEach((c, i) => {
+    const total = table.totals[cellKey(i, null)]
+    if (c.kind !== 'figure' || !c.shown || total?.state !== 'ok') return
+    for (const a of total.amounts.length ? total.amounts : [{ value: 0 }]) out.push({ measure: c.id, value: a.value, ...(a.currency ? { currency: a.currency } : {}) })
+  })
   return out.slice(0, HEADLINE_MAX)
 }
 
@@ -162,46 +181,74 @@ function cell(value: string | number | null | undefined): string {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
-/**
- * The CSV (REP-09): the question in words first, a note row for each figure that could not answer,
- * then the table and its totals. Money is in major units with one column for each currency (M7).
- */
-export async function csvOf(question: RunQuestion, table: ReportTable): Promise<string> {
+/** A key's name in words: Reports names the shared keys, a module its own. */
+export const keyName = (key: string, labels: Record<string, string>) => siteWords()(labels[key] ?? `reports.by.${key}`)
+
+/** The question in words, as the page says it, with the pivot and the filter. */
+async function questionWords(question: RunQuestion): Promise<string[]> {
   const say = siteWords()
   const language = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
   const date = new Intl.DateTimeFormat(language, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
   const dayOf = (d: string) => date.format(new Date(`${d}T12:00:00Z`))
-  const siteCurrency = (await useSetting('core.locale.currency') as string | null) ?? 'GBP'
   const dates = question.period.from === question.period.to ? dayOf(question.period.from) : `${dayOf(question.period.from)} to ${dayOf(question.period.to)}`
-  const columns = table.visible.flatMap((f) => {
-    if (f.unit !== 'money') return [{ figure: f, currency: undefined as string | undefined, label: f.unit === 'minutes' ? say('reports.csv.minutes', { figure: say(f.label) }) : say(f.label) }]
-    const currencies = new Set<string>()
-    for (const shown of [table.totals[f.id], ...table.rows.map(r => r.cells[f.id])]) if (shown?.state === 'ok') for (const a of shown.amounts) if (a.currency) currencies.add(a.currency)
-    if (!currencies.size) currencies.add(siteCurrency)
-    return [...currencies].sort().map(currency => ({ figure: f, currency, label: `${say(f.label)} (${currency})` }))
-  })
-  const value = (f: FigureColumn, currency: string | undefined, shown: ReportTable['totals'][string] | undefined): string | number => {
+  const by = (key: string | undefined) => key ? say('reports.by-sentence', { by: keyName(key, question.keyLabels).toLowerCase() }) : null
+  const lines = [[question.scope.title, dates, by(question.rowsBy), question.acrossBy ? say('reports.across-sentence', { by: keyName(question.acrossBy, question.keyLabels).toLowerCase() }) : null].filter(Boolean).join(', ')]
+  if (question.filter) lines.push(`${keyName(question.filter.key, question.keyLabels)}: ${question.filter.values.map(v => question.filter!.labels[v] ?? v).join(', ')}`)
+  return lines
+}
+
+interface CsvContext { table: ReportTable, say: ReturnType<typeof siteWords>, siteCurrency: string }
+interface CsvColumn { column: ReportColumn, key: string, currency: string | undefined, label: string }
+
+/** The currencies a cell key holds across the totals and rows, sorted; the site's own where there is none. */
+function currenciesIn(table: ReportTable, key: string, fallback: string): string[] {
+  const found = new Set<string>()
+  for (const shown of [table.totals[key], ...table.rows.map(r => r.cells[key])]) {
+    if (shown?.state !== 'ok') continue
+    for (const a of shown.amounts) if (a.currency) found.add(a.currency)
+  }
+  return found.size ? [...found].sort() : [fallback]
+}
+
+/** The CSV columns one table column gives: one, or one for each currency of a money column (M7). */
+function csvColumnsFor(ctx: CsvContext, c: ReportColumn, key: string, head: string): CsvColumn[] {
+  if (c.unit !== 'money') return [{ column: c, key, currency: undefined, label: c.unit === 'minutes' ? ctx.say('reports.csv.minutes', { figure: head }) : head }]
+  return currenciesIn(ctx.table, key, ctx.siteCurrency).map(currency => ({ column: c, key, currency, label: `${head} (${currency})` }))
+}
+
+/**
+ * The CSV (REP-09): the question in words first, a note row for each figure that could not answer,
+ * then the table and its totals. Money is in major units with one column for each currency (M7); a
+ * pivot's columns are named by their group and column.
+ */
+export async function csvOf(question: RunQuestion, table: ReportTable): Promise<string> {
+  const say = siteWords()
+  const siteCurrency = (await useSetting('core.locale.currency') as string | null) ?? 'GBP'
+  const ctx: CsvContext = { table, say, siteCurrency }
+  const labelOf = (c: ReportColumn) => c.kind === 'formula' ? c.label : say(c.label)
+  const columns = table.groups.flatMap(g => table.columns.flatMap((c, i) => {
+    if (!c.shown) return []
+    return csvColumnsFor(ctx, c, cellKey(i, g.value), `${question.acrossBy ? `${g.label} ` : ''}${labelOf(c)}`)
+  }))
+  const value = (c: ReportColumn, currency: string | undefined, shown: ReportTable['totals'][string] | undefined): string | number => {
     if (!shown || shown.state !== 'ok') return '–'
-    if (f.unit === 'money') {
+    if (c.unit === 'money') {
       const minor = shown.amounts.filter(a => (a.currency ?? siteCurrency) === currency).reduce((s, a) => s + a.value, 0)
       const digits = new Intl.NumberFormat('en', { style: 'currency', currency: currency ?? siteCurrency }).resolvedOptions().maximumFractionDigits ?? 2
       return (minor / 10 ** digits).toFixed(digits) // not-policy: minor units to major
     }
     const total = shown.amounts.reduce((s, a) => s + a.value, 0)
-    return f.unit === 'percent' ? total.toFixed(1) : total
+    return c.unit === 'percent' ? total.toFixed(1) : Number.isInteger(total) ? total : total.toFixed(1)
   }
-  const lines: (string | number)[][] = [
-    [say(question.label)],
-    [say('reports.csv.question'), [question.scope.title, dates, question.by ? say('reports.by-sentence', { by: say(`reports.by.${question.by}`).toLowerCase() }) : null].filter(Boolean).join(', ')],
-  ]
-  for (const u of unavailableOf(question, table)) {
-    const figure = question.figures.find(f => f.id === u.measure)
-    lines.push([say('reports.csv.not-available'), figure ? say(figure.label) : u.measure, say(`reports.unavailable.${u.reason}`)])
+  const lines: (string | number)[][] = [[wordsOf(question.name)], ...(await questionWords(question)).map(w => [say('reports.csv.question'), w])]
+  for (const u of unavailableOf(table)) {
+    const figure = question.columns.find((c): c is FigureColumn => c.kind === 'figure' && c.id === u.measure)
+    lines.push([say('reports.csv.not-available'), figure && !figure.gone ? say(figure.label) : u.measure, say(`reports.unavailable.${u.reason}`)])
   }
   lines.push([])
-  lines.push([question.by ? say(`reports.by.${question.by}`) : '', ...columns.map(c => c.label)])
-  for (const row of table.rows) lines.push([row.label, ...columns.map(c => value(c.figure, c.currency, row.cells[c.figure.id]))])
-  lines.push([say('reports.total'), ...columns.map(c => value(c.figure, c.currency, table.totals[c.figure.id]))])
+  lines.push([question.rowsBy ? keyName(question.rowsBy, question.keyLabels) : '', ...columns.map(c => c.label)])
+  for (const row of table.rows) lines.push([row.label, ...columns.map(c => value(c.column, c.currency, row.cells[c.key]))])
+  lines.push([say('reports.total'), ...columns.map(c => value(c.column, c.currency, table.totals[c.key]))])
   return `${lines.map(l => l.map(cell).join(',')).join('\r\n')}\r\n`
 }
 
@@ -215,7 +262,7 @@ export async function mayOpen(actor: Actor, run: Pick<RunRow, 'id' | 'question'>
   const question = JSON.parse(run.question) as RunQuestion
   const abilities = new Map((await listMeasures(null)).map(m => [m.id, m.ability]))
   const record = question.scope.kind === 'production' && question.scope.id ? ['core.production', question.scope.id] as const : undefined
-  for (const f of question.figures) {
+  for (const f of question.columns.filter((c): c is FigureColumn => c.kind === 'figure' && c.readable)) {
     const ability = abilities.get(f.id)
     if (!ability) return false
     const key = `${ability}:${record?.[1] ?? ''}`
@@ -228,7 +275,7 @@ export async function mayOpen(actor: Actor, run: Pick<RunRow, 'id' | 'question'>
 export interface RunSummary {
   id: string
   report: string
-  label: string
+  name: Words
   question: RunQuestion
   state: RunRow['state']
   failure: string | null
@@ -257,7 +304,7 @@ export async function listRuns(actor: Actor): Promise<RunSummary[]> {
 export function summaryOf(row: RunRow, mine: boolean): RunSummary {
   const question = JSON.parse(row.question) as RunQuestion
   return {
-    id: row.id, report: row.report_key ?? '', label: question.label, question, state: row.state, failure: row.failure, rows: row.rows_count,
+    id: row.id, report: row.report_key ?? row.definition_id ?? '', name: question.name, question, state: row.state, failure: row.failure, rows: row.rows_count,
     headline: row.headline ? JSON.parse(row.headline) as Headline[] : [], unavailable: JSON.parse(row.unavailable) as Unavailable[],
     createdAt: row.created_at, finishedAt: row.finished_at, mine,
   }
