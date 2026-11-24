@@ -96,6 +96,12 @@ import crewCallGet from '../../server/api/front-of-house/crew-calls/[id]/index.g
 import crewCallPatch from '../../server/api/front-of-house/crew-calls/[id]/index.patch'
 import crewCallState from '../../server/api/front-of-house/crew-calls/[id]/state.post'
 import crewCallMine from '../../server/api/front-of-house/crew-calls/[id]/mine.get'
+import perksGet from '../../server/api/front-of-house/crew-calls/[id]/perks/index.get'
+import perksPeople from '../../server/api/front-of-house/crew-calls/[id]/perks/people.get'
+import handoutsGet from '../../server/api/front-of-house/crew-calls/[id]/handouts/index.get'
+import handoutsPost from '../../server/api/front-of-house/crew-calls/[id]/handouts/index.post'
+import handoutUndo from '../../server/api/front-of-house/crew-calls/[id]/handouts/[handoutId]/undo.post'
+import handoutCalls from '../../server/api/front-of-house/handout-calls.get'
 import { call, inContext, person, rows, saveKey, server, setModule } from '../../../../tests/integration/helpers'
 
 export const handle = server({
@@ -192,6 +198,12 @@ export const handle = server({
   'PATCH /api/front-of-house/crew-calls/:id': crewCallPatch,
   'POST /api/front-of-house/crew-calls/:id/state': crewCallState,
   'GET /api/front-of-house/crew-calls/:id/mine': crewCallMine,
+  'GET /api/front-of-house/crew-calls/:id/perks': perksGet,
+  'GET /api/front-of-house/crew-calls/:id/perks/people': perksPeople,
+  'GET /api/front-of-house/crew-calls/:id/handouts': handoutsGet,
+  'POST /api/front-of-house/crew-calls/:id/handouts': handoutsPost,
+  'POST /api/front-of-house/crew-calls/:id/handouts/:handoutId/undo': handoutUndo,
+  'GET /api/front-of-house/handout-calls': handoutCalls,
 })
 
 export type Person = ReturnType<typeof person>

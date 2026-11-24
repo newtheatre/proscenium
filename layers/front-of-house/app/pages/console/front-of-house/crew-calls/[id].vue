@@ -1,6 +1,6 @@
 <!-- One crew call (festival-ready changes, part 5, "Crew call"): Details (dates, season, perks
-     rules), Questions (the form volunteers answer once, in forms' slot), Crew (who signed up and
-     whether they have answered) and Shifts. The primary action follows the lifecycle: open, close,
+     rules), Questions (the form volunteers answer once, in forms' slot, and which question is which),
+     Crew (who signed up and whether they have answered), Shifts, and Perks (counts, FH-50). The primary action follows the lifecycle: open, close,
      archive once it has ended. -->
 <script setup lang="ts">
 type State = 'draft' | 'open' | 'closed' | 'archived'
@@ -33,6 +33,16 @@ const route = useRoute()
 const id = computed(() => String(route.params.id))
 const path = computed(() => `/api/front-of-house/crew-calls/${encodeURIComponent(id.value)}`)
 const { data, status, error, refresh } = await useAPI<Call>(() => path.value, { key: `front-of-house:crew-call:${id.value}` })
+interface Perks {
+  tshirts: { size: string | null, earned: number, handed: number, toHand: number }[]
+  tshirtsEarly: number
+  meals: { day: string, earned: number, handed: number, needs: { need: string, count: number | null }[] }[]
+  mealsEarly: number
+  roles: { tshirtSize?: string, mealDays?: string, dietaryNeed?: string }
+  questions: { key: string, label: string }[]
+}
+interface PerkPerson { accountId: string, name: string, shifts: number, tshirt: boolean, size: string | null, mealDays: string[], needs: string[], handed: { item: 'tshirt' | 'meal', day: string | null }[] }
+const { data: perks, refresh: refreshPerks } = await useAPI<Perks>(() => `${path.value}/perks`, { key: `front-of-house:crew-call-perks:${id.value}` })
 const { data: choices } = await useAPI<{ seasons: { id: string, name: string }[] }>('/api/front-of-house/choices', { key: 'front-of-house:choices' })
 
 const TONE = { draft: 'neutral', open: 'success', closed: 'warning', archived: 'neutral' } as const
@@ -76,7 +86,37 @@ const tabs = computed(() => [
   { id: 'questions', label: t('front-of-house.crew-calls.tab.questions') },
   { id: 'crew', label: t('front-of-house.crew-calls.tab.crew') },
   { id: 'shifts', label: t('front-of-house.crew-calls.tab.shifts') },
+  { id: 'perks', label: t('front-of-house.crew-calls.tab.perks') },
 ])
+
+// Which question is which, chosen from the attached form's questions; the template's keys by default.
+const ROLES = ['tshirtSize', 'mealDays', 'dietaryNeed'] as const
+const UNSET = 'unset'
+const roles = reactive<Record<typeof ROLES[number], string>>({ tshirtSize: UNSET, mealDays: UNSET, dietaryNeed: UNSET })
+watch(perks, (p) => {
+  if (p) for (const r of ROLES) roles[r] = p.roles[r] ?? UNSET
+}, { immediate: true })
+const questionItems = computed(() => [{ value: UNSET, label: t('front-of-house.crew-calls.roles.none') }, ...(perks.value?.questions ?? []).map(q => ({ value: q.key, label: q.label }))])
+async function saveRoles() {
+  refusal.value = null
+  try {
+    await write(path.value, { method: 'PATCH', body: { questionRoles: Object.fromEntries(ROLES.filter(r => roles[r] !== UNSET).map(r => [r, roles[r]])) } })
+    toast.add({ title: t('front-of-house.crew-calls.roles.saved'), color: 'success' })
+    await refreshPerks()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+// Names behind "Show list": reading them is audited, and dietary needs come only with view-needs.
+const list = ref<{ needs: boolean, people: PerkPerson[] } | null>(null)
+const showing = ref(false)
+async function showList() {
+  list.value = await useNuxtApp().$api<{ needs: boolean, people: PerkPerson[] }>(`${path.value}/perks/people` as string)
+  showing.value = true
+}
+const sizeLabel = (size: string | null) => size ?? t('front-of-house.crew-calls.perks.no-size')
+const needCount = (count: number | null) => count === null ? t('front-of-house.crew-calls.perks.fewer-than-3') : String(count)
 
 // Details: saved together; the perks rules are numbers left empty when the call gives none.
 const form = reactive({ name: '', seasonId: NONE, days: { start: '', end: '' }, tshirts: false, tshirtMinShifts: 3, meals: false, mealMinMinutes: 240, mealsOnRequest: true })
@@ -222,6 +262,33 @@ const shiftName = (s: CrewShift) => s.productionTitle ? t('front-of-house.shift.
               slot-id="front-of-house.crew-call"
               :subject="d.id"
             />
+            <UForm
+              v-if="perks?.questions.length"
+              class="max-w-xl space-y-4"
+              :state="roles"
+              novalidate
+              @submit="saveRoles"
+            >
+              <h3 class="font-medium text-highlighted">
+                {{ t('front-of-house.crew-calls.roles.title') }}
+              </h3>
+              <UFormField
+                v-for="r in ROLES"
+                :key="r"
+                :label="t(`front-of-house.crew-calls.roles.${r}`)"
+              >
+                <USelect
+                  v-model="roles[r]"
+                  :items="questionItems"
+                  value-key="value"
+                />
+              </UFormField>
+              <UButton
+                type="submit"
+                :label="t('front-of-house.save')"
+                loading-auto
+              />
+            </UForm>
           </div>
         </template>
         <template #tab-crew>
@@ -271,7 +338,116 @@ const shiftName = (s: CrewShift) => s.productionTitle ? t('front-of-house.shift.
             />
           </RecordList>
         </template>
+        <template #tab-perks>
+          <div
+            v-if="perks"
+            class="space-y-8"
+          >
+            <PageSection :title="t('front-of-house.crew-calls.perks.tshirts')">
+              <p
+                v-if="d.tshirtMinShifts === null"
+                class="text-sm text-muted"
+              >
+                {{ t('front-of-house.crew-calls.perks.no-tshirts') }}
+              </p>
+              <RecordList
+                v-else-if="perks.tshirts.length"
+                :label="t('front-of-house.crew-calls.perks.tshirts')"
+              >
+                <RecordListItem
+                  v-for="row in perks.tshirts"
+                  :key="row.size ?? ''"
+                  :name="sizeLabel(row.size)"
+                  :description="t('front-of-house.crew-calls.perks.tshirt-line', { earned: row.earned, handed: row.handed, toHand: row.toHand })"
+                />
+              </RecordList>
+              <p
+                v-else
+                class="text-sm text-muted"
+              >
+                {{ t('front-of-house.crew-calls.perks.none-earned') }}
+              </p>
+              <p
+                v-if="perks.tshirtsEarly"
+                class="text-sm text-muted"
+              >
+                {{ t('front-of-house.crew-calls.perks.early', { count: perks.tshirtsEarly }) }}
+              </p>
+            </PageSection>
+            <PageSection :title="t('front-of-house.crew-calls.perks.meals')">
+              <p
+                v-if="d.mealMinMinutes === null"
+                class="text-sm text-muted"
+              >
+                {{ t('front-of-house.crew-calls.perks.no-meals') }}
+              </p>
+              <RecordList
+                v-else
+                :label="t('front-of-house.crew-calls.perks.meals')"
+              >
+                <RecordListItem
+                  v-for="row in perks.meals"
+                  :key="row.day"
+                  :name="dates.dayNamed(row.day)"
+                  :description="[t('front-of-house.crew-calls.perks.meal-line', { earned: row.earned, handed: row.handed }), ...row.needs.map(n => `${n.need}: ${needCount(n.count)}`)].join(' · ')"
+                />
+              </RecordList>
+              <p
+                v-if="perks.mealsEarly"
+                class="text-sm text-muted"
+              >
+                {{ t('front-of-house.crew-calls.perks.early', { count: perks.mealsEarly }) }}
+              </p>
+            </PageSection>
+            <div class="flex flex-wrap gap-3">
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-list"
+                :label="t('front-of-house.crew-calls.perks.show-list')"
+                loading-auto
+                @click="showList"
+              />
+              <UButton
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-shirt"
+                :to="`/live/front-of-house/handouts/${encodeURIComponent(d.id)}`"
+                :label="t('front-of-house.crew-calls.perks.open-handouts')"
+              />
+            </div>
+          </div>
+        </template>
       </PageRecord>
+      <UModal
+        v-model:open="showing"
+        :title="t('front-of-house.crew-calls.perks.list-title', { call: d.name })"
+      >
+        <template #body>
+          <RecordList
+            v-if="list?.people.length"
+            :label="t('front-of-house.crew-calls.tab.crew')"
+          >
+            <RecordListItem
+              v-for="p in list.people"
+              :key="p.accountId"
+              icon="i-lucide-user"
+              :name="p.name"
+              :description="[
+                p.tshirt ? t('front-of-house.crew-calls.perks.person-tshirt', { size: sizeLabel(p.size) }) : null,
+                p.mealDays.length ? t('front-of-house.crew-calls.perks.person-meals', { days: p.mealDays.map(day => dates.dayBrief(day)).join(', ') }) : null,
+                list.needs && p.needs.length ? p.needs.join(', ') : null,
+              ].filter(Boolean).join(' · ')"
+            />
+          </RecordList>
+          <p
+            v-else
+            class="text-muted"
+          >
+            {{ t('front-of-house.crew-calls.no-crew.title') }}
+          </p>
+        </template>
+      </UModal>
     </template>
   </DataBoundary>
 </template>
