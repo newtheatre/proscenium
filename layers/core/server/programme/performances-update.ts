@@ -5,6 +5,7 @@ import { first, nowMs, refuse } from '#kit'
 import type { Actor, UnitView } from '#kit'
 import { assertNoBlockingClosure } from '../places/closures'
 import { operatingDayOf } from '../calendar'
+import { shiftLineUp } from './line-ups'
 import { checkDropIn, checkTimes, noClash, runGuards, spaceFits, turnaroundMs, warningsFor, whyNotFree } from './performances-checks'
 import { CHANGED, MINUTE, performanceRow, record, SPACE_UNSUITABLE, syncProductionDates, type PerformancePatch, type PerformanceRow } from './performances'
 
@@ -119,6 +120,7 @@ export async function updatePerformance(unit: UnitView, id: string, patch: Perfo
       external_booking_url = ${next.externalBookingUrl}, shape = ${shape}
     WHERE id = ${id} AND state = ${row.state} AND starts_at = ${row.starts_at} AND space_id = ${row.space_id}${guards.length ? sql` AND ${sql.join(guards, sql` AND `)}` : sql``}`)
     .expect(1, change.moved && !scheduled ? SPACE_UNSUITABLE : CHANGED)
+  shiftLineUp(unit, id, next.startsAt - row.starts_at)
   if (scheduled && change.retimed) syncProductionDates(unit, row.production_id)
   unit.audit({ action: 'update', record: record(id), detail: { retimed: change.retimed, moved: change.moved, capacity: change.recapacitied, ...(shape !== row.shape ? { shape } : {}) } })
   announceChanges(unit, row, next, change)

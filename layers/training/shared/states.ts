@@ -41,8 +41,10 @@ export const ATTEMPT_KINDS = ['attempt', 'allowance'] as const
 export const VIDEO_STATES = ['uploading', 'processing', 'ready', 'failed', 'deleted'] as const
 
 export const SESSION_STATES = ['unpublished', 'published', 'cancelled', 'completed'] as const
+export type SessionState = typeof SESSION_STATES[number]
 export const SIGN_UP = ['open', 'invited'] as const
 export const PLACE_STATES = ['booked', 'waiting', 'cancelled', 'attended', 'absent'] as const
+export type PlaceState = typeof PLACE_STATES[number]
 export const CANCEL_KINDS = ['self', 'staff', 'session-cancelled', 'merge'] as const
 
 export const SIGN_OFF_KINDS = ['trainer', 'attendance', 'self', 'lesson', 'quiz', 'activity', 'evidence', 'void'] as const

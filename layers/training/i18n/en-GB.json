@@ -63,9 +63,18 @@
   "training.abilities.record.award.label": "Award a training record without the steps",
   "training.abilities.record.revoke.label": "Revoke training records and void any sign-off",
   "training.abilities.competency.manage.label": "Create competencies and change their routes",
+  "training.abilities.session.manage.label": "Schedule, change and cancel sessions",
+  "training.abilities.session.run.label": "Mark attendance, add walk-ins and close a session",
+  "training.abilities.place.book.label": "Take and cancel a place on a session",
+  "training.abilities.place.manage.label": "Give or cancel other people's places",
+  "training.abilities.evidence.verify.label": "Check certificates and declarations",
   "training.abilities.settings.manage.label": "Change Training's settings",
   "training.facts.course-trainer.label": "A trainer of the course",
   "training.facts.competent.label": "Holds the competency",
+  "training.forms.quiz.label": "Quiz on this course",
+  "training.forms.declaration.label": "Questions with a declaration on this course",
   "training.notification-topics.records.label": "Your training",
-  "training.notification-topics.records.description": "When you complete a course."
+  "training.notification-topics.records.description": "When you complete a course.",
+  "training.notification-topics.sessions.label": "Training sessions",
+  "training.notification-topics.sessions.description": "Reminders before a session you have a place on."
 }
