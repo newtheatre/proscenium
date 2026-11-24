@@ -23,6 +23,8 @@ export type PublicEffect = Pick<GuidanceEffect, 'termId' | 'label' | 'descriptio
 
 export interface PublicPerformance {
   id: string
+  /** A drop-in is worded as opening hours, "Open 10:00 to 17:00", never as a start (DI4). */
+  shape: 'timed' | 'drop-in'
   startsAt: number
   doorsAt: number | null
   endsAt: number
@@ -114,6 +116,7 @@ interface ProductionRow {
 interface PerformanceRow {
   id: string
   production_id: string
+  shape: PublicPerformance['shape']
   starts_at: number
   doors_at: number | null
   ends_at: number
@@ -321,7 +324,7 @@ async function publicPerformances(productions: ProductionRow[], now: number, can
   const byId = new Map(productions.map(p => [p.id, p]))
   // Drafts are never public. A cancelled performance shows only until it would have ended, and only by choice.
   const rows = await all<PerformanceRow>(
-    `SELECT f.id, f.production_id, f.starts_at, f.doors_at, f.ends_at, f.state, f.label, f.capacity, f.external_booking_url,
+    `SELECT f.id, f.production_id, f.shape, f.starts_at, f.doors_at, f.ends_at, f.state, f.label, f.capacity, f.external_booking_url,
         v.id AS venue_id, v.slug AS venue_slug, v.name AS venue_name, s.id AS space_id, s.name AS space_name
        FROM core_performances f JOIN core_venues v ON v.id = f.venue_id JOIN core_spaces s ON s.id = f.space_id
       WHERE f.production_id IN (SELECT value FROM json_each(?))
@@ -359,6 +362,7 @@ async function publicPerformances(productions: ProductionRow[], now: number, can
   })))
   return rows.map(r => ({
     id: r.id,
+    shape: r.shape,
     startsAt: r.starts_at,
     doorsAt: r.doors_at,
     endsAt: r.ends_at,
