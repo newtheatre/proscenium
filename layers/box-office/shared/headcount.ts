@@ -1,6 +1,8 @@
 // What the door counter's presses add up to (BO-73), worked out the same way on the server and on a
 // device that is offline. Inside never goes below nought: more out than in is a miscount, not a debt.
 
+import { deviceId } from './device-ids'
+
 export interface Tap { id: string, kind: 'in' | 'out' | 'undo', quantity: number, reversesId: string | null, tappedAt: number }
 
 export interface Tally {
@@ -33,18 +35,7 @@ export function fullness(inside: number, capacity: number | null, warnPercent: n
   return inside * 100 >= capacity * warnPercent ? 'warning' : 'ok' // not-policy: a percentage
 }
 
-const ID_ALPHABET = '234567abcdefghijklmnopqrstuvwxyz' // not-policy: the kit's id alphabet (kit/ids.ts)
-const TIME_CHARS = 10 // not-policy: the id format
-const RANDOM_CHARS = 16 // not-policy: the id format
-
-/** A press's id as the kit makes one (`hct_` and 26 characters, time first), made on the device (HC2). */
+/** A press's id, made on the device (HC2). */
 export function newTapId(now = Date.now()): string {
-  let rest = now
-  let time = ''
-  for (let i = 0; i < TIME_CHARS; i++) {
-    time = ID_ALPHABET[rest % ID_ALPHABET.length] + time
-    rest = Math.floor(rest / ID_ALPHABET.length)
-  }
-  const random = [...crypto.getRandomValues(new Uint8Array(RANDOM_CHARS))].map(b => ID_ALPHABET[b % ID_ALPHABET.length]).join('')
-  return `hct_${time}${random}`
+  return deviceId('hct', now)
 }
