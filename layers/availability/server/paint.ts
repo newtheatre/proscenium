@@ -2,38 +2,12 @@
 // day or as a change to the pattern covering it. Clear takes back what was painted there.
 import { sql } from 'drizzle-orm'
 import { inAccountScope, newId, nowMs, refuse, useDb, type UnitView } from '#kit'
-import { minutesOf, type Level } from '../shared/levels'
+import { clockOf as clock, DAY_MINUTES, repaint, spanOf, without, type Span } from '../shared/grid'
+import type { Level } from '../shared/levels'
 import { checkLines, entryDates, touched, updatePattern, type LineInput } from './entries'
 import { nextDate, weekdayOf } from './levels'
 
-const DAY_MINUTES = 1440 // not-policy: minutes in a day
-
 export interface Stroke { date: string, from: string | null, until: string | null, level: Level | 'clear', target: 'days' | 'pattern' }
-
-interface Span { start: number, end: number }
-const clock = (m: number) => m === DAY_MINUTES ? '24:00' : `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}` // not-policy: minutes to HH:MM
-const spanOf = (from: string | null, until: string | null): Span => from && until ? { start: minutesOf(from), end: minutesOf(until) } : { start: 0, end: DAY_MINUTES }
-
-/** What is left of `span` once `cut` is taken out: nothing, one piece or two. */
-export function without(span: Span, cut: Span): Span[] {
-  if (cut.end <= span.start || span.end <= cut.start) return [span]
-  return [{ start: span.start, end: cut.start }, { start: cut.end, end: span.end }].filter(s => s.end > s.start)
-}
-
-/** A weekday's lines with the stroke painted over them, neighbours of one level joined. */
-export function repaint(lines: LineInput[], weekday: number, cut: Span, level: Level | 'clear'): LineInput[] {
-  const others = lines.filter(l => l.weekday !== weekday)
-  const day = lines.filter(l => l.weekday === weekday).flatMap(l => without(spanOf(l.from, l.until), cut).map(s => ({ ...s, level: l.level })))
-  if (level !== 'clear') day.push({ ...cut, level })
-  day.sort((a, b) => a.start - b.start)
-  const joined: (Span & { level: Level })[] = []
-  for (const s of day) {
-    const last = joined[joined.length - 1]
-    if (last && last.end === s.start && last.level === s.level) last.end = s.end
-    else joined.push({ ...s })
-  }
-  return [...others, ...joined.map(s => ({ weekday, from: clock(s.start), until: clock(s.end), level: s.level }))]
-}
 
 interface ExceptionRow { id: string, first_date: string, last_date: string, weekdays: string | null, from_local: string | null, until_local: string | null, level: Level, reason: string | null, reason_shared: number, entered_by: string, request_id: string | null, created_at: number }
 
