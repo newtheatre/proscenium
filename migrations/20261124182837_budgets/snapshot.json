@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ba15cf3a-6c90-4ca6-8ac2-f64a13a9304b",
+  "id": "c31bb3ef-8b80-47e8-ba4c-3d5f39b87e1f",
   "prevIds": [
-    "a630e1d2-57da-4fc1-aa64-9ebe4e5b6cab"
+    "729c9681-eb33-47cd-9370-db341fc6f901"
   ],
   "ddl": [
     {
@@ -200,6 +200,10 @@
     },
     {
       "name": "box_office_exchanges",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_headcount_taps",
       "entityType": "tables"
     },
     {
@@ -5845,6 +5849,116 @@
       "notNull": true,
       "autoincrement": false,
       "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "reverses_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "reason_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "tapped_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "device_label",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "tapped_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "received_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "offline",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
       "generated": null,
       "entityType": "columns"
     },
@@ -27529,6 +27643,38 @@
       "entityType": "indexes"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_performance",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "tapped_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_reverses",
+      "columns": [
+        {
+          "value": "reverses_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "reverses_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "box_office_holds",
       "name": "box_office_holds_order",
       "columns": [
@@ -33921,6 +34067,36 @@
       "entityType": "fks"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "fk_box_office_headcount_taps_reverses_id_box_office_headcount_taps_id_fk",
+      "columns": [
+        "reverses_id"
+      ],
+      "tableTo": "box_office_headcount_taps",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "fk_box_office_headcount_taps_reason_term_id_core_terms_id_fk",
+      "columns": [
+        "reason_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "box_office_holds",
       "name": "fk_box_office_holds_order_id_box_office_orders_id_fk",
       "columns": [
@@ -38007,6 +38183,15 @@
       "entityType": "pks"
     },
     {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "box_office_holds",
       "name": "box_office_holds_pk",
       "columns": [
@@ -40014,6 +40199,30 @@
       "table": "box_office_exchanges",
       "name": "box_office_exchanges_difference",
       "value": "\"difference_minor\" > 0 AND \"price_minor\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_kind",
+      "value": "\"kind\" IN ('in', 'out', 'undo')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_quantity",
+      "value": "\"quantity\" BETWEEN 1 AND 50",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_reverses",
+      "value": "(\"kind\" = 'undo') = (\"reverses_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_headcount_taps",
+      "name": "box_office_headcount_taps_device",
+      "value": "\"device_label\" IS NULL OR length(\"device_label\") <= 40",
       "entityType": "checks"
     },
     {
