@@ -28,7 +28,7 @@ export function normaliseOrigin(text: unknown): string | null {
 /** The address a request arrived on, from the Worker's own request, never from forwarded headers. */
 export function requestUrl(event: H3Event): URL {
   // Nitro's local fetches during a page render share the platform object, so they see the outer request.
-  const request = (event.context.cloudflare as { request?: Request } | undefined)?.request ?? event.web?.request
+  const request = (event.context.cloudflare as { request?: Request } | undefined)?.request ?? (event as unknown as { req?: Request }).req
   return request ? new URL(request.url) : getRequestURL(event, { xForwardedHost: false, xForwardedProto: false })
 }
 

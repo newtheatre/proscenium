@@ -24,5 +24,5 @@ export default defineEventHandler(async (event) => {
   if (!mode) return
   setCookie(event, MODE_KEY, mode, { path: '/', maxAge: MODE_COOKIE_AGE, sameSite: 'lax' })
   const others = (getHeader(event, 'cookie') ?? '').split(/;\s*/).filter(c => c && !c.startsWith(`${MODE_KEY}=`))
-  event.node.req.headers.cookie = [...others, `${MODE_KEY}=${mode}`].join('; ')
+  if (event.node) event.node.req.headers.cookie = [...others, `${MODE_KEY}=${mode}`].join('; ')
 })

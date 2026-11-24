@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
   })
   if (!answer) return
   setResponseStatus(event, SERVICE_UNAVAILABLE)
-  setResponseHeader(event, 'retry-after', answer.wait)
+  setResponseHeader(event, 'retry-after', String(answer.wait))
   setResponseHeader(event, 'cache-control', 'no-store')
   if (answer.page === null) {
     setResponseHeader(event, 'content-type', 'application/json')

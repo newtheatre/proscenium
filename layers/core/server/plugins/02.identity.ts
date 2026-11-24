@@ -4,7 +4,7 @@
 // passkeys (@simplewebauthn/server, through @peculiar/x509's tsyringe) need it, and the Worker has
 // none.
 import 'reflect-metadata'
-import { defineNitroPlugin } from 'nitropack/runtime'
+import { definePlugin as defineNitroPlugin } from 'nitro'
 import { setAccessProvider } from '#kit/access'
 import { identityAccess } from '../identity/access'
 

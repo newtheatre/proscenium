@@ -27,7 +27,7 @@ setEmailEventsSetAside(emailEventsSetAside)
 setContentUpkeep(async (at) => {
   const { env } = useContext()
   const query = async (collection: string, sql: string) => {
-    const response = await useNitroApp().localFetch(`/__nuxt_content/${collection}/query`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sql }) })
+    const response = await useNitroApp().fetch(new Request(`http://localhost/__nuxt_content/${collection}/query`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sql }) }))
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
   }
   await mendContentStore(env.DB, env.CACHE, at, query)

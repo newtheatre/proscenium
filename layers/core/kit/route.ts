@@ -177,7 +177,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     const rateClass = decl.rateLimit === 'default' && actor.accountId && actor.grants?.length ? 'staff' : decl.rateLimit
     const rate = await countAgainstRate(rateClass, who)
     if (!rate.allowed) {
-      setResponseHeader(event, 'Retry-After', rate.retryAfter)
+      setResponseHeader(event, 'Retry-After', String(rate.retryAfter))
       throw new Refusal('core.rate-limit.reached', 'Too many requests. Please slow down.', { status: 429, remedy: waitRemedy(rate.retryAfter) })
     }
 
