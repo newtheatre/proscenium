@@ -116,5 +116,29 @@ the parts above:
 - Lines post to Invoices' own income accounts (`accountsOf('invoicing', 'income')`); choosing any
   income account in the ledger waits for Finance to offer one list for every module.
 - The treasurer's role template gains `invoicing.invoice.issue` and `invoicing.payment.record`.
-- Not yet: the PDF, sending, the public pay page, reminders, debtors and the over-payment give-back
-  (slice 2), and bills, credit notes and write-offs after it.
+- Not yet: card payment on the public page (IE-12) and the over-payment give-back, then bills,
+  credit notes and write-offs.
+
+## As built: sending, slice 2 (IE-10, IE-11, IE-17, IE-18)
+
+The PDF, the email and its public page, reminders, and Owed to us (S5's debtors half). Where the build
+differs from the parts above:
+
+- The PDF is made by the job `invoicing.after-issue`, queued in the issuing batch, rather than in the
+  issuing request; the queue retries it, and the email waits for it. It is drawn with `pdf-lib` and
+  the standard Helvetica, so a letter outside Windows-1252 loses its accent or prints as a question
+  mark. The theatre's name, address and numbers come from the organisation settings when it is made,
+  not from the frozen row; no logo yet.
+- The email carries the link to the page, not the PDF: core's email has no attachments yet. The page
+  offers the PDF.
+- The link's token is derived from the invoice and the link's expiry with the kit's keyed hash, and
+  only its hash is stored, so each message sent while the link lasts carries the same link (I-32). A
+  send after it lapses makes a new one, and the old dies. Paying the invoice keeps the link, so the
+  page can say nothing is owed.
+- `invoicing_reminders` records the first send as step `sent` as well as the reminder steps, each
+  unique per invoice, so a retried job never sends twice. Only an invoice whose first email went is
+  chased; one marked to send by hand waits for a person, who can send it from S2.
+- Reminders run hourly and send once the theatre's local time passes `reminders.send-at`. Core has
+  no closed days yet, so I-33's closed-day rule waits for it.
+- Ageing adds a "Not yet due" band before I-34's four. S5's creditors tab follows with bills.
+- `/invoice` joins the reserved address prefixes.

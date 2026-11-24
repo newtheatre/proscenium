@@ -2,7 +2,7 @@
      was earlier. Issuing numbers it from its series and posts it; after that it changes only by a
      credit note. The total shown is sent back, so a draft changed meanwhile is refused, not issued. -->
 <script setup lang="ts">
-const props = defineProps<{ invoiceId: string, version: number, totalMinor: number, currency: string }>()
+const props = defineProps<{ invoiceId: string, version: number, totalMinor: number, currency: string, /** Where it would be emailed; null to send by hand. */ email: string | null }>()
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ issued: [number: string] }>()
 
@@ -12,12 +12,13 @@ const { toRefusal, fieldErrors } = useRefusal()
 const { toLocal } = useDates()
 const text = useInvoiceText()
 const today = () => toLocal(Date.now()).slice(0, 10) // not-policy: the date part of a local date and time
-const form = reactive({ issueOn: '' })
+const form = reactive({ issueOn: '', send: true })
 const formEl = useFormRef('formEl')
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 watch(open, (now) => {
   if (!now) return
   form.issueOn = today()
+  form.send = true
   refusal.value = null
 })
 
@@ -26,7 +27,7 @@ async function issue() {
   try {
     const done = await $api<{ number: string }>(`/api/invoicing/invoices/${props.invoiceId}/issue`, {
       method: 'POST',
-      body: { version: props.version, expectedTotalMinor: props.totalMinor, ...(form.issueOn === today() ? {} : { issueOn: form.issueOn }) },
+      body: { version: props.version, expectedTotalMinor: props.totalMinor, send: !!props.email && form.send, ...(form.issueOn === today() ? {} : { issueOn: form.issueOn }) },
     })
     open.value = false
     emit('issued', done.number)
@@ -66,6 +67,19 @@ async function issue() {
             :max="today()"
           />
         </UFormField>
+        <UCheckbox
+          v-if="email"
+          v-model="form.send"
+          name="send"
+          :label="t('invoicing.screens.issue.send', { email })"
+          :description="t('invoicing.screens.issue.send-help')"
+        />
+        <p
+          v-else
+          class="text-sm text-muted"
+        >
+          {{ t('invoicing.screens.issue.no-email') }}
+        </p>
       </UForm>
     </template>
     <template #footer>

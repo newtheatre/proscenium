@@ -1,6 +1,7 @@
 // Money received against an invoice out (IE-13, IE-14; rules I-20 to I-23, I-25). The payment is
 // Payments' (P-A2); this module adds the allocation, raises what is allocated with the predicate on
-// the statement, and closes the invoice when nothing is left, all in Payments' batch.
+// the statement, and closes the invoice when nothing is left, all in Payments' batch. The link stays
+// until it expires, so the public page can say nothing is owed.
 import { z } from 'zod'
 import { first, newId, nowMs, refuse, today, type UnitView } from '#kit'
 import { recordReceived, type Part } from '#modules/payments'
@@ -32,8 +33,7 @@ export async function settlePart(unit: UnitView, part: Part) {
   const at = nowMs()
   unit.add({
     sql: `UPDATE invoicing_invoices SET allocated_minor = allocated_minor + ?1,
-      state = CASE WHEN allocated_minor + ?1 = total_minor THEN 'closed' ELSE state END,
-      pay_token_hash = CASE WHEN allocated_minor + ?1 = total_minor THEN NULL ELSE pay_token_hash END, updated_at = ?2
+      state = CASE WHEN allocated_minor + ?1 = total_minor THEN 'closed' ELSE state END, updated_at = ?2
       WHERE id = ?3 AND state = 'open' AND allocated_minor + ?1 <= total_minor`, // not-policy: numbered parameters
     params: [part.amountMinor, at, invoice!.id],
   }).expect(1, over)

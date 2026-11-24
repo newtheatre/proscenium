@@ -208,7 +208,7 @@ export function shownState(invoice: Pick<Invoice, 'state' | 'allocatedMinor' | '
 const DAY_MS = 86_400_000 // not-policy: a calendar day of UTC dates
 
 /** Whole calendar days from one theatre-local date to a later one. */
-function daysBetween(from: string, to: string): number {
+export function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS)
 }
 
@@ -233,5 +233,6 @@ export async function powersOn(actor: Actor, invoice: Invoice) {
     canEdit: invoice.state === 'draft' && (await can(actor, 'invoicing.invoice.draft')).allowed,
     canIssue: invoice.state === 'draft' && (await can(actor, 'invoicing.invoice.issue', on)).allowed,
     canRecordPayment: invoice.state === 'open' && (await can(actor, 'invoicing.payment.record', on)).allowed,
+    canSend: invoice.direction === 'out' && (invoice.state === 'open' || invoice.state === 'closed') && !!invoice.billToEmail && (await can(actor, 'invoicing.invoice.issue', on)).allowed,
   }
 }

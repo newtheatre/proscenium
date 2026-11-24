@@ -28,5 +28,19 @@
   "invoicing.abilities.invoice.view.label": "See invoices and what has been paid against them",
   "invoicing.abilities.invoice.draft.label": "Write and change draft invoices",
   "invoicing.abilities.invoice.issue.label": "Issue invoices, which numbers them and posts them to the ledger",
-  "invoicing.abilities.payment.record.label": "Record bank transfers and cheques received against invoices"
+  "invoicing.abilities.payment.record.label": "Record bank transfers and cheques received against invoices",
+  "invoicing.settings.pay.link-valid-for.label": "Invoice links work for",
+  "invoicing.settings.pay.link-valid-for.help": "How long the link in an invoice's email and its reminders opens the invoice. Sending one after the link has lapsed makes a new link.",
+  "invoicing.settings-sections.reminders": "Reminders",
+  "invoicing.settings.reminders.enabled.label": "Send reminders",
+  "invoicing.settings.reminders.enabled.help": "Reminds customers by email before and after an invoice falls due. Off stops every scheduled reminder; one sent by hand still goes.",
+  "invoicing.settings.reminders.before-due.label": "First reminder before it falls due",
+  "invoicing.settings.reminders.before-due.help": "How long before the due date the first reminder goes. Nought sends none before it.",
+  "invoicing.settings.reminders.first-after.label": "First overdue reminder",
+  "invoicing.settings.reminders.first-after.help": "How long after the due date the first overdue reminder goes.",
+  "invoicing.settings.reminders.second-after.label": "Second overdue reminder",
+  "invoicing.settings.reminders.second-after.help": "How long after the due date the second and last automatic reminder goes.",
+  "invoicing.settings.reminders.send-at.label": "Reminders go from",
+  "invoicing.settings.reminders.send-at.help": "The time of day reminders are sent.",
+  "invoicing.settings.rules.second-after-first": "The second overdue reminder goes later than the first."
 }

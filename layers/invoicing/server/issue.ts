@@ -16,6 +16,8 @@ export const issueFields = z.object({
   // The gross the screen showed; a different figure on the server refuses quoting both (decision 0004).
   expectedTotalMinor: z.number().int().min(0),
   issueOn: z.iso.date().optional(),
+  // Emails it once the PDF is made, when it has an address (I-17); otherwise it is sent by hand.
+  send: z.boolean().default(true),
 }).strict()
 
 /** Checks what issue needs before any statement is written. */
@@ -67,6 +69,7 @@ export async function issue(unit: UnitView, actor: Actor, invoice: Invoice, inpu
     params: [number, issueOn, await dueFrom(invoice, issueOn), registered ? await useSetting('finance.tax.number') : null, postingId, actor.accountId ?? null, at, at, invoice.id, input.version, input.expectedTotalMinor],
   }).expect(1, { code: 'invoicing.invoice.changed', reason: 'Someone else changed this invoice a moment ago.', remedy: 'Reload it and try again.' })
   unit.audit({ action: 'state', record: ['invoicing.invoice', invoice.id], detail: { from: 'draft', to: 'open', number, totalMinor: invoice.totalMinor } })
+  unit.enqueue('invoicing.after-issue', { invoiceId: invoice.id, send: input.send, byId: actor.accountId ?? null })
   unit.announce('invoicing.invoice.issued', { invoiceId: invoice.id, kind: 'invoice', totalMinor: invoice.totalMinor }, { record: ['invoicing.invoice', invoice.id] })
   return { number }
 }

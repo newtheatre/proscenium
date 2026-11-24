@@ -49,6 +49,7 @@
     "jiti": "^2.6.1",
     "jsqr": "1.4.0",
     "nuxt": "4.7.0",
+    "pdf-lib": "1.17.1",
     "reflect-metadata": "^0.2.2",
     "reka-ui": "2.11.0",
     "tailwindcss": "^4.3.5",

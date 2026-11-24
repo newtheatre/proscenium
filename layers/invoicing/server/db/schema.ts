@@ -295,4 +295,26 @@ export const allocations = defineTable('invoicing_allocations', {
   ],
 })
 
-export const tables = { series, parties, invoices, lines, allocations, exportProfiles, exportCodes, exportRuns }
+export const REMINDER_STEPS = ['sent', 'before-due', 'overdue-1', 'overdue-2', 'manual'] as const
+
+/** Each time an invoice out was emailed: when issued, each reminder step once, and any sent by hand (I-17, I-31, I-35). */
+export const reminders = defineTable('invoicing_reminders', {
+  id: col.id(),
+  invoiceId: col.ref('invoicing_invoices'),
+  step: col.internal(text('step', { enum: REMINDER_STEPS }).notNull()),
+  notificationId: col.internal(text('notification_id').notNull()),
+  sentBy: col.account('sent_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'ivn',
+  realm: 'operational',
+  subject: { via: 'invoice_id' },
+  appendOnly: true,
+  extra: t => [
+    index('invoicing_reminders_invoice').on(t.invoiceId, t.createdAt),
+    uniqueIndex('invoicing_reminders_step').on(t.invoiceId, t.step).where(sql`step IN ('sent', 'before-due', 'overdue-1', 'overdue-2')`),
+    check('invoicing_reminders_steps', sql`${t.step} IN ('sent', 'before-due', 'overdue-1', 'overdue-2', 'manual')`),
+  ],
+})
+
+export const tables = { series, parties, invoices, lines, allocations, reminders, exportProfiles, exportCodes, exportRuns }

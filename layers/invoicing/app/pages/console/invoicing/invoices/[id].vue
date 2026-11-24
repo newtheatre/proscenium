@@ -36,6 +36,9 @@ interface InvoiceView {
   allocations: { id: string, kind: 'payment' | 'credit' | 'write_off' | 'reversal', amountMinor: number, onDate: string, createdAt: number }[]
   choices: DraftChoices | null
   paymentAccounts: { id: string, label: string }[]
+  pdfUrl: string | null
+  sends: { id: string, step: 'sent' | 'before-due' | 'overdue-1' | 'overdue-2' | 'manual', at: number }[]
+  canSend: boolean
   canEdit: boolean
   canIssue: boolean
   canRecordPayment: boolean
@@ -45,7 +48,7 @@ const route = useRoute()
 const id = computed(() => String(route.params.id))
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { day } = useDates()
+const { day, dateTime } = useDates()
 const toast = useToast()
 const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
@@ -82,6 +85,17 @@ async function issued(number: string) {
   toast.add({ title: t('invoicing.screens.issue.done', { number }), color: 'success' })
   await refresh()
 }
+async function send() {
+  try {
+    const done = await $api<{ step: string }>(`/api/invoicing/invoices/${id.value}/send`, { method: 'POST' })
+    toast.add({ title: t(done.step === 'sent' ? 'invoicing.screens.send.sent' : 'invoicing.screens.send.reminded', { email: invoice.value?.billToEmail ?? '' }), color: 'success' })
+    await refresh()
+  }
+  catch (e) {
+    const refusal = toRefusal(e)
+    toast.add({ title: refusal.reason, description: refusal.remedy, color: 'error' })
+  }
+}
 async function recorded() {
   toast.add({ title: t('invoicing.screens.payment.done'), color: 'success' })
   await refresh()
@@ -91,7 +105,12 @@ const actions = computed(() => [
   ...(data.value?.canIssue ? [{ label: t('invoicing.screens.issue.title'), icon: 'i-lucide-send', onSelect: () => { issuing.value = true } }] : []),
   ...(data.value?.canRecordPayment ? [{ label: t('invoicing.screens.payment.title'), icon: 'i-lucide-banknote', onSelect: () => { paying.value = true } }] : []),
 ])
-const menu = computed(() => data.value?.canEdit ? [{ label: t('invoicing.screens.draft.delete'), icon: 'i-lucide-trash-2', onSelect: remove }] : [])
+const everSent = computed(() => !!data.value?.sends.some(s => s.step === 'sent'))
+const menu = computed(() => [
+  ...(data.value?.canEdit ? [{ label: t('invoicing.screens.draft.delete'), icon: 'i-lucide-trash-2', onSelect: remove }] : []),
+  ...(data.value?.pdfUrl ? [{ label: t('invoicing.screens.invoices.pdf'), icon: 'i-lucide-file-down', to: data.value.pdfUrl, external: true, target: '_blank' }] : []),
+  ...(data.value?.canSend && (!everSent.value || invoice.value?.state === 'open') ? [{ label: t(everSent.value ? 'invoicing.screens.send.remind' : 'invoicing.screens.send.send'), icon: 'i-lucide-mail', onSelect: send }] : []),
+])
 const facts = computed(() => {
   const i = invoice.value
   if (!i) return []
@@ -181,6 +200,20 @@ const lineDescription = (l: InvoiceView['lines'][number]) => [
           </RecordList>
         </PageSection>
         <PageSection
+          v-if="data.sends.length"
+          :title="t('invoicing.screens.send.log')"
+        >
+          <RecordList :label="t('invoicing.screens.send.log')">
+            <RecordListItem
+              v-for="s in data.sends"
+              :key="s.id"
+              icon="i-lucide-mail"
+              :name="t(`invoicing.screens.send.steps.${s.step}`)"
+              :description="dateTime(s.at)"
+            />
+          </RecordList>
+        </PageSection>
+        <PageSection
           v-if="data.invoice.notes || data.invoice.internalNote"
           :title="t('invoicing.screens.draft.notes-group')"
         >
@@ -206,6 +239,7 @@ const lineDescription = (l: InvoiceView['lines'][number]) => [
       :version="invoice.version"
       :total-minor="invoice.totalMinor"
       :currency="invoice.currency"
+      :email="invoice.billToEmail"
       @issued="issued"
     />
     <InvoicingPaymentDialog
