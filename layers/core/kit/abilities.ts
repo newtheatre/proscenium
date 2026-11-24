@@ -4,9 +4,10 @@ import { DeclarationError } from './refusal'
 
 /**
  * A record type. Most have a table; one without a table has a fixed set of ids instead, such as
- * core.branding with the one id `site`. Its resolver gives the label, the address and the parent.
+ * core.branding with the one id `site`, or takes its ids from a data point's contributions, as
+ * practice scenarios do. Its resolver gives the label, the address and the parent.
  */
-export type RecordDecl = { parent?: string, owner?: string } & ({ table: string, ids?: undefined } | { table?: undefined, ids: readonly string[] })
+export type RecordDecl = { parent?: string, owner?: string } & ({ table: string, ids?: undefined, point?: undefined } | { table?: undefined, ids: readonly string[], point?: undefined } | { table?: undefined, ids?: undefined, point: string })
 export interface AbilityDecl {
   /** The record type it acts on. Without it the ability is site-wide only. */
   on?: string
