@@ -7,7 +7,7 @@ import AxeBuilder from '@axe-core/playwright'
 
 const owner = { kind: 'person', accountId: 'acc_e2eowner', name: 'Browser Tests', assurance: 'strong', reassertedAt: Date.now(), grants: ['core.modules.manage', 'core.settings.manage'].map(ability => ({ ability, via: 'test' })) }
 const member = { kind: 'person', accountId: `acc_avail${Date.now() % 1_000_000}`, name: 'Ada Available', assurance: 'strong', reassertedAt: Date.now(), grants: [] }
-const organiser = { kind: 'person', accountId: `acc_organ${Date.now() % 1_000_000}`, name: 'Olly Organiser', assurance: 'strong', reassertedAt: Date.now(), grants: ['availability.request.send', 'availability.find.anyone'].map(ability => ({ ability, via: 'test' })) }
+const organiser = { kind: 'person', accountId: `acc_organ${Date.now() % 1_000_000}`, name: 'Olly Organiser', assurance: 'strong', reassertedAt: Date.now(), grants: ['availability.request.send', 'availability.find.anyone', 'availability.find.use', 'availability.entry.on-behalf'].map(ability => ({ ability, via: 'test' })) }
 const output = fileURLToPath(new URL('../../.output', import.meta.url))
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 // A Monday three to four weeks ahead, so every day in view can be painted.
@@ -184,5 +184,31 @@ test.describe('a request to check availability', () => {
       await page.getByRole('dialog').getByRole('button', { name: 'Stop asking' }).click()
       await expect(people).toContainText('No longer asked')
     })
+  })
+})
+
+test.describe('finding a time', () => {
+  test.use(as(organiser))
+
+  test('finds the best times for the company, shows who is free, and marks someone who must come', async ({ page }) => {
+    await visit(page, '/members/find-a-time')
+    await expect(page.getByRole('heading', { level: 1, name: 'Find a time' })).toBeVisible()
+    await page.getByRole('button', { name: 'Find times' }).click()
+    await expect(page.getByText('Choose at least one group.')).toBeVisible()
+    await page.getByRole('button', { name: /^Groups/ }).click()
+    await page.getByRole('option', { name: 'Gallery company' }).click()
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Find times' }).click()
+    await expect(page.getByRole('heading', { name: 'Best times' })).toBeVisible()
+    await expect(page.getByRole('checkbox', { name: /Ada Available/ })).toBeVisible()
+    await noViolations(page)
+    await page.getByRole('button', { name: 'Who' }).first().click()
+    const panel = page.getByRole('dialog')
+    await expect(panel.getByRole('heading', { name: /^Not known/ })).toBeVisible()
+    await expect(panel).toContainText('Ada Available')
+    await noViolations(page)
+    await page.keyboard.press('Escape')
+    await page.getByRole('checkbox', { name: /Ada Available/ }).check()
+    await expect(page.getByText('No time works for everyone who must come')).toBeVisible()
   })
 })
