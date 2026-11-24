@@ -40,6 +40,8 @@ export default defineConfig({
           name: 'integration',
           include: ['tests/integration/**/*.test.ts', 'layers/*/tests/integration/**/*.test.ts'],
           setupFiles: ['./tests/integration/setup.ts'],
+          // Coverage instruments every module, which slows the longest flows past the 5 s default.
+          testTimeout: 20_000, // not-policy: a test runner limit
         },
       },
     ],
