@@ -22,6 +22,8 @@
   "core.sign-in.page.error.closed": "This theatre is not taking new accounts at the moment.",
   "core.sign-in.page.error.disabled": "This account is disabled. Contact the theatre to find out why.",
   "core.sign-in.page.error.provider-other": "{provider} did not confirm who you are. Try again.",
+  "core.sign-in.page.error.provider-managed-elsewhere": "Addresses at that domain sign in another way. Enter your address below to see how.",
+  "core.sign-in.page.error.provider-prove-address": "{provider} has not confirmed that {address} is yours. We have emailed it a code: enter it below, and next time {provider} will sign you straight in.",
   "core.sign-in.page.terms.before": "By creating an account you agree to our",
   "core.sign-in.page.terms.terms": "terms of use",
   "core.sign-in.page.terms.between": "and have read our",

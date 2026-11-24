@@ -91,7 +91,7 @@ A partial unique index allows one draft version per form. Question labels are th
 
 ### forms\_fields
 
-The field catalogue: one row per question identity, across all versions of a form. Written at publish.
+The field catalogue: one row per question identity, across all versions of a form. Written at publish, in one statement for all of a version's questions and one for those it retires, so publishing a form of any length takes the same handful of statements.
 
 | Column | Type and constraints | Class | On erasure |
 | --- | --- | --- | --- |

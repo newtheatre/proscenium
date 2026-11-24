@@ -5,104 +5,19 @@
 // answers, drops what logic hides, and refuses what is not valid.
 import { all, first, linkTokens, newId, openSpecial, refuse, sealSpecial, today, useSetting, type Actor, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import type { Answers, CalculationType, DataClass, Definition, Entry, Evaluation, Question, Stage, Value } from '../shared/engine'
+import type { Answers, CalculationType, DataClass, Definition, Entry, Evaluation, Marked, Question, Stage, Value } from '../shared/engine'
 import { moneyWords } from '../shared/words'
-import { OTHER, SUBMIT, evaluate, firstStage, isEmpty, isFinal, otherKey, questionsOf } from '../shared/engine'
+import { OTHER, SUBMIT, evaluate, firstStage, hasAnswerKey, isEmpty, isFinal, mark, otherKey, questionsOf } from '../shared/engine'
 import { answers as answersTable } from './db/schema'
 import type { FormRow, VersionRow } from './forms'
 import { openRound } from './review'
 import { tellReceived } from './notices'
 import { recordLabels } from './sources'
+import { REASONS, RESPONSE, refuseShut, shut, getResponse, type LinkRow, type ResponseRow } from './response-rows'
 import { figureName, specialCalculations, type Figure } from '../shared/figures'
 import { attachFileAnswers, refuseFileProblems, settleFileAnswers } from './files'
 
-// ---- the link ----
-
-export interface LinkRow {
-  id: string
-  formId: string
-  audience: 'anyone' | 'signed_in'
-  opensAt: number | null
-  closesAt: number | null
-  responseCap: number | null
-  responseCount: number
-  onePerPerson: boolean
-  status: 'active' | 'paused' | 'ended'
-  /** `forms.link` for the form's own link, or the slot another module declared. */
-  slotKey: string
-  /** The record the answers are about, when the form is attached to one. */
-  subjectType: string | null
-  subjectId: string | null
-}
-type Stored<T, K extends keyof T> = Omit<T, K> & Record<K, number>
-export type StoredPlace = Stored<LinkRow, 'onePerPerson'>
-export const PLACE = 'id, form_id AS formId, audience, opens_at AS opensAt, closes_at AS closesAt, response_cap AS responseCap, response_count AS responseCount, one_per_person AS onePerPerson, status, slot_key AS slotKey, subject_type AS subjectType, subject_id AS subjectId'
-
-/** The form's own link, if it has been given one. A form is offered nowhere until it is. */
-export async function getLink(formId: string): Promise<LinkRow | null> {
-  const row = await first<Stored<LinkRow, 'onePerPerson'>>(
-    `SELECT ${PLACE} FROM forms_placements WHERE form_id = ? AND slot_key = 'forms.link' AND subject_type IS NULL`, formId)
-  return row ? { ...row, onePerPerson: !!row.onePerPerson } : null
-}
-
-/** Why a form cannot be answered just now, in the order a person would want to hear it. */
-export type Shut = 'paused' | 'not-yet' | 'closed' | 'full' | 'sign-in' | 'answered'
-
-export const REASONS: Record<Shut, { reason: string, remedy?: string }> = {
-  'paused': { reason: 'This form is not taking answers at the moment.' },
-  'not-yet': { reason: 'This form has not opened yet.', remedy: 'Come back when it opens.' },
-  'closed': { reason: 'This form has closed.' },
-  'full': { reason: 'This form has had all the responses it can take.' },
-  'sign-in': { reason: 'This form is for people with an account.', remedy: 'Sign in, then open the form again.' },
-  'answered': { reason: 'You have already answered this form.' },
-}
-
-/** The first thing in the way of this person answering now, or null. `ownId` is a response of theirs that does not count against them. */
-export async function shut(form: FormRow, link: LinkRow, actor: Actor, at: number, ownId?: string): Promise<Shut | null> {
-  if (form.status === 'closed') return 'closed'
-  if (form.status !== 'live' || link.status !== 'active') return 'paused'
-  if (link.opensAt !== null && at < link.opensAt) return 'not-yet'
-  if (link.closesAt !== null && at >= link.closesAt) return 'closed'
-  if (link.audience === 'signed_in' && !actor.accountId) return 'sign-in'
-  if (link.onePerPerson && actor.accountId) {
-    const theirs = await first<{ id: string }>(`SELECT id FROM forms_responses WHERE placement_id = ?1 AND state = 'submitted' AND person_id IN (${accountScopeSql('?2')})`, link.id, actor.accountId)
-    if (theirs && theirs.id !== ownId) return 'answered'
-  }
-  if (link.responseCap !== null && link.responseCount >= link.responseCap) return 'full'
-  return null
-}
-
-export function refuseShut(why: Shut): never {
-  const { reason, remedy } = REASONS[why]
-  return refuse(`forms.link.${why}`, reason, { status: why === 'sign-in' ? 401 : 409, ...(remedy ? { remedy } : {}) }) // not-policy: HTTP statuses
-}
-
-// ---- a response ----
-
-export interface ResponseRow {
-  id: string
-  reference: string
-  formId: string
-  versionId: string
-  placementId: string
-  subjectType: string | null
-  subjectId: string | null
-  personId: string | null
-  respondentEmail: string | null
-  state: 'draft' | 'awaiting_payment' | 'submitted' | 'withdrawn'
-  stageKey: string | null
-  stageKind: string | null
-  stageNote: string | null
-  currentRevision: number
-  submittedAt: number | null
-  decidedAt: number | null
-  decisionReason: string | null
-  /** What the form's calculations came to, as the server worked them out when it was last sent (JSON). */
-  calculated: string | null
-  createdAt: number
-}
-const RESPONSE = 'calculated, subject_type AS subjectType, subject_id AS subjectId, decided_at AS decidedAt, decision_reason AS decisionReason, id, reference, form_id AS formId, version_id AS versionId, placement_id AS placementId, person_id AS personId, respondent_email AS respondentEmail, state, stage_key AS stageKey, stage_kind AS stageKind, stage_note AS stageNote, current_revision AS currentRevision, submitted_at AS submittedAt, created_at AS createdAt'
-export const getResponse = (id: string) => first<ResponseRow>(`SELECT ${RESPONSE} FROM forms_responses WHERE id = ?`, id)
+export { PLACE, REASONS, getLink, shut, refuseShut, getResponse, type LinkRow, type StoredPlace, type Shut, type ResponseRow } from './response-rows'
 
 /** Whether a response is this person's: by account, across any merged into it. A signed-out response is nobody's to come back to. */
 export async function owns(response: ResponseRow, actor: Actor): Promise<boolean> {
@@ -259,7 +174,13 @@ export interface Sending {
  * event, together or not at all (FB-302). The cap and one response each are held by the statements
  * themselves, so two people sending at the same moment cannot both take the last place (FB-301).
  */
-export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ reference: string }> {
+/** A marking as the response row keeps it: score, out of and passed, each null where nothing is marked. */
+export const markingColumns = (marked: Marked | null): [number | null, number | null, boolean | null] => marked ? [marked.score, marked.outOf, marked.passed] : [null, null, null]
+
+/** A response just stored, as the system's moves from its first stage need it (FB-514). */
+export interface Arrived { response: ResponseRow, def: Definition, stage: Stage, answers: Answers, marking: Marked | null }
+
+export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ reference: string, marking: Marked | null, arrived: Arrived }> {
   const def = JSON.parse(s.version.definition) as Definition
   // Each file answer is read back from core's store first, so the engine checks what core holds; a file must have passed its check.
   const fileProblems = await settleFileAnswers(def, s.answers, s.responseId)
@@ -275,6 +196,9 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   const stage = firstStage(def)
   const retentionDue = retentionFrom(s.form, stage.kind, s.at)
   const calculated = Object.keys(evaluation.calculated).length ? JSON.stringify(evaluation.calculated) : null
+  // MK1: marked here, from what is stored, against the key of the version answered.
+  const marking = mark(def, evaluation)
+  const [score, outOf, passed] = markingColumns(marking)
 
   unit.add({
     sql: 'UPDATE forms_placements SET response_count = response_count + 1 WHERE id = ?1 AND status = \'active\' AND (response_cap IS NULL OR response_count < response_cap) AND (opens_at IS NULL OR opens_at <= ?2) AND (closes_at IS NULL OR closes_at > ?2)',
@@ -285,15 +209,15 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   const taken = 'EXISTS (SELECT 1 FROM forms_responses WHERE placement_id = ?2 AND unique_key = ?3 AND id <> ?1)'
   if (s.draft) {
     unit.add({
-      sql: `UPDATE forms_responses SET state = 'submitted', stage_key = ?8, stage_kind = ?9, current_revision = 1, version_id = ?4, unique_key = ?3, calculated = ?5, submitted_at = ?6, updated_at = ?6, retention_due_at = ?7 WHERE id = ?1 AND state = 'draft' AND NOT ${taken}`, // not-policy: numbered parameters
-      params: [s.responseId, s.link.id, uniqueKey, s.version.id, calculated, s.at, retentionDue, stage.key, stage.kind],
+      sql: `UPDATE forms_responses SET state = 'submitted', stage_key = ?8, stage_kind = ?9, current_revision = 1, version_id = ?4, unique_key = ?3, calculated = ?5, score = ?10, out_of = ?11, passed = ?12, submitted_at = ?6, updated_at = ?6, retention_due_at = ?7 WHERE id = ?1 AND state = 'draft' AND NOT ${taken}`, // not-policy: numbered parameters
+      params: [s.responseId, s.link.id, uniqueKey, s.version.id, calculated, s.at, retentionDue, stage.key, stage.kind, score, outOf, passed],
     }).expect(1, once)
     unit.add({ sql: 'DELETE FROM forms_response_drafts WHERE response_id = ?', params: [s.responseId] })
   }
   else {
     unit.add({
-      sql: `INSERT INTO forms_responses (id, placement_id, unique_key, reference, form_id, version_id, realm, person_id, respondent_email, state, stage_key, stage_kind, current_revision, calculated, is_test, submitted_at, created_at, updated_at, retention_due_at, subject_type, subject_id) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'audience', ?7, ?8, 'submitted', ?12, ?13, 1, ?9, 0, ?10, ?10, ?10, ?11, ?14, ?15 WHERE NOT ${taken}`, // not-policy: numbered parameters
-      params: [s.responseId, s.link.id, uniqueKey, reference, s.form.id, s.version.id, personId, email, calculated, s.at, retentionDue, stage.key, stage.kind, s.link.subjectType, s.link.subjectId],
+      sql: `INSERT INTO forms_responses (id, placement_id, unique_key, reference, form_id, version_id, realm, person_id, respondent_email, state, stage_key, stage_kind, current_revision, calculated, score, out_of, passed, is_test, submitted_at, created_at, updated_at, retention_due_at, subject_type, subject_id) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'audience', ?7, ?8, 'submitted', ?12, ?13, 1, ?9, ?16, ?17, ?18, 0, ?10, ?10, ?10, ?11, ?14, ?15 WHERE NOT ${taken}`, // not-policy: numbered parameters
+      params: [s.responseId, s.link.id, uniqueKey, reference, s.form.id, s.version.id, personId, email, calculated, s.at, retentionDue, stage.key, stage.kind, s.link.subjectType, s.link.subjectId, score, outOf, passed],
     }).expect(1, once)
   }
 
@@ -305,7 +229,12 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
   unit.audit({ action: 'create', record: ['forms.response', s.responseId], detail: { formId: s.form.id, version: s.version.number } })
   unit.announce('forms.response.submitted', { responseId: s.responseId, formId: s.form.id }, { record: ['forms.response', s.responseId] })
   await tellReceived(unit, s.form, { id: s.responseId, reference, personId, respondentEmail: email })
-  return { reference }
+  const response: ResponseRow = {
+    id: s.responseId, reference, formId: s.form.id, versionId: s.version.id, placementId: s.link.id, subjectType: s.link.subjectType, subjectId: s.link.subjectId,
+    personId, respondentEmail: email, state: 'submitted', stageKey: stage.key, stageKind: stage.kind, stageNote: null, currentRevision: 1,
+    submittedAt: s.at, decidedAt: null, decisionReason: null, calculated, score, outOf, passed, createdAt: s.draft?.createdAt ?? s.at,
+  }
+  return { reference, marking, arrived: { response, def, stage, answers: evaluation.answers, marking } }
 }
 
 /**
@@ -316,14 +245,14 @@ export async function writeSubmission(unit: UnitView, s: Sending): Promise<{ ref
  * written in the caller's unit by writeSubmission. Shared by POST /api/forms/open/:slug/responses
  * and the addResponse service another module calls.
  */
-export async function sendResponse(unit: UnitView, input: { form: FormRow, version: VersionRow, link: LinkRow, actor: Actor, responseId: string, answers: Answers, email: string | null, at: number }): Promise<{ responseId: string, reference: string }> {
+export async function sendResponse(unit: UnitView, input: { form: FormRow, version: VersionRow, link: LinkRow, actor: Actor, responseId: string, answers: Answers, email: string | null, at: number }): Promise<{ responseId: string, reference: string, marking: Marked | null, arrived?: Arrived }> {
   const { form, link, actor } = input
   const existing = await getResponse(input.responseId)
   const theirs = existing ? await owns(existing, actor) : false
   if (existing) {
     // Sent before: the same reply, and nothing written. A signed-out person's is known by the address it carried.
     const same = existing.formId === form.id && (theirs || (!existing.personId && !actor.accountId && existing.respondentEmail === (form.anonymous ? null : input.email)))
-    if (existing.state === 'submitted' && same) return { responseId: existing.id, reference: existing.reference }
+    if (existing.state === 'submitted' && same) return { responseId: existing.id, reference: existing.reference, marking: await markingOf(existing) }
     // Somebody else's id reads the same as one that was never an id.
     if (!(existing.state === 'draft' && theirs && existing.formId === form.id)) return refuse('forms.response.not-found', 'There is no response here.', { status: 404 }) // not-policy: HTTP status
   }
@@ -334,8 +263,24 @@ export async function sendResponse(unit: UnitView, input: { form: FormRow, versi
   if (!form.anonymous && !actor.accountId && !input.email)
     return refuse('forms.response.email-needed', 'Give an email address so we know who these answers are from.', { status: 422, fields: { email: 'forms.response.email-needed' } }) // not-policy: HTTP status
 
-  const { reference } = await writeSubmission(unit, { responseId: input.responseId, form, version: input.version, link, actor, email: input.email, answers: input.answers, draft: existing, at: input.at })
-  return { responseId: input.responseId, reference }
+  const { reference, marking, arrived } = await writeSubmission(unit, { responseId: input.responseId, form, version: input.version, link, actor, email: input.email, answers: input.answers, draft: existing, at: input.at })
+  return { responseId: input.responseId, reference, marking, arrived }
+}
+
+/**
+ * How a sent response was marked, question by question, worked out again from its current answers
+ * and its version's key. The totals are the stored ones (MK1). Null where the version has no key.
+ */
+export async function markingOf(response: Pick<ResponseRow, 'id' | 'versionId' | 'currentRevision' | 'score' | 'outOf' | 'passed'>, def?: Definition, revision = response.currentRevision): Promise<Marked | null> {
+  const definition = def ?? JSON.parse((await first<{ definition: string }>('SELECT definition FROM forms_versions WHERE id = ?', response.versionId))!.definition) as Definition
+  if (!hasAnswerKey(definition)) return null
+  const types = new Map(questionsOf(definition).map(({ question }) => [question.id, question.type]))
+  // A special-category question cannot carry a correct answer, so nothing sealed is opened to mark.
+  const stored = (await readAnswers([response.id], types, false, revision)).get(response.id) ?? []
+  const marked = mark(definition, evaluate(definition, toAnswers(definition, stored), { today: await today() }))
+  // An earlier revision's score is worked out again (MK5); only the latest is stored.
+  if (!marked || revision !== response.currentRevision || response.score === null || response.outOf === null) return marked
+  return { ...marked, score: response.score, outOf: response.outOf, passed: response.passed === null ? null : !!response.passed }
 }
 
 // ---- reading answers back ----
