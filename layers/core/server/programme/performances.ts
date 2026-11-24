@@ -14,6 +14,7 @@ import type { ChangeImpact, ProposedChange } from '../points/change-impact'
 import type { ChangeGuard, GuardAnswer } from '../points/change-guard'
 import type { SpaceBusy } from '../points/space-busy'
 import { latecomerRule, type LatecomerRule } from '../../shared/latecomers'
+import { shiftLineUp } from './line-ups'
 
 export type PerformanceState = 'draft' | 'scheduled' | 'cancelled' | 'completed'
 /** Timed, or drop-in: open from its start until its end, with no doors or intervals (C-62). */
@@ -329,10 +330,10 @@ async function runGuards(change: ProposedChange, actor: Actor): Promise<void> {
 // ---------------------------------------------------------------------------------------------
 // Writes
 
-type Times<T> = Omit<T, 'startsAt' | 'endsAt' | 'doorsAt'> & { startsAt?: number | string, endsAt?: number | string, doorsAt?: number | string | null }
+type Times<T> = Omit<T, 'startsAt' | 'endsAt' | 'doorsAt'> & { startsAt?: number | string | null, endsAt?: number | string, doorsAt?: number | string | null }
 
 /** Turns local date-times from the console into instants in the theatre's time zone. */
-export async function inInstants<T extends PerformancePatch>(input: Times<T>): Promise<T> {
+export async function inInstants<T extends object>(input: Times<T>): Promise<T> {
   const local = (['startsAt', 'endsAt', 'doorsAt'] as const).filter(k => typeof input[k] === 'string')
   if (!local.length) return input as T
   const rule = await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet.', { status: 409, remedy: TIME_ZONE_REMEDY })
@@ -537,6 +538,7 @@ export async function updatePerformance(unit: UnitView, id: string, patch: Perfo
       external_booking_url = ${next.externalBookingUrl}, shape = ${shape}
     WHERE id = ${id} AND state = ${row.state} AND starts_at = ${row.starts_at} AND space_id = ${row.space_id}${guards.length ? sql` AND ${sql.join(guards, sql` AND `)}` : sql``}`)
     .expect(1, moved && !scheduled ? SPACE_UNSUITABLE : CHANGED)
+  shiftLineUp(unit, id, next.startsAt - row.starts_at)
   if (scheduled && retimed) syncProductionDates(unit, row.production_id)
   unit.audit({ action: 'update', record: record(id), detail: { retimed, moved, capacity: recapacitied, ...(shape !== row.shape ? { shape } : {}) } })
   const target = { record: record(id) }

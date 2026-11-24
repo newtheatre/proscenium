@@ -7,7 +7,8 @@ import { all, first, nowMs, theatreTimeZone, useSetting } from '#kit'
 import { instantOfLocal, localDateOf } from '#kit/clock'
 import { productionBySlug } from './service'
 import { ageWording, guidanceFor, type GuidanceEffect, type GuidanceWarning } from './guidance'
-import { shownCredits, type ShownCredit } from './credits'
+import { shownCredits, shownPerformanceCredits, type ShownCredit } from './credits'
+import { appearancesOf, lineUpsFor } from './line-ups'
 import { bookingActions, priceSummaries, type ShownBooking } from './booking'
 import type { PriceSummary } from '../points/booking-action'
 import { publicImages, type PublicImage } from './media'
@@ -20,6 +21,17 @@ export interface PublicNote { termId: string, label: string, detail: string | nu
 /** A content warning as the page shows it. A null level is a row nobody has graded yet: no level word. */
 export type PublicWarning = Pick<GuidanceWarning, 'termId' | 'label' | 'description' | 'heading' | 'level' | 'detail'>
 export type PublicEffect = Pick<GuidanceEffect, 'termId' | 'label' | 'description' | 'icon' | 'detail'>
+
+/** An act in a performance's line-up, as the public sees it: announced items only (LU3). */
+export interface PublicLineUpItem {
+  id: string
+  name: string
+  note: string | null
+  startsAt: number | null
+  minutes: number | null
+  /** The act's own production, once it is published. */
+  production: { slug: string, title: string } | null
+}
 
 export interface PublicPerformance {
   id: string
@@ -39,6 +51,9 @@ export interface PublicPerformance {
   latecomers: LatecomerRule
   /** The booking button, or null where there is none (C-39: "where one exists"). */
   booking: ShownBooking | null
+  lineUp: PublicLineUpItem[]
+  /** Credits for this date only (LU4), each item's with its lineUpId. */
+  credits: ShownCredit[]
 }
 
 export interface PublicProduction {
@@ -70,6 +85,8 @@ export interface PublicProduction {
   /** Worked out, not stored (part 3): cancelled, or its last performance not cancelled has ended. */
   past: boolean
   credits: ShownCredit[]
+  /** Other productions' line-ups it appears in (LU3): "Also appearing in". */
+  appearances: { slug: string, title: string, startsAt: number }[]
   poster: PublicImage | null
   photos: PublicImage[]
   performances: PublicPerformance[]
@@ -86,6 +103,8 @@ export interface PublicProductionOptions {
   members?: boolean
   now?: number
 }
+
+const appearances = async (productionId: string) => (await appearancesOf(productionId)).map(({ slug, title, startsAt }) => ({ slug, title, startsAt }))
 
 interface ProductionRow {
   id: string
@@ -152,7 +171,7 @@ export async function publicProduction(slug: string, options: PublicProductionOp
   if (!row) return null
   if (found.moved) return { moved: found.slug }
   const now = options.now ?? nowMs()
-  const performances = await publicPerformances([row], now, options.cancelledVisible ?? true)
+  const performances = await publicPerformances([row], now, options.cancelledVisible ?? true, options.members ?? false)
   const guidance = (await guidanceFor(row.id))!
   return {
     id: row.id,
@@ -178,6 +197,7 @@ export async function publicProduction(slug: string, options: PublicProductionOp
     state: row.state,
     past: isPast(row.state, performances, now),
     credits: await shownCredits(row.id, options.members ?? false),
+    appearances: await appearances(row.id),
     ...(await publicImages([row.id])).get(row.id)!,
     performances,
     venues: await publicVenues([...new Set(performances.map(p => p.venue.id))]),
@@ -320,7 +340,7 @@ export async function whatsOnFilters(options: { now?: number } = {}): Promise<Wh
   }
 }
 
-async function publicPerformances(productions: ProductionRow[], now: number, cancelledVisible: boolean): Promise<PublicPerformance[]> {
+async function publicPerformances(productions: ProductionRow[], now: number, cancelledVisible: boolean, members = false): Promise<PublicPerformance[]> {
   const byId = new Map(productions.map(p => [p.id, p]))
   // Drafts are never public. A cancelled performance shows only until it would have ended, and only by choice.
   const rows = await all<PerformanceRow>(
@@ -349,6 +369,7 @@ async function publicPerformances(productions: ProductionRow[], now: number, can
     )) effectsOff.set(e.performance_id, [...(effectsOff.get(e.performance_id) ?? []), e.label])
   }
   const latecomers = await latecomersFor(rows.map(r => r.id))
+  const [lineUps, credits] = await Promise.all([lineUpsFor(rows.map(r => r.id), { publicOnly: true }), shownPerformanceCredits(rows.map(r => r.id), members)])
   // A cancelled production books nothing; otherwise only a scheduled performance not yet over.
   const bookable = rows.filter(r => r.state === 'scheduled' && r.ends_at > now && byId.get(r.production_id)!.state === 'published')
   const booking = await bookingActions(bookable.map(r => ({
@@ -374,6 +395,8 @@ async function publicPerformances(productions: ProductionRow[], now: number, can
     effectsOff: effectsOff.get(r.id) ?? [],
     latecomers: latecomers.get(r.id)!,
     booking: booking[r.id] ?? null,
+    lineUp: (lineUps.get(r.id) ?? []).map(i => ({ id: i.id, name: i.name, note: i.note, startsAt: i.startsAt, minutes: i.minutes, production: i.production && { slug: i.production.slug, title: i.production.title } })),
+    credits: credits.get(r.id) ?? [],
   }))
 }
 

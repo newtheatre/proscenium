@@ -50,7 +50,7 @@ type Kind = 'cancel' | 'reschedule' | 'move' | 'capacity'
 interface Reach { lines: string[], refusal: HeldRefusal | null }
 
 const { t } = useT()
-const props = defineProps<{ productionId: string, title: string }>()
+const props = defineProps<{ productionId: string, title: string, creditsPublic?: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
 
 const { $api } = useNuxtApp()
@@ -294,6 +294,10 @@ async function cancel() {
   if (!await settled(cancelReach.value?.refusal ?? null, cancelAnswer.value, async () => (await reach(p.id, 'cancel')).refusal, (still) => { if (cancelReach.value) cancelReach.value.refusal = still })) return
   if (await run(() => call(p.id, '/cancel', 'POST', { reasonTermId: cancelForm.value.reasonTermId, note: cancelForm.value.note }), 'Performance cancelled')) cancelling.value = null
 }
+
+// The line-up and credits for one date (C-61)
+const lineUpFor = ref<Performance | null>(null)
+const lineUpOpen = computed({ get: () => !!lineUpFor.value, set: (v) => { if (!v) lineUpFor.value = null } })
 
 // Access features
 const accessFor = ref<Performance | null>(null)
@@ -585,6 +589,7 @@ function actions(p: Performance) {
     if (productionEffects.value.length) items.push({ label: 'Staging effects', icon: 'i-lucide-zap-off', onSelect: () => startEffects(p) })
     if (inRun) items.push({ label: 'Edit the run', icon: 'i-lucide-calendar-range', onSelect: () => startEditRun(inRun) })
   }
+  items.push({ label: 'Line-up and credits', icon: 'i-lucide-list-ordered', onSelect: () => { lineUpFor.value = p } })
   if (p.state === 'scheduled') items.push({ label: 'Cancel', icon: 'i-lucide-calendar-x', color: 'error' as const, onSelect: () => startCancel(p) })
   if (p.state === 'cancelled' && p.startsAt > Date.now()) items.push({ label: 'Reinstate', icon: 'i-lucide-undo-2', onSelect: () => reinstate(p) })
   if (p.state === 'draft') items.push({ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove(p) })
@@ -1183,5 +1188,22 @@ function actions(p: Performance) {
       :spaces="spaces"
       @changed="runEdited"
     />
+
+    <USlideover
+      v-model:open="lineUpOpen"
+      :title="lineUpFor ? `Line-up and credits, ${dates.dayNamed(lineUpFor.startsAt)} ${dates.time(lineUpFor.startsAt)}` : 'Line-up and credits'"
+      description="Who appears and who is credited at this performance only."
+      :ui="{ content: 'sm:max-w-2xl' }"
+    >
+      <template #body>
+        <PerformanceLineUp
+          v-if="lineUpFor"
+          :production-id="productionId"
+          :credits-public="creditsPublic ?? true"
+          :performance="lineUpFor"
+          @changed="emit('changed')"
+        />
+      </template>
+    </USlideover>
   </PageSection>
 </template>

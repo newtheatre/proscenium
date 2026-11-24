@@ -519,6 +519,8 @@ export const announces = {
   'core.performance.moved': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), oldVenueId: z.string(), oldSpaceId: z.string(), venueId: z.string(), spaceId: z.string() }), internal: false }),
   'core.performance.capacity-changed': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), oldCapacity: z.number().int().nullable(), capacity: z.number().int().nullable() }), internal: false }),
   'core.performance.cancelled': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), reason: code() }), internal: false }),
+  // A performance's line-up gained, lost or reordered an item, or an item changed (C-61).
+  'core.line-up.changed': event({ version: 1, payload: z.object({ performanceId: z.string() }), internal: false }),
   'core.performance.completed': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string() }), internal: false }),
   'core.venue.archived': event({ version: 1, payload: z.object({ venueId: z.string() }), internal: false }),
   'core.space.archived': event({ version: 1, payload: z.object({ spaceId: z.string(), venueId: z.string() }), internal: false }),
