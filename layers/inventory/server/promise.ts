@@ -44,10 +44,19 @@ export function usableSql(itemId: SQL | string, departmentId: string, w: Window)
       WHERE u.item_id = ${itemId} AND u.applies = 1 AND k.blocks_when_overdue = 1 AND k.state = 'active' AND u.next_due_on IS NOT NULL AND u.next_due_on < ${w.startDay})`
 }
 
-/** C1 to C4 for `quantity` of an item over a window: one predicate for a statement to carry. */
-export function freeSql(itemId: SQL | string, quantity: number, departmentId: string, w: Window, e: Except, at = nowMs()): SQL {
-  return sql`${usableSql(itemId, departmentId, w)}
-    AND (SELECT i.quantity FROM inventory_items i WHERE i.id = ${itemId}) >= ${quantity} + ${heldSql(itemId, w, e, at)}`
+/** One promise asked for: so many of an item, for a loan of a department, over a window. */
+export interface Ask {
+  itemId: string
+  quantity: number
+  departmentId: string
+  window: Window
+  except: Except
+}
+
+/** C1 to C4 for an ask: one predicate for a statement to carry. */
+export function freeSql(a: Ask, at = nowMs()): SQL {
+  return sql`${usableSql(a.itemId, a.departmentId, a.window)}
+    AND (SELECT i.quantity FROM inventory_items i WHERE i.id = ${a.itemId}) >= ${a.quantity} + ${heldSql(a.itemId, a.window, a.except, at)}`
 }
 
 export type Unfree = 'not-usable' | 'taken'
@@ -58,7 +67,8 @@ export interface Taken { reason: Unfree, loanIds: string[] }
  * The same check as a read, for a screen that names what is in the way (L7) and for `isPromisable`.
  * Never a guard on its own: the statement carries the predicate again.
  */
-export async function whyNotFree(itemId: string, quantity: number, departmentId: string, w: Window, e: Except): Promise<Taken | null> {
+export async function whyNotFree(a: Ask): Promise<Taken | null> {
+  const { itemId, quantity, departmentId, window: w, except: e } = a
   const db = useDb()
   const at = nowMs()
   const [usable] = await db.all<{ ok: number }>(sql`SELECT ${usableSql(itemId, departmentId, w)} AS ok`)

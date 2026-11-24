@@ -112,13 +112,13 @@ export async function promiseLine(unit: UnitView, loan: Loan, line: Line, w: Win
   const whole = contents.length ? sql` AND (SELECT count(*) FROM inventory_items WHERE container_id = ${line.itemId} AND state <> 'disposed') = ${contents.length}` : sql``
   unit.add(sql`UPDATE inventory_loan_lines SET state = 'promised', updated_at = ${at}
     WHERE id = ${line.id} AND state IN ('wanted', 'listed') AND item_id = ${line.itemId}
-      AND ${freeSql(line.itemId, line.quantity, loan.departmentId, w, { lineId: line.id }, at)}${whole}`).expect(1, CLASH)
+      AND ${freeSql({ itemId: line.itemId, quantity: line.quantity, departmentId: loan.departmentId, window: w, except: { lineId: line.id } }, at)}${whole}`).expect(1, CLASH)
   for (const content of contents) {
     const id = newId('kll')
     unit.add(sql`INSERT INTO inventory_loan_lines (id, loan_id, item_id, quantity, state, with_line_id, created_at, updated_at)
       SELECT ${id}, ${loan.id}, ${content}, 1, 'promised', ${line.id}, ${at}, ${at}
       WHERE (SELECT container_id FROM inventory_items WHERE id = ${content}) = ${line.itemId}
-        AND ${freeSql(content, 1, loan.departmentId, w, { lineId: id }, at)}`).expect(1, CLASH)
+        AND ${freeSql({ itemId: content, quantity: 1, departmentId: loan.departmentId, window: w, except: { lineId: id } }, at)}`).expect(1, CLASH)
   }
 }
 
@@ -129,7 +129,7 @@ export async function failingLines(loan: Loan, w: Window, lines: Line[]): Promis
   const out: Failing[] = []
   for (const line of lines) {
     if (!line.itemId || line.state !== 'listed') continue
-    const why = await whyNotFree(line.itemId, line.quantity, loan.departmentId, w, { lineId: line.id })
+    const why = await whyNotFree({ itemId: line.itemId, quantity: line.quantity, departmentId: loan.departmentId, window: w, except: { lineId: line.id } })
     if (why) out.push({ lineId: line.id, itemId: line.itemId, why })
   }
   return out

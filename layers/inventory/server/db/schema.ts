@@ -11,6 +11,13 @@ import {
 const inList = (values: readonly string[]) => sql.raw(values.map(v => `'${v}'`).join(', '))
 const requirements = () => col.internal(text('requirements', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`))
 const flag = (name: string, on: boolean) => col.internal(integer(name, { mode: 'boolean' }).notNull().default(on))
+/** The columns every set-up list shares: active or archived, its order, and its times. */
+const listed = () => ({
+  state: col.internal(text('state', { enum: RECORD_STATES }).notNull().default('active')),
+  sort: col.internal(integer('sort').notNull().default(0)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+})
 
 /** Kit departments: the unit of authority, each with its tag counter and who it lends to. */
 export const departments = defineTable('inventory_departments', {
@@ -24,10 +31,7 @@ export const departments = defineTable('inventory_departments', {
   guidance: col.internal(text('guidance')),
   contact: col.internal(text('contact')),
   departmentTermId: col.ref('core_terms', { nullable: true }),
-  state: col.internal(text('state', { enum: RECORD_STATES }).notNull().default('active')),
-  sort: col.internal(integer('sort').notNull().default(0)),
-  createdAt: col.createdAt(),
-  updatedAt: col.updatedAt(),
+  ...listed(),
 }, {
   id: 'kdp',
   realm: 'operational',
@@ -50,10 +54,7 @@ export const categories = defineTable('inventory_categories', {
   departmentId: col.ref('inventory_departments'),
   name: col.internal(text('name').notNull()),
   requirements: requirements(),
-  state: col.internal(text('state', { enum: RECORD_STATES }).notNull().default('active')),
-  sort: col.internal(integer('sort').notNull().default(0)),
-  createdAt: col.createdAt(),
-  updatedAt: col.updatedAt(),
+  ...listed(),
 }, {
   id: 'kcat',
   realm: 'operational',
@@ -72,10 +73,7 @@ export const locations = defineTable('inventory_locations', {
   parentId: col.ref('inventory_locations', { nullable: true }),
   venueId: col.ref('core_venues', { nullable: true }),
   spaceId: col.ref('core_spaces', { nullable: true }),
-  state: col.internal(text('state', { enum: RECORD_STATES }).notNull().default('active')),
-  sort: col.internal(integer('sort').notNull().default(0)),
-  createdAt: col.createdAt(),
-  updatedAt: col.updatedAt(),
+  ...listed(),
 }, {
   id: 'kloc',
   realm: 'operational',
@@ -189,10 +187,7 @@ export const inspectionKinds = defineTable('inventory_inspection_kinds', {
   contractorAllowed: flag('contractor_allowed', true),
   certificate: col.internal(text('certificate', { enum: CERTIFICATE }).notNull().default('optional')),
   blocksWhenOverdue: flag('blocks_when_overdue', true),
-  state: col.internal(text('state', { enum: RECORD_STATES }).notNull().default('active')),
-  sort: col.internal(integer('sort').notNull().default(0)),
-  createdAt: col.createdAt(),
-  updatedAt: col.updatedAt(),
+  ...listed(),
 }, {
   id: 'kik',
   realm: 'operational',
