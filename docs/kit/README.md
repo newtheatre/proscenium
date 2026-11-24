@@ -38,7 +38,8 @@ export const items = defineTable('lost_property_items', {
 Every column has a data class (`public`, `internal`, `personal`, `freeText`, `special`); a column
 without one fails the build. Ids are `<prefix>_<26 characters>`, sorted by creation time unless
 `random: true`. `appendOnly: true` adds database triggers that refuse updates and deletes, except
-erasure writing its placeholder. A realm is `audience`, `members`, `operational` or `system` (the
+erasure writing its placeholder. `appendOnly: { except: ['state'] }` does the same but lets the named
+columns change: a versioned row whose only moving part is its state (Companies' agreements). A realm is `audience`, `members`, `operational` or `system` (the
 platform's own tables). An account subject column that may be empty needs
 `subject: { account: 'account_id', unlinked: 'staff' }`: staff reach the rows it cannot link by
 search. `col.internal()` and `col.personal()` take `encrypted: true`, sealed with the one core key as
