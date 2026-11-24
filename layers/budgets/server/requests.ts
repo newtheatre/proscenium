@@ -30,10 +30,10 @@ export interface Request {
   createdAt: number
 }
 
-const COLUMNS = `r.id, r.requested_by AS requestedBy, r.line_id AS lineId, l.name AS lineName, b.id AS budgetId, b.name AS budgetName,
+export const COLUMNS = `r.id, r.requested_by AS requestedBy, r.line_id AS lineId, l.name AS lineName, b.id AS budgetId, b.name AS budgetName,
   b.currency, r.amount_minor AS amountMinor, r.description, r.needed_by AS neededBy, r.state, r.decided_at AS decidedAt,
   r.decision_note AS decisionNote, r.fulfilled_minor AS fulfilledMinor, r.lapses_on AS lapsesOn, r.created_at AS createdAt`
-const FROM = 'FROM budgets_spending_requests r JOIN budgets_lines l ON l.id = r.line_id JOIN budgets_budgets b ON b.id = l.budget_id'
+export const FROM = 'FROM budgets_spending_requests r JOIN budgets_lines l ON l.id = r.line_id JOIN budgets_budgets b ON b.id = l.budget_id'
 
 export async function requireRequest(id: string | undefined): Promise<Request> {
   const row = id ? await first<Request>(`SELECT ${COLUMNS} ${FROM} WHERE r.id = ?`, id) : null

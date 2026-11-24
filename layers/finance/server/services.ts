@@ -7,6 +7,6 @@ export type { LedgerRange, EntryRow, EntryCount, TaxTotal, TaxCode, InclusiveEnt
 export { rangeOf, toCsv } from './reports'
 export { isPeriodOpen, listPeriods, rangeClosed, financeYearOf } from './periods'
 export type { PeriodState } from './periods'
-export type { PeriodCloseCheck } from './points/period-close-check'
+export type { PeriodBounds, PeriodCloseCheck } from './points/period-close-check'
 export { performanceTotals } from './reports'
 export type { PerformanceTotal } from './reports'

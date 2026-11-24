@@ -78,6 +78,8 @@ export const lines = defineTable('budgets_lines', {
   categoryId: col.ref('budgets_categories', { nullable: true }),
   sortOrder: col.internal(integer('sort_order').notNull()),
   archivedAt: col.timestamp('archived_at'),
+  // When its holders were told it went over budget (BC-34); cleared once it is back within it.
+  overNotifiedAt: col.timestamp('over_notified_at'),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),
 }, {
@@ -151,6 +153,7 @@ export const requests = defineTable('budgets_spending_requests', {
   state: col.internal(text('state', { enum: REQUEST_STATES }).notNull()),
   decidedBy: col.account('decided_by', { role: 'actor', onMerge: 'alias', nullable: true }),
   decidedAt: col.timestamp('decided_at'),
+  chasedAt: col.timestamp('chased_at'),
   // Seen by the requester; required when declining.
   decisionNote: col.freeText(text('decision_note')),
   fulfilledMinor: col.minor('fulfilled_minor').notNull().default(0),
@@ -208,6 +211,8 @@ export const claims = defineTable('budgets_claims', {
   decidedAt: col.timestamp('decided_at'),
   // Who gave the first of two approvals above budgets.claims.second-approval-above (C4); null otherwise.
   firstApprovedBy: col.account('first_approved_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  // When its approvers were last reminded it waits on them (budgets.reminders.approver-after).
+  chasedAt: col.timestamp('chased_at'),
   expensePostingId: col.internal(text('expense_posting_id')),
   version: col.internal(integer('version').notNull().default(0)),
   createdAt: col.createdAt(),

@@ -70,6 +70,8 @@ export default defineModule({
     'claims.routes': setting.list({ default: ['bank-transfer'], of: 'choice', options: ['bank-transfer', 'parent-body', 'cash', 'cheque'], change: 'budgets.settings.manage', audience: 'staff' }),
     // Preselected on a new claim; one of the offered routes.
     'claims.default-route': setting.choice({ default: 'bank-transfer', options: ['bank-transfer', 'parent-body', 'cash', 'cheque'], change: 'budgets.settings.manage', audience: 'staff' }),
+    // When an undecided claim or request is chased, and again each time this passes.
+    'reminders.approver-after': setting.duration({ default: '7d', min: '1d', max: '60d', change: 'budgets.settings.manage', audience: 'staff' }),
     'retention.claims': setting.duration({ default: '6y', min: '2y', max: '10y', change: 'budgets.settings.manage', audience: 'staff', onChange: 'confirm' }),
   }),
 
@@ -81,6 +83,8 @@ export default defineModule({
   tasks: {
     // Lapses approved requests past their date, and anonymises decided ones past retention.
     'budgets.sweep-requests': task({ dailyAt: '04:50' }),
+    // Chases undecided claims and requests, anonymises claims past retention, and checks lines over budget.
+    'budgets.sweep-claims': task({ dailyAt: '05:00' }),
   },
 
   tables,
@@ -92,7 +96,12 @@ export default defineModule({
       'budgets.claim.decided': event({ version: 1, payload: z.object({ claimId: z.string(), decision: z.enum(['approved', 'returned', 'declined', 'voided']), amountMinor: z.number().int() }), internal: true }),
       'budgets.request.decided': event({ version: 1, payload: z.object({ requestId: z.string(), decision: z.enum(['approved', 'declined']), amountMinor: z.number().int() }), internal: true }),
     },
-    listens: { 'core.module.enabled': 'categories' },
+    listens: {
+      'core.module.enabled': 'categories',
+      // A decision moves spent or committed: tell holders when a line goes over budget (BC-34).
+      'budgets.claim.decided': 'over-budget',
+      'budgets.request.decided': 'over-budget',
+    },
   },
 
   contributes: {
@@ -154,6 +163,20 @@ export default defineModule({
         },
       },
       {
+        id: 'budgets.over-budget',
+        category: 'transactional' as const,
+        side: 'members' as const,
+        channels: ['email' as const, 'inbox' as const],
+        variables: { line: 'text' as const, budget: 'text' as const, amount: 'text' as const, link: 'text' as const },
+        link: '/console/budgets',
+        wording: {
+          'en-GB': {
+            subject: '{{ line }} in {{ budget }} is over budget',
+            body: 'Spent and committed on **{{ line }}** in the budget {{ budget }} are now {{ amount }} over what was budgeted.\n\n[See the budget]({{ link }})',
+          },
+        },
+      },
+      {
         id: 'budgets.request-decided',
         category: 'transactional' as const,
         side: 'members' as const,
@@ -169,6 +192,8 @@ export default defineModule({
       },
     ],
     'core.count': [{ id: 'budgets.approvals', file: 'approvals' }],
+    // Warns, never blocks, of claims still undecided with items spent in the period (BC-36).
+    'finance.period-close-check': [{ id: 'budgets.claims-to-come', file: 'claims-to-come' }],
     // Approved claims paid through Payments: the part clears claims payable and raises paid (BC-30, BC-31).
     'payments.disbursement': [{ id: 'budgets' }],
     'core.navigation': [

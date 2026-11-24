@@ -7,7 +7,7 @@ import { all, first, newId, nowMs, Refusal, today, usePoint, useContext, theatre
 import { instantOfLocal, previousDate } from '#kit/clock'
 import { assertTerm } from '#modules/core'
 import { closedSql, getPeriod, type PeriodState } from './periods'
-import type { PeriodCloseCheck } from './points/period-close-check'
+import type { PeriodBounds, PeriodCloseCheck } from './points/period-close-check'
 
 export interface Blocker { sentence: string, to?: string, module: string }
 
@@ -24,18 +24,33 @@ export async function closeBlockers(period: PeriodState): Promise<Blocker[]> {
   const totals = await periodTotals(period.id)
   if (totals.debitsMinor !== totals.creditsMinor) out.push({ module: 'finance', sentence: 'The period\'s debits and credits differ. Report this as a fault.' })
 
+  const bounds = await boundsOf(period)
+  for (const check of await usePoint<PeriodCloseCheck>('finance.period-close-check')) {
+    for (const blocker of await check.value.blockers?.(bounds) ?? []) out.push({ ...blocker, module: check.module })
+  }
+  return out
+}
+
+/** What other modules want the treasurer to know before closing `period`; none of it stops the close. */
+export async function closeWarnings(period: PeriodState): Promise<Blocker[]> {
+  if (period.closed) return []
+  const bounds = await boundsOf(period)
+  const out: Blocker[] = []
+  for (const check of await usePoint<PeriodCloseCheck>('finance.period-close-check')) {
+    for (const warning of await check.value.warnings?.(bounds) ?? []) out.push({ ...warning, module: check.module })
+  }
+  return out
+}
+
+async function boundsOf(period: PeriodState): Promise<PeriodBounds> {
   const zone = await theatreTimeZone()
-  const bounds = {
+  return {
     id: period.id,
     startsOn: period.startsOn,
     endsOn: period.endsOn,
     startsAt: instantOfLocal(period.startsOn, '00:00', zone),
     endsAt: instantOfLocal(previousDate(period.endsOn, -1), '00:00', zone),
   }
-  for (const check of await usePoint<PeriodCloseCheck>('finance.period-close-check')) {
-    for (const blocker of await check.value.blockers(bounds)) out.push({ ...blocker, module: check.module })
-  }
-  return out
 }
 
 /** The sealed debits and credits posted into a period, each a positive figure. */

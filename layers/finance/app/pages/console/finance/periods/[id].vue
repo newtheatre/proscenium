@@ -15,7 +15,7 @@ const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const id = computed(() => String(route.params.id))
-const { data, status, error, refresh } = await useAPI<{ period: Period, blockers: Blocker[], movement: Movement[], held?: Held[], ended?: boolean, closableFrom?: string, canClose: boolean, canReopen: boolean }>(() => `/api/finance/periods/${id.value}`, { key: `finance:period:${id.value}` })
+const { data, status, error, refresh } = await useAPI<{ period: Period, blockers: Blocker[], warnings?: Blocker[], movement: Movement[], held?: Held[], ended?: boolean, closableFrom?: string, canClose: boolean, canReopen: boolean }>(() => `/api/finance/periods/${id.value}`, { key: `finance:period:${id.value}` })
 const { dayLong: dateOf } = useDates()
 
 // The chart is in the theatre's own currency; anything in another stays in the list beneath it.
@@ -158,39 +158,10 @@ async function reopen() {
             :title="t('finance.screens.period.checklist')"
             :description="t('finance.screens.period.checklist-help')"
           >
-            <p
-              v-if="!loaded.blockers.length"
-              class="flex items-center gap-2"
-            >
-              <UIcon
-                name="i-lucide-circle-check"
-                class="text-success"
-              />
-              {{ t('finance.screens.period.ready') }}
-            </p>
-            <ul
-              v-else
-              class="space-y-2"
-            >
-              <li
-                v-for="(b, i) in loaded.blockers"
-                :key="i"
-                class="flex items-start gap-2"
-              >
-                <UIcon
-                  name="i-lucide-circle-alert"
-                  class="mt-0.5 shrink-0 text-warning"
-                />
-                <ULink
-                  v-if="b.to"
-                  :to="b.to"
-                  class="underline"
-                >
-                  {{ b.sentence }}
-                </ULink>
-                <span v-else>{{ b.sentence }}</span>
-              </li>
-            </ul>
+            <FinanceCloseChecklist
+              :blockers="loaded.blockers"
+              :warnings="loaded.warnings"
+            />
           </PageSection>
 
           <PageSection
