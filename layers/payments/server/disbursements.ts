@@ -5,7 +5,7 @@
 import { all, first, localDate, newId, nowMs, Refusal, runInContext, useContext, usePoint, useSetting, type UnitView } from '#kit'
 import { postEntries, reversePosting, type EntryInput } from '#modules/finance'
 import type { DisbursementHandler, DisbursementMethod, DisbursementPart } from './points/disbursement'
-import { touchPayee } from './payees'
+import { payeeFor, touchPayee, type MaskedPayee } from './payees'
 import { ownerEntries } from './owner-entries'
 
 export const DISBURSEMENT_METHODS: readonly DisbursementMethod[] = ['bank-transfer', 'cheque', 'theatre-card', 'petty-cash', 'parent-body']
@@ -89,6 +89,42 @@ export async function recordDisbursement(unit: UnitView, input: DisbursementInpu
   if (input.payeeId) await touchPayee(unit, input.payeeId)
   unit.audit({ action: 'create', record: ['payments.disbursement', id], detail: { method: input.method, amountMinor: input.amountMinor, owner: input.owner.module } })
   return id
+}
+
+/** Whom an owner's record pays, masked, through its handler: null when the handler names nobody or no details were saved. */
+export async function payeeOfRecord(owner: { module: string, record: string }): Promise<MaskedPayee | null> {
+  const party = await (await disbursementHandlers()).get(owner.module)?.payee?.(owner.record)
+  return party ? payeeFor(party) : null
+}
+
+export interface DisbursementBatch {
+  owner: string
+  parts: { record: string, amountMinor: number }[]
+  method: DisbursementMethod
+  paidOn: string
+  reference?: string | null
+}
+
+/**
+ * One payment covering several of an owner's records, such as a claimant's approved claims: one
+ * disbursement per record, each paid to the record's payee when details are held. Never commits.
+ */
+export async function recordDisbursements(unit: UnitView, batch: DisbursementBatch): Promise<string[]> {
+  const records = new Set(batch.parts.map(p => p.record))
+  if (records.size !== batch.parts.length) throw new Refusal('payments.disbursement.twice', 'Each record is paid once in one payment.', { status: 422 })
+  const ids: string[] = []
+  for (const part of batch.parts) {
+    const payee = await payeeOfRecord({ module: batch.owner, record: part.record })
+    ids.push(await recordDisbursement(unit, {
+      owner: { module: batch.owner, record: part.record },
+      amountMinor: part.amountMinor,
+      method: batch.method,
+      paidOn: batch.paidOn,
+      reference: batch.reference ?? null,
+      payeeId: payee?.held ? payee.id : null,
+    }))
+  }
+  return ids
 }
 
 interface DisbursementRow { id: string, method: DisbursementMethod, amount_minor: number, currency: string, owner_module: string, owner_record: string, payee_id: string | null, paid_on: string, reference: string | null, reverses_id: string | null, posting_id: string }

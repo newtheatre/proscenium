@@ -1,12 +1,13 @@
-// Deciding a claim (BC-21 to BC-25, BC-27; rules C1 to C3 and C5). Approval is per claim: each holder
-// approves the items on the budgets they hold, and the approval that leaves no item undecided posts
-// the expense in the same unit. Returning, declining and voiding each carry a note the claimant sees.
-import { all, can, first, nowMs, refuse, type Actor, type UnitView } from '#kit'
+// Deciding a claim (BC-21 to BC-27; rules C1 to C5). Approval is per claim: each holder approves the
+// items on the budgets they hold, and the approval that leaves no item undecided posts the expense in
+// the same unit, unless the claim is above the second-approval threshold and still needs a second
+// person. Returning, declining and voiding each carry a note the claimant sees.
+import { all, can, first, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import { notify } from '#modules/core'
+import { accountLabel, holdersOf, notify } from '#modules/core'
 import { postEntries, reversePosting, type EntryInput } from '#modules/finance'
 import { budgetLines, requireBudget, requireLine } from './budgets'
-import { budgetsOf, changed, heldBudgets, isClaimant, itemsOf, logEvent, marksOf, type Claim, type Item } from './claims'
+import { budgetsOf, changed, COLUMNS, heldBudgets, isClaimant, itemsOf, logEvent, marksOf, type Claim, type Item } from './claims'
 import { pendingOn } from './pending'
 import { formatMoney } from './money'
 
@@ -62,6 +63,17 @@ async function overByLine(claim: Claim, decided: { lineId: string, amountMinor: 
   return over
 }
 
+/** C4: the threshold above which a claim needs a second approver, or null when one is enough. */
+async function secondAbove(): Promise<number | null> {
+  return await useSetting('budgets.claims.second-approval-above') as number | null
+}
+
+/** Whether this person may give a claim's second approval: the treasurer, and not who gave the first. */
+async function maySecond(actor: Actor, claim: Claim, any: boolean): Promise<boolean> {
+  if (!claim.firstApprovedBy || !any || !actor.accountId) return false
+  return !(await isClaimant({ claimantId: claim.firstApprovedBy }, actor))
+}
+
 /** What the approver may see before deciding: their items, how far over each line approving would go, and the marks. */
 export async function reviewOf(actor: Actor, claim: Claim) {
   const items = await itemsOf(claim.id)
@@ -72,6 +84,9 @@ export async function reviewOf(actor: Actor, claim: Claim) {
     items,
     yours: mine.map(i => i.id),
     any,
+    // Every item decided and above the threshold: waiting on a second approver (C4).
+    awaitingSecond: claim.state === 'submitted' && !!claim.firstApprovedBy,
+    mayApproveSecond: claim.state === 'submitted' && await maySecond(actor, claim, any),
     overMinor: [...over.values()].reduce((a, b) => a + b, 0),
     marks: await marksOf(claim, items),
   }
@@ -95,13 +110,15 @@ async function checkDecisions(claim: Claim, items: readonly Item[], decisions: r
 
 /**
  * Approves the actor's items of a submitted claim (BC-22). Over budget only the treasurer approves
- * (C3). When no item is left undecided, the claim is approved and its expense posted (C5).
+ * (C3). When no item is left undecided, the claim is approved and its expense posted (C5), unless it
+ * is above the second-approval threshold: then it waits for the treasurer, someone else (C4).
  */
 export async function approve(unit: UnitView, actor: Actor, claim: Claim, input: { version: number, items: ItemDecision[] }): Promise<{ state: 'approved' | 'submitted' }> {
   submitted(claim)
   await notOwn(actor, claim)
   const items = await itemsOf(claim.id)
   const { any, held } = await requireApprover(actor, claim, items)
+  if (claim.firstApprovedBy) return approveSecond(unit, actor, claim, { items, version: input.version, any })
   await checkDecisions(claim, items, input.items, held)
   const over = await overByLine(claim, input.items.map(d => ({ lineId: d.lineId, amountMinor: d.approvedMinor })))
   const overMinor = [...over.values()].reduce((a, b) => a + b, 0)
@@ -127,7 +144,35 @@ export async function approve(unit: UnitView, actor: Actor, claim: Claim, input:
   }
   const total = decided.reduce((sum, i) => sum + (i.approvedMinor ?? 0), 0)
   if (total === 0) refuse('budgets.claim.nothing-approved', 'Nothing on this claim would be approved.', { status: 422, remedy: 'Decline it with a note instead.' })
-  const postingId = await postExpense(unit, claim, decided as (Item & { approvedMinor: number, lineId: string })[], at)
+  const above = await secondAbove()
+  if (above !== null && total > above) {
+    unit.add({
+      sql: "UPDATE budgets_claims SET first_approved_by = ?1, version = version + 1, updated_at = ?2 WHERE id = ?3 AND state = 'submitted' AND first_approved_by IS NULL AND version = ?4", // not-policy: numbered parameters
+      params: [actor.accountId ?? null, at, claim.id, input.version],
+    }).expect(1, changed())
+    logEvent(unit, claim.id, { action: 'approved', by: actor.accountId ?? null, at, amountMinor })
+    unit.audit({ action: 'update', record: ['budgets.claim', claim.id], detail: { approvedMinor: total, first: true } })
+    await askSecond(unit, claim, actor, total)
+    return { state: 'submitted' }
+  }
+  await settleApproval(unit, actor, claim, { decided: decided as Decided[], version: input.version, total, at })
+  return { state: 'approved' }
+}
+
+/** C4's second approval: the treasurer, not the first approver, approves the amounts already decided. */
+async function approveSecond(unit: UnitView, actor: Actor, claim: Claim, input: { items: Item[], version: number, any: boolean }): Promise<{ state: 'approved' }> {
+  const { items } = input
+  if (!(await maySecond(actor, claim, input.any))) refuse('budgets.claim.second', 'This claim needs a second approval from the treasurer, someone other than who approved it first.', { status: 403 })
+  const total = items.reduce((sum, i) => sum + (i.approvedMinor ?? 0), 0)
+  await settleApproval(unit, actor, claim, { decided: items as Decided[], version: input.version, total, at: nowMs() })
+  return { state: 'approved' }
+}
+
+/** The approval that moves the claim: the expense posted, the request fulfilled, the claimant told (C5). */
+type Decided = Item & { approvedMinor: number, lineId: string }
+async function settleApproval(unit: UnitView, actor: Actor, claim: Claim, input: { decided: Decided[], version: number, total: number, at: number }): Promise<void> {
+  const { decided, total, at } = input
+  const postingId = await postExpense(unit, claim, decided, at)
   unit.add({
     sql: "UPDATE budgets_claims SET state = 'approved', approved_minor = ?1, decided_at = ?2, expense_posting_id = ?3, version = version + 1, updated_at = ?2 WHERE id = ?4 AND state = 'submitted' AND version = ?5", // not-policy: numbered parameters
     params: [total, at, postingId, claim.id, input.version],
@@ -137,7 +182,19 @@ export async function approve(unit: UnitView, actor: Actor, claim: Claim, input:
   unit.audit({ action: 'state', record: ['budgets.claim', claim.id], detail: { from: 'submitted', to: 'approved', approvedMinor: total } })
   unit.announce('budgets.claim.decided', { claimId: claim.id, decision: 'approved', amountMinor: total }, { record: ['budgets.claim', claim.id] })
   await tellClaimant(unit, claim, { decision: 'approved', amountMinor: total, note: decided.some(i => i.partReason) ? 'Part of it was approved; the reasons are on the claim.' : 'It will be paid by the route you chose.' })
-  return { state: 'approved' }
+}
+
+/** Tells the treasurers, other than the first approver and the claimant, that a claim waits on their second approval. */
+async function askSecond(unit: UnitView, claim: Claim, first: Actor, total: number): Promise<void> {
+  const treasurers = await holdersOf('budgets.claim.approve-any')
+  const skip = new Set([first.accountId, claim.claimantId].filter(Boolean))
+  const to = treasurers.filter(id => !skip.has(id))
+  if (!to.length) return
+  await notify(unit, 'budgets.claim-to-approve', {
+    to,
+    variables: { person: claim.claimantId ? await accountLabel(claim.claimantId) : '', amount: await formatMoney(total, claim.currency), number: claim.number ?? '', title: claim.title, link: `/console/budgets/claims/${claim.id}` },
+    subject: ['budgets.claim', claim.id],
+  })
 }
 
 /** What a claim posts at approval: each item debits its category's account, tagged with its line and production; claims-payable is credited. */
@@ -178,7 +235,7 @@ function fulfil(unit: UnitView, claim: Claim, amountMinor: number, at: number): 
   })
 }
 
-async function tellClaimant(unit: UnitView, claim: Claim, told: { decision: string, amountMinor: number, note: string }): Promise<void> {
+export async function tellClaimant(unit: UnitView, claim: Claim, told: { decision: string, amountMinor: number, note: string }): Promise<void> {
   const { decision, amountMinor, note } = told
   if (!claim.claimantId) return
   await notify(unit, 'budgets.claim-decided', {
@@ -202,7 +259,7 @@ async function reject(unit: UnitView, actor: Actor, claim: Claim, input: { versi
   const at = nowMs()
   unit.add({ sql: "UPDATE budgets_claim_items SET approved_minor = NULL, part_reason = NULL WHERE claim_id IN (SELECT id FROM budgets_claims WHERE id = ? AND state = 'submitted' AND version = ?)", params: [claim.id, input.version] })
   unit.add({
-    sql: `UPDATE budgets_claims SET state = ?1, decided_at = CASE WHEN ?1 = 'declined' THEN ?2 ELSE decided_at END, version = version + 1, updated_at = ?2
+    sql: `UPDATE budgets_claims SET state = ?1, first_approved_by = NULL, decided_at = CASE WHEN ?1 = 'declined' THEN ?2 ELSE decided_at END, version = version + 1, updated_at = ?2
           WHERE id = ?3 AND state = 'submitted' AND version = ?4`, // not-policy: numbered parameters
     params: [state, at, claim.id, input.version],
   }).expect(1, changed())
@@ -242,15 +299,12 @@ export interface WaitingClaim { id: string, number: string | null, title: string
 export async function claimsWaitingOn(actor: Actor): Promise<WaitingClaim[]> {
   if (!actor.accountId) return []
   const rows = await all<Claim>(
-    `SELECT c.id, c.number, c.claimant_id AS claimantId, c.request_id AS requestId, c.title, c.state, c.currency, c.total_minor AS totalMinor,
-        c.approved_minor AS approvedMinor, c.paid_minor AS paidMinor, c.pay_route AS payRoute, c.declared_at AS declaredAt, c.submitted_at AS submittedAt,
-        c.decided_at AS decidedAt, c.expense_posting_id AS expensePostingId, c.version, c.created_at AS createdAt
-      FROM budgets_claims c WHERE c.state = 'submitted' AND (c.claimant_id IS NULL OR c.claimant_id NOT IN (${accountScopeSql('?1')}))
+    `SELECT ${COLUMNS} FROM budgets_claims c WHERE c.state = 'submitted' AND (c.claimant_id IS NULL OR c.claimant_id NOT IN (${accountScopeSql('?1')}))
       ORDER BY c.submitted_at`, actor.accountId)
   const out: WaitingClaim[] = []
   for (const claim of rows) {
     const review = await reviewOf(actor, claim)
-    if (!review.yours.length) continue
+    if (!review.yours.length && !review.mayApproveSecond) continue
     out.push({
       id: claim.id, number: claim.number, title: claim.title, claimantId: claim.claimantId, currency: claim.currency, totalMinor: claim.totalMinor,
       submittedAt: claim.submittedAt, overMinor: review.overMinor, late: review.marks.lateItems.length > 0, notAskedFirst: review.marks.notAskedFirst,

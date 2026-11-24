@@ -1,9 +1,10 @@
 <!-- A claim, for its claimant (BC-19 to BC-24). While a draft or sent back, items are added with a
      receipt photographed for each, or a reason; the claimant declares it true and submits it. Once
      submitted it is fixed: each item shows what was approved and why less, and the log says who did
-     what. A claim nobody has decided can be withdrawn. -->
+     what. A claim nobody has decided can be withdrawn. The claimant chooses how they are paid among
+     the theatre's routes, and is pointed to their bank details for a transfer. -->
 <script setup lang="ts">
-import type { ClaimItem } from '../../../../composables/useClaim'
+import type { ClaimItem, PayRoute } from '../../../../composables/useClaim'
 
 interface OfferedLine { id: string, name: string, budgetId: string, budgetName: string, currency: string }
 interface Category { id: string, name: string, description: string }
@@ -12,7 +13,7 @@ const { t } = useT()
 const { day } = useDates()
 const text = useBudgetText()
 const { id, data, status, error, refresh, act, title } = await useClaim()
-const { data: choices } = await useAPI<{ lines: OfferedLine[], categories: Category[] }>('/api/budgets/expenses', { key: 'budgets:expenses' })
+const { data: choices } = await useAPI<{ lines: OfferedLine[], categories: Category[], routes: { offered: PayRoute[], preset: PayRoute } }>('/api/budgets/expenses', { key: 'budgets:expenses' })
 
 const editable = computed(() => !!data.value && data.value.mine && ['draft', 'returned'].includes(data.value.claim.state))
 const withdrawable = computed(() => !!data.value && data.value.mine && ['draft', 'submitted', 'returned'].includes(data.value.claim.state))
@@ -27,6 +28,12 @@ function openItem(item: ClaimItem | null) {
 const { $api } = useNuxtApp()
 async function removeItem(item: ClaimItem) {
   await $api(`/api/budgets/claims/${id.value}/items/${item.id}` as string, { method: 'DELETE', body: {} }).catch(() => undefined)
+  await refresh()
+}
+const routeItems = computed(() => (choices.value?.routes.offered ?? []).map(r => ({ value: r, label: t(`budgets.settings.claims.routes.options.${r}`) })))
+async function setRoute(payRoute: PayRoute) {
+  const claim = data.value!.claim
+  await $api(`/api/budgets/claims/${id.value}` as string, { method: 'PATCH', body: { title: claim.title, requestId: claim.requestId, payRoute } }).catch(() => undefined)
   await refresh()
 }
 const submit = () => act('/submit', { declared: true }, 'budgets.screens.claims.submitted')
@@ -122,6 +129,42 @@ const menu = computed(() => withdrawable.value ? [{ label: t('budgets.screens.cl
               />
             </RecordListItem>
           </RecordList>
+        </PageSection>
+        <PageSection
+          v-if="data.mine"
+          :title="t('budgets.screens.claims.route')"
+        >
+          <div class="space-y-3">
+            <UFormField
+              v-if="editable && routeItems.length > 1"
+              :label="t('budgets.screens.claims.route-label')"
+            >
+              <USelect
+                :model-value="data.claim.payRoute"
+                :items="routeItems"
+                class="sm:w-72"
+                @update:model-value="setRoute($event as PayRoute)"
+              />
+            </UFormField>
+            <p
+              v-else
+              class="text-sm"
+            >
+              {{ t(`budgets.settings.claims.routes.options.${data.claim.payRoute}`) }}
+            </p>
+            <p
+              v-if="data.claim.payRoute === 'bank-transfer'"
+              class="text-sm text-muted"
+            >
+              {{ t('budgets.screens.claims.route-bank') }}
+              <ULink
+                to="/account/bank-details"
+                class="underline"
+              >
+                {{ t('budgets.screens.claims.route-bank-link') }}
+              </ULink>
+            </p>
+          </div>
         </PageSection>
         <PageSection
           v-if="editable && data.items.length"

@@ -1,8 +1,8 @@
 // Expenses in the members' area (BC-15, BC-19): the person's own claims and requests, open ones first,
-// with the lines and categories they may choose and their approved requests a claim may fulfil.
+// with the lines, categories and payment routes they may choose and their approved requests a claim may fulfil.
 import { can, defineRoute, refuse } from '#kit'
 import { myRequests, offeredLines } from '../../requests'
-import { myClaims } from '../../claims'
+import { myClaims, payRoutes } from '../../claims'
 import { listCategories } from '../../categories'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (_event, { actor }) => {
@@ -16,6 +16,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     claims: canClaim ? await myClaims(actor.accountId!) : [],
     requests,
     lines: await offeredLines(),
+    routes: await payRoutes(),
     categories: (await listCategories()).filter(c => !c.archivedAt).map(c => ({ id: c.id, name: c.name, description: c.description })),
   }
 })

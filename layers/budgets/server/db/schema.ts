@@ -206,6 +206,8 @@ export const claims = defineTable('budgets_claims', {
   declaredAt: col.timestamp('declared_at'),
   submittedAt: col.timestamp('submitted_at'),
   decidedAt: col.timestamp('decided_at'),
+  // Who gave the first of two approvals above budgets.claims.second-approval-above (C4); null otherwise.
+  firstApprovedBy: col.account('first_approved_by', { role: 'actor', onMerge: 'alias', nullable: true }),
   expensePostingId: col.internal(text('expense_posting_id')),
   version: col.internal(integer('version').notNull().default(0)),
   createdAt: col.createdAt(),
