@@ -5,6 +5,7 @@ import type { H3Event } from 'h3'
 import type { Actor, KitEnv } from '../context'
 import { currentContext } from '../context-store'
 import { Refusal } from '../refusal'
+import type { PracticeAnswer } from './sample'
 
 export { PRACTICE_HEADER } from '../../shared/practice'
 
@@ -26,7 +27,7 @@ export interface PracticeGate {
   /** An unmarked request: refuses a change sent from a practice page (M2). */
   unmarked: (event: H3Event) => void | Promise<void>
   /** After a marked change commits, inside the store: ticks the scenario's tasks (T1). */
-  changed?: () => Promise<void>
+  changed?: (answer: PracticeAnswer) => Promise<void>
 }
 
 const closed: PracticeGate = {

@@ -59,7 +59,7 @@ export interface TableOptions {
   /**
    * What a practice store holds of this table when it is made (Practice mode, part 2): 'empty' (the
    * default) for sample sets to fill, 'copy' for the theatre's own setup, each column through its
-   * erasure rule, or 'replace' for stand-in rows the module's sample set writes.
+   * erasure rule, or 'replace': copied as well, for the module's sample set to swap for stand-ins.
    */
   practice?: 'empty' | 'copy' | 'replace'
 }
