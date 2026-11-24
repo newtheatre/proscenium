@@ -1,11 +1,35 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ed98c6f1-67e0-4baf-b2e8-081abfc7cfc1",
+  "id": "bfe96915-c75c-4c0b-bf0d-6cf7db64fc8f",
   "prevIds": [
     "7cf5fe44-b9dc-49fd-8826-1d97028a6e3d"
   ],
   "ddl": [
+    {
+      "name": "availability_exceptions",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_pattern_lines",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_patterns",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_profiles",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_request_people",
+      "entityType": "tables"
+    },
+    {
+      "name": "availability_requests",
+      "entityType": "tables"
+    },
     {
       "name": "awards_awards",
       "entityType": "tables"
@@ -256,10 +280,6 @@
     },
     {
       "name": "core_accounts",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_age_markers",
       "entityType": "tables"
     },
     {
@@ -785,6 +805,566 @@
     {
       "name": "spaces_purposes",
       "entityType": "tables"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "first_date",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "last_date",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "weekdays",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "from_local",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "until_local",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "level",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "reason_shared",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "entered_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "request_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "pattern_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "weekday",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "from_local",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "until_local",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "level",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "label",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "starts_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "ends_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "unmarked_means",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "changed_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "checked_to",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "request_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'asked'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "answered_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "reminders_sent",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "message",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "from_date",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "to_date",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "due_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "group_refs",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "source_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "opened_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'open'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "closed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "availability_requests",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
     },
     {
       "table": "awards_awards",
@@ -7851,56 +8431,6 @@
       "name": "anonymised_at",
       "type": "integer",
       "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_age_markers",
-      "name": "account_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_age_markers",
-      "name": "turns_18_on",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_age_markers",
-      "name": "source",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_age_markers",
-      "name": "recorded_by",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_age_markers",
-      "name": "recorded_at",
-      "type": "integer",
-      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -21207,6 +21737,132 @@
       "entityType": "columns"
     },
     {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "last_date",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "availability_pattern_lines_pattern",
+      "columns": [
+        {
+          "value": "pattern_id",
+          "isExpression": false
+        },
+        {
+          "value": "weekday",
+          "isExpression": false
+        },
+        {
+          "value": "from_local",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "availability_patterns_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "availability_request_people_once",
+      "columns": [
+        {
+          "value": "request_id",
+          "isExpression": false
+        },
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "availability_request_people_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_source",
+      "columns": [
+        {
+          "value": "source_ref",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "source_ref IS NOT NULL AND state = 'open'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "due_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "awards_awards",
       "name": "awards_awards_type",
       "columns": [
@@ -23024,20 +23680,6 @@
       "columns": [
         {
           "value": "name",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_age_markers",
-      "name": "core_age_markers_turns",
-      "columns": [
-        {
-          "value": "turns_18_on",
           "isExpression": false
         }
       ],
@@ -26365,6 +27007,51 @@
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "fk_availability_exceptions_request_id_availability_requests_id_fk",
+      "columns": [
+        "request_id"
+      ],
+      "tableTo": "availability_requests",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "fk_availability_pattern_lines_pattern_id_availability_patterns_id_fk",
+      "columns": [
+        "pattern_id"
+      ],
+      "tableTo": "availability_patterns",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "fk_availability_request_people_request_id_availability_requests_id_fk",
+      "columns": [
+        "request_id"
+      ],
+      "tableTo": "availability_requests",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
     },
     {
       "table": "awards_awards",
@@ -29883,6 +30570,15 @@
       "entityType": "fks"
     },
     {
+      "table": "availability_profiles",
+      "name": "availability_profiles_pk",
+      "columns": [
+        "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "bar_stock_levels",
       "name": "bar_stock_levels_pk",
       "columns": [
@@ -29919,15 +30615,6 @@
         "table_name",
         "column_name",
         "row_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "core_age_markers",
-      "name": "core_age_markers_pk",
-      "columns": [
-        "account_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -30150,6 +30837,51 @@
         "bookable_id",
         "weekday",
         "opens_at"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "availability_pattern_lines_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "availability_patterns_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "availability_request_people_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_pk",
+      "columns": [
+        "id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -31658,6 +32390,96 @@
       "entityType": "uniques"
     },
     {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_dates",
+      "value": "\"last_date\" >= \"first_date\" AND julianday(\"last_date\") - julianday(\"first_date\") <= 366",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_times",
+      "value": "(\"from_local\" IS NULL AND \"until_local\" IS NULL) OR ((\"from_local\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"from_local\" <= '24:00') AND (\"until_local\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"until_local\" <= '24:00') AND \"until_local\" > \"from_local\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_level",
+      "value": "\"level\" IN ('free', 'maybe', 'busy')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_exceptions",
+      "name": "availability_exceptions_reason",
+      "value": "\"reason\" IS NULL OR length(\"reason\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "availability_pattern_lines_weekday",
+      "value": "\"weekday\" BETWEEN 1 AND 7",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "availability_pattern_lines_times",
+      "value": "(\"from_local\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"from_local\" <= '24:00') AND (\"until_local\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"until_local\" <= '24:00') AND \"until_local\" > \"from_local\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_pattern_lines",
+      "name": "availability_pattern_lines_level",
+      "value": "\"level\" IN ('free', 'maybe', 'busy')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "availability_patterns_label",
+      "value": "length(\"label\") BETWEEN 1 AND 40",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_patterns",
+      "name": "availability_patterns_dates",
+      "value": "\"ends_on\" IS NULL OR \"ends_on\" >= \"starts_on\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_profiles",
+      "name": "availability_profiles_unmarked",
+      "value": "\"unmarked_means\" IS NULL OR \"unmarked_means\" IN ('unknown', 'free')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_request_people",
+      "name": "availability_request_people_state",
+      "value": "\"state\" IN ('asked', 'answered', 'lapsed', 'withdrawn')",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_title",
+      "value": "length(\"title\") BETWEEN 1 AND 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_message",
+      "value": "\"message\" IS NULL OR length(\"message\") <= 1000",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_dates",
+      "value": "\"to_date\" >= \"from_date\" AND julianday(\"to_date\") - julianday(\"from_date\") <= 366",
+      "entityType": "checks"
+    },
+    {
+      "table": "availability_requests",
+      "name": "availability_requests_state_values",
+      "value": "\"state\" IN ('open', 'closed')",
+      "entityType": "checks"
+    },
+    {
       "table": "awards_awards",
       "name": "awards_awards_state",
       "value": "\"state\" IN ('current', 'revoked')",
@@ -32441,12 +33263,6 @@
       "table": "core_accounts",
       "name": "core_accounts_pronouns_length",
       "value": "pronouns IS NULL OR length(pronouns) BETWEEN 1 AND 40",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_age_markers",
-      "name": "core_age_markers_date",
-      "value": "\"turns_18_on\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'",
       "entityType": "checks"
     },
     {
