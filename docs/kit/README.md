@@ -311,6 +311,31 @@ presented value belongs to (R-34). It is for the host's server code only: the pr
 enumerable, so an answer turned into JSON (a route returning it, a summary, an event or job
 payload) leaves it out, and it is dropped from any verdict that is not met.
 
+## Figures
+
+A module answers figures about its own records through `core.measure`, one file per figure in
+`server/contributions/core.measure/<name>.ts`, listed in the manifest as
+`{ id: '<module>.<name>', file: '<name>' }`:
+`export default defineMeasure({ label, unit, combine, by, filters?, ability, read })`. `unit` is
+count, money, minutes or percent; `combine` is sum, distinct or level; `by` lists the breakdowns it
+answers, the shared ones (`performance`, `production`, `season`, `collection`, `venue`, `space`,
+`day`, `week`, `month`, `committee-year`) or the module's own `<module>.<noun>`; `filters` the keys
+it narrows by. `read(query)` answers `{ rows: [{ keys, value, currency? }] }` or `'unsupported'`.
+A ratio has no read: `ratio: { of, over }` names two figures and core divides them group by group,
+leaving out a group with nothing under it. The registry refuses a figure not named under its module,
+an ability nobody declares, another module's own key, and a ratio of a figure that does not exist or
+does not break down as the ratio does.
+
+Read a figure only through `readMeasure(id, { from, to, scope?, by, filter? }, actor?)` from
+`#modules/core`. It refuses an unknown figure, an undeclared breakdown or filter, more than two
+breakdowns, a filter of no values or more than twenty, and a reader without the figure's ability
+site-wide or on the scope record, all before the module is asked. It answers `{ state: 'ok', rows }`,
+`{ state: 'unsupported' }` or `{ state: 'unavailable', reason }`: the module is off, the read threw,
+it outlasted `core.measures.read-budget`, or its answer held anything but asked keys and numbers (an
+account id, a stray field, money without a currency, a count with one). A bad answer is logged with
+the rule it broke, never the row. Unavailable is shown as unavailable, never as nought.
+`listMeasures(actor?)` lists the figures a reader may read somewhere.
+
 ## Email outcomes
 
 Cloudflare Email Sending reports each message's outcome (delivered, bounced, complained and so on)
