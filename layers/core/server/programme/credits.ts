@@ -103,7 +103,8 @@ function changed(unit: UnitView, productionId: string, state: string) {
 }
 
 /** Tells the linked person once, in the members' area and by email unless they switched it off. */
-async function tell(unit: UnitView, productionId: string, creditId: string, accountId: string, production: string, role: string, origin: string) {
+async function tell(unit: UnitView, about: { productionId: string, creditId: string, accountId: string, production: string, role: string, origin: string }) {
+  const { productionId, creditId, accountId, production, role, origin } = about
   await notify(unit, 'core.credit.added', {
     to: accountId,
     variables: { production, role, link: `${origin}/account/credits` },
@@ -113,11 +114,15 @@ async function tell(unit: UnitView, productionId: string, creditId: string, acco
 }
 
 export async function addCredit(unit: UnitView, productionId: string, input: CreditInput, origin: string): Promise<string> {
-  return insertCredit(unit, productionId, await productionOf(productionId), input, origin)
+  return insertCredit(unit, { productionId, production: await productionOf(productionId), origin }, input)
 }
 
+/** Where a credit goes: its production (read already, or made earlier in this unit) and the site origin for the link. */
+export interface CreditPlace { productionId: string, production: { title: string, state: string }, origin: string }
+
 /** A credit on a production read already, or made earlier in this unit (createProduction's credits). */
-export async function insertCredit(unit: UnitView, productionId: string, production: { title: string, state: string }, input: CreditInput, origin: string): Promise<string> {
+export async function insertCredit(unit: UnitView, place: CreditPlace, input: CreditInput): Promise<string> {
+  const { productionId, production, origin } = place
   if (input.accountId) await checkAccount(input.accountId)
   const lineUpId = input.lineUpId ?? null
   const performanceId = lineUpId
@@ -136,11 +141,12 @@ export async function insertCredit(unit: UnitView, productionId: string, product
       AND (${lineUpId} IS NULL OR EXISTS (SELECT 1 FROM core_performance_line_ups WHERE id = ${lineUpId} AND performance_id = ${performanceId}))`).expect(1, belongs ? NOT_THIS : SECTION_REFUSED)
   unit.audit({ action: 'create', record: ['core.production', productionId], detail: { credit: id, linked: !!input.accountId, ...(performanceId ? { performanceId } : {}) } })
   changed(unit, productionId, production.state)
-  if (input.accountId) await tell(unit, productionId, id, input.accountId, production.title, input.role, origin)
+  if (input.accountId) await tell(unit, { productionId, creditId: id, accountId: input.accountId, production: production.title, role: input.role, origin })
   return id
 }
 
-export async function updateCredit(unit: UnitView, productionId: string, creditId: string, input: Partial<CreditInput>, origin: string): Promise<void> {
+export async function updateCredit(unit: UnitView, on: { productionId: string, creditId: string, origin: string }, input: Partial<CreditInput>): Promise<void> {
+  const { productionId, creditId, origin } = on
   const production = await productionOf(productionId)
   const row = await creditRow(productionId, creditId)
   const linking = input.accountId !== undefined && input.accountId !== null && input.accountId !== row.account_id
@@ -158,7 +164,7 @@ export async function updateCredit(unit: UnitView, productionId: string, creditI
     WHERE id = ${creditId} AND production_id = ${productionId} AND ${moving ? assertTerm(section, SECTION) : sql`1`}`).expect(1, moving ? SECTION_REFUSED : CHANGED)
   unit.audit({ action: 'update', record: ['core.production', productionId], detail: { credit: creditId, fields: Object.keys(input).sort() } })
   changed(unit, productionId, production.state)
-  if (linking) await tell(unit, productionId, creditId, input.accountId!, production.title, input.role ?? row.role, origin)
+  if (linking) await tell(unit, { productionId, creditId, accountId: input.accountId!, production: production.title, role: input.role ?? row.role, origin })
 }
 
 export async function removeCredit(unit: UnitView, productionId: string, creditId: string): Promise<void> {
