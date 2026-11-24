@@ -24,3 +24,10 @@ What the build settled that the parts above leave open, and where it differs fro
 - **Own record.** Handing yourself a perk is refused `core.access.own-record` in the service; the Owner stands above it, as everywhere. `handout.record` sits on the crew call rather than on the person, so the kit's owner rule could not do it.
 - **Retention.** Handouts are append-only. The daily sweep clears the size once the call's last day is older than `front-of-house.retention.assignments`; the rows stay.
 - **Not done.** The `leading-shift` fact does not bring `handout.record`, because the fact sits on a performance and the ability on a crew call; the Front of house manager preset has it. There is no `welfare-lead` preset yet to give `view-needs` to.
+
+## FB-514: moves the system makes
+
+- **Where it lives.** `systemMove` in `layers/forms/shared/engine/evaluate.ts`; `followSystemMoves` and `arrive` in `layers/forms/server/stages.ts`, called after a submission (the public route and `addResponse`), a staff move and a resubmission. Checks in `shared/engine/checks.ts`. `docs/specs/form-builder/14-changes-2026-11-24.md` rows 12 to 17 record what was built.
+- **Unit size.** A chain of five fits the unit's fifty statements with room to spare only because the person is told once, at the end of the chain. A form whose system moves open review rounds or queue several actions at each step may come close; if one is ever refused as too large, the remedy is a shorter chain.
+- **The loop warning** is an audit entry (`detail.loop`) on the response; the health check joins it to the form's live version, so publishing a fixed version clears it.
+- **Not done.** Records' own fields (FB-508) never take system moves, since they have no stages.
