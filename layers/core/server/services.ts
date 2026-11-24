@@ -52,6 +52,8 @@ export { describeViewer, holdsConsole, holdsAdmin, holdsLive } from './interface
 export { setupNeeded } from './identity/setup'
 export type { ViewerDescription } from './interface/viewer'
 export { standingOf, isMember } from './identity/standings'
+export { ageStatus, ageStatuses } from './identity/age'
+export type { AgeStatus } from './identity/age'
 export type { Standing } from './identity/standings'
 export { holdersOf, holdersOfRole } from './identity/holders'
 export { getPerformance, listPerformances, capacityOf, assertSpaceFree, isSpaceFree } from './programme/performances'
