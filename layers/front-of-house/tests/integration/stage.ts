@@ -102,6 +102,11 @@ import handoutsGet from '../../server/api/front-of-house/crew-calls/[id]/handout
 import handoutsPost from '../../server/api/front-of-house/crew-calls/[id]/handouts/index.post'
 import handoutUndo from '../../server/api/front-of-house/crew-calls/[id]/handouts/[handoutId]/undo.post'
 import handoutCalls from '../../server/api/front-of-house/handout-calls.get'
+import gridGet from '../../server/api/front-of-house/grid.get'
+import batchesGet from '../../server/api/front-of-house/batches/index.get'
+import batchesPost from '../../server/api/front-of-house/batches/index.post'
+import batchRemove from '../../server/api/front-of-house/batches/[id]/remove.post'
+import shiftCopy from '../../server/api/front-of-house/shifts/[id]/copy.post'
 import { call, inContext, person, rows, saveKey, server, setModule } from '../../../../tests/integration/helpers'
 
 export const handle = server({
@@ -204,6 +209,11 @@ export const handle = server({
   'POST /api/front-of-house/crew-calls/:id/handouts': handoutsPost,
   'POST /api/front-of-house/crew-calls/:id/handouts/:handoutId/undo': handoutUndo,
   'GET /api/front-of-house/handout-calls': handoutCalls,
+  'GET /api/front-of-house/grid': gridGet,
+  'GET /api/front-of-house/batches': batchesGet,
+  'POST /api/front-of-house/batches': batchesPost,
+  'POST /api/front-of-house/batches/:id/remove': batchRemove,
+  'POST /api/front-of-house/shifts/:id/copy': shiftCopy,
 })
 
 export type Person = ReturnType<typeof person>
