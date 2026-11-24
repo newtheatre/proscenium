@@ -301,12 +301,13 @@ export async function publish(unit: UnitView, actor: Actor, courseId: string, in
   // Sessions not yet started move to the new version; one already started keeps its own (V7).
   unit.add({ sql: 'UPDATE training_sessions SET version_id = ?, updated_at = ? WHERE course_id = ? AND starts_at > ? AND status IN (\'unpublished\', \'published\')', params: [version.id, at, courseId, at] })
   if (cutTo !== null) {
-    // Every holder at once (V6). Telling each one is the job of the notifications slice.
+    // Every holder at once (V6); the job tells them, a page at a time.
     unit.add({
       sql: `UPDATE training_records SET natural_expires_at = coalesce(natural_expires_at, expires_at), expires_at = ?1, cut_reason = 'material-changed', updated_at = ?2
         WHERE course_id = ?3 AND status = 'awarded' AND (expires_at IS NULL OR expires_at > ?1)`, // not-policy: bound parameters
       params: [cutTo, at, courseId],
     })
+    unit.enqueue('training.notify-holders', { courseId, versionId: version.id, after: null })
   }
   unit.announce('training.course.published', { courseId, versionId: version.id, number: version.number, changeKind }, { record: ['training.course', courseId] })
   unit.audit({ action: 'state', record: ['training.course', courseId], detail: { published: version.number, changeKind } })

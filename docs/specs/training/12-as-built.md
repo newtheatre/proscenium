@@ -12,7 +12,7 @@ Where the build departs from, or is narrower than, this specification and the se
 - **Guards and the Owner.** The own-sign-off and own-award guards apply to everyone, the Owner included: they are four-eyes rules, which Matt's ruling of 23 November 2026 on own records leaves in place. Revoking one's own record is not guarded, since it is never to one's benefit.
 - **Abilities** are declared with the first route that needs them, as the conformance check requires. This slice declares `course.view`, `course.manage`, `sign-off.record`, `record.view`, `record.award`, `record.revoke` and `settings.manage`. The fact `training.competent` comes with competencies.
 - **The point `training.step-source`** is declared in this slice, for Front of house's FH-51; its contract file came with shadowed shifts (below).
-- **Notifications.** Only `training.record-awarded` (topic `training.records`, can be switched off) and `training.record-revoked` so far. Telling holders a version cut their training short waits for the job `training.notify-holders`.
+- **Notifications.** `training.record-awarded` (topic `training.records`, can be switched off) and `training.record-revoked`; the expiry, lapse and cut-short notices came later (below).
 - **Settings.** The seventeen of the second round plus `evidence.chase-after` and the two quiz settings. The video settings and Stream credentials come with uploaded video. Training's settings are on its page under Admin > Modules, following the platform's convention, not at `/console/training/settings`.
 
 ## Competencies (TR-22, TR-23, TR-35 to TR-37, TR-50), 24 November 2026
@@ -58,7 +58,6 @@ Where the build departs from, or is narrower than, this specification and the se
 - **Once per course.** An occurrence counts once towards a course, even when two of its steps read the same source; it counts again towards another course that reads it.
 - **When Training reads** (H2): on `POST /api/training/courses/<id>/activity`, which the course page calls when the person opens it; from the listener `step-source-confirmed`, which reads the sources whose `event` is the one heard; and in the daily task `training.sweep-records` at 06:00, one unit per person and course, for everyone with a sign-off inside the progress window on a live course with an activity step.
 - **Listening.** Training's `events.listens` cannot name an event no module announces yet, so the entry `'front-of-house.shadow.confirmed': 'step-source-confirmed'` is added in Front of house's FH-51 pull request. Each later source adds its own line naming the same listener.
-- **The sweep's other work** (expiry warnings and lapse events, L3) is not built yet; the task does only H2 so far.
 - **Tests** use the fixture module `stint` in `tests/fixtures/modules`, whose source `stint.shift` keeps shifts in memory, so Training's tests do not need Front of house.
 
 ## Certificates and declarations (TR-21, TR-46 to TR-48, TR-52), 24 November 2026
@@ -73,3 +72,11 @@ Where the build departs from, or is narrower than, this specification and the se
 - **The queue** (`GET /api/training/evidence`) lists waiting evidence oldest first on the courses where the person may verify, filterable by kind and course, and marks what has waited past `training.evidence.chase-after` as overdue (E8). The console home card and the weekly digest come with the screens and the digest job.
 - **Notifications.** `training.evidence-submitted` goes to the holders of `training.evidence.verify` at the course (optional, topic `training.records`); `training.evidence-decided` tells the person the outcome and cannot be switched off.
 - **Not yet:** deleting evidence files on erasure and in the retention sweep, and adding them to a person's download.
+
+## Expiry warnings, lapses and cut short (L3, V6), 24 November 2026
+
+- **The daily task** `training.sweep-records` (06:00) now also warns each holder once when `training.records.warn-before` remains (`training.record.expiring`, notice `training.record-expiring`) and announces each lapse once after the date (`training.record.lapsed`, notice `training.record-lapsed`). Once is kept by the columns `warned_at` and `lapse_announced_at`, set on the statement's predicate; each record is its own unit; a run takes at most 20 pages of 100 and the next run carries on. Lapsed is still read from the date: the row stays `awarded`.
+- **Cut short.** Publishing a version that requires retraining enqueues the bulk-lane job `training.notify-holders`, which announces `training.record.cut-short` for each record it cut and tells the holders a page of 100 at a time (`training.record-cut-short`, which cannot be switched off), enqueuing itself for the next page.
+- **A warning already sent** is not repeated when a version later cuts the record short; the cut-short notice says the new date.
+- **Dates in messages** are written in words ("14 March 2027") by Training's `dayInWords`, since notice variables are text.
+- **Not yet:** `training.sweep-retention` (anonymising ended records and their sign-offs, deleting evidence and its files past their dates) and the weekly digest `training.send-digest`.
