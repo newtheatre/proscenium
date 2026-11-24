@@ -43,21 +43,29 @@ export async function dispatch(messages: JobMessage[]): Promise<void> {
   }
 }
 
+let runJob: ((jobId: string) => Promise<unknown>) | undefined
+
+/** How a job is run in a store: jobs.ts says so when it loads, so this file never imports it. */
+export function setStoreJobRunner(runner: (jobId: string) => Promise<unknown>): void {
+  runJob = runner
+}
+
 /**
  * In practice a job runs in the store after the response, under the same session (O4): nothing
  * reaches the real queues. A delayed job waits for the trainee's "Run now" instead.
  */
 async function runInStore(messages: JobMessage[]): Promise<void> {
   const { env, practice, waitUntil } = useContext()
-  const { runJob } = await import('./jobs')
+  if (!runJob) throw new Error('No job runner: jobs.ts has not loaded')
+  const run = runJob
   const due = messages.filter(m => !m.delaySeconds)
-  const run = (async () => {
+  const running = (async () => {
     for (const message of due) {
-      await runInContext({ env, practice, actor: { kind: 'job' }, cache: {} }, () => runJob(message.jobId))
+      await runInContext({ env, practice, actor: { kind: 'job' }, cache: {} }, () => run(message.jobId))
         .catch(error => log.error('core.practice.job-failed', { jobId: message.jobId, error: String((error as Error)?.message ?? error) }))
     }
   })()
   // After the response where the platform allows it; a test, with no waitUntil, sees them done.
-  if (waitUntil) waitUntil(run)
-  else await run
+  if (waitUntil) waitUntil(running)
+  else await running
 }

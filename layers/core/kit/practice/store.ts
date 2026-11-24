@@ -51,24 +51,31 @@ export class PracticeStore extends DurableObject<StoreBindings> {
 
   private async cleanUp(session: { accountId: string } | null): Promise<void> {
     if (session) {
-      const { FILES, CACHE } = this.env
-      if (FILES) {
-        for (let cursor: string | undefined, page: R2Objects; ; cursor = page.cursor) {
-          page = await FILES.list({ prefix: filesPrefix(session.accountId), cursor })
-          if (page.objects.length) await FILES.delete(page.objects.map(o => o.key))
-          if (!page.truncated) break
-        }
-      }
-      if (CACHE) {
-        for (let cursor: string | undefined, page: KVNamespaceListResult<unknown>; ; cursor = page.list_complete ? undefined : page.cursor) {
-          page = await CACHE.list({ prefix: cachePrefix(session.accountId), cursor })
-          await Promise.all(page.keys.map(k => CACHE.delete(k.name)))
-          if (page.list_complete) break
-        }
-      }
+      await this.clearFiles(session.accountId)
+      await this.clearCache(session.accountId)
     }
     await this.ctx.storage.deleteAlarm()
     await this.ctx.storage.deleteAll()
+  }
+
+  private async clearFiles(accountId: string): Promise<void> {
+    const { FILES } = this.env
+    if (!FILES) return
+    for (let cursor: string | undefined, page: R2Objects; ; cursor = page.cursor) {
+      page = await FILES.list({ prefix: filesPrefix(accountId), cursor })
+      if (page.objects.length) await FILES.delete(page.objects.map(o => o.key))
+      if (!page.truncated) break
+    }
+  }
+
+  private async clearCache(accountId: string): Promise<void> {
+    const { CACHE } = this.env
+    if (!CACHE) return
+    for (let cursor: string | undefined, page: KVNamespaceListResult<unknown>; ; cursor = page.list_complete ? undefined : page.cursor) {
+      page = await CACHE.list({ prefix: cachePrefix(accountId), cursor })
+      await Promise.all(page.keys.map(k => CACHE.delete(k.name)))
+      if (page.list_complete) break
+    }
   }
 
   private exec({ sql, params }: StoreStatement): StoreAnswer {

@@ -1,10 +1,10 @@
 // Availability: a person's own word on when they are free (spec part 2). The gate's six tables:
 // profiles, weekly patterns and their lines, dated exceptions, and requests with the people asked.
-// Polls, meetings and calendar imports add theirs with their slices. Times of day are wall clock.
+// Polls add a find, its people, slots and votes; meetings their invitees; calendar imports come later. Times of day are wall clock.
 import { integer, text, check, index, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { col, defineTable } from '#kit/db'
-import { ASKED_STATES, LEVELS, REQUEST_STATES, UNMARKED } from '../../shared/levels'
+import { ASKED_STATES, LEVELS, MEETING_STATES, POLL_STATES, REQUEST_STATES, RESPONSES, UNMARKED, VOTES } from '../../shared/levels'
 
 const inList = (values: readonly string[]) => sql.raw(values.map(v => `'${v}'`).join(', '))
 const clock = (c: unknown) => sql`(${c} GLOB '[0-2][0-9]:[0-5][0-9]' AND ${c} <= '24:00')`
@@ -156,4 +156,143 @@ export const requestPeople = defineTable('availability_request_people', {
   ],
 })
 
-export const tables = { profiles, patterns, patternLines, exceptions, requests, requestPeople }
+/** A find sent as a poll (F7, F8): 2 to 6 slots its people answer until `answers_by`. */
+export const finds = defineTable('availability_finds', {
+  id: col.id(),
+  title: col.internal(text('title').notNull()),
+  lengthMinutes: col.internal(integer('length_minutes').notNull()),
+  groupRefs: col.internal(text('group_refs', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`)),
+  spaceIds: col.internal(text('space_ids', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`)),
+  contextRef: col.internal(text('context_ref')),
+  targetId: col.internal(text('target_id')),
+  createdBy: col.account('created_by', { role: 'actor' }),
+  answersBy: col.timestamp('answers_by').notNull(),
+  state: col.internal(text('state', { enum: POLL_STATES }).notNull().default('polling')),
+  decidedSlotId: col.internal(text('decided_slot_id')),
+  outcomeRef: col.internal(text('outcome_ref')),
+  decidedAt: col.timestamp('decided_at'),
+  abandonedAt: col.timestamp('abandoned_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'avfd',
+  realm: 'members',
+  subject: 'none',
+  retention: 'availability.retention.history',
+  extra: t => [
+    index('availability_finds_state').on(t.state, t.answersBy),
+    index('availability_finds_created_by').on(t.createdBy),
+    check('availability_finds_title', sql`length(${t.title}) BETWEEN 1 AND 80`),
+    check('availability_finds_length', sql`${t.lengthMinutes} BETWEEN 15 AND 720`),
+    check('availability_finds_state_values', sql`${t.state} IN (${inList(POLL_STATES)})`),
+  ],
+})
+
+/** One person a poll asks; must-have people rule out slots on the grid. */
+export const findPeople = defineTable('availability_find_people', {
+  findId: col.ref('availability_finds'),
+  accountId: col.account('account_id', { role: 'subject' }),
+  mustHave: col.internal(integer('must_have', { mode: 'boolean' }).notNull().default(false)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  realm: 'members',
+  onErasure: 'delete-row',
+  extra: t => [
+    primaryKey({ columns: [t.findId, t.accountId] }),
+    index('availability_find_people_account').on(t.accountId),
+  ],
+})
+
+/** A shortlisted slot of a poll, its length the find's. */
+export const findSlots = defineTable('availability_find_slots', {
+  id: col.id(),
+  findId: col.ref('availability_finds'),
+  startsAt: col.timestamp('starts_at').notNull(),
+  endsAt: col.timestamp('ends_at').notNull(),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'avfs',
+  realm: 'members',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('availability_find_slots_once').on(t.findId, t.startsAt),
+    check('availability_find_slots_order', sql`${t.endsAt} > ${t.startsAt}`),
+  ],
+})
+
+/** One person's answer for one slot. Only they and the organiser ever see it (F7). */
+export const findVotes = defineTable('availability_find_votes', {
+  id: col.id(),
+  slotId: col.ref('availability_find_slots'),
+  accountId: col.account('account_id', { role: 'subject' }),
+  answer: col.internal(text('answer', { enum: VOTES }).notNull()),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'avfv',
+  realm: 'members',
+  onErasure: 'delete-row',
+  extra: t => [
+    uniqueIndex('availability_find_votes_once').on(t.slotId, t.accountId),
+    index('availability_find_votes_account').on(t.accountId),
+    check('availability_find_votes_answer', sql`${t.answer} IN (${inList(VOTES)})`),
+  ],
+})
+
+/** An arranged meeting (M1 to M6). Past is derived from `ends_at`. */
+export const meetings = defineTable('availability_meetings', {
+  id: col.id(),
+  title: col.internal(text('title').notNull()),
+  startsAt: col.timestamp('starts_at').notNull(),
+  endsAt: col.timestamp('ends_at').notNull(),
+  place: col.internal(text('place')),
+  spaceBookingRef: col.internal(text('space_booking_ref')),
+  contextRef: col.internal(text('context_ref')),
+  // The agenda, internal as a request's message is: the screen says not to name anyone in it.
+  notes: col.internal(text('notes')),
+  arrangedBy: col.account('arranged_by', { role: 'actor' }),
+  findId: col.ref('availability_finds', { nullable: true }),
+  state: col.internal(text('state', { enum: MEETING_STATES }).notNull().default('arranged')),
+  cancelledReason: col.internal(text('cancelled_reason')),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'avmt',
+  realm: 'members',
+  subject: 'none',
+  retention: 'availability.retention.history',
+  extra: t => [
+    index('availability_meetings_time').on(t.state, t.startsAt),
+    index('availability_meetings_arranged_by').on(t.arrangedBy),
+    check('availability_meetings_title', sql`length(${t.title}) BETWEEN 1 AND 80`),
+    check('availability_meetings_length', sql`${t.endsAt} > ${t.startsAt} AND ${t.endsAt} - ${t.startsAt} <= 86400000`),
+    check('availability_meetings_place', sql`${t.place} IS NULL OR length(${t.place}) <= 120`),
+    check('availability_meetings_notes', sql`${t.notes} IS NULL OR length(${t.notes}) <= 2000`),
+    check('availability_meetings_reason', sql`${t.cancelledReason} IS NULL OR length(${t.cancelledReason}) <= 200`),
+    check('availability_meetings_state_values', sql`${t.state} IN (${inList(MEETING_STATES)})`),
+  ],
+})
+
+/** One person invited, and their answer. Past meetings keep the row so "7 invited" stays true. */
+export const meetingInvitees = defineTable('availability_meeting_invitees', {
+  id: col.id(),
+  meetingId: col.ref('availability_meetings'),
+  accountId: col.account('account_id', { role: 'subject' }),
+  response: col.internal(text('response', { enum: RESPONSES }).notNull().default('pending')),
+  respondedAt: col.timestamp('responded_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'avmi',
+  realm: 'members',
+  onErasure: 'keep-row',
+  extra: t => [
+    uniqueIndex('availability_meeting_invitees_once').on(t.meetingId, t.accountId),
+    index('availability_meeting_invitees_account').on(t.accountId, t.response),
+    check('availability_meeting_invitees_response', sql`${t.response} IN (${inList(RESPONSES)})`),
+  ],
+})
+
+export const tables = { profiles, patterns, patternLines, exceptions, requests, requestPeople, finds, findPeople, findSlots, findVotes, meetings, meetingInvitees }

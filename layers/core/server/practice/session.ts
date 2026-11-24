@@ -137,28 +137,40 @@ export interface StartOptions {
  * scenario cannot start, or `core.practice.other-active` while another scenario's session is on.
  */
 export async function startPractice(actor: Actor, scenarioId: string, options: StartOptions = {}): Promise<SessionRow> {
-  if (actor.kind !== 'person' || !actor.accountId) refuse('core.practice.not-allowed', 'Practice is for signed-in people.', { status: 403 })
-  const s = await scenario(scenarioId)
-  if (!s) refuse('core.practice.unknown', "This practice isn't available.", { status: 404 })
-  if (!(await mayPractise(actor, s.id))) refuse('core.practice.not-allowed', 'Practice opens through a training course.', { status: 403, remedy: 'Ask your trainer which course opens this practice.' })
-  const blocked = await unavailable(s)
-  if (blocked) refuse(blocked.code, "This practice can't start here.", { status: 409 })
-  const current = await readSession(actor.accountId)
-  if (current && !options.again) {
-    if (current.scenario_id === s.id && current.bundle_hash === await bundleHash()) {
-      await touch(current, nowMs())
-      return current
-    }
-    if (current.scenario_id !== s.id && !options.replace) refuse('core.practice.other-active', 'Another practice is still going.', { status: 409, remedy: 'Leave it first, then start this one.' })
-  }
-  if (current) await endPractice(actor.accountId, options.again ? 'again' : current.scenario_id === s.id ? 'updated' : 'replaced')
+  const s = await startable(actor, scenarioId)
+  const accountId = actor.accountId!
+  const current = await readSession(accountId)
+  const carried = current && !options.again ? await carryOn(current, s, options) : null
+  if (carried) return carried
+  if (current) await endPractice(accountId, options.again ? 'again' : current.scenario_id === s.id ? 'updated' : 'replaced')
   try {
     return await makeStore(actor, s, nowMs())
   }
   catch (error) {
     const reference = useContext().requestId
     log.error('core.practice.could-not-start', { scenario: s.id, reference, error: String((error as Error)?.message ?? error) })
-    await practiceStore(useContext().env, actor.accountId).destroy()
+    await practiceStore(useContext().env, accountId).destroy()
     refuse('core.practice.could-not-start', "Practice couldn't start.", { status: 500, remedy: `Try again. If it keeps happening, give an administrator this reference: ${reference}` })
   }
+}
+
+/** The scenario, once this person may start it here (S1), or the refusal saying why not. */
+async function startable(actor: Actor, scenarioId: string): Promise<PracticeScenario> {
+  if (actor.kind !== 'person' || !actor.accountId) refuse('core.practice.not-allowed', 'Practice is for signed-in people.', { status: 403 })
+  const s = await scenario(scenarioId)
+  if (!s) refuse('core.practice.unknown', "This practice isn't available.", { status: 404 })
+  if (!(await mayPractise(actor, s.id))) refuse('core.practice.not-allowed', 'Practice opens through a training course.', { status: 403, remedy: 'Ask your trainer which course opens this practice.' })
+  const blocked = await unavailable(s)
+  if (blocked) refuse(blocked.code, "This practice can't start here.", { status: 409 })
+  return s
+}
+
+/** The session carried on (S8), or null when a new store is needed; refuses to replace another scenario's unasked (S2). */
+async function carryOn(current: SessionRow, s: PracticeScenario, options: StartOptions): Promise<SessionRow | null> {
+  if (current.scenario_id === s.id && current.bundle_hash === await bundleHash()) {
+    await touch(current, nowMs())
+    return current
+  }
+  if (current.scenario_id !== s.id && !options.replace) refuse('core.practice.other-active', 'Another practice is still going.', { status: 409, remedy: 'Leave it first, then start this one.' })
+  return null
 }
