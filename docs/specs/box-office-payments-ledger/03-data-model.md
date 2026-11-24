@@ -758,9 +758,12 @@ Closing is a row, not a flag. The newest row for a period says whether it is clo
 | `code` | text | primary key; `none` always exists | Internal | keep |
 | `label` | text |  | Internal | keep |
 | `rate_basis_points` | integer | CHECK >= 0 | Internal | keep |
-| `active` | integer | boolean | Internal | keep |
+| `active` | integer | boolean; a code that is not active is no longer offered, and stays on what uses it | Internal | keep |
+| `in_scope` | integer | boolean; false for `none` and `outside`, which never go on a VAT return | Internal | keep |
 
-The first release ships only `none`. The columns exist so that a VAT-registered theatre can be supported later without a migration of the ledger.
+Rows shipped (amendment F-A2, Invoices and exports part 4): `none` (no tax), `standard` (2000 basis points), `reduced` (500), `zero`, `exempt` and `outside`. A trigger refuses changing a code's code, rate or scope once any entry uses it, and refuses deleting a used code; `none` never changes. A new rate is a new code, and the old one is made inactive. The Tax codes screen (Admin, Modules, Finance) adds and changes codes under `finance.settings.manage`.
+
+An entry's `tax_code` and `tax_minor` describe its net amount: `tax_minor` is the VAT on it, signed like the entry, and the VAT itself is a separate entry on Finance's own accounts `finance.vat-output` (liability) and `finance.vat-input` (asset), written with `for_module` = `finance`. Other modules read tax through `taxTotals(range)` and entry rows through `entryRows(range, { afterId, limit })`, never from these tables.
 
 ## Where the lessons came from
 
