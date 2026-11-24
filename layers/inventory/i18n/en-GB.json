@@ -243,5 +243,14 @@
   "inventory.item-form.owner": "Owner",
   "inventory.item-form.due-back": "Goes back on",
   "inventory.item-form.description-add": "Its tag is given when you save.",
-  "inventory.item-form.added": "Kit added"
+  "inventory.item-form.added": "Kit added",
+  "inventory.labels.title": "Labels",
+  "inventory.labels.help.one": "{count} label. Print on sticker paper and stick it where it can be scanned.",
+  "inventory.labels.help.other": "{count} labels. Print on sticker paper and stick each where it can be scanned.",
+  "inventory.labels.print": "Print",
+  "inventory.labels.none": "None of these items is yours to see",
+  "inventory.labels.code": "Label for {tag}",
+  "inventory.labels.print-one": "Print label",
+  "inventory.labels.print-these.one": "Print a label for this item",
+  "inventory.labels.print-these.other": "Print labels for these {count} items"
 }

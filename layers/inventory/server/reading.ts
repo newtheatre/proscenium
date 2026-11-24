@@ -41,6 +41,14 @@ export async function dueWindow(): Promise<{ today: string, dueBy: string }> {
   return { today, dueBy: row!.due_by }
 }
 
+export interface Label { id: string, tag: string, name: string, department: string, departmentId: string }
+
+// What a label carries (S11), for the items asked for, in tag order.
+export async function labelsFor(ids: string[]): Promise<Label[]> {
+  return all<Label>(`SELECT i.id, i.tag, i.name, d.name AS department, d.id AS "departmentId" FROM inventory_items i JOIN inventory_categories c ON c.id = i.category_id
+    JOIN inventory_departments d ON d.id = c.department_id WHERE i.id IN (SELECT value FROM json_each(?)) ORDER BY i.tag`, JSON.stringify(ids))
+}
+
 export async function itemByTag(tag: string): Promise<{ id: string, departmentId: string } | null> {
   const row = await first<{ id: string, department_id: string }>('SELECT i.id, c.department_id FROM inventory_items i JOIN inventory_categories c ON c.id = i.category_id WHERE i.tag = ?', tag.trim().toUpperCase())
   return row ? { id: row.id, departmentId: row.department_id } : null

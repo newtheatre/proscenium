@@ -13,9 +13,10 @@ const moving = ref<{ id: string, tag: string, homeLocationId: string }[]>([])
 
 const editable = computed(() => !!data.value?.editable && data.value.item.state !== 'disposed')
 const primary = computed(() => editable.value ? { label: t('inventory.item.edit'), icon: 'i-lucide-pencil', to: `/console/inventory/items/${id.value}/edit` } : undefined)
-const actions = computed(() => editable.value && data.value
-  ? [[{ label: t('inventory.items.move'), icon: 'i-lucide-move', onSelect: () => { moving.value = [data.value!.item] } }]]
-  : [])
+const actions = computed(() => [
+  [{ label: t('inventory.labels.print-one'), icon: 'i-lucide-qr-code', to: `/console/inventory/labels?items=${encodeURIComponent(id.value)}` }],
+  editable.value && data.value ? [{ label: t('inventory.items.move'), icon: 'i-lucide-move', onSelect: () => { moving.value = [data.value!.item] } }] : [],
+].filter(group => group.length))
 const trail = computed(() => [{ label: t('inventory.navigation.items.label'), to: '/console/inventory' }])
 const tabs = computed(() => [
   { id: 'details', label: t('inventory.item.tab.details') },

@@ -74,3 +74,14 @@ test('the item page says where it is, and it moves to another store', async ({ p
   await page.getByRole('tab', { name: 'History' }).click()
   await expect(page.getByText(`Lantern store ${stamp} to Get-out bay ${stamp}`).first()).toBeVisible()
 })
+
+test('an item\'s label prints its tag, name and a code that opens it', async ({ page }) => {
+  await visit(page, '/console/inventory')
+  await page.getByText(`Fresnel ${stamp}`).first().click()
+  await page.getByRole('button', { name: /^More actions/ }).click()
+  await page.getByRole('menuitem', { name: 'Print label' }).click()
+  await expect(page.getByRole('heading', { name: 'Labels', level: 1 })).toBeVisible()
+  await expect(page.getByText(`Fresnel ${stamp}`)).toBeVisible()
+  await expect(page.getByRole('img', { name: /^Label for / })).toBeVisible()
+  await noViolations(page)
+})

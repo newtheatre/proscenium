@@ -12,6 +12,7 @@ import readItem from '../../server/api/inventory/items/[id]/index.get'
 import putItem from '../../server/api/inventory/items/[id]/index.put'
 import moveItems from '../../server/api/inventory/items/move.post'
 import byTag from '../../server/api/inventory/items/by-tag/[tag].get'
+import labels from '../../server/api/inventory/labels.get'
 import { approveLoan } from '../../server/loans'
 import { attempt, member, ready, request, shelf, type Shelf } from './stage'
 
@@ -23,6 +24,7 @@ const app = server({
   'PUT /api/inventory/items/:id': putItem,
   'POST /api/inventory/items/move': moveItems,
   'GET /api/inventory/items/by-tag/:tag': byTag,
+  'GET /api/inventory/labels': labels,
 })
 
 const lead = person(['inventory.item.edit'])
@@ -207,5 +209,18 @@ describe('who sees which kit (INV-13, INV-15, INV-16, I9)', () => {
     expect(list.today).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     const days = (Date.parse(list.dueBy) - Date.parse(list.today)) / 86_400_000
     expect(days).toBe(7)
+  })
+
+  it('prints labels only for the items a person may see, at the theatre\'s size (S11)', async () => {
+    const mine = await shelf()
+    const theirs = await shelf()
+    const [own] = await add(mine)
+    const [other] = await add(theirs)
+    const viewer = person([], { grants: [{ ability: 'inventory.item.view', via: 'role', record: { type: 'inventory.department', id: mine.departmentId } }] } as any)
+    const sheet = ok(await req('GET', `/api/inventory/labels?items=${own},${other}`, undefined, viewer))
+    expect(sheet.size).toBe('small')
+    expect(sheet.labels.map((l: any) => l.id)).toEqual([own])
+    expect(sheet.labels[0]).toMatchObject({ tag: (await tags([own!]))[0], name: 'Fresnel' })
+    expect((await req('GET', '/api/inventory/labels?items=', undefined, viewer)).status).toBe(422)
   })
 })

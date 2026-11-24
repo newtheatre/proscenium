@@ -17,13 +17,19 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 const canAdd = computed(() => !!data.value?.editable.length)
 const actions = computed(() => canAdd.value ? [{ label: t('inventory.items.add'), icon: 'i-lucide-plus', to: '/console/inventory/items/new' }] : [])
+const labelsFor = (ids: string[]) => `/console/inventory/labels?items=${ids.map(encodeURIComponent).join(',')}`
+// Labels for what the list shows, as many as one sheet takes.
+const SHEET = 200 // not-policy: the labels route's shape bound
+const menu = computed(() => current.value.length ? [{ label: t('inventory.labels.print-these', { count: Math.min(current.value.length, SHEET) }), icon: 'i-lucide-qr-code', to: labelsFor(current.value.slice(0, SHEET).map(i => i.id)) }] : [])
 const open = (id: string) => navigateTo(`/console/inventory/items/${encodeURIComponent(id)}`)
 watch(exact, (item) => { if (item) void open(item.id) })
 
 async function scanned(code: string) {
   refusal.value = null
+  const read = readLabel(code)
+  if ('itemId' in read) return open(read.itemId)
   try {
-    const { itemId } = await $api<{ itemId: string }>(`/api/inventory/items/by-tag/${encodeURIComponent(tagOf(code))}`)
+    const { itemId } = await $api<{ itemId: string }>(`/api/inventory/items/by-tag/${encodeURIComponent(read.tag)}`)
     await open(itemId)
   }
   catch (e) {
@@ -38,7 +44,10 @@ const describe = (i: ItemRow) => [
   i.nextDueOn ? t(isDue(i) ? 'inventory.items.due-soon' : 'inventory.items.next-due', { date: day(i.nextDueOn) }) : null,
 ].filter(Boolean).join(' · ')
 const rowActions = (i: ItemRow): DropdownMenuItem[][] => [
-  [{ label: t('inventory.items.open'), icon: 'i-lucide-arrow-right', onSelect: () => { void open(i.id) } }],
+  [
+    { label: t('inventory.items.open'), icon: 'i-lucide-arrow-right', onSelect: () => { void open(i.id) } },
+    { label: t('inventory.labels.print-one'), icon: 'i-lucide-qr-code', to: labelsFor([i.id]) },
+  ],
   data.value?.editable.includes(i.departmentId) && i.state !== 'disposed' ? [{ label: t('inventory.items.move'), icon: 'i-lucide-move', onSelect: () => { moving.value = [i] } }] : [],
 ].filter(group => group.length)
 </script>
@@ -57,8 +66,9 @@ const rowActions = (i: ItemRow): DropdownMenuItem[][] => [
         @scanned="scanned"
       />
       <PageActions
-        v-if="actions.length"
+        v-if="actions.length || menu.length"
         :actions="actions"
+        :menu="menu"
       />
     </template>
     <template #toolbar>
