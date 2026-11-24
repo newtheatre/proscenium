@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "f6df91fc-ef9f-4a2e-9766-4127f9faf707",
+  "id": "2a194891-0bc0-4913-8553-168b45c17890",
   "prevIds": [
-    "0df99870-7c00-4e02-85aa-7f7fedc590b6"
+    "ed98c6f1-67e0-4baf-b2e8-081abfc7cfc1"
   ],
   "ddl": [
     {
@@ -703,11 +703,19 @@
       "entityType": "tables"
     },
     {
+      "name": "payments_disbursements",
+      "entityType": "tables"
+    },
+    {
       "name": "payments_intent_parts",
       "entityType": "tables"
     },
     {
       "name": "payments_intents",
+      "entityType": "tables"
+    },
+    {
+      "name": "payments_payees",
       "entityType": "tables"
     },
     {
@@ -2573,6 +2581,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -6933,6 +6951,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "'all'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -13727,6 +13755,16 @@
       "entityType": "columns"
     },
     {
+      "table": "finance_tax_codes",
+      "name": "in_scope",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "forms_action_runs",
       "name": "id",
       "type": "text",
@@ -14690,6 +14728,36 @@
       "table": "forms_responses",
       "name": "calculated",
       "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "score",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "out_of",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "forms_responses",
+      "name": "passed",
+      "type": "integer",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -18597,6 +18665,136 @@
       "entityType": "columns"
     },
     {
+      "table": "payments_disbursements",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "method",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "owner_module",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "owner_record",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "payee_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "paid_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "reference",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "reverses_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "posting_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "payments_intent_parts",
       "name": "id",
       "type": "text",
@@ -18778,6 +18976,116 @@
     },
     {
       "table": "payments_intents",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_payees",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_payees",
+      "name": "party_module",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_payees",
+      "name": "party_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_payees",
+      "name": "account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_payees",
+      "name": "account_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_payees",
+      "name": "sort_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_payees",
+      "name": "account_number",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_payees",
+      "name": "last_digits",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_payees",
+      "name": "last_used_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_payees",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_payees",
       "name": "updated_at",
       "type": "integer",
       "notNull": true,
@@ -26277,6 +26585,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "finance_entries",
+      "name": "finance_entries_tax_code",
+      "columns": [
+        {
+          "value": "tax_code",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "tax_code <> 'none'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "finance_period_closes",
       "name": "finance_period_closes_period",
       "columns": [
@@ -27537,6 +27859,52 @@
       "entityType": "indexes"
     },
     {
+      "table": "payments_disbursements",
+      "name": "payments_disbursements_reverses",
+      "columns": [
+        {
+          "value": "reverses_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "reverses_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "payments_disbursements_owner",
+      "columns": [
+        {
+          "value": "owner_module",
+          "isExpression": false
+        },
+        {
+          "value": "owner_record",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "payments_disbursements_paid",
+      "columns": [
+        {
+          "value": "paid_on",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "payments_intent_parts",
       "name": "payments_intent_parts_owner",
       "columns": [
@@ -27605,6 +27973,38 @@
       ],
       "isUnique": false,
       "where": "session_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_payees",
+      "name": "payments_payees_party",
+      "columns": [
+        {
+          "value": "party_module",
+          "isExpression": false
+        },
+        {
+          "value": "party_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_payees",
+      "name": "payments_payees_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "account_id IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -31759,6 +32159,21 @@
       "entityType": "fks"
     },
     {
+      "table": "payments_disbursements",
+      "name": "fk_payments_disbursements_payee_id_payments_payees_id_fk",
+      "columns": [
+        "payee_id"
+      ],
+      "tableTo": "payments_payees",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "payments_intent_parts",
       "name": "fk_payments_intent_parts_intent_id_payments_intents_id_fk",
       "columns": [
@@ -34390,6 +34805,15 @@
       "entityType": "pks"
     },
     {
+      "table": "payments_disbursements",
+      "name": "payments_disbursements_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "payments_intent_parts",
       "name": "payments_intent_parts_pk",
       "columns": [
@@ -34401,6 +34825,15 @@
     {
       "table": "payments_intents",
       "name": "payments_intents_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "payments_payees",
+      "name": "payments_payees_pk",
       "columns": [
         "id"
       ],
@@ -36553,6 +36986,24 @@
       "table": "payments_attempts",
       "name": "payments_attempts_state",
       "value": "\"state\" IN ('started', 'pending', 'succeeded', 'failed', 'cancelled', 'unknown')",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "payments_disbursements_amount",
+      "value": "\"amount_minor\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "payments_disbursements_method",
+      "value": "\"method\" IN ('bank-transfer', 'cheque', 'theatre-card', 'petty-cash', 'parent-body')",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_disbursements",
+      "name": "payments_disbursements_reference",
+      "value": "\"reference\" IS NULL OR length(\"reference\") <= 40",
       "entityType": "checks"
     },
     {
