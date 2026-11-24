@@ -1,6 +1,6 @@
 // A stroke cut into a weekday's lines: what is left of each, the new stretch, neighbours joined.
 import { describe, expect, it } from 'vitest'
-import { repaint, without } from '../../server/paint'
+import { repaint, without } from '../../shared/grid'
 
 describe('without', () => {
   it('leaves nothing, one piece or two', () => {

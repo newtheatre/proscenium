@@ -151,6 +151,8 @@ export const points = {
   // What the person has coming (a performance they hold tickets for, a shift they are on), for My
   // account's Upcoming card, so core lists other modules' things without importing them.
   'core.upcoming': point({ kind: 'code', contract: 'upcoming' }),
+  // Short billing lines on a production's public page, such as "By arrangement with" (C-75). Public data only.
+  'core.public-lines': point({ kind: 'code', contract: 'public-lines' }),
   'core.setup-step': point({
     kind: 'data',
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),

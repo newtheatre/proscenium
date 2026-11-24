@@ -1,7 +1,6 @@
 <!-- My availability (S1, AV-04): the week to paint free, maybe or busy, or clear; a change for some
      dates (S3); what is asked of me; and my entries ahead. Days in view live in the address. -->
 <script setup lang="ts">
-import { LEVELS, type ShownLevel } from '../../../../shared/levels'
 import type { Entry } from '../../../composables/useMyAvailability'
 
 const { t } = useT()
@@ -9,14 +8,6 @@ const dates = useDates()
 const m = await useMyAvailability()
 const { data, status, error, refresh, query, heading, tool, target, pending, saving, patternLabels } = m
 const adding = ref(false)
-
-const TOOLS = computed(() => [...LEVELS, 'clear' as const].map(value => ({ value, label: t(`availability.tools.${value}`) })))
-const TARGETS = computed(() => [
-  { value: 'days', label: t('availability.mine.target-days') },
-  { value: 'pattern', label: t('availability.mine.target-pattern') },
-])
-const LEGEND: ShownLevel[] = ['free', 'maybe', 'busy', 'unknown']
-const SWATCH: Record<ShownLevel, string> = { free: 'bg-success/25', maybe: 'bg-warning/30', busy: 'bg-error/25', unknown: 'availability-hatch' }
 
 const facts = computed(() => {
   const p = data.value?.profile
@@ -27,7 +18,7 @@ const facts = computed(() => {
   ]
 })
 const asking = computed(() => (data.value?.requests ?? []).filter(r => r.open && r.state !== 'withdrawn'))
-const pendingPattern = computed(() => pending.value ? m.patternOn(pending.value.date)?.label ?? '' : '')
+const pendingPattern = computed(() => pending.value ? m.patternOn(pending.value.date)?.label ?? '' : null)
 
 function when(e: Entry): string {
   const days = e.firstDate === e.lastDate ? dates.dayNamed(e.firstDate) : dates.range(e.firstDate, e.lastDate)
@@ -73,30 +64,25 @@ function when(e: Entry): string {
         >
           {{ heading }}
         </h2>
-        <UFormField
-          :label="t('availability.mine.paint')"
-          orientation="horizontal"
-        >
-          <UTabs
-            v-model="tool"
-            :items="TOOLS"
-            :content="false"
-            size="sm"
-          />
-        </UFormField>
-        <UFormField
-          v-if="data?.patterns.length"
-          :label="t('availability.mine.target')"
-          orientation="horizontal"
-        >
-          <USelect
-            :model-value="target ?? undefined"
-            :items="TARGETS"
-            :placeholder="t('availability.mine.target-ask')"
-            class="w-44"
-            @update:model-value="target = $event as 'days' | 'pattern'"
-          />
-        </UFormField>
+        <UButton
+          to="/members/availability/patterns"
+          icon="i-lucide-repeat"
+          color="neutral"
+          variant="ghost"
+          :label="t('availability.mine.patterns')"
+        />
+        <UButton
+          to="/members/availability/requests"
+          icon="i-lucide-inbox"
+          color="neutral"
+          variant="ghost"
+          :label="t('availability.asked.title')"
+        />
+        <AvailabilityPaintTools
+          v-model:tool="tool"
+          v-model:target="target"
+          :patterns="!!data?.patterns.length"
+        />
       </div>
     </template>
     <DataBoundary
@@ -115,7 +101,7 @@ function when(e: Entry): string {
             :icon="r.state === 'answered' ? 'i-lucide-circle-check' : 'i-lucide-calendar-check'"
             :color="r.state === 'answered' ? 'neutral' : 'info'"
             variant="subtle"
-            :actions="r.state === 'answered' ? [] : [{ label: t('availability.mine.this-is-right'), onClick: () => m.answer(r.id) }]"
+            :actions="r.state === 'answered' ? [{ label: t('availability.mine.open-request'), color: 'neutral', variant: 'outline', to: `/members/availability/requests/${r.id}` }] : [{ label: t('availability.mine.this-is-right'), onClick: () => m.answer(r.id) }, { label: t('availability.mine.open-request'), color: 'neutral', variant: 'outline', to: `/members/availability/requests/${r.id}` }]"
           />
           <FactStrip
             :facts="facts"
@@ -135,21 +121,7 @@ function when(e: Entry): string {
               :readonly="saving"
               @paint="m.paint"
             />
-            <ul
-              class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted"
-              :aria-label="t('availability.mine.key')"
-            >
-              <li
-                v-for="level in LEGEND"
-                :key="level"
-                class="flex items-center gap-1.5"
-              >
-                <span
-                  class="inline-block size-3.5 rounded-sm border border-default"
-                  :class="SWATCH[level]"
-                />{{ t(`availability.levels.${level}`) }}
-              </li>
-            </ul>
+            <AvailabilityLegend />
           </div>
           <PageSection
             :title="t('availability.mine.entries')"
@@ -197,32 +169,10 @@ function when(e: Entry): string {
         </USlideover>
       </template>
     </DataBoundary>
-    <UModal
-      :open="!!pending"
-      :title="t('availability.mine.which-title')"
-      :description="t('availability.mine.which-help', { pattern: pendingPattern })"
-      @update:open="v => { if (!v) pending = null }"
-    >
-      <template #footer>
-        <div class="flex flex-wrap justify-end gap-2">
-          <UButton
-            :label="t('availability.mine.which-pattern', { pattern: pendingPattern })"
-            color="neutral"
-            variant="outline"
-            @click="m.choose('pattern')"
-          />
-          <UButton
-            :label="t('availability.mine.which-days')"
-            @click="m.choose('days')"
-          />
-        </div>
-      </template>
-    </UModal>
+    <AvailabilityPatternAsk
+      :pattern="pendingPattern"
+      @choose="m.choose"
+      @dismiss="pending = null"
+    />
   </PageFrame>
 </template>
-
-<style scoped>
-.availability-hatch {
-  background-image: repeating-linear-gradient(135deg, var(--ui-bg-accented) 0 4px, transparent 4px 8px);
-}
-</style>
