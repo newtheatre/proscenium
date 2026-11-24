@@ -54,6 +54,8 @@ export default defineModule({
       { id: 'gallery.tickets', target: 'account', side: 'audience', ability: 'signed-in', component: 'GalleryTickets', order: 10 },
       { id: 'gallery.drafts', target: 'account', side: 'audience', ability: 'signed-in', component: 'GalleryTickets', order: 20, count: 'gallery.drafts', hideEmpty: true },
     ],
+    // Practice mode's browser test practises the sample door.
+    'core.practice-scenario': [{ id: 'gallery.door', version: 1, label: 'gallery.practice.door', summary: 'gallery.practice.door-summary', minutes: 5, needs: ['gallery'], samples: [], start: '/live/gallery', routes: ['/live/gallery'], abilities: ['gallery.sample.manage'], tasks: [{ id: 'admit', label: 'gallery.practice.admit' }] }],
     'core.navigation-group': [{ id: 'gallery', icon: 'i-lucide-layout-grid', after: 'box-office' }],
     'core.search-source': [{ id: 'gallery.production-search', record: 'gallery.production', ability: 'gallery.sample.view', route: '/api/gallery/search', shells: ['console'] }],
     'core.record-resolver': [{ id: 'gallery.production', file: 'gallery.production' }],

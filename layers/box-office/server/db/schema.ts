@@ -742,6 +742,42 @@ export const scans = defineTable('box_office_scans', {
   ],
 })
 
+/**
+ * One press of the door counter (BO-73): people counted in without a ticket scan, counted out, or an
+ * earlier press undone. Its id is made on the device, so a press sent twice from offline counts once.
+ */
+export const headcountTaps = defineTable('box_office_headcount_taps', {
+  id: col.id(),
+  // The performance the counter was set to.
+  performanceId: col.internal(text('performance_id').notNull()),
+  kind: col.internal(text('kind', { enum: ['in', 'out', 'undo'] }).notNull()),
+  // A group counted in one press ("+4"); an undo carries the quantity it takes back.
+  quantity: col.internal(integer('quantity').notNull().default(1)),
+  reversesId: col.ref('box_office_headcount_taps', { nullable: true }),
+  // Only for an undo after the undo window, by a holder of box-office.headcount.correct.
+  reasonTermId: col.ref('core_terms', { nullable: true }),
+  tappedBy: col.account('tapped_by', { role: 'actor' }),
+  deviceLabel: col.internal(text('device_label')),
+  // The device's clock, and the server's: they differ for presses made offline.
+  tappedAt: col.timestamp('tapped_at').notNull(),
+  receivedAt: col.timestamp('received_at').notNull(),
+  offline: col.internal(integer('offline', { mode: 'boolean' }).notNull().default(false)),
+}, {
+  id: 'hct',
+  realm: 'operational',
+  subject: 'none',
+  appendOnly: true,
+  extra: t => [
+    index('box_office_headcount_taps_performance').on(t.performanceId, t.tappedAt),
+    // A press is undone once at most.
+    uniqueIndex('box_office_headcount_taps_reverses').on(t.reversesId).where(sql`reverses_id IS NOT NULL`),
+    check('box_office_headcount_taps_kind', sql`${t.kind} IN ('in', 'out', 'undo')`),
+    check('box_office_headcount_taps_quantity', sql`${t.quantity} BETWEEN 1 AND 50`),
+    check('box_office_headcount_taps_reverses', sql`(${t.kind} = 'undo') = (${t.reversesId} IS NOT NULL)`),
+    check('box_office_headcount_taps_device', sql`${t.deviceLabel} IS NULL OR length(${t.deviceLabel}) <= 40`),
+  ],
+})
+
 /** One row each time lines of an order are cancelled or exchanged. */
 export const cancellations = defineTable('box_office_cancellations', {
   id: col.id(),
@@ -844,4 +880,4 @@ export const exchanges = defineTable('box_office_exchanges', {
   ],
 })
 
-export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, seatingLayouts, runLayouts, passTypes, passShows, passPrices, passes, passRedemptions, passCovers, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }
+export const tables = { performanceSales, bands, ticketTypes, ticketPresets, spaceTicketPresets, seatingLayouts, runLayouts, passTypes, passShows, passPrices, passes, passRedemptions, passCovers, prices, pools, orders, holds, claims, orderLines, tickets, scans, headcountTaps, cancellations, compRequests, exchanges }
