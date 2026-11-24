@@ -77,3 +77,52 @@ export function defineMeasure<M extends Measure>(measure: M): M {
   else if (typeof measure.read !== 'function') fail('read', 'answers the figure, or the figure is a ratio')
   return measure
 }
+
+export interface PersonMeasureQuery {
+  from: string
+  to: string
+  scope?: MeasureScope
+  /** At most one shared key. */
+  by?: SharedBreakdown
+}
+
+/** An account id, at most the asked key and a number: never a name, an address or words (R3-27). */
+export interface PersonRow {
+  person: string
+  keys?: Partial<Record<SharedBreakdown, string>>
+  value: number
+}
+
+/**
+ * A figure per person (core.person-measure; Reports rules P1 to P8): members-side participation only,
+ * such as minutes volunteered, read only by Reports, with every read audited.
+ */
+export interface PersonMeasure {
+  label: string
+  unit: 'count' | 'minutes'
+  combine: 'sum' | 'distinct'
+  by: SharedBreakdown[]
+  /** The module's own, privileged, with audit 'read'. */
+  ability: string
+  /** A core.privacy-record contribution id saying why the theatre holds it. */
+  purpose: string
+  /** Only members-side participation qualifies; audience data never does. */
+  side: 'members'
+  read: (query: PersonMeasureQuery) => Promise<{ rows: PersonRow[] } | 'unsupported'>
+}
+
+/** Declares a figure per person: `export default definePersonMeasure({...})` in `server/contributions/core.person-measure/<name>.ts`. */
+export function definePersonMeasure<M extends PersonMeasure>(measure: M): M {
+  const fail = (field: string, message: string): never => { throw new DeclarationError(`core.person-measure.${field}`, message) }
+  if (!measure || typeof measure !== 'object') fail('(figure)', 'the default export is definePersonMeasure({...})')
+  if (typeof measure.label !== 'string' || !measure.label) fail('label', 'is a translation key')
+  if (!['count', 'minutes'].includes(measure.unit)) fail('unit', 'is count or minutes')
+  if (!['sum', 'distinct'].includes(measure.combine)) fail('combine', 'is sum or distinct')
+  if (measure.side !== 'members') fail('side', 'is members: only members-side participation may be counted per person')
+  if (typeof measure.ability !== 'string' || !measure.ability.includes('.')) fail('ability', 'names the privileged ability a reader needs')
+  if (typeof measure.purpose !== 'string' || !measure.purpose.includes('.')) fail('purpose', 'names a core.privacy-record entry')
+  if (!Array.isArray(measure.by)) fail('by', 'lists the shared breakdowns it answers, perhaps none')
+  for (const key of measure.by) if (!(SHARED_BREAKDOWNS as readonly string[]).includes(key)) fail('by', `"${key}" is not a shared breakdown; a figure per person breaks down by shared keys only`)
+  if (typeof measure.read !== 'function') fail('read', 'answers the figure')
+  return measure
+}
