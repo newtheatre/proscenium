@@ -47,5 +47,8 @@
   "gallery.home-figures.drafts.detail.other": "{count} sent",
   "gallery.home-figures.drafts.series": "Written",
   "gallery.home-figures.drafts.summary": "Four drafts on the first day and nine on the second.",
-  "gallery.home-figures.broken.label": "Never shown"
+  "gallery.home-figures.broken.label": "Never shown",
+  "gallery.practice.door": "Practise the sample door",
+  "gallery.practice.door-summary": "Let people in at the sample door, with nothing real at stake.",
+  "gallery.practice.admit": "Admit someone"
 }
