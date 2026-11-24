@@ -1,6 +1,6 @@
 <!-- A ready-made report (REP-04): choose the production, the dates and the breakdown; its figures are
      read live and in parallel, headline totals first, then a chart where one helps, then the table.
-     Nothing is written. A figure the person may not see is left out and counted, never shown as nought. -->
+     Nothing is written until the person keeps a copy. A figure they may not see is counted, never nought. -->
 <script setup lang="ts">
 import type { PageBreakdown, PeriodRule, ReportView } from '../../../../shared/reports'
 
@@ -39,12 +39,17 @@ const by = computed(() => chosenBy.value === 'none' ? undefined : chosenBy.value
 
 const { ready, visible, hidden, totals, rows, status: reading, error: readError, refresh: reread } = useReportFigures(view, by)
 const { text } = useFigureText()
-const { range } = useDates()
+const { keep, download } = useReportCopy(view, by)
+const actions = computed(() => ready.value
+  ? [
+      { label: t('reports.copy.keep'), icon: 'i-lucide-copy-plus', onSelect: keep },
+      { label: t('reports.copy.download'), icon: 'i-lucide-download', lesser: true, onSelect: download },
+    ]
+  : [])
 
 const title = computed(() => view.value ? t(view.value.report.label) : t('reports.title'))
-const question = computed(() => view.value
-  ? [view.value.scope.title, range(view.value.period.from, view.value.period.to), by.value ? t('reports.by-sentence', { by: t(`reports.by.${by.value}`).toLowerCase() }) : null].filter(Boolean).join(', ')
-  : '')
+const questionText = useQuestionText()
+const question = computed(() => view.value ? questionText(view.value.scope.title, view.value.period.from, view.value.period.to, by.value) : '')
 const facts = computed(() => visible.value.map(f => ({ label: t(f.label), value: text(f.unit, totals.value[f.id]).text })))
 
 // One chart, of the first figure that counts something, where it helps: over time, or a few rows.
@@ -69,6 +74,12 @@ const chartSummary = computed(() => {
     :description="view ? t(view.report.description) : undefined"
     :trail="[{ label: t('reports.title'), to: '/console/reports' }]"
   >
+    <template
+      v-if="actions.length"
+      #primary
+    >
+      <PageActions :actions="actions" />
+    </template>
     <DataBoundary
       :data="view"
       :status="status"

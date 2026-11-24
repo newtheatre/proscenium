@@ -13,6 +13,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'core.performance.schedule', 'core.season.manage',
       'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.order.view', 'box-office.report.view', 'box-office.comp.approve',
       'front-of-house.shift.view', 'front-of-house.night-report.view',
+      'reports.report.view', 'reports.run.export',
     ],
   },
   {
@@ -51,6 +52,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       'payments.attempt.reconcile', 'payments.refund.approve', 'payments.session.view',
       'membership-fees.charge.view', 'membership-fees.charge.waive',
       'bar.sale.view',
+      'reports.report.view', 'reports.run.export',
     ],
   },
 ]

@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import type { FigureColumn, PageBreakdown } from '../../shared/reports'
-import type { ReportRow, Shown } from '../composables/useReportFigures'
+import type { ReportRow, Shown } from '../../shared/table'
 
 const props = defineProps<{ figures: FigureColumn[], rows: ReportRow[], totals: Record<string, Shown>, by: PageBreakdown, caption: string }>()
 

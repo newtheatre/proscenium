@@ -21,6 +21,8 @@ export interface MeasureListing {
   by: string[]
   filters: string[]
   ratio: boolean
+  /** The ability that reads it, so a kept copy can be checked again today. */
+  ability: string
 }
 
 const MAX_BY = 2 // not-policy: rule M5, at most two breakdowns a read
@@ -170,7 +172,7 @@ export async function listMeasures(actor?: Actor | null): Promise<MeasureListing
   const out: MeasureListing[] = []
   for (const [id, { module, measure }] of await figures()) {
     if (actor && !(await mayReadSomewhere(measure, actor))) continue
-    out.push({ id, module, label: measure.label, unit: measure.unit, combine: measure.combine, by: [...measure.by], filters: [...(measure.filters ?? [])], ratio: !!measure.ratio })
+    out.push({ id, module, label: measure.label, unit: measure.unit, combine: measure.combine, by: [...measure.by], filters: [...(measure.filters ?? [])], ratio: !!measure.ratio, ability: measure.ability })
   }
   return out.sort((a, b) => a.id.localeCompare(b.id))
 }

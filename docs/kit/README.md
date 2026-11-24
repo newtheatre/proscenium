@@ -146,7 +146,8 @@ Any module may import core's services without listing core: `import { notifyAddr
   transactional email from inside your job. Declare the type as a contribution to
   `core.notification-type` (wording inline, variables `url` or `text`, `{{ theatre }}` filled by
   core; a phrase your server code builds into a variable comes from your catalogue through
-  `wordsFrom(catalogue)` from `#kit`, never an English literal). It throws on failure, so your job
+  `wordsFrom(catalogue)` from `#kit`, never an English literal; `siteWords()` looks a key up in every
+  module's catalogue, for words naming another module's keys). It throws on failure, so your job
   retries; nothing is sent until the sending domain is set and verified. In tests, `setMailer(fn)` from `layers/core/server/notifications/mailer.ts`
   records messages instead of sending them.
 - `notify(unit, typeKey, { to, variables?, dedupeKey?, senderKey?, subject? })` tells accounts
@@ -181,7 +182,9 @@ Any module may import core's services without listing core: `import { notifyAddr
   your module makes itself, such as a download: it is ready and attached in your unit, with no
   upload check. Its slot says `source: 'server'` (and only such a slot may accept `json`, `zip` or
   `csv`); nobody can upload into it. With `expiresAt` the files sweep removes it, bytes and row,
-  once that passes, and it is not served after. A slot with `access: 'record'` is served only to
+  once that passes, and it is not served after. `storedFileBytes(fileId, { type, id })` gives a
+  ready file's bytes back to the module that owns it, for a route that serves the file itself (an
+  export it audits). A slot with `access: 'record'` is served only to
   someone your `core.file-access` contribution allows: key it by the owning record type and export
   `{ canRead(actor, record, file) }` (type `FileAccess` from `#modules/core`).
 - `getBrand()`: the theatre's name, logos and colour tokens for light and dark.
@@ -309,7 +312,8 @@ site-wide or on the scope record, all before the module is asked. It answers `{ 
 it outlasted `core.measures.read-budget`, or its answer held anything but asked keys and numbers (an
 account id, a stray field, money without a currency, a count with one). A bad answer is logged with
 the rule it broke, never the row. Unavailable is shown as unavailable, never as nought.
-`listMeasures(actor?)` lists the figures a reader may read somewhere.
+`listMeasures(actor?)` lists the figures a reader may read somewhere, each with its ability, so
+something kept from a read (a report's copy) can be checked against the reader again later.
 
 ## Email outcomes
 

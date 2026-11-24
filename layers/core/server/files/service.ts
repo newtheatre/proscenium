@@ -53,6 +53,17 @@ export async function fileRow(id: string): Promise<FileRow | null> {
   return first<FileRow>('SELECT * FROM core_files WHERE id = ?', id)
 }
 
+/**
+ * A ready file's bytes, for a module that stored the file itself and serves it through its own
+ * route (a report's copy, audited as an export). Null once the file is gone or expired.
+ */
+export async function storedFileBytes(id: string, owner: { type: string, id: string }): Promise<Uint8Array | null> {
+  const row = await first<{ object_key: string, expires_at: number | null }>("SELECT object_key, expires_at FROM core_files WHERE id = ? AND owner_type = ? AND owner_id = ? AND state = 'ready'", id, owner.type, owner.id)
+  if (!row || (row.expires_at !== null && row.expires_at <= nowMs())) return null
+  const object = await store.get(row.object_key)
+  return object ? new Uint8Array(await object.arrayBuffer()) : null
+}
+
 export function fileUrl(id: string): string {
   return `/files/${id}`
 }

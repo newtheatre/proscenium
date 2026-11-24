@@ -1,7 +1,7 @@
 // A figure's value as text in the theatre's language: money from minor units, a percentage to one
 // decimal place, minutes as hours and minutes. Money in two currencies is shown side by side (M7).
 import type { FigureColumn } from '../../shared/reports'
-import type { Amount, Shown } from './useReportFigures'
+import type { Amount, Shown } from '../../shared/table'
 
 export function useFigureText() {
   const { t } = useT()

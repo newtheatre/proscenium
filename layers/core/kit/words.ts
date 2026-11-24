@@ -3,6 +3,8 @@
 // imports its own i18n/en-GB.json, which the server bundles; nothing is read from disk at run time.
 // The lookup is the app's: `{name}` placeholders, and `.one` / `.other` when a count is given.
 
+import { useRegistry } from './registry'
+
 export type Words = (key: string, params?: Record<string, string | number>) => string
 
 /** A lookup over one or more catalogues. A missing key answers with the key, as the app does. */
@@ -14,4 +16,17 @@ export function wordsFrom(...catalogues: Record<string, string>[]): Words {
     if (text === undefined) return key
     return text.replace(/\{(\w+)\}/g, (_, name: string) => String(params[name] ?? `{${name}}`))
   }
+}
+
+let site: Words | undefined
+let siteFrom: unknown
+
+/** Every module's catalogue at once: for words naming another module's keys, such as a figure's label. */
+export function siteWords(): Words {
+  const registry = useRegistry()
+  if (!site || siteFrom !== registry) {
+    site = wordsFrom(...[...registry.modules.values()].map(m => m.words ?? {}))
+    siteFrom = registry
+  }
+  return site
 }
