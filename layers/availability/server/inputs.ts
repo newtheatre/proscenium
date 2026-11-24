@@ -28,7 +28,15 @@ export const exceptionInput = z.object({
 
 export const unmarkedInput = z.object({ unmarkedMeans: z.enum(UNMARKED).nullable() }).strict()
 
-export const windowQuery = z.object({ from: z.coerce.number().int(), to: z.coerce.number().int() })
+export const daysQuery = z.object({ from: date, to: date })
+
+export const strokeInput = z.object({
+  date,
+  from: clock.nullable(),
+  until: clock.nullable(),
+  level: z.enum([...LEVELS, 'clear']),
+  target: z.enum(['days', 'pattern']),
+}).strict()
 
 export const requestInput = z.object({
   title: z.string().trim().min(1).max(80), // not-policy: as the table's CHECK

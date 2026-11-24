@@ -89,9 +89,9 @@ describe('patterns (A2)', () => {
     const sam = person([])
     const made = await req(sam, 'POST', '/api/availability/patterns', tuesdayEvenings)
     expect(made.status, JSON.stringify(made.body)).toBe(200)
-    const page = await req(sam, 'GET', `/api/availability/me?from=${JAN_12}&to=${at(24)}`)
+    const page = await req(sam, 'GET', '/api/availability/me?from=2027-01-12&to=2027-01-12')
     expect(page.body.patterns).toEqual([{ id: made.body.patternId, label: 'Term', startsOn: '2026-12-01', endsOn: null, lines: [{ weekday: 2, from: '18:00', until: '22:00', level: 'busy' }] }])
-    expect(page.body.blocks.map((b: any) => b.level)).toEqual(['unknown', 'busy', 'unknown'])
+    expect(page.body.days).toEqual([{ date: '2027-01-12', pieces: [{ start: 0, end: 1080, level: 'unknown' }, { start: 1080, end: 1320, level: 'busy' }, { start: 1320, end: 1440, level: 'unknown' }] }])
     expect((await rows('SELECT name, payload FROM core_events WHERE record_id = ?', sam.accountId))[0]).toMatchObject({ name: 'availability.entry.updated' })
   })
 

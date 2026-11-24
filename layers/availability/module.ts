@@ -16,6 +16,8 @@ export default defineModule({
   // Part 6. Every number is a proposed default for the workshops.
   settings: defineSettings('availability', {
     'grid.step': setting.choice({ default: '30', options: ['15', '30', '60'], change, audience: 'signed-in' }),
+    'grid.day-starts': setting.time({ default: '09:00', min: '00:00', max: '12:00', change, audience: 'signed-in' }),
+    'grid.day-ends': setting.time({ default: '23:00', min: '15:00', max: '23:59', change, audience: 'signed-in' }),
     'entry.unmarked-default': setting.choice({ default: 'unknown', options: ['unknown', 'free'], change, audience: 'staff' }),
     'entry.horizon': setting.duration({ default: '12mo', min: '1mo', max: '24mo', units: ['month'], change, audience: 'signed-in' }),
   }),
@@ -45,6 +47,9 @@ export default defineModule({
   },
 
   contributes: {
+    'core.navigation': [
+      { id: 'availability.mine', menu: 'members', to: '/members/availability', icon: 'i-lucide-calendar-check', order: 45 },
+    ],
     'core.record-resolver': [{ id: 'availability.request', file: 'request' }],
     'core.notification-type': [{
       id: 'availability.request-opened',

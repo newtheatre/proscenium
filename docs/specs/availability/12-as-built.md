@@ -16,3 +16,13 @@ Where the build departs from, or is narrower than, parts 1 to 11. The build is t
 - **Not yet:** the S1 screen (AV-04), the `core.person-busy` contribution (AV-07, once lane A's support module is on `next`), Productions' and Rehearsals' group contributions, and retention.
 
 Tests: `layers/availability/tests/integration/gate.test.ts` (through the routes and services, with the fixture module `crews` contributing a group kind) and `layers/availability/tests/unit/levels.test.ts`.
+
+## My availability (AV-04, S1 and S3), 24 November 2026
+
+- **Screen.** `/members/availability`, in the members' menu for everyone signed in. A week from Monday on a computer, three days on a phone, moved with Earlier and Later; the first day in view is in the address (`?from=`). The grid (`AvailabilityWeekGrid`) is shared with the request and Find a time screens to come.
+- **Painting.** Choose Free, Maybe, Busy or Clear, then drag down one day with a mouse, or tap (or press Enter on) where the stretch starts and then where it ends; arrow keys move between cells. A day's heading paints the whole day. Each stroke is one `POST /api/availability/paint` for one day.
+- **Clear** takes back what was painted: it cuts the stroke out of the person's entries on that day, so the day falls back to the pattern or to unmarked time. An entry over several days keeps its other days, split into pieces that keep the entry's `created_at`, so which entry wins (A4) never changes.
+- **Pattern days.** The first stroke on a day a pattern covers asks "Just these days" or "Change the pattern", and the answer holds for the visit; a select beside the palette changes it. "Change the pattern" cuts the stroke into that weekday's lines and joins neighbours of one level; with no pattern covering the day it is refused `availability.pattern.none`. Creating and dating patterns is S2, the next slice.
+- **Read.** `GET /api/availability/me` takes dates (`from`, `to`, at most 62 days) and answers each day's pieces in minutes past midnight, worked out per A4 with the person's own reasons, so the grid needs no time-zone arithmetic. It also answers the grid settings and the requests asking the person, with "This is right" on the screen.
+- **Settings** `grid.day-starts` (09:00) and `grid.day-ends` (23:00, at most 23:59, the kit's time kind) are added; the grid opens scrolled to the first.
+- **Not yet:** commitments on the grid (after `core.person-busy`), calendar imports (S14), S2 patterns, S4 and S5 as pages of their own.
