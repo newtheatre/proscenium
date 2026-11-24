@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "7c37ba73-fba8-469f-95d6-df55dd36ec8e",
+  "id": "4e640522-7af2-46b5-ac73-16fbaf1e7d60",
   "prevIds": [
-    "48cd55e0-6327-4a8b-b986-4f4ce9e05a70"
+    "0c286fd7-0535-4d17-91fc-1fdf3c76b762"
   ],
   "ddl": [
     {
@@ -284,6 +284,22 @@
     },
     {
       "name": "budgets_categories",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_claim_events",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_claim_items",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_claims",
+      "entityType": "tables"
+    },
+    {
+      "name": "budgets_counters",
       "entityType": "tables"
     },
     {
@@ -840,6 +856,18 @@
     },
     {
       "name": "payments_webhook_events",
+      "entityType": "tables"
+    },
+    {
+      "name": "programme_planning_entries",
+      "entityType": "tables"
+    },
+    {
+      "name": "programme_planning_placements",
+      "entityType": "tables"
+    },
+    {
+      "name": "programme_planning_plans",
       "entityType": "tables"
     },
     {
@@ -8637,6 +8665,446 @@
     {
       "table": "budgets_categories",
       "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "claim_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "action",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "disbursement_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "posting_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "claim_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "spent_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "description",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "supplier",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "line_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "category_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "no_receipt_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "approved_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "part_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "sort_order",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "number",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "claimant_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "request_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "total_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "approved_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "paid_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "pay_route",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "declared_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "submitted_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "first_approved_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "expense_posting_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "version",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_counters",
+      "name": "year_starts_on",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "budgets_counters",
+      "name": "next_number",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -22385,6 +22853,456 @@
       "entityType": "columns"
     },
     {
+      "table": "programme_planning_entries",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "plan_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "source_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "category_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'candidate'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "production_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "company_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "applicant_account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "get_in_minutes",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "get_out_minutes",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "performances_wanted",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "shape",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'timed'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "rights_status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'unknown'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "collection_ids",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'[]'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "staff_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "withdrawn_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "entry_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "line_up_item_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "offered_slot_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "told_fingerprint",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "season_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'planning'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "board_from",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "board_to",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "day_starts",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'09:00'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "day_ends",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'00:00'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "call_opens_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "call_closes_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "publish_productions",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "published_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "published_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "version",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "promotions_codes",
       "name": "id",
       "type": "text",
@@ -28103,6 +29021,134 @@
       "entityType": "indexes"
     },
     {
+      "table": "budgets_claim_events",
+      "name": "budgets_claim_events_claim",
+      "columns": [
+        {
+          "value": "claim_id",
+          "isExpression": false
+        },
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "budgets_claim_items_claim",
+      "columns": [
+        {
+          "value": "claim_id",
+          "isExpression": false
+        },
+        {
+          "value": "sort_order",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "budgets_claim_items_line",
+      "columns": [
+        {
+          "value": "line_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_number",
+      "columns": [
+        {
+          "value": "number",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "number IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_posting",
+      "columns": [
+        {
+          "value": "expense_posting_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "expense_posting_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_claimant",
+      "columns": [
+        {
+          "value": "claimant_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "submitted_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_request",
+      "columns": [
+        {
+          "value": "request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "budgets_holders",
       "name": "budgets_holders_account",
       "columns": [
@@ -31541,6 +32587,80 @@
       "entityType": "indexes"
     },
     {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_plan",
+      "columns": [
+        {
+          "value": "plan_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_source_ref",
+      "columns": [
+        {
+          "value": "source_ref",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"programme_planning_entries\".\"source_ref\" IS NOT NULL AND \"programme_planning_entries\".\"state\" IN ('candidate', 'accepted')",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "programme_planning_placements_entry",
+      "columns": [
+        {
+          "value": "entry_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_season",
+      "columns": [
+        {
+          "value": "season_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "promotions_codes",
       "name": "promotions_codes_code",
       "columns": [
@@ -34143,6 +35263,81 @@
       "entityType": "fks"
     },
     {
+      "table": "budgets_claim_events",
+      "name": "fk_budgets_claim_events_claim_id_budgets_claims_id_fk",
+      "columns": [
+        "claim_id"
+      ],
+      "tableTo": "budgets_claims",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "fk_budgets_claim_items_claim_id_budgets_claims_id_fk",
+      "columns": [
+        "claim_id"
+      ],
+      "tableTo": "budgets_claims",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "fk_budgets_claim_items_line_id_budgets_lines_id_fk",
+      "columns": [
+        "line_id"
+      ],
+      "tableTo": "budgets_lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "fk_budgets_claim_items_category_id_budgets_categories_id_fk",
+      "columns": [
+        "category_id"
+      ],
+      "tableTo": "budgets_categories",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "fk_budgets_claims_request_id_budgets_spending_requests_id_fk",
+      "columns": [
+        "request_id"
+      ],
+      "tableTo": "budgets_spending_requests",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "budgets_holders",
       "name": "fk_budgets_holders_budget_id_budgets_budgets_id_fk",
       "columns": [
@@ -36114,6 +37309,96 @@
       "entityType": "fks"
     },
     {
+      "table": "programme_planning_entries",
+      "name": "fk_programme_planning_entries_plan_id_programme_planning_plans_id_fk",
+      "columns": [
+        "plan_id"
+      ],
+      "tableTo": "programme_planning_plans",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "fk_programme_planning_entries_category_term_id_core_terms_id_fk",
+      "columns": [
+        "category_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "fk_programme_planning_entries_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "fk_programme_planning_placements_performance_id_core_performances_id_fk",
+      "columns": [
+        "performance_id"
+      ],
+      "tableTo": "core_performances",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "fk_programme_planning_placements_entry_id_programme_planning_entries_id_fk",
+      "columns": [
+        "entry_id"
+      ],
+      "tableTo": "programme_planning_entries",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "fk_programme_planning_plans_season_id_core_seasons_id_fk",
+      "columns": [
+        "season_id"
+      ],
+      "tableTo": "core_seasons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "promotions_codes",
       "name": "fk_promotions_codes_promotion_id_promotions_promotions_id_fk",
       "columns": [
@@ -37244,6 +38529,16 @@
       "entityType": "pks"
     },
     {
+      "table": "programme_planning_placements",
+      "name": "programme_planning_placements_pk",
+      "columns": [
+        "performance_id",
+        "entry_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "spaces_bookable_purposes",
       "name": "spaces_bookable_purposes_pk",
       "columns": [
@@ -37903,6 +39198,42 @@
       "name": "budgets_categories_pk",
       "columns": [
         "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "budgets_claim_events_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "budgets_claim_items_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "budgets_counters",
+      "name": "budgets_counters_pk",
+      "columns": [
+        "year_starts_on"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -38891,6 +40222,24 @@
     {
       "table": "payments_webhook_events",
       "name": "payments_webhook_events_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_pk",
       "columns": [
         "id"
       ],
@@ -40065,6 +41414,96 @@
       "table": "budgets_categories",
       "name": "budgets_categories_description_length",
       "value": "length(\"description\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "budgets_claim_events_action",
+      "value": "\"action\" IN ('submitted', 'returned', 'resubmitted', 'approved', 'declined', 'withdrawn', 'voided', 'paid', 'payment-reversed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claim_events",
+      "name": "budgets_claim_events_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 500",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "budgets_claim_items_amount",
+      "value": "\"amount_minor\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "budgets_claim_items_approved",
+      "value": "\"approved_minor\" IS NULL OR \"approved_minor\" BETWEEN 0 AND \"amount_minor\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "budgets_claim_items_part",
+      "value": "\"approved_minor\" IS NULL OR \"approved_minor\" = \"amount_minor\" OR \"part_reason\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "budgets_claim_items_description",
+      "value": "length(\"description\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "budgets_claim_items_supplier",
+      "value": "\"supplier\" IS NULL OR length(\"supplier\") <= 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "budgets_claim_items_reason",
+      "value": "\"no_receipt_reason\" IS NULL OR length(\"no_receipt_reason\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claim_items",
+      "name": "budgets_claim_items_part_reason",
+      "value": "\"part_reason\" IS NULL OR length(\"part_reason\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_state",
+      "value": "\"state\" IN ('draft', 'submitted', 'returned', 'approved', 'declined', 'withdrawn', 'voided', 'paid')",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_route",
+      "value": "\"pay_route\" IN ('bank-transfer', 'parent-body', 'cash', 'cheque')",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_title",
+      "value": "length(\"title\") <= 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_total",
+      "value": "\"total_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_paid",
+      "value": "\"paid_minor\" >= 0 AND \"paid_minor\" <= coalesce(\"approved_minor\", 0)",
+      "entityType": "checks"
+    },
+    {
+      "table": "budgets_claims",
+      "name": "budgets_claims_numbered",
+      "value": "\"state\" IN ('draft', 'withdrawn') OR \"number\" IS NOT NULL",
       "entityType": "checks"
     },
     {
@@ -41535,6 +42974,114 @@
       "table": "payments_till_splits",
       "name": "payments_till_splits_one_receipt",
       "value": "\"receipt_account_id\" IS NULL OR \"receipt_to\" IS NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_source",
+      "value": "\"source\" IN ('call', 'manual', 'companies', 'import')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_kind",
+      "value": "\"kind\" IN ('own', 'visiting', 'hire', 'event')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_state",
+      "value": "\"state\" IN ('candidate', 'accepted', 'declined', 'withdrawn')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_shape",
+      "value": "\"shape\" IN ('timed', 'drop-in')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_rights",
+      "value": "\"rights_status\" IN ('none-needed', 'needed', 'held-by-company', 'unknown')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_withdrawn",
+      "value": "\"withdrawn_reason\" IS NULL OR \"withdrawn_reason\" IN ('applicant', 'staff', 'production-cancelled', 'retention')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_title",
+      "value": "length(\"title\") BETWEEN 1 AND 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_source_ref_length",
+      "value": "\"source_ref\" IS NULL OR length(\"source_ref\") <= 80",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_minutes",
+      "value": "\"minutes\" IS NULL OR \"minutes\" BETWEEN 1 AND 1440",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_get_in",
+      "value": "\"get_in_minutes\" BETWEEN 0 AND 720 AND \"get_out_minutes\" BETWEEN 0 AND 720",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_wanted",
+      "value": "\"performances_wanted\" BETWEEN 1 AND 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_note",
+      "value": "\"staff_note\" IS NULL OR length(\"staff_note\") <= 2000",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_entries",
+      "name": "programme_planning_entries_accepted",
+      "value": "(\"state\" = 'accepted') = (\"production_id\" IS NOT NULL) OR \"state\" = 'withdrawn'",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_placements",
+      "name": "programme_planning_placements_fingerprint",
+      "value": "\"told_fingerprint\" IS NULL OR length(\"told_fingerprint\") <= 64",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_state",
+      "value": "\"state\" IN ('planning', 'published', 'closed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_board",
+      "value": "\"board_to\" >= \"board_from\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_hours",
+      "value": "(\"day_starts\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"day_starts\" <= '24:00') AND (\"day_ends\" GLOB '[0-2][0-9]:[0-5][0-9]' AND \"day_ends\" <= '24:00') AND (\"day_ends\" > \"day_starts\" OR \"day_ends\" = '00:00')",
+      "entityType": "checks"
+    },
+    {
+      "table": "programme_planning_plans",
+      "name": "programme_planning_plans_call",
+      "value": "\"call_closes_at\" IS NULL OR \"call_opens_at\" IS NULL OR \"call_closes_at\" > \"call_opens_at\"",
       "entityType": "checks"
     },
     {
