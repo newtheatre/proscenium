@@ -6,7 +6,7 @@ import type { Definition } from '../../../../shared/engine'
 import { sources } from '../../../sources'
 import { actionList } from '../../../actions'
 import { getLink } from '../../../responses'
-import { accountName, getDraft, getFields, listVersions, requireForm } from '../../../forms'
+import { accountName, authorDefinition, getDraft, getFields, listVersions, mayMark, requireForm } from '../../../forms'
 
 export default defineRoute({ ability: 'forms.form.edit', record: event => ['forms.form', getRouterParam(event, 'id')], rateLimit: 'default' }, async (_event, { record, actor }) => {
   const form = await requireForm(record!.id)
@@ -29,7 +29,7 @@ export default defineRoute({ ability: 'forms.form.edit', record: event => ['form
     requireRetention: await useSetting('forms.retention.require-choice'),
     shared: (await getLink(form.id)) !== null,
     form: { id: form.id, slug: form.slug, title: form.title, mode: form.mode, status: form.status, anonymous: form.anonymous, allowEdits: form.allowEdits, retentionDays: form.retentionDays, retentionDeclinedDays: form.retentionDeclinedDays, liveVersion: live?.number ?? null, createdAt: form.createdAt, archivedAt: form.archivedAt },
-    draft: { definition, editRevision: draft.editRevision, editedBy: await accountName(draft.editedBy), updatedAt: draft.updatedAt },
+    draft: { definition: await authorDefinition(definition, actor, form.id), editRevision: draft.editRevision, editedBy: await accountName(draft.editedBy), updatedAt: draft.updatedAt },
     // What has been published of each question: its type is fixed and its data class only rises.
     fields: fields.map(f => ({ questionId: f.questionId, key: f.key, type: f.type, dataClass: f.dataClass, retired: f.retiredInVersion !== null })),
     reviewers: { roles, people },
@@ -38,6 +38,8 @@ export default defineRoute({ ability: 'forms.form.edit', record: event => ['form
     // What other modules can do when a response takes a move, for the stages editor.
     actions: await actionList(),
     canRead: (await can(actor, 'forms.response.read', ['forms.form', form.id])).allowed,
+    // Correct answers, points and the pass mark are shown and saved only for this (FB-513).
+    canMark: await mayMark(actor, form.id),
     canSaveTemplate: (await can(actor, 'forms.template.manage')).allowed,
     versions: versions.map(v => ({ id: v.id, number: v.number, publishedAt: v.publishedAt, publishedBy: v.publishedBy, summary: JSON.parse(v.changeSummary) })),
   }
