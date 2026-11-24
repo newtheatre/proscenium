@@ -28,6 +28,7 @@ export type { PublicProduction, PublicPerformance, PublicListing, PublicProducti
 export type { PublicImage } from './programme/media'
 export type { ChangeImpact, ProposedChange } from './points/change-impact'
 export type { SpaceBusy, SpaceBusyItem, SpaceBusyQuery } from './points/space-busy'
+export type { PersonBusy, PersonBusyItem, PersonBusyQuery } from './points/person-busy'
 export type { AccountNotice, AccountNoticeSource } from './points/account-notice'
 export { findOrCreateAccount } from './identity/guests'
 export { canSendClaimLink, claimLink, isUnclaimed, sendClaimLink } from './identity/claim'
@@ -65,3 +66,5 @@ export type { Performance, PerformanceState, PerformanceQuery } from './programm
 export { relyingParty } from './identity/web'
 export { currentVersion as currentPolicyVersion } from './policies/versions'
 export type { PolicyVersion } from './policies/versions'
+export { readMeasure, listMeasures, mayReadMeasure } from './measures/service'
+export type { MeasureAnswer, MeasureListing } from './measures/service'
