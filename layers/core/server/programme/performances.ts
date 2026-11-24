@@ -16,6 +16,8 @@ import type { SpaceBusy } from '../points/space-busy'
 import { latecomerRule, type LatecomerRule } from '../../shared/latecomers'
 
 export type PerformanceState = 'draft' | 'scheduled' | 'cancelled' | 'completed'
+/** Timed, or drop-in: open from its start until its end, with no doors or intervals (C-62). */
+export type PerformanceShape = 'timed' | 'drop-in'
 
 export interface AccessFeature { termId: string, detail: string | null }
 
@@ -38,11 +40,14 @@ export interface Performance {
   cancelReasonTermId: string | null
   cancelNote: string | null
   completedAt: number | null
+  shape: PerformanceShape
   /** Whether the theatre runs the performance's space (R-36). Core treats both alike. */
   spaceManaged: boolean
 }
 
 export interface PerformanceInput {
+  /** Chosen when made, and changed only while a draft (DI1). Timed when not given. */
+  shape?: PerformanceShape
   venueId: string
   spaceId: string
   startsAt: number
@@ -78,6 +83,7 @@ interface PerformanceRow {
   cancel_reason_term_id: string | null
   cancel_note: string | null
   completed_at: number | null
+  shape: PerformanceShape
   space_managed: number
 }
 
@@ -89,6 +95,7 @@ const toPerformance = (r: PerformanceRow): Performance => ({
   id: r.id, productionId: r.production_id, venueId: r.venue_id, spaceId: r.space_id, startsAt: r.starts_at, doorsAt: r.doors_at, endsAt: r.ends_at,
   operatingDay: r.operating_day, intervalCount: r.interval_count, intervalMinutes: r.interval_minutes, capacity: r.capacity, label: r.label, externalBookingUrl: r.external_booking_url,
   state: r.state, cancelledAt: r.cancelled_at, cancelReasonTermId: r.cancel_reason_term_id, cancelNote: r.cancel_note, completedAt: r.completed_at,
+  shape: r.shape,
 })
 
 const record = (id: string): ['core.performance', string] => ['core.performance', id]
@@ -342,6 +349,12 @@ function checkTimes(startsAt: number, endsAt: number, doorsAt: number | null) {
   if (doorsAt !== null && doorsAt > startsAt) refuse('core.performance.doors', 'Doors must open at or before the start.', { status: 422, fields: { doorsAt: 'Doors must open at or before the start.' } })
 }
 
+/** DI2: a drop-in opens and closes within one operating day; the caller has already cleared its doors and intervals. */
+async function checkDropIn(startsAt: number, endsAt: number): Promise<void> {
+  if (await operatingDayOf(startsAt) !== await operatingDayOf(endsAt - 1))
+    refuse('core.performance.drop-in-one-day', 'A drop-in opens and closes on the same day.', { status: 422, fields: { endsAt: 'Close it the same day, or make one drop-in for each day.' } })
+}
+
 const MINUTE = 60_000 // not-policy: milliseconds in a minute
 
 /**
@@ -354,13 +367,15 @@ export async function createPerformance(unit: UnitView, productionId: string, in
   if (!production && !made) refuse('core.production.not-found', 'There is no such production.', { status: 404 })
   if (production?.state === 'cancelled') refuse('core.production.cancelled', 'A cancelled production cannot have new performances.', { status: 409 })
   const defaults = await performanceDefaults(productionId, input.spaceId, made)
+  const shape = input.shape ?? 'timed'
   const endsAt = input.endsAt ?? input.startsAt + (input.runningMinutes ?? defaults.runningMinutes) * MINUTE
-  const doorsAt = input.doorsAt === undefined ? input.startsAt - (input.doorsBeforeMinutes ?? defaults.doorsBeforeMinutes) * MINUTE : input.doorsAt
+  const doorsAt = shape === 'drop-in' ? null : input.doorsAt === undefined ? input.startsAt - (input.doorsBeforeMinutes ?? defaults.doorsBeforeMinutes) * MINUTE : input.doorsAt
   checkTimes(input.startsAt, endsAt, doorsAt)
+  if (shape === 'drop-in') await checkDropIn(input.startsAt, endsAt)
   const id = newId('perf')
-  unit.add(sql`INSERT INTO core_performances (id, production_id, venue_id, space_id, starts_at, doors_at, ends_at, operating_day, interval_count, interval_minutes, capacity, label, external_booking_url, state, created_at)
+  unit.add(sql`INSERT INTO core_performances (id, production_id, venue_id, space_id, starts_at, doors_at, ends_at, operating_day, interval_count, interval_minutes, capacity, label, external_booking_url, state, shape, created_at)
     SELECT ${id}, ${productionId}, ${input.venueId}, ${input.spaceId}, ${input.startsAt}, ${doorsAt}, ${endsAt}, ${await operatingDayOf(input.startsAt)},
-      ${input.intervalCount ?? null}, ${input.intervalMinutes ?? null}, ${input.capacity ?? null}, ${input.label ?? null}, ${input.externalBookingUrl ?? null}, 'draft', ${nowMs()}
+      ${shape === 'drop-in' ? 0 : input.intervalCount ?? null}, ${shape === 'drop-in' ? null : input.intervalMinutes ?? null}, ${input.capacity ?? null}, ${input.label ?? null}, ${input.externalBookingUrl ?? null}, 'draft', ${shape}, ${nowMs()}
     WHERE ${spaceFits(input.venueId, input.spaceId)} AND EXISTS (SELECT 1 FROM core_productions WHERE id = ${productionId} AND state <> 'cancelled')`).expect(1, production ? SPACE_UNSUITABLE : NOT_PLACED)
   unit.audit({ action: 'create', record: record(id), detail: { productionId, by: actorId } })
   return id
@@ -476,6 +491,9 @@ export async function updatePerformance(unit: UnitView, id: string, patch: Perfo
   const row = await performanceRow(id)
   if (row.state === 'completed') refuse('core.performance.completed', 'A completed performance cannot be changed.', { status: 409 })
   if (row.state === 'cancelled') refuse('core.performance.cancelled', 'A cancelled performance cannot be changed.', { status: 409, remedy: 'Reinstate it first.' })
+  if (patch.shape !== undefined && patch.shape !== row.shape && row.state !== 'draft')
+    refuse('core.performance.shape-fixed', 'Only a draft performance can change between timed and drop-in.', { status: 409, fields: { shape: 'Make a new performance instead.' } })
+  const shape = patch.shape ?? row.shape
   const startsAt = patch.startsAt ?? row.starts_at
   const next = {
     venueId: patch.venueId ?? row.venue_id,
@@ -492,7 +510,9 @@ export async function updatePerformance(unit: UnitView, id: string, patch: Perfo
   }
   // Moving the start moves doors with it, unless the patch says where doors are.
   if (patch.startsAt !== undefined && patch.doorsAt === undefined && patch.doorsBeforeMinutes == null && row.doors_at !== null) next.doorsAt = row.doors_at + (next.startsAt - row.starts_at)
+  if (shape === 'drop-in') Object.assign(next, { doorsAt: null, intervalCount: 0, intervalMinutes: null })
   checkTimes(next.startsAt, next.endsAt, next.doorsAt)
+  if (shape === 'drop-in') await checkDropIn(next.startsAt, next.endsAt)
   const retimed = next.startsAt !== row.starts_at || next.endsAt !== row.ends_at
   const moved = next.spaceId !== row.space_id || next.venueId !== row.venue_id
   const recapacitied = next.capacity !== row.capacity
@@ -514,11 +534,11 @@ export async function updatePerformance(unit: UnitView, id: string, patch: Perfo
   const day = retimed ? await operatingDayOf(next.startsAt) : row.operating_day
   unit.add(sql`UPDATE core_performances SET venue_id = ${next.venueId}, space_id = ${next.spaceId}, starts_at = ${next.startsAt}, ends_at = ${next.endsAt},
       doors_at = ${next.doorsAt}, operating_day = ${day}, interval_count = ${next.intervalCount}, interval_minutes = ${next.intervalMinutes}, capacity = ${next.capacity}, label = ${next.label},
-      external_booking_url = ${next.externalBookingUrl}
+      external_booking_url = ${next.externalBookingUrl}, shape = ${shape}
     WHERE id = ${id} AND state = ${row.state} AND starts_at = ${row.starts_at} AND space_id = ${row.space_id}${guards.length ? sql` AND ${sql.join(guards, sql` AND `)}` : sql``}`)
     .expect(1, moved && !scheduled ? SPACE_UNSUITABLE : CHANGED)
   if (scheduled && retimed) syncProductionDates(unit, row.production_id)
-  unit.audit({ action: 'update', record: record(id), detail: { retimed, moved, capacity: recapacitied } })
+  unit.audit({ action: 'update', record: record(id), detail: { retimed, moved, capacity: recapacitied, ...(shape !== row.shape ? { shape } : {}) } })
   const target = { record: record(id) }
   if (scheduled && retimed)
     unit.announce('core.performance.rescheduled', { performanceId: id, productionId: row.production_id, oldStartsAt: row.starts_at, oldEndsAt: row.ends_at, startsAt: next.startsAt, endsAt: next.endsAt }, target)

@@ -661,6 +661,9 @@ export const performances = defineTable('core_performances', {
   completedAt: col.internal(integer('completed_at')),
   // The long run that made it, so a chunk repeated makes nothing twice and an unfinished run can be removed.
   runId: col.internal(text('run_id').references(() => performanceRuns.id, { onDelete: 'set null' })),
+  // Timed, or drop-in: open from starts_at until ends_at, no doors or intervals (C-62, DI1 to DI6).
+  // Bounded by the route's input and the service, not a CHECK, so adding it rebuilds nothing.
+  shape: col.public(text('shape').notNull().default('timed')),
   createdAt: col.createdAt(),
 }, {
   id: 'perf',

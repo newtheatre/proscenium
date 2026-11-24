@@ -10,6 +10,7 @@ import type { HeldRefusal } from './ChangeHeld.vue'
 type State = 'draft' | 'scheduled' | 'cancelled' | 'completed'
 interface Performance {
   id: string
+  shape: 'timed' | 'drop-in'
   venueId: string
   spaceId: string
   startsAt: number
@@ -87,7 +88,7 @@ const place = (p: Performance) => spaces.value.find(s => s.value === p.spaceId)?
 /** Whether every performance is in the one space, which is then said once above the list. */
 const oneSpace = computed(() => new Set(performances.value.map(p => p.spaceId)).size === 1)
 /** Where (unless there is only one space), doors, end and seats, on one line. */
-const summaryOf = (p: Performance) => [...(oneSpace.value ? [] : [place(p)]), ...(p.doorsAt ? [`doors ${dates.time(p.doorsAt)}`] : []), `ends ${dates.time(p.endsAt)}`, ...(p.capacity !== null ? [`${p.capacity} seats`] : [])].join(' · ')
+const summaryOf = (p: Performance) => [...(oneSpace.value ? [] : [place(p)]), ...(p.shape === 'drop-in' ? ['drop-in'] : []), ...(p.doorsAt ? [`doors ${dates.time(p.doorsAt)}`] : []), p.shape === 'drop-in' ? `open until ${dates.time(p.endsAt)}` : `ends ${dates.time(p.endsAt)}`, ...(p.capacity !== null ? [`${p.capacity} seats`] : [])].join(' · ')
 const accessLabel = (id: string) => data.value?.options.access.find(a => a.id === id)?.label ?? 'Access'
 const thing = (p: Performance) => `the ${dates.time(p.startsAt)} performance of ${props.title} on ${dates.dayNamed(p.startsAt)}`
 const upperFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
@@ -141,7 +142,14 @@ function reach(id: string, kind: Kind): Promise<Reach> {
 const editing = ref<Performance | null>(null)
 const MINUTE = 60_000 // not-policy: milliseconds in a minute
 const open = ref(false)
-const form = ref({ spaceId: '', startsAt: null as number | null })
+const form = ref({ shape: 'timed' as Performance['shape'], spaceId: '', startsAt: null as number | null, endsAt: null as number | null })
+const dropIn = computed(() => form.value.shape === 'drop-in')
+// Timed or drop-in is chosen when a performance is made, and changed only while it is a draft (DI1).
+const shapeChangeable = computed(() => !editing.value || editing.value.state === 'draft')
+const SHAPES = [
+  { value: 'timed', label: 'Timed', description: 'Starts at a set time, with doors and any intervals.' },
+  { value: 'drop-in', label: 'Drop-in', description: 'Open for a stretch of one day, such as an exhibition: people come any time.' },
+]
 const overrides = ref<ShowOverrides>(noOverrides())
 const shown = computed(() => form.value.spaceId && data.value ? defaultsIn(form.value.spaceId) : null)
 /** Whether a whole-day closure that blocks performances covers this day for the chosen space. The
@@ -158,6 +166,8 @@ function checkPerformance() {
   return [
     ...(form.value.spaceId ? [] : [needed('spaceId')]),
     ...(form.value.startsAt ? [] : [needed('startsAt')]),
+    ...(dropIn.value && !form.value.endsAt ? [needed('endsAt')] : []),
+    ...(dropIn.value && form.value.endsAt && form.value.startsAt && form.value.endsAt <= form.value.startsAt ? [{ name: 'endsAt', message: 'Close it after it opens.' }] : []),
     ...overrideErrors(overrides.value, shown.value, !!data.value?.defaults.sellsHere),
     ...(editHeld.value?.question && !editAnswer.value ? [needed('changeAnswer')] : []),
   ]
@@ -167,7 +177,7 @@ function start(p: Performance | null) {
   editHeld.value = null
   editAnswer.value = undefined
   editing.value = p
-  form.value = { spaceId: p?.spaceId ?? usualSpace() ?? spaces.value[0]?.value ?? '', startsAt: p?.startsAt ?? null }
+  form.value = { shape: p?.shape ?? 'timed', spaceId: p?.spaceId ?? usualSpace() ?? spaces.value[0]?.value ?? '', startsAt: p?.startsAt ?? null, endsAt: p?.shape === 'drop-in' ? p.endsAt : null }
   overrides.value = noOverrides()
   if (p) {
     // A performance shows as changed only where it differs from the show's defaults.
@@ -205,6 +215,11 @@ async function save() {
     runningMinutes: o.runningMinutes ?? (editing.value ? d.runningMinutes : null),
     doorsBeforeMinutes: o.doorsBeforeMinutes ?? (editing.value ? d.doorsBeforeMinutes : null),
   }
+  if (shapeChangeable.value) body.shape = form.value.shape
+  // A drop-in's hours are its own: open from and open until, with no doors or intervals.
+  if (dropIn.value) {
+    Object.assign(body, { endsAt: form.value.endsAt, runningMinutes: null, doorsBeforeMinutes: null, intervalCount: null, intervalMinutes: null })
+  }
   const p = editing.value
   if (!p) {
     if (await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/performances` as string, { method: 'POST', body }), 'Performance added', performanceForm.value)) open.value = false
@@ -212,7 +227,7 @@ async function save() {
   }
   if (p.state === 'scheduled') {
     const kinds: Kind[] = []
-    const endsAt = form.value.startsAt! + (body.runningMinutes as number) * MINUTE
+    const endsAt = dropIn.value ? form.value.endsAt! : form.value.startsAt! + (body.runningMinutes as number) * MINUTE
     if (form.value.startsAt !== p.startsAt || endsAt !== p.endsAt) kinds.push('reschedule')
     if (form.value.spaceId !== p.spaceId) kinds.push('move')
     if (o.capacity !== p.capacity) kinds.push('capacity')
@@ -792,7 +807,18 @@ function actions(p: Performance) {
             />
           </UFormField>
           <UFormField
-            label="Starts"
+            v-if="shapeChangeable"
+            label="Kind"
+            name="shape"
+          >
+            <URadioGroup
+              v-model="form.shape"
+              :items="SHAPES"
+              orientation="horizontal"
+            />
+          </UFormField>
+          <UFormField
+            :label="dropIn ? 'Open from' : 'Starts'"
             name="startsAt"
             required
           >
@@ -801,11 +827,24 @@ function actions(p: Performance) {
               :unavailable="closed"
             />
           </UFormField>
+          <UFormField
+            v-if="dropIn"
+            label="Open until"
+            name="endsAt"
+            help="The same day. For an exhibition over several days, add one drop-in for each day."
+            required
+          >
+            <FieldDateTime
+              v-model="form.endsAt"
+              :unavailable="closed"
+            />
+          </UFormField>
           <ShowDefaults
             v-if="shown && open"
             v-model="overrides"
             :defaults="shown"
             :sells-here="data!.defaults.sellsHere"
+            :drop-in="dropIn"
           />
         </UForm>
       </template>
