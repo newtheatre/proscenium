@@ -6,7 +6,7 @@ import { confirmAuthenticator } from '../../../../identity/authenticator'
 import { credentialNotice } from '../../../../identity/notices'
 import { deviceLabel } from '../../../../identity/web'
 
-export default defineRoute({
+export default defineRoute({ practice: 'refuse',
   ability: 'signed-in',
   rateLimit: 'sign-in',
   input: z.object({ code: z.string().trim().regex(/^\d{6}$/) }).strict(), // not-policy: an app shows six digits

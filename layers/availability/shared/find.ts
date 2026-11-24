@@ -12,6 +12,12 @@ export type Week = Record<string, Piece[]>
 export interface Span { start: number, end: number }
 export interface Slot { date: string, start: number, end: number, free: number, maybe: number, unknown: number, busy: number }
 
+/** F6: the latest finish in minutes (null while unset), who is under 18 on each date, and one-to-one. */
+export interface Under18 { lateFinish: number | null, late: Record<string, string[]>, oneToOne: boolean }
+
+/** F6: the under-18s a slot keeps past the latest finish. */
+export const lateFor = (u: Under18, slot: { date: string, end: number }): string[] => u.lateFinish !== null && slot.end > u.lateFinish ? u.late[slot.date] ?? [] : []
+
 const WORST: ShownLevel[] = ['free', 'unknown', 'maybe', 'busy']
 
 /** The person's worst level over [start, end): busy over maybe over unknown over free. */

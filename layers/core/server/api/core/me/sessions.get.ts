@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { all, defineRoute, nowMs } from '#kit'
 import { sessionOf } from '../../../identity/guards'
 
-export default defineRoute({ ability: 'signed-in', rateLimit: 'default', input: z.object({}) }, async (event) => {
+export default defineRoute({ practice: 'refuse', ability: 'signed-in', rateLimit: 'default', input: z.object({}) }, async (event) => {
   const session = await sessionOf(event)
   const rows = await all<{ id: string, device: string, created_at: number, last_seen_at: number, assurance: string }>(
     'SELECT id, device, created_at, last_seen_at, assurance FROM core_sessions WHERE account_id = ? AND ended_at IS NULL AND expires_at > ? ORDER BY last_seen_at DESC', // exact-account: identity's own table, keyed by the living account

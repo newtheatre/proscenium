@@ -7,6 +7,7 @@
 import { useContext, useEnv } from './context'
 import { nowMs } from './clock'
 import { log } from './log'
+import { practiceName } from './practice/gate'
 
 export interface RealtimeTicket {
   room: string
@@ -72,7 +73,7 @@ export async function publish(room: string, channel: string, data: unknown = nul
   const namespace = useEnv().REALTIME
   if (!namespace) return
   try {
-    await (namespace.get(namespace.idFromName(room)) as unknown as Hub).publish(JSON.stringify({ channel, data }))
+    await (namespace.get(namespace.idFromName(practiceName(room))) as unknown as Hub).publish(JSON.stringify({ channel, data }))
   }
   catch (error) {
     log.warn('core.realtime.publish-failed', { channel, error: String((error as Error)?.message ?? error) })
@@ -81,7 +82,7 @@ export async function publish(room: string, channel: string, data: unknown = nul
 
 /** A ticket to the signed-in account's own room. */
 export async function ownTicket(accountId: string, sessionId: string | null, at: number): Promise<string> {
-  return signTicket(sessionKey(), { room: accountRoom(accountId), accountId, sessionId, expires: at + TICKET_LIFE })
+  return signTicket(sessionKey(), { room: practiceName(accountRoom(accountId)), accountId, sessionId, expires: at + TICKET_LIFE })
 }
 
 function sessionKey(): string {
@@ -110,12 +111,12 @@ export async function grantTicket(value: string, accountId: string, sessionId: s
   try { grant = JSON.parse(new TextDecoder().decode(unb64(body))) as RealtimeGrant }
   catch { return null }
   if (grant.accountId !== accountId || !(grant.expires > at)) return null
-  return signTicket(sessionKey(), { room: grant.room, accountId, sessionId, expires: Math.min(at + TICKET_LIFE, grant.expires) })
+  return signTicket(sessionKey(), { room: practiceName(grant.room), accountId, sessionId, expires: Math.min(at + TICKET_LIFE, grant.expires) })
 }
 
 const hub = (name: string) => {
   const namespace = useEnv().REALTIME
-  return namespace ? namespace.get(namespace.idFromName(name)) as unknown as Hub : null
+  return namespace ? namespace.get(namespace.idFromName(practiceName(name))) as unknown as Hub : null
 }
 
 /**

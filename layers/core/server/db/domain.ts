@@ -80,6 +80,7 @@ export const vocabularies = defineTable('core_vocabularies', {
   // A grouped vocabulary keeps its terms under headings, and every live term needs one.
   grouped: col.internal(integer('grouped', { mode: 'boolean' }).notNull().default(false)),
 }, {
+  practice: 'copy',
   realm: 'operational',
   subject: 'none',
   extra: t => [
@@ -98,6 +99,7 @@ export const termGroups = defineTable('core_term_groups', {
   slug: col.internal(text('slug')),
   sort: col.internal(integer('sort').notNull().default(0)),
 }, {
+  practice: 'copy',
   id: 'tgr',
   realm: 'operational',
   subject: 'none',
@@ -129,6 +131,7 @@ export const terms = defineTable('core_terms', {
   groupId: col.internal(text('group_id').references(() => termGroups.id, { onDelete: 'restrict' })),
   createdAt: col.createdAt(),
 }, {
+  practice: 'copy',
   id: 'trm',
   realm: 'operational',
   subject: 'none',
@@ -501,6 +504,7 @@ export const venues = defineTable('core_venues', {
   state: col.internal(text('state').notNull().default('active')),
   createdAt: col.createdAt(),
 }, {
+  practice: 'copy',
   id: 'ven',
   realm: 'operational',
   subject: 'none',
@@ -544,6 +548,7 @@ export const spaces = defineTable('core_spaces', {
   sort: col.internal(integer('sort').notNull().default(0)),
   createdAt: col.createdAt(),
 }, {
+  practice: 'copy',
   id: 'spc',
   realm: 'operational',
   subject: 'none',
@@ -568,6 +573,7 @@ export const placeAccess = defineTable('core_place_access', {
   note: col.public(text('note')),
   sort: col.internal(integer('sort').notNull().default(0)),
 }, {
+  practice: 'copy',
   id: 'pla',
   realm: 'operational',
   subject: 'none',
