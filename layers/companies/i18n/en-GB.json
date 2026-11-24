@@ -39,5 +39,7 @@
   "companies.facts.contact-of.label": "Is a contact of the company",
   "companies.navigation.groups.companies.label": "Companies",
   "companies.abilities.settlement.view.label": "See settlements and their figures",
-  "companies.abilities.settlement.approve.label": "Approve a settlement someone else prepared"
+  "companies.abilities.settlement.approve.label": "Approve a settlement someone else prepared",
+  "companies.abilities.allocation.manage.label": "Change guest places and name guests for a company",
+  "companies.abilities.guest.name.label": "Name and withdraw their company's guests"
 }

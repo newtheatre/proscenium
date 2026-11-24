@@ -105,36 +105,46 @@ export async function approveComps(unit: UnitView, requestId: string): Promise<C
 
 /** Approves a request still asked for, in the unit, and issues its tickets. */
 async function issueComps(unit: UnitView, request: Pick<CompRow, 'id' | 'performance_id' | 'band_id' | 'quantity' | 'for_account_id' | 'order_id'>, decidedBy: string | null): Promise<Confirmed> {
-  const actor = useContext().actor
   const requestId = request.id
+  if (request.order_id) return convertReservation(unit, { ...request, order_id: request.order_id }, await compType(), decidedBy)
+  const at = nowMs()
+  await approveWithinCap(unit, request, decidedBy, at)
+  const confirmed = await issueCompOrder(unit, { performanceId: request.performance_id, bandId: request.band_id, quantity: request.quantity, accountId: request.for_account_id, compRequestId: requestId })
+  unit.add(sql`UPDATE box_office_comp_requests SET state = 'issued', order_id = ${confirmed.orderId}, updated_at = ${at} WHERE id = ${requestId} AND state = 'approved'`).expect(1, CHANGED)
+  unit.announce('box-office.comp-request.decided', { requestId, state: 'issued' }, { record: ['box-office.comp-request', requestId] })
+  return confirmed
+}
+
+export interface CompOrder { performanceId: string, bandId: string, quantity: number, accountId: string, compRequestId?: string | null }
+
+/**
+ * A confirmed order of zero-price tickets on the complimentary type, claimed from one band's pool in
+ * the unit, so a sold-out band refuses the whole batch. Comp requests and Companies' guests (BO-75) use it.
+ */
+export async function issueCompOrder(unit: UnitView, request: CompOrder): Promise<Confirmed> {
+  const actor = useContext().actor
   const type = await compType()
-  if (request.order_id) return convertReservation(unit, { ...request, order_id: request.order_id }, type, decidedBy)
-  const pool = (await poolsOf(request.performance_id)).find(p => p.bandId === request.band_id)
+  const pool = (await poolsOf(request.performanceId)).find(p => p.bandId === request.bandId)
   if (!pool) refuse('box-office.comp.bad-band', 'That band is no longer on sale for this performance.', { status: 409 })
   const at = nowMs()
   // Nothing is charged: the currency is the performance's, for the order's money columns.
-  const currency = (await pricesFor(request.performance_id, at))[0]?.currency ?? 'GBP'
-  await approveWithinCap(unit, request, decidedBy, at)
-
+  const currency = (await pricesFor(request.performanceId, at))[0]?.currency ?? 'GBP'
   const orderId = newId('ord')
   const holdId = newId('hold')
   const order: OrderRow = {
-    id: orderId, reference: newReference(), state: 'basket', account_id: request.for_account_id, currency, total_minor: 0, expires_at: at + HOLD,
+    id: orderId, reference: newReference(), state: 'basket', account_id: request.accountId, currency, total_minor: 0, expires_at: at + HOLD,
     release_at: null, intent_id: null, confirm_email: null, confirm_name: null, booked_with: null, admit_on_payment: 0, sold_by: actor.accountId ?? null,
   }
   unit.add(sql`INSERT INTO box_office_orders (id, reference, channel, state, account_id, signed_in, currency, total_minor, sold_by, expires_at, keep, created_at, updated_at)
-    VALUES (${orderId}, ${order.reference}, 'desk', 'basket', ${request.for_account_id}, 0, ${currency}, 0, ${order.sold_by}, ${order.expires_at}, 0, ${at}, ${at})`)
+    VALUES (${orderId}, ${order.reference}, 'desk', 'basket', ${request.accountId}, 0, ${currency}, 0, ${order.sold_by}, ${order.expires_at}, 0, ${at}, ${at})`)
   unit.add(sql`INSERT INTO box_office_holds (id, kind, order_id, held_by, created_at, updated_at) VALUES (${holdId}, 'basket', ${orderId}, ${actor.accountId ?? null}, ${at}, ${at})`)
   const claimed = (await claimSeats(unit, { holdId, requests: [{ poolId: pool.id, quantity: request.quantity }], expiresAt: order.expires_at })).flat()
   const lineIds = unit.insertSet(orderLines, claimed.map(claimId => ({
-    orderId, kind: 'ticket', performanceId: request.performance_id, bandId: request.band_id, ticketTypeId: type.id, claimId, listMinor: 0, discountMinor: 0, amountMinor: 0, compRequestId: requestId, state: 'live',
+    orderId, kind: 'ticket', performanceId: request.performanceId, bandId: request.bandId, ticketTypeId: type.id, claimId, listMinor: 0, discountMinor: 0, amountMinor: 0, compRequestId: request.compRequestId ?? null, state: 'live',
   })))
   unit.expect(claimed.length)
-  const lines: LineRow[] = lineIds.map(id => ({ id, performance_id: request.performance_id, band_id: request.band_id, ticket_type_id: type.id, amount_minor: 0, type_name: type.name, type_kind: 'complimentary', band_name: null }))
-  const confirmed = await confirmOrder(unit, order, lines, { from: 'basket', account: { id: request.for_account_id, signedIn: false } })
-  unit.add(sql`UPDATE box_office_comp_requests SET state = 'issued', order_id = ${orderId}, updated_at = ${at} WHERE id = ${requestId} AND state = 'approved'`).expect(1, CHANGED)
-  unit.announce('box-office.comp-request.decided', { requestId, state: 'issued' }, { record: ['box-office.comp-request', requestId] })
-  return confirmed
+  const lines: LineRow[] = lineIds.map(id => ({ id, performance_id: request.performanceId, band_id: request.bandId, ticket_type_id: type.id, amount_minor: 0, type_name: type.name, type_kind: 'complimentary', band_name: null }))
+  return confirmOrder(unit, order, lines, { from: 'basket', account: { id: request.accountId, signedIn: false } })
 }
 
 /** Declines a request (by an approver) or withdraws it (by the requester). */
