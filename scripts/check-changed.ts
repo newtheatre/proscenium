@@ -1,6 +1,7 @@
 // bun run check:changed [base]: the quick loop for one change. Lints the files changed against
 // origin/next (or base), runs the unit tests related to them, then the conformance checks.
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { $ } from 'bun'
 
 const base = process.argv[2] ?? 'origin/next'
@@ -20,7 +21,8 @@ if (code.length) {
 }
 else console.log('No changed code files')
 
-failed ||= (await $`bun scripts/check.ts`.nothrow()).exitCode !== 0
+// Built from this file's folder: a literal path reads to knip as an unresolved import.
+failed ||= (await $`bun ${join(import.meta.dir, 'check.ts')}`.nothrow()).exitCode !== 0
 if (failed) {
   console.log('\ncheck:changed found problems; fix them before pushing. Run `bun run check` for the whole repo.')
   process.exit(1)
