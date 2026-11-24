@@ -3,7 +3,7 @@
 // and their training at a glance. Only ever the caller's rows.
 import { all, first, nowMs, refuse, useSetting } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
-import { waysToLearn, type StepKind, type Way } from '../shared/states'
+import { waysToLearn, type PlaceState, type StepKind, type Way } from '../shared/states'
 import { getCourse, stepsOf, type Course, type Step } from './courses'
 import { lessonFor } from './lessons'
 import { progressOn, recordsOf, type RecordView } from './progress'
@@ -35,8 +35,10 @@ async function mine(course: Course, accountId: string, records: RecordView[]): P
   const progress = course.liveVersionId ? await progressOn(course, accountId) : null
   const done = progress?.steps.filter(s => s.met).length ?? 0
   const held = record?.standing === 'current' || record?.standing === 'expiring'
+  // Begun means any sign-off counted, even part of a step done several times, or a place held.
+  const begun = (progress?.steps.some(s => s.done > 0) ?? false) || (await placesOfPerson(accountId)).some(p => p.session.courseId === course.id)
   return {
-    status: statusOf(record, held ? 0 : done),
+    status: statusOf(record, held || !begun ? 0 : 1),
     record: record ? { id: record.id, awardedAt: record.awardedAt, expiresAt: record.expiresAt, standing: record.standing, cutReason: record.cutReason } : null,
     done,
     of: progress?.steps.length ?? 0,
@@ -60,7 +62,7 @@ export async function catalogue(accountId: string | undefined): Promise<Catalogu
 
 /** What the person does next on a step, by its kind (amended part 5, M3). */
 export type StepAction
-  = | { kind: 'session' }
+  = | { kind: 'session', place: { sessionId: string, startsAt: number, state: PlaceState } | null }
     | { kind: 'trainer' }
     | { kind: 'reading', materialUrl: string | null, materialFileId: string | null }
     | { kind: 'lesson', reached: number, sections: number }
@@ -83,7 +85,10 @@ export interface MyStep {
 async function actionFor(actor: Actor, course: Course, step: Step): Promise<StepAction> {
   const accountId = actor.accountId
   switch (step.kind) {
-    case 'session': return { kind: 'session' }
+    case 'session': {
+      const place = accountId ? (await placesOfPerson(accountId)).find(p => p.session.courseId === course.id) : undefined
+      return { kind: 'session', place: place ? { sessionId: place.sessionId, startsAt: place.session.startsAt, state: place.state } : null }
+    }
     case 'practical': return { kind: 'trainer' }
     case 'reading': return { kind: 'reading', materialUrl: step.materialUrl, materialFileId: step.materialFileId }
     case 'lesson': {
@@ -192,7 +197,7 @@ export async function myTraining(accountId: string): Promise<MyTraining> {
     if (!course?.liveVersionId) continue
     const progress = await progressOn(course, accountId)
     const done = progress.steps.filter(s => s.met).length
-    if (done && !progress.complete) inProgress.push({ courseId, slug: course.slug, title: course.title, done, of: progress.steps.length })
+    if (progress.steps.some(s => s.done > 0) && !progress.complete) inProgress.push({ courseId, slug: course.slug, title: course.title, done, of: progress.steps.length })
   }
   const notApproved = await all<MyTraining['notApproved'][number]>(
     `SELECT e.id AS evidenceId, e.course_id AS courseId, c.slug, c.title, e.reject_reason AS reason FROM training_evidence e JOIN training_courses c ON c.id = e.course_id

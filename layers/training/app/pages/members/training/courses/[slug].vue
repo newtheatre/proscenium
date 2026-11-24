@@ -44,6 +44,7 @@ const primary = computed(() => {
   const c = data.value
   const s = next.value
   if (!c || !s) return null
+  if (s.action.kind === 'session' && s.action.place) return { label: t('training.steps.view-place'), to: `/members/training/sessions/${encodeURIComponent(s.action.place.sessionId)}` }
   if (s.action.kind === 'session' && c.sessions.length) return { label: t('training.steps.sign-up'), to: `/members/training/sessions/${encodeURIComponent((c.sessions.find(x => x.placesLeft) ?? c.sessions[0]!).id)}` }
   if ((s.action.kind === 'certificate' || s.action.kind === 'declaration') && !s.action.waiting && !(s.action.kind === 'declaration' && s.action.hasQuestions)) {
     const step: EvidenceStep = { id: s.id, title: s.title, action: s.action }

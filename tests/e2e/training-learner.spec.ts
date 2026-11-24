@@ -6,7 +6,7 @@ import AxeBuilder from '@axe-core/playwright'
 const grant = (ability: string) => ({ ability, via: 'test' })
 const stamp = Date.now()
 const manager = { kind: 'person', accountId: 'acc_trainingscreens_manager', name: 'Tara Trainer', assurance: 'strong', reassertedAt: stamp, grants: ['core.settings.manage', 'core.modules.manage', 'training.course.manage', 'training.course.view', 'training.session.manage'].map(grant) }
-const learner = { kind: 'person', accountId: `acc_trainingscreens_${stamp}`, name: 'Lee Learner', assurance: 'strong', reassertedAt: stamp, grants: ['training.course.view', 'training.place.book'].map(grant) }
+const learner = { kind: 'person', accountId: `acc_trainingscreens_${stamp}`, name: 'Lee Learner', assurance: 'strong', reassertedAt: stamp, facts: ['core.member'], grants: ['training.course.view', 'training.place.book'].map(grant) }
 const as = (actor: object) => ({ 'x-test-actor': JSON.stringify(actor) })
 const title = `Till ${stamp}`
 

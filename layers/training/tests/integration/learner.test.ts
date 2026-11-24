@@ -55,7 +55,7 @@ describe('a course as a learner sees it (M3)', () => {
     expect(seen.status, JSON.stringify(seen.body)).toBe(200)
     expect(seen.body.steps.map((s: any) => s.action.kind)).toEqual(['session', 'trainer', 'reading'])
     expect(seen.body.steps[2].action.materialUrl).toBe('https://example.org/till')
-    expect(seen.body.steps[0].action).toEqual({ kind: 'session' })
+    expect(seen.body.steps[0].action).toEqual({ kind: 'session', place: null })
     expect(seen.body.steps.every((s: any) => !s.met && s.needed === 1)).toBe(true)
     // Only the published session, with its places left.
     expect(seen.body.sessions).toHaveLength(1)
@@ -64,6 +64,24 @@ describe('a course as a learner sees it (M3)', () => {
     expect(seen.body.changes[0].changeNote).toBe('Clearer wording')
     expect(seen.body.mine.status).toBe('not-started')
     expect(stepIds).toHaveLength(3)
+  })
+
+  it('counts a place held or part of a repeated step as begun, and points the session step at the place', async () => {
+    const manager = await someone(MANAGER)
+    const { courseId, stepIds } = await liveCourse(manager, [{ kind: 'session', title: 'Come along' }, { kind: 'practical', title: 'Cash up', timesRequired: 2 }])
+    const made = await req(manager, 'POST', `/api/training/courses/${courseId}/sessions`, { startsAt: NOV_24 + 3 * DAY, endsAt: NOV_24 + 3 * DAY + 2 * HOUR, capacity: 4 })
+    await req(manager, 'POST', `/api/training/sessions/${made.body.sessionId}/publish`, {})
+    const slug = await slugOf(manager, courseId)
+
+    const booked = await learner()
+    expect((await req(booked, 'POST', `/api/training/sessions/${made.body.sessionId}/places`, {})).status).toBe(200)
+    const seen = (await req(booked, 'GET', `/api/training/me/courses/${slug}`)).body
+    expect(seen.steps[0].action).toEqual({ kind: 'session', place: { sessionId: made.body.sessionId, startsAt: NOV_24 + 3 * DAY, state: 'booked' } })
+    expect(seen.mine).toMatchObject({ status: 'in-progress', done: 0 })
+
+    const partway = await learner()
+    await req(manager, 'POST', `/api/training/courses/${courseId}/sign-offs`, { accountId: partway.accountId, stepId: stepIds[1], occurredOn: '2026-11-24' })
+    expect((await req(partway, 'GET', `/api/training/me/courses/${slug}`)).body.mine).toMatchObject({ status: 'in-progress', done: 0 })
   })
 
   it('refuses a course that does not exist or is not published', async () => {

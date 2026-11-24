@@ -160,6 +160,8 @@
   "training.steps.not-approved": "Not approved: {reason}",
   "training.steps.waiting": "Waiting for approval",
   "training.steps.sign-up": "Sign up for a session",
+  "training.steps.place": "{state}: {when}",
+  "training.steps.view-place": "See your session",
   "training.steps.open-reading": "Open",
   "training.steps.confirm-reading": "I have read it",
   "training.steps.read-done": "Reading confirmed",

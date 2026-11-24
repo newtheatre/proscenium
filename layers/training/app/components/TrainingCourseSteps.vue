@@ -36,7 +36,7 @@ function progress(step: MyStep): string | undefined {
   if (step.needed > 1 && !step.met) return t('training.steps.times', { done: step.done, needed: step.needed })
   if (step.met) return undefined
   switch (a.kind) {
-    case 'session': return props.sessions ? undefined : t('training.steps.no-sessions')
+    case 'session': return a.place ? t('training.steps.place', { state: t(`training.place-states.${a.place.state}`), when: dateTime(a.place.startsAt) }) : props.sessions ? undefined : t('training.steps.no-sessions')
     case 'trainer': return t('training.steps.trainer')
     case 'lesson': return a.reached ? t('training.steps.sections', { reached: a.reached, sections: a.sections }) : t('training.steps.lesson')
     case 'quiz': return a.nextTryAt ? t('training.steps.try-from', { when: dateTime(a.nextTryAt) }) : a.tries ? t('training.steps.tries', { used: a.used, tries: a.tries }) : t('training.steps.quiz')
@@ -65,6 +65,14 @@ const evidence = (step: MyStep) => step.action.kind === 'certificate' || step.ac
           tone="success"
           :label="t('training.steps.done')"
         />
+        <template v-else-if="s.action.kind === 'session' && s.action.place">
+          <UButton
+            color="neutral"
+            variant="outline"
+            :label="t('training.steps.view-place')"
+            :to="`/members/training/sessions/${encodeURIComponent(s.action.place.sessionId)}`"
+          />
+        </template>
         <template v-else-if="s.action.kind === 'session' && sessions">
           <UButton
             color="neutral"
