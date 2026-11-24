@@ -33,7 +33,19 @@ A setting may name a screen of its own only once that screen shows and saves it,
 | `core.sign-in.google` | boolean | false |  | public | No | Whether Google sign-in is offered |
 | `core.sign-in.google-domains` | list of text | empty |  | staff | No | Google organisation domains accepted. Empty accepts any Google account. |
 | `core.sign-in.managed-domains` | list of text | empty |  | public | No | Email domains whose addresses sign in only through the provider, never by emailed link |
-| `core.sign-in.provider-is-strong` | boolean | false |  | staff | No | Treat a managed-domain provider sign-in as strong assurance. For a theatre whose provider enforces two-step sign-in. |
+| `core.sign-in.provider-is-strong` | boolean | false |  | staff | No | Treat a managed-domain provider sign-in as strong assurance. For a theatre whose provider enforces two-step sign-in. Google only. |
+| `core.sign-in.microsoft` | boolean | false |  | public | No | Whether Microsoft sign-in is offered (ID-47) |
+| `core.sign-in.microsoft-client-id` | text | unset | at most 200 | staff | No | The app registration's client id; its secret is the credential `CORE_MICROSOFT_CLIENT_SECRET` |
+| `core.sign-in.microsoft-tenants` | list of text | empty | tenant ids (GUIDs) | staff | No | Tenants whose accounts may sign in. Empty accepts any work or school account. |
+| `core.sign-in.microsoft-personal` | boolean | false |  | staff | No | Also accept personal Microsoft accounts |
+| `core.sign-in.microsoft-domains` | list of text | empty | domains | staff | No | Domains whose addresses a Microsoft sign-in may link to by address (MS3) |
+| `core.sign-in.microsoft-managed-domains` | list of text | empty | domains | public | No | Addresses here sign in only with Microsoft (MS4) |
+| `core.sign-in.oidc` | boolean | false |  | public | No | Whether a general OpenID Connect provider is offered |
+| `core.sign-in.oidc-label` | text | unset | 1 to 40 | public | No | Its button: "Sign in with {label}" |
+| `core.sign-in.oidc-discovery` | text | unset | `https://`, at most 300 | staff | No | The issuer's discovery address; its secret is `CORE_OIDC_CLIENT_SECRET` |
+| `core.sign-in.oidc-client-id` | text | unset | at most 200 | staff | No |  |
+| `core.sign-in.oidc-domains` | list of text | empty | domains | staff | No | As for Microsoft |
+| `core.sign-in.oidc-managed-domains` | list of text | empty | domains | public | No | As for Microsoft |
 | `core.sign-in.invite-lifetime` | duration | 7d | 1d to 30d | staff | No | How long an invitation link works |
 | `core.sign-in.unverified-address-lifetime` | duration | 7d | 1d to 30d | staff | No | How long an added address may stay unverified before it is removed |
 
@@ -89,7 +101,10 @@ A setting may name a screen of its own only once that screen shows and saves it,
 | --- | --- |
 | A way in always exists | Passkey is fixed on; turning off the email link is refused while any claimed account has no passkey and no provider link |
 | Idle within lifetime | `sessions.idle-limit` is no longer than `sessions.lifetime` |
-| Managed domains need a provider | `sign-in.managed-domains` is empty unless `sign-in.google` is on |
+| Managed domains need a provider | Each managed-domains list (Google's `sign-in.managed-domains`, `microsoft-managed-domains`, `oidc-managed-domains`) is empty unless its provider is on |
+| One provider per managed domain | A domain is in at most one managed-domains list (MS4) |
+| Managed domains are vouched for | Microsoft's and the general provider's managed domains are each in that provider's link domains, since their people are never sent a code |
+| Providers need their set-up | Microsoft on needs its client id and secret; the general provider on needs its label, discovery address, client id and secret. The discovery address starts `https://`; tenants are GUIDs. |
 | Strong provider needs a managed domain | `sign-in.provider-is-strong` is false unless `sign-in.managed-domains` is set |
 | No expiry needs permission | A role's expiry rule cannot be "none" while `grants.allow-no-expiry` is false, except Owner |
 
@@ -240,6 +255,7 @@ These prevail over the tables above where they differ.
 | --- | --- |
 | Freshness window | How long a fresh proof of identity covers further sensitive actions is the kit's setting `core.access.fresh-within` (10 minutes by default, 1 minute to 1 hour). Identity declares no setting of its own for it. |
 | Google client id | A new setting, `core.sign-in.google-client-id` (text, unset, staff audience). `core.sign-in.google` cannot be turned on while it or the client secret is unset. The client ID, secret and accepted organisations are set together in Google's set-up on Admin > Sign-in (`PUT /api/core/sign-in-providers/google`), and switching it on is the last step there. |
+| Microsoft and other providers (ID-47) | Each provider is an entry in `layers/core/server/identity/providers.ts` with hooks for its endpoints, issuer, identity key, organisation check and whether its email claim proves the address. Microsoft's identity is keyed `<tid>:<oid>` and its issuer must be `https://login.microsoftonline.com/<tid>/v2.0`; the authority is the one listed tenant, `organizations`, or `common` when personal accounts are allowed. The general provider's endpoints come from its discovery document, fetched and checked when saved (`PUT /api/core/sign-in-providers/oidc`, refusing `core.sign-in.oidc-discovery-*`) and on each sign-in; its identity is keyed `<issuer>\|<sub>`. When the provider has not proven the address (Microsoft: `xms_edov` true and a listed domain; general: `email_verified` and a listed domain) and the identity is not yet linked, the callback seals the pending identity in the cookie `__Host-proscenium-provider-link` for the link lifetime and sends the browser to `/sign-in?error=core.sign-in.provider-prove-address`. The sign-in page reads `GET /api/core/sign-in/proving` and emails that address a code; using it links the identity, and later sign-ins need no code. An address another provider manages is refused (`core.sign-in.provider-managed-elsewhere`). `signIn.managed` on `/api/core/me` is a list of `{ domains, provider }`. |
 | Year-end expiry | The year-end rule reads `core.organisation.year-end`, which core domain declares: text in the form `MM-DD`, month then day (for example `07-31`), never 29 February, and unset until setup. A grant that expires at the year end ends at the close of the next occurrence of that day in the theatre's time zone (`core.locale.time-zone`). While the setting is unset, "year end" cannot be chosen as an expiry and a grant asks for an explicit end date instead. |
 | Reads of an account | `core.account.read` needs a strong session but no fresh check (`fresh: false`). Foundations has ruled this for every privileged ability that only reads: strong, audited as a read, never asked again. The build follows it. |
 | Module-scoped grants | A grant is one row naming a role and a scope. A module scope limits the role to that module's abilities when the resolver reads it; the abilities are never copied into the grant, so a later change to the role takes effect at once. |
