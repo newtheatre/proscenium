@@ -1,0 +1,2091 @@
+{
+  "layers/awards/app/pages/console/awards/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/awards/server/api/awards/awards/[id]/link.post.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/awards/server/api/awards/types/[id]/awards.post.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/awards/server/contributions/core.requirement/awards.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/awards/server/importing.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/bar/app/components/BarAddProduct.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/bar/app/components/BarChoices.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/bar/app/pages/admin/modules/bar/products/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
+  "layers/bar/app/pages/admin/modules/bar/stock.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/bar/app/pages/bar/allergens.vue": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/bar/app/pages/console/bar/age-checks.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/bar/app/pages/console/bar/stock/deliveries/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/bar/app/pages/console/bar/stock/index.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/bar/app/pages/console/bar/stock/stocktakes/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/bar/app/till-panels/BarTillLivePanel.vue": {
+    "vue/no-unused-properties": {
+      "count": 1
+    }
+  },
+  "layers/bar/app/till-panels/BarTillPanel.vue": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    },
+    "vue/no-unused-properties": {
+      "count": 2
+    }
+  },
+  "layers/bar/server/age-checks.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/bar/server/allergens.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/bar/server/catalogue.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/bar/server/choices.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/bar/server/contributions/promotions.target/item.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/bar/server/db/schema.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "layers/bar/server/pricing.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/bar/server/selling.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/bar/server/stock.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-depth": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/app/components/BoxOfficeCheckout.vue": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/box-office/app/components/BoxOfficeChooseTickets.vue": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
+  "layers/box-office/app/components/BoxOfficePassHolders.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/box-office/app/composables/useOfflineDoor.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/app/pages/admin/modules/box-office/ticket-types.vue": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "layers/box-office/app/pages/console/box-office/comps.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/box-office/app/pages/console/box-office/orders/[id]/index.vue": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/app/pages/console/box-office/passes.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/box-office/app/pages/console/box-office/performances/[id]/index.vue": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/box-office/app/pages/live/door/[performance]/index.vue": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
+  "layers/box-office/app/record-tabs/BoxOfficeProductionTickets.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/box-office/app/till-panels/BoxOfficeTillPanel.vue": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
+  "layers/box-office/app/utils/passSwaps.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/module.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/api/box-office/orders/[id]/index.get.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/api/box-office/performances/[id]/door.get.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/api/box-office/performances/[id]/layout.get.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/baskets.ts": {
+    "max-params": {
+      "count": 4
+    }
+  },
+  "layers/box-office/server/book.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/cancel.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/capacity.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/change.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/box-office/server/checkout.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/confirm.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/contributions/core.booking-action/box-office.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/contributions/promotions.target/ticket.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/copy.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/db/schema.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/desk.ts": {
+    "complexity": {
+      "count": 4
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/box-office/server/door.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/entitlement.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/box-office/server/exchange.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/importing.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/layouts.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/links.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/pass-covers.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-params": {
+      "count": 5
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/box-office/server/pass-entries.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 5
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/pass-holding.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/pass-sales.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/passes.ts": {
+    "complexity": {
+      "count": 3
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/prices.ts": {
+    "max-params": {
+      "count": 3
+    }
+  },
+  "layers/box-office/server/promotions.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/refunds.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/reservations.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/run-setup.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/setup.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/box-office/server/ticket-types.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/core/app/components/PageForm.vue": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/core/app/components/PageFrame.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/core/app/components/PageList.vue": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
+  "layers/core/app/components/PageSteps.vue": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "layers/core/app/components/ProductionGuidance.vue": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/core/app/components/ProductionMedia.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/core/app/components/ProductionPerformances.vue": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
+  "layers/core/app/components/SettingsSections.vue": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
+  "layers/core/app/components/SignInProviders.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/core/app/components/TableOrList.vue": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/app/components/VocabularyTerms.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/core/app/composables/useAccessApplicationForm.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "layers/core/app/composables/useRealtime.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/app/home-cards/CoreEmailUnverifiedCard.vue": {
+    "vue/no-unused-properties": {
+      "count": 1
+    }
+  },
+  "layers/core/app/middleware/access.global.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/app/pages/admin/modules/core/venues/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/core/app/pages/admin/webhooks/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/core/app/pages/console/people/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
+  "layers/core/app/pages/console/programme/productions/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/core/app/plugins/api.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/kit/abilities.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/kit/access.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/kit/db.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/kit/email-events.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/kit/external.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/core/kit/jobs.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/kit/lists.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/core/kit/manifest.ts": {
+    "complexity": {
+      "count": 3
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/core/kit/modules-store.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/kit/registry.ts": {
+    "complexity": {
+      "count": 3
+    },
+    "max-depth": {
+      "count": 4
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/core/kit/requirements.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-depth": {
+      "count": 5
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/kit/route.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/kit/settings-store.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/kit/settings.ts": {
+    "complexity": {
+      "count": 3
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/core/kit/unit.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/module/domain.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "layers/core/module/identity.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/branding/index.put.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "layers/core/server/api/core/files/[id].get.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/files/[id].patch.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/files/index.post.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/me.patch.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/me/passkeys.post.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/me/reassert.post.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/modules/index.get.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/notifications/set-up-domain.post.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/owner-recovery.post.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/settings/history.get.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/settings/index-search.get.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/settings/index.get.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/setup/passkey.post.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/api/core/sign-in/passkey.post.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/brand/theme.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/core/server/content-store.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/contributions/core.requirement/access-scheme.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/db/domain.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "layers/core/server/files/inspect.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-depth": {
+      "count": 4
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/core/server/files/service.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/access-scheme.ts": {
+    "complexity": {
+      "count": 3
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 4
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 3
+    }
+  },
+  "layers/core/server/identity/data-requests.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/defaults.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/erasure.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/grant-warnings.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/grants.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/holders.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/merge-move.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/merge-undo.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/merge.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/my-addresses.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/oidc.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/roles.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/sessions.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/identity/web.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/interface/access.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/notifications/deliver.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/notifications/mailer.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    }
+  },
+  "layers/core/server/notifications/notify.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/notifications/outcomes.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/notifications/preferences.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/core/server/notifications/render.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/notifications/send.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/policies/readiness.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/programme/credits.ts": {
+    "max-params": {
+      "count": 2
+    }
+  },
+  "layers/core/server/programme/performances.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/programme/runs.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 3
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/programme/service.ts": {
+    "complexity": {
+      "count": 3
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/core/server/realtime-hub.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/routes/files/[id].get.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/routes/robots.txt.get.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/core/server/settings/history.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/vocabularies/service.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/server/webhooks/deliver.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/shared/colour.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/core/shared/controls.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/shared/list.ts": {
+    "complexity": {
+      "count": 5
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 3
+    }
+  },
+  "layers/core/shared/markdown.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/shared/navigation.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/shared/next.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/core/shared/policies.ts": {
+    "complexity": {
+      "count": 3
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 3
+    }
+  },
+  "layers/core/shared/validation.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/finance/server/ledger.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/forms/app/components/FormsBuilder.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/forms/app/components/FormsBuilderCanvas.vue": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/forms/app/components/FormsBuilderDetails.vue": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/forms/app/components/FormsConditionEditor.vue": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/app/components/FormsFill.vue": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/forms/app/components/FormsFillQuestion.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/forms/app/components/FormsStagesDialog.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/forms/app/composables/useFormBuilder.ts": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "layers/forms/app/pages/console/forms/[id]/responses.vue": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
+  "layers/forms/app/utils/forms-words.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/server/actions.ts": {
+    "max-params": {
+      "count": 2
+    }
+  },
+  "layers/forms/server/api/forms/forms/[id]/responses/[response].get.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/server/api/forms/forms/[id]/responses/export.get.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/server/api/forms/open/[slug]/files/index.post.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/server/api/forms/sources/[source].get.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/server/forms.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/server/hosting.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/server/responses.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/forms/server/review.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/server/slots.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/server/sources.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/server/stages.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/shared/builder/edit.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/forms/shared/builder/formula.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/shared/engine/calculations.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/shared/engine/checks.ts": {
+    "complexity": {
+      "count": 6
+    },
+    "max-depth": {
+      "count": 3
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 6
+    }
+  },
+  "layers/forms/shared/engine/conditions.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/forms/shared/engine/evaluate.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/forms/shared/engine/marking.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/forms/shared/engine/reach.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/forms/shared/engine/validation.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/forms/shared/templates.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/app/home-cards/FrontOfHouseShiftsCard.vue": {
+    "vue/no-unused-properties": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/app/pages/admin/modules/front-of-house/checklists.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/app/pages/console/front-of-house/incidents/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/app/pages/console/front-of-house/night-reports/[id].vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/app/pages/console/front-of-house/rota/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/app/pages/live/front-of-house/[performance]/checklists/[id].vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/app/pages/live/front-of-house/[performance]/index.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/app/pages/live/front-of-house/incident.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/app/pages/members/front-of-house/shifts/[id].vue": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/module.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/server/checklists.ts": {
+    "max-params": {
+      "count": 2
+    }
+  },
+  "layers/front-of-house/server/contributions/core.requirement/front-of-house.ts": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/server/db/schema.ts": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/server/incidents.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/front-of-house/server/rota.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/membership-fees/app/till-panels/MembershipFeesTillPanel.vue": {
+    "vue/no-unused-properties": {
+      "count": 2
+    }
+  },
+  "layers/membership/app/components/MembershipAddMemberModal.vue": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/membership/app/home-cards/MembershipCardHomeCard.vue": {
+    "vue/no-unused-properties": {
+      "count": 1
+    }
+  },
+  "layers/membership/app/pages/account/membership/index.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/membership/app/pages/admin/modules/membership/lists/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/membership/app/pages/admin/modules/membership/schemes/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/membership/app/pages/console/membership/memberships/[id].vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/membership/app/utils/membership-poster.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/membership/server/api/membership/applications/[id]/decide.post.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/membership/server/api/membership/mine/[id]/renew.post.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/membership/server/api/membership/schemes/[id].patch.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/membership/server/api/membership/schemes/[id]/members.post.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/membership/server/contributions/core.requirement/membership.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-depth": {
+      "count": 7
+    },
+    "max-lines-per-function": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/membership/server/importing.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/membership/server/join.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/membership/server/members.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/membership/server/memberships.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/membership/server/verify.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "layers/occupancy/server/services.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/payments/app/components/PaymentsTill.vue": {
+    "complexity": {
+      "count": 3
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 3
+    },
+    "vue/max-lines-per-block": {
+      "count": 2
+    }
+  },
+  "layers/payments/app/pages/admin/modules/payments/providers.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/payments/server/answers.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/payments/server/api/payments/webhooks/[account].post.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/payments/server/attest.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/payments/server/calls/sumup/client.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/payments/server/disbursements.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/payments/server/handoff.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/payments/server/refunds.ts": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "layers/payments/server/splits.ts": {
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/payments/server/start.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/payments/server/till.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 1
+    }
+  },
+  "layers/promotions/app/pages/console/promotions/[id].vue": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/promotions/server/engine.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/promotions/server/promotions.ts": {
+    "complexity": {
+      "count": 4
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 3
+    }
+  },
+  "layers/public-site/app/components/PublicSiteDateButtons.vue": {
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/public-site/app/components/PublicSiteProduction.vue": {
+    "max-lines": {
+      "count": 1
+    },
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/public-site/app/pages/whats-on/index.vue": {
+    "vue/max-lines-per-block": {
+      "count": 1
+    }
+  },
+  "layers/public-site/server/readiness/content.ts": {
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "layers/public-site/server/routes/sitemap.xml.get.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "layers/spaces/server/bookings.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "complexity": {
+      "count": 1
+    },
+    "max-params": {
+      "count": 2
+    }
+  },
+  "scripts/checks/interface.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "scripts/checks/migrations.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    },
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "scripts/checks/policies.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    },
+    "complexity": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "scripts/checks/routes.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "complexity": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "scripts/checks/site.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    },
+    "complexity": {
+      "count": 1
+    }
+  },
+  "scripts/checks/source.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 25
+    },
+    "complexity": {
+      "count": 3
+    },
+    "max-depth": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 5
+    }
+  },
+  "scripts/db-generate.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    },
+    "max-depth": {
+      "count": 1
+    }
+  },
+  "scripts/lib/lists.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "scripts/lib/load.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 11
+    },
+    "max-depth": {
+      "count": 1
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "scripts/lib/policies.ts": {
+    "complexity": {
+      "count": 2
+    },
+    "sonarjs/cognitive-complexity": {
+      "count": 2
+    }
+  },
+  "scripts/lib/write.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "scripts/search-indexes.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  }
+}
