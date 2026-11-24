@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "a942159f-f53f-4fb6-83b6-98e44700da87",
+  "id": "0bea7d3a-9c58-4555-a9df-98d246d7203c",
   "prevIds": [
-    "eb2ad6ae-3717-4658-938f-60b510862240"
+    "7cf5fe44-b9dc-49fd-8826-1d97028a6e3d"
   ],
   "ddl": [
     {
@@ -616,10 +616,6 @@
     },
     {
       "name": "front_of_house_emergency_cards",
-      "entityType": "tables"
-    },
-    {
-      "name": "front_of_house_handouts",
       "entityType": "tables"
     },
     {
@@ -2517,6 +2513,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_products",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -6877,6 +6883,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "'all'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "tax_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -16191,96 +16207,6 @@
       "entityType": "columns"
     },
     {
-      "table": "front_of_house_handouts",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "crew_call_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "account_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "item",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "day",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "size",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "reverses_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "handed_by",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
       "table": "front_of_house_incident_actions",
       "name": "id",
       "type": "text",
@@ -25301,46 +25227,6 @@
       "entityType": "indexes"
     },
     {
-      "table": "front_of_house_handouts",
-      "name": "front_of_house_handouts_call",
-      "columns": [
-        {
-          "value": "crew_call_id",
-          "isExpression": false
-        },
-        {
-          "value": "account_id",
-          "isExpression": false
-        },
-        {
-          "value": "item",
-          "isExpression": false
-        },
-        {
-          "value": "day",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "front_of_house_handouts_reverses",
-      "columns": [
-        {
-          "value": "reverses_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "reverses_id IS NOT NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
       "table": "front_of_house_incident_actions",
       "name": "front_of_house_incident_actions_incident",
       "columns": [
@@ -29338,36 +29224,6 @@
       "entityType": "fks"
     },
     {
-      "table": "front_of_house_handouts",
-      "name": "fk_front_of_house_handouts_crew_call_id_front_of_house_crew_calls_id_fk",
-      "columns": [
-        "crew_call_id"
-      ],
-      "tableTo": "front_of_house_crew_calls",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "fk_front_of_house_handouts_reverses_id_front_of_house_handouts_id_fk",
-      "columns": [
-        "reverses_id"
-      ],
-      "tableTo": "front_of_house_handouts",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
       "table": "front_of_house_incident_actions",
       "name": "fk_front_of_house_incident_actions_incident_id_front_of_house_incidents_id_fk",
       "columns": [
@@ -31584,15 +31440,6 @@
       "entityType": "pks"
     },
     {
-      "table": "front_of_house_handouts",
-      "name": "front_of_house_handouts_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "front_of_house_incident_actions",
       "name": "front_of_house_incident_actions_pk",
       "columns": [
@@ -33465,24 +33312,6 @@
       "table": "front_of_house_emergency_cards",
       "name": "front_of_house_emergency_cards_body",
       "value": "length(\"body\") BETWEEN 1 AND 8000",
-      "entityType": "checks"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "front_of_house_handouts_item",
-      "value": "\"item\" IN ('tshirt', 'meal')",
-      "entityType": "checks"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "front_of_house_handouts_day",
-      "value": "(\"item\" = 'meal') = (\"day\" IS NOT NULL)",
-      "entityType": "checks"
-    },
-    {
-      "table": "front_of_house_handouts",
-      "name": "front_of_house_handouts_size",
-      "value": "\"size\" IS NULL OR length(\"size\") <= 20",
       "entityType": "checks"
     },
     {
