@@ -1,6 +1,6 @@
 // A module's own breakdown keys, such as Box office's ticket types (B6, REP-43): the module labels
 // the key and lists its values through reports.key, so a page can name a row and offer a filter.
-import { usePoint } from '#kit'
+import { refuse, usePoint } from '#kit'
 import { MODULE_KEY, isPageBreakdown } from '../shared/reports'
 
 export interface ReportKey {
@@ -31,7 +31,18 @@ export async function nameable(key: string): Promise<boolean> {
   return isPageBreakdown(key) || (MODULE_KEY.test(key) && (await keysOf()).has(key))
 }
 
+const PERSONAL = /^acc_|@/ // not-policy: an account id or an email address
+
+/** Refuses a key that lists people: figures per person go only through core.person-measure (R3-27). */
+export function checkedValues(key: string, values: { value: string, label: string }[]): { value: string, label: string }[] {
+  if (values.some(v => PERSONAL.test(v.value) || PERSONAL.test(v.label))) {
+    return refuse('reports.key.lists-people', `The breakdown ${key} lists people, which only figures per person may do.`, { status: 500 })
+  }
+  return values
+}
+
 /** A module key's values with their names; empty for a key nobody labels. */
 export async function keyValues(key: string): Promise<{ value: string, label: string }[]> {
-  return await (await keysOf()).get(key)?.values() ?? []
+  const found = (await keysOf()).get(key)
+  return found ? checkedValues(key, await found.values()) : []
 }

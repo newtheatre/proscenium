@@ -163,7 +163,11 @@ offers Undo. A figure a saved report names that is no longer offered keeps its p
 hold) and is counted under the table. A pivot whose copy would be wider than
 `reports.builder.max-columns` is refused with `reports.run.too-wide`. Module keys (Box office's
 ticket type and where it was sold) are named and listed through a new point, `reports.key`, which a
-module contributes to for each key it breaks down or filters by. Deviations: the filter on a shared
+module contributes to for each key it breaks down or filters by. It only names a key and lists its
+values: which keys a figure honours is still declared once, on the figure's own `by` and `filters` in
+`core.measure`, which core enforces. A key whose values are account ids or email addresses is refused
+with `reports.key.lists-people`, because figures per person go only through `core.person-measure`
+(R3-27). Deviations: the filter on a shared
 record key (venue, production) takes one record; archiving says nothing of schedules or pins, which
 do not exist yet; the builder has no live preview, as the saved report opens straight after saving.
 See `layers/reports/tests/integration/builder.test.ts` and `layers/reports/tests/unit/formula.test.ts`.
