@@ -26,6 +26,8 @@ export interface ModuleEntry {
   root: string
   owner: Owner
   handlers: ModuleHandlers
+  /** The module's en-GB catalogue, for words the server builds from another module's keys. */
+  words?: Record<string, string>
 }
 
 export interface Registry {

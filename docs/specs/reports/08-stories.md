@@ -122,3 +122,25 @@ breakdown and again as a total, in parallel, and writes nothing. Box office cont
 attendance (scope production, breakdown performance, seven figures, a bar chart). The page offers the
 breakdowns its figures share among performance, production, season, venue, day and month; module keys
 such as channel wait for the builder. See `layers/reports/tests/integration/ready-made.test.ts`.
+
+REP-09 to REP-11 are built in Reports. "Keep a copy" and "Download CSV" on a report page post to
+`POST /api/reports/runs`, which works out the question (figures the reader may see, breakdown,
+scope and dates) and stores it on a `reports_runs` row with the job `reports.run-report` on the bulk
+lane. The job claims the run with `WHERE state = 'queued'` and `expect(1)` (R3), reads every figure
+as the person who asked, lays the table out with the same function the page uses
+(`layers/reports/shared/table.ts`, B7) and stores the CSV and the page's JSON with `storeFile` in
+the slots `reports.run-csv` and `reports.run-data`, expiring after `reports.runs.keep-for`; past
+`reports.runs.row-limit` rows it fails with `reports.run.too-large`. The CSV starts with the
+report's name, the question in words and a "Not available" row for each figure that could not
+answer, then the table and a totals row; money is in major units with a column per currency. Saved
+copies (`/console/reports/runs`) lists the copies a person may open today, and a copy's page shows
+its figures as they stood and checks again every few seconds while it is being made. Opening a copy
+or its files needs `reports.run.view` on it (its requester holds that as owner) and, today, every
+figure's own ability on its scope (R6); downloading needs `reports.run.export` and is audited as
+`export`. The daily task `reports.expire-runs` marks copies past `reports.runs.keep-for` expired
+in one statement and clears their file ids; core's files sweep removes the files themselves. The
+server words a copy through the kit's new `siteWords()`, which reads every module's catalogue.
+Deviations: a run keeps no `job_id`, and its file columns are plain ids rather than references,
+because the files sweep deletes expired files. `reports_definitions` is created now for the
+builder. See `layers/reports/tests/integration/copies.test.ts`.
+
